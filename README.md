@@ -384,6 +384,8 @@ in `"prigh:accounts"`. `/model openai-codex/gpt-6-sol@work` pins a login
 for the session. When a usage limit stops a run, prigh carries on with the
 provider's next login that allows fallback (OAuth ones by default, API
 keys only if you turn it on) before handing over to `fallback_models`.
+A composer session on Codex, Claude Code or an ACP agent runs on that
+CLI's own login: it has no prigh login to pin.
 
 With `prigh serve -tokens`, a user can share one of their built-in
 providers' logins with other users: `/accounts share LOGIN [with USER]`
