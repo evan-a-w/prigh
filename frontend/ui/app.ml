@@ -1264,10 +1264,15 @@ let restore_command m command =
 
 (* ---- provider logins -------------------------------------------------- *)
 
-let logins_picker ?(query = "") m ~title rows =
+let logins_picker ?(query = "") ?section m ~title rows =
   let items =
     List.map rows ~f:(fun (r : Provider_logins.Row.t) ->
-      Picker.Item.create ~id:r.id ~detail:r.detail ~marked:r.marked r.label)
+      Picker.Item.create
+        ?section
+        ~id:r.id
+        ~detail:r.detail
+        ~marked:r.marked
+        r.label)
   in
   open_picker m Commands (Picker.create ~query ~title items)
 ;;
@@ -1305,6 +1310,7 @@ let share_picker m ~ref_ users =
   | Ok l, users ->
     logins_picker
       m
+      ?section:(Provider_logins.share_note l)
       ~title:(Provider_logins.share_title l)
       (Provider_logins.share_rows_for l users)
 ;;
@@ -6282,7 +6288,8 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
     , [ call
           (Set_adapter_login
              { adapter
-             ; login = (if String.equal item.id "own" then None else Some item.id)
+             ; login =
+                 (if String.equal item.id "own" then None else Some item.id)
              })
           ~tag:(Adapter_login_set adapter)
       ] )
@@ -7785,21 +7792,24 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Adapters_shown ->
        decode json ~f:P.Adapter_status.list_of_json (fun statuses ->
          decode json ~f:P.Adapter_login.list_of_json (fun logins ->
-         ( output
-             { m with notice = None }
-             ~title:"Agent CLIs"
-             (Content.lines
-                (String.concat
-                   ~sep:"\n"
-                   (Adapters_command.lines statuses logins)))
-         , [] )))
+           ( output
+               { m with notice = None }
+               ~title:"Agent CLIs"
+               (Content.lines
+                  (String.concat
+                     ~sep:"\n"
+                     (Adapters_command.lines statuses logins)))
+           , [] )))
      | Adapter_login_picker adapter ->
        decode json ~f:P.Adapter_login.list_of_json (fun logins ->
          match Adapters_command.find_login logins ~adapter with
          | Error e -> error { m with notice = None } (Error.to_string_hum e), []
          | Ok l ->
            let current ref_ =
-             Option.equal String.equal (Option.map l.login ~f:(fun c -> c.ref_)) ref_
+             Option.equal
+               String.equal
+               (Option.map l.login ~f:(fun c -> c.ref_))
+               ref_
            in
            let items =
              Picker.Item.create
@@ -7818,8 +7828,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                { m with notice = None }
                (Adapter_login l.adapter)
                (Picker.create
-                  ~title:
-                    (P.Session_engine.adapter_label l.adapter ^ " runs on")
+                  ~title:(P.Session_engine.adapter_label l.adapter ^ " runs on")
                   items)
            , [] ))
      | Adapter_login_set adapter ->

@@ -808,6 +808,15 @@ let shareable auth account =
 
 let share_title (l : Login.t) = sprintf "Share %s with" (title l)
 
+let share_note (l : Login.t) =
+  match l.provider.provider with
+  | "openai-codex" ->
+    Some
+      "Their Codex sessions can run on it too: their tool host gets \
+       short-lived access tokens"
+  | _ -> None
+;;
+
 let share_rows_for (l : Login.t) users =
   let r = l.account.ref_ in
   List.map users ~f:(fun user ->

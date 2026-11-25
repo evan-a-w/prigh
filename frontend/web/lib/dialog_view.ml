@@ -33,6 +33,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Attach -> "Attach"
   | Compaction_models | Generate_models | Approval_models | Naming_models ->
     "Models"
+  | Adapter_logins _ -> "Logins"
   | Defaults (Model | Fallback) -> "Models"
   | Defaults Thinking -> "Levels"
   | Defaults Mode -> "Modes"

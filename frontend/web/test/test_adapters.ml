@@ -238,3 +238,69 @@ let%expect_test "an error, and no host" =
     The agent CLIs run on a tool host: connect one (the TUI, prigh tool-host or the desktop app).
     |}]
 ;;
+
+let logins ~login =
+  sprintf
+    {|"adapter_logins":[{"adapter":"codex","provider":"openai-codex","login":%s,"label":%s,"choices":[{"ref":"work","label":"Work"},{"ref":"~alice/main","label":"Alice's ChatGPT"}]}]|}
+    (if login then {|"work"|} else "null")
+    (if login then {|"Work"|} else "null")
+;;
+
+let%expect_test "Engines: Codex's login, own or one of prigh's ChatGPT logins" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (hello ~features:[ "engines" ]));
+  H.quiet h (fun () -> H.act h (Settings_section Engines));
+  H.reply
+    h
+    "list_adapters"
+    (sprintf
+       {|{"adapters":[%s],%s}|}
+       (status "codex" "Codex" ~installed:"true" ~version:"0.166.0")
+       (logins ~login:false));
+  H.text h ~selector:".adapter-login";
+  H.click h ~selector:".adapter-login-choice";
+  H.text h ~selector:".picker-dialog";
+  H.click h ~nth:1 ~selector:".picker-item";
+  H.reply h "set_adapter_login" (sprintf "{%s}" (logins ~login:true));
+  H.text h ~selector:".adapter-login";
+  [%expect
+    {|
+    Codex login
+    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login.
+    (Codex's own)
+    (Run "/adapters login codex")
+    (Focus picker-input)
+    Codex runs on
+    (Close (Esc))
+    []
+    Codex's own login its login on the session's tool host ✓
+    Work prigh's: its host gets short-lived tokens
+    Alice's ChatGPT prigh's: its host gets short-lived tokens
+    ↑↓ to move, Enter to choose, Esc to close
+    (Picker_choose work)
+    (Rpc (method_ set_adapter_login) (params ((adapter codex) (login work)))
+     (tag (Adapter_login_saved codex)))
+    (Focus dialog)
+    (Expire_toast (id 0) (after_ms 3740))
+    Codex login
+    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login.
+    (Work)
+    |}]
+;;
+
+let%expect_test "a Codex session on prigh's login: Codex · MODEL@LOGIN" =
+  let h =
+    H.create
+      ~state:
+        (H.state_json
+           ~fields:
+             [ "engine", `String "composer"
+             ; "adapter", `String "codex"
+             ; "adapter_login", `String "Work"
+             ]
+           ())
+      ()
+  in
+  H.text h ~selector:".model-chip";
+  [%expect {| (Codex · Opus 5.5 @Work) |}]
+;;

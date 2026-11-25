@@ -105,22 +105,56 @@ let refresh_row (m : App.Model.t) ~inject =
     ]
 ;;
 
+let login_row ~inject (l : Adapter_login.t) =
+  let who = Session_engine.adapter_label l.adapter in
+  let current =
+    match l.login with
+    | None -> who ^ "'s own"
+    | Some c -> c.label
+  in
+  row
+    ~cls:("adapter-login adapter-login-" ^ l.adapter)
+    ~name:(who ^ " login")
+    ~about:
+      (sprintf
+         "Your %s sessions run on %s's own login on their tool host, or on one \
+          of your %s logins in prigh (yours or shared with you): prigh hands \
+          the host short-lived tokens and counts the usage on that login."
+         who
+         who
+         (match l.provider with
+          | "openai-codex" -> "ChatGPT"
+          | p -> p))
+    [ select
+        ~cls:"adapter-login-choice"
+        ~title:(sprintf "Choose %s's login (/adapters login %s)" who l.adapter)
+        ~label:(sprintf "%s login: %s" who current)
+        ~on_click:(inject (Action.Run ("/adapters login " ^ l.adapter)))
+        current
+    ]
+;;
+
 let groups (m : App.Model.t) ~inject =
-  group [ refresh_row m ~inject ]
-  ::
-  (match m.adapters.statuses with
-   | None | Some (Error _) -> []
-   | Some (Ok []) ->
-     [ group
-         [ row
-             ~name:"No tool host"
-             ~about:
-               "The agent CLIs run on a tool host: connect one (the TUI, prigh \
-                tool-host or the desktop app)."
-             []
-         ]
-     ]
-   | Some (Ok statuses) ->
-     List.map (Adapters_page.by_host statuses) ~f:(fun (host, here) ->
-       group ~title:host (List.map here ~f:(adapter ~inject))))
+  (group [ refresh_row m ~inject ]
+   ::
+   (match m.adapters.logins with
+    | [] -> []
+    | logins ->
+      [ group ~title:"Logins" (List.map logins ~f:(login_row ~inject)) ]))
+  @
+  match m.adapters.statuses with
+  | None | Some (Error _) -> []
+  | Some (Ok []) ->
+    [ group
+        [ row
+            ~name:"No tool host"
+            ~about:
+              "The agent CLIs run on a tool host: connect one (the TUI, prigh \
+               tool-host or the desktop app)."
+            []
+        ]
+    ]
+  | Some (Ok statuses) ->
+    List.map (Adapters_page.by_host statuses) ~f:(fun (host, here) ->
+      group ~title:host (List.map here ~f:(adapter ~inject)))
 ;;

@@ -4,12 +4,20 @@ open! Import
 type t =
   { statuses : (Adapter_status.t list, string) Result.t option
   ; loading : bool
+  ; logins : Adapter_login.t list
   }
 [@@deriving sexp_of, equal]
 
-let empty = { statuses = None; loading = false }
+let empty = { statuses = None; loading = false; logins = [] }
 let loading t = { t with loading = true }
-let loaded _ statuses = { statuses = Some statuses; loading = false }
+
+let loaded t = function
+  | Ok (statuses, logins) ->
+    { statuses = Some (Ok statuses); loading = false; logins }
+  | Error e -> { t with statuses = Some (Error e); loading = false }
+;;
+
+let logins_changed t logins = { t with logins }
 let changed t statuses = { t with statuses = Some (Ok statuses) }
 
 let by_host (statuses : Adapter_status.t list) =

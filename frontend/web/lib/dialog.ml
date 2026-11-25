@@ -33,6 +33,7 @@ module Picker_kind = struct
     | Generate_models
     | Approval_models
     | Naming_models
+    | Adapter_logins of string
     | Defaults of New_default.Picker.t
     | Attach
     | Menu of Context_menu.t
@@ -212,6 +213,7 @@ let per_session = function
           | Generate_models
           | Approval_models
           | Naming_models
+          | Adapter_logins _
           | Defaults _
           | Attach )
       ; _

@@ -336,6 +336,9 @@ module Reply_tag : sig
     | Memory_loaded (** [get_memory] *)
     | Usage_loaded (** [usage_limits] *)
     | Adapters_loaded (** [list_adapters] *)
+    | Adapter_logins_loaded of string option
+    (** [list_adapters] for [/adapters login]: the adapter whose picker opens *)
+    | Adapter_login_saved of string (** [set_adapter_login]: the adapter *)
     | Instructions_loaded (** [get_custom_instructions] *)
     | Instruction_saved
     (** [save_custom_instruction]: the draft closes, or says why not *)

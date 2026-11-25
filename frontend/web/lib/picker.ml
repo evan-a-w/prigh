@@ -31,6 +31,7 @@ end
 
 type t =
   { title : string
+  ; note : string option
   ; query : string
   ; items : Item.t list
   ; visible : Item.t list
@@ -39,6 +40,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 let title t = t.title
+let note t = t.note
 let query t = t.query
 let visible t = t.visible
 let selected t = t.selected
@@ -67,9 +69,10 @@ let set_query t query =
   { t with query; visible; selected = first_selected visible ~query }
 ;;
 
-let create ?(query = "") ?highlight ~title items =
+let create ?(query = "") ?highlight ?note ~title items =
   let visible = filter items ~query in
   { title
+  ; note
   ; query
   ; items
   ; visible

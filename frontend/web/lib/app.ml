@@ -289,6 +289,9 @@ module Reply_tag = struct
     | Memory_loaded
     | Usage_loaded
     | Adapters_loaded
+    | Adapter_logins_loaded of string option
+    (** the picker to open, for an adapter *)
+    | Adapter_login_saved of string
     | Instructions_loaded
     | Instruction_saved
     | Instruction_removed
@@ -1587,6 +1590,7 @@ let close_dialog (m : Model.t) =
                 | Generate_models
                 | Approval_models
                 | Naming_models
+                | Adapter_logins _
                 | Logins _
                 | Defaults _ )
             ; _
@@ -4818,6 +4822,75 @@ let compaction_command (m : Model.t) rest =
     | (Set_at _ | Set_model _ | Set_mask _) as action -> set_compaction m action)
 ;;
 
+let adapter_logins_picker (m : Model.t) ~adapter =
+  match Prigh_ui.Adapters_command.find_login m.adapters.logins ~adapter with
+  | Error e -> error m (String.capitalize (Error.to_string_hum e))
+  | Ok (l : Adapter_login.t) ->
+    let current ref_ =
+      Option.equal
+        String.equal
+        (Option.map l.login ~f:(fun (c : Adapter_login.Choice.t) -> c.ref_))
+        ref_
+    in
+    let who = Session_engine.adapter_label l.adapter in
+    open_picker
+      m
+      (Picker
+         { kind = Adapter_logins l.adapter
+         ; picker =
+             Picker.create
+               ~title:(who ^ " runs on")
+               (Picker.Item.create
+                  ~id:"own"
+                  ~detail:"its login on the session's tool host"
+                  ~search:"own"
+                  ~marked:(current None)
+                  (who ^ "'s own login")
+                :: List.map l.choices ~f:(fun (c : Adapter_login.Choice.t) ->
+                  Picker.Item.create
+                    ~id:c.ref_
+                    ~detail:"prigh's: its host gets short-lived tokens"
+                    ~search:c.ref_
+                    ~marked:(current (Some c.ref_))
+                    c.label))
+         })
+;;
+
+let set_adapter_login (m : Model.t) ~adapter login =
+  ( m
+  , [ call
+        (Set_adapter_login
+           { adapter
+           ; login =
+               (if String.Caseless.equal login "own" then None else Some login)
+           })
+        ~tag:(Adapter_login_saved adapter)
+    ] )
+;;
+
+let adapters_command (m : Model.t) rest =
+  match Prigh_ui.Adapters_command.parse rest with
+  | Error e -> error m (String.capitalize (Error.to_string_hum e))
+  | Ok (List { refresh }) ->
+    let m, cmds = open_settings ~section:Engines m in
+    if refresh
+    then (
+      let m, more = fetch_adapters ~refresh m in
+      m, cmds @ more)
+    else m, cmds
+  | Ok (Login { adapter; login = Some login }) ->
+    set_adapter_login m ~adapter:(Option.value adapter ~default:"codex") login
+  | Ok (Login { adapter; login = None }) ->
+    if List.is_empty m.adapters.logins
+    then
+      ( m
+      , [ call
+            (List_adapters { refresh = false })
+            ~tag:(Adapter_logins_loaded adapter)
+        ] )
+    else adapter_logins_picker m ~adapter
+;;
+
 let generate_model_summary config =
   String.capitalize (Prigh_ui.Generate_model_command.summary config)
 ;;
@@ -7408,7 +7481,14 @@ let hidden_messages (m : Model.t) ~path ~entry result =
 
 module Logins = Prigh_ui.Provider_logins
 
-let logins_picker (m : Model.t) ?(query = "") ?(noun = "logins") ~title rows =
+let logins_picker
+      (m : Model.t)
+      ?(query = "")
+      ?(noun = "logins")
+      ?note
+      ~title
+      rows
+  =
   let items =
     List.map rows ~f:(fun (r : Logins.Row.t) ->
       Picker.Item.create ~id:r.id ~detail:r.detail ~marked:r.marked r.label)
@@ -7416,7 +7496,9 @@ let logins_picker (m : Model.t) ?(query = "") ?(noun = "logins") ~title rows =
   open_picker
     m
     (Picker
-       { kind = Logins { noun }; picker = Picker.create ~query ~title items })
+       { kind = Logins { noun }
+       ; picker = Picker.create ~query ?note ~title items
+       })
 ;;
 
 let logins_request (m : Model.t) ~command (r : Logins.Request.t) =
@@ -7469,6 +7551,7 @@ let accounts_command (m : Model.t) rest =
        logins_picker
          m
          ~noun:"users"
+         ?note:(Logins.share_note l)
          ~title:(Logins.share_title l)
          (Logins.share_rows_for l users))
   | Pick query ->
@@ -7834,6 +7917,7 @@ let run_command_unchecked (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Error message -> error m message)
   | "compaction", rest -> compaction_command m rest
   | "generate-model", rest -> generate_model_command m rest
+  | "adapters", rest -> adapters_command m rest
   | "approval-model", rest -> approval_model_command m rest
   | "naming", rest -> naming_command m rest
   | "auto-archive", rest -> auto_archive_command m rest
@@ -9784,10 +9868,31 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     let result =
       Result.bind result ~f:(fun json ->
         Result.map_error
-          (Adapter_status.list_of_json json)
+          (let open Or_error.Let_syntax in
+           let%bind statuses = Adapter_status.list_of_json json in
+           let%map logins = Adapter_login.list_of_json json in
+           statuses, logins)
           ~f:Error.to_string_hum)
     in
     { m with adapters = Adapters_page.loaded m.adapters result }, []
+  | Adapter_logins_loaded adapter, Ok json ->
+    decode m json Adapter_login.list_of_json ~f:(fun logins ->
+      adapter_logins_picker
+        { m with adapters = Adapters_page.logins_changed m.adapters logins }
+        ~adapter)
+  | Adapter_login_saved adapter, Ok json ->
+    decode m json Adapter_login.list_of_json ~f:(fun logins ->
+      let m =
+        { m with adapters = Adapters_page.logins_changed m.adapters logins }
+      in
+      match
+        List.find logins ~f:(fun (l : Adapter_login.t) ->
+          String.equal l.adapter adapter)
+      with
+      | Some l -> toast m (Prigh_ui.Adapters_command.changed l)
+      | None -> m, [])
+  | (Adapter_logins_loaded _ | Adapter_login_saved _), Error e ->
+    error m (String.capitalize e)
   | Usage_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -11476,6 +11581,10 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some w -> open_worktree m w ~new_session:false
        | None -> m, [])
+    | Adapter_logins adapter ->
+      back_to_settings
+        ~back:m.return_to_settings
+        (set_adapter_login { m with dialog = None } ~adapter item.id)
     | Logins _ ->
       back_to_settings
         ~back:m.return_to_settings
@@ -12942,6 +13051,7 @@ let update_connected (m : Model.t) (action : Action.t) =
                       | Generate_models
                       | Approval_models
                       | Naming_models
+                      | Adapter_logins _
                       | Logins _
                       | Defaults _ )
                   ; _

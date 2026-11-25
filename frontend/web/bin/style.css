@@ -802,6 +802,7 @@ kbd {
 .picker-detail { margin-left: auto; }
 .picker-check { color: var(--foreground); align-self: center; }
 .picker-empty { color: var(--muted-foreground); padding: 24px 4px; font-size: 14px; text-align: center; }
+.picker-note { color: var(--muted-foreground); font-size: 13px; padding: 0 4px 8px; }
 
 .link-button { text-decoration: none; }
 

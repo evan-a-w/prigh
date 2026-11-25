@@ -445,3 +445,22 @@ let%expect_test "ChatGPT, OpenAI API and a login shared with the user" =
     (Manage)
     |}]
 ;;
+
+let%expect_test "sharing a ChatGPT login says the recipient's Codex may use it" =
+  let h = create () in
+  H.quiet h (fun () ->
+    H.event h {|{"type":"event","event":"accounts_changed"}|};
+    H.reply
+      h
+      "auth_status"
+      (String.substr_replace_all
+         sharing_json
+         ~pattern:{|"provider":"openai"|}
+         ~with_:{|"provider":"openai-codex"|}
+       |> String.substr_replace_all ~pattern:"openai/" ~with_:"openai-codex/");
+    H.reply h "account_share_targets" {|["bob","carol"]|});
+  H.quiet h (fun () -> H.act h (Run "/accounts share openai-codex/work"));
+  H.text h ~selector:".picker-note";
+  [%expect
+    {| Their Codex sessions can run on it too: their tool host gets short-lived access tokens |}]
+;;

@@ -189,3 +189,7 @@ val shareable : P.Auth_status.t list -> string -> (Login.t, string) Result.t
 val share_title : Login.t -> string
 
 val share_rows_for : Login.t -> string list -> Row.t list
+
+(** What sharing it also covers, for the share picker: the recipient's
+    agent CLI sessions on it (their host gets short-lived tokens). *)
+val share_note : Login.t -> string option

@@ -50,6 +50,8 @@ module Picker_kind : sig
     (** [/approval-model]: model keys, or [off] (the session's) *)
     | Naming_models
     (** [/naming model]: model keys, or [off] (the drafting model's) *)
+    | Adapter_logins of string
+    (** [/adapters login ADAPTER]: item ids are login refs, or [own] *)
     | Defaults of New_default.Picker.t
     (** the settings' New sessions: model keys, or host ids; the first item
         ([builtin]) goes back to the built-in *)

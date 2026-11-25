@@ -240,12 +240,20 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
   | None ->
     let thinking = Option.value m.pending.thinking ~default:state.thinking in
     let level = Reasoning.chip_label state.model ~current:thinking in
-    (* The login, when the provider has several: model@login. *)
+    (* The login, when the provider has several: model@login; an agent
+       CLI's, when it runs on one of prigh's (in [model_label]). *)
     let login =
-      Prigh_ui.Provider_logins.of_session m.auth state
-      |> Option.map ~f:(fun l -> Prigh_ui.Provider_logins.short l.account)
+      if Session_engine.is_harness state.engine
+      then
+        Prigh_ui.Provider_logins.of_session m.auth state
+        |> Option.map ~f:(fun l -> Prigh_ui.Provider_logins.short l.account)
+      else state.engine.login
     in
-    let at = Option.value_map login ~default:"" ~f:(fun l -> "@" ^ l) in
+    let at =
+      match login with
+      | Some l when Session_engine.is_harness state.engine -> "@" ^ l
+      | _ -> ""
+    in
     button
       ~cls:"chip-button model-chip"
       ~title:
