@@ -161,6 +161,8 @@ let%expect_test "help lists every key and command" =
     switch to the list's Nth model
     Alt+F (in the model menu)
     star or unstar the highlighted model
+    Alt+E (in the model menu)
+    pick the session's engine (Codex, Claude Code, …), as its foot's engine menu does
     ↑ ↓ or Enter or Esc (a chip's menu)
     move / choose / close it; type to filter the models or hosts
     Tab (a chip's menu; ← → in the host's)
@@ -315,7 +317,9 @@ let%expect_test "help lists every key and command" =
     /settings [section]
     appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new
-    start a new session
+    start a new session (/new ENGINE: on another engine or adapter, e.g. codex or claude, when the backend runs several; the new-session screen picks one too)
+    /engine [adapter]
+    switch this session to another of the composer's adapters (codex, claude, ...): it carries on from a summary of the session so far
     /temporary
     a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name]
@@ -875,6 +879,7 @@ let%expect_test "signing out" =
        ; user = Some "ann"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.text h ~selector:".sidebar-footer";
   [%expect

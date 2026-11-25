@@ -81,6 +81,32 @@ let chip (m : App.Model.t) ~inject =
     [ icon Ghost; Node.text "Temporary" ]
 ;;
 
+(* What the new session runs on, when the backend runs several engines: a
+   picker of them. *)
+let engine_chip (m : App.Model.t) ~inject =
+  match App.current_choice m with
+  | Some current when Deployed_engines.has_choice (App.deployed m) ->
+    let label =
+      match current.adapter with
+      | None -> String.capitalize current.engine
+      | Some _ -> Deployed_engines.Choice.label current
+    in
+    button
+      ~cls:
+        "ghost tray-engine h-[30px] min-w-0 gap-1.5 border-transparent \
+         bg-transparent px-2 text-[12.5px] font-normal text-muted-foreground \
+         hover:bg-accent hover:text-foreground focus-visible:outline-2 \
+         focus-visible:outline-offset-1 focus-visible:outline-ring narrow:h-9 \
+         [&_.icon]:size-[15px] [&_.icon]:flex-none \
+         max-[359px]:[&_.icon]:hidden [&>span]:truncate"
+      ~title:
+        (sprintf "Runs on %s: start it on another engine (/new ENGINE)" label)
+      ~label:(sprintf "Engine: %s. Change it" label)
+      ~on_click:(inject Action.Pick_engine)
+      [ icon Bot; span ~cls:"tray-engine-name" label ]
+  | _ -> Node.none
+;;
+
 let tray (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
@@ -152,6 +178,7 @@ let tray (m : App.Model.t) ~inject =
              ~on_click:(inject (Action.Run "/worktree"))
              [ icon Branch; span ~cls:"tray-branch" branch; icon Chevron ]
          | None -> Node.none)
+      ; engine_chip m ~inject
       ; chip m ~inject
       ]
 ;;

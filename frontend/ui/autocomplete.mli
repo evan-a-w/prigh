@@ -59,6 +59,7 @@ val compute
   -> default_dir_host:string option
        (** where [/default-dir] lists directories ([None]: the active host) *)
   -> server:Server_link.t option (** what [/connect] offers *)
+  -> engines:P.Deployed_engines.t (** what [/new] and [/engine] offer *)
   -> model:P.Model.t option (** the session's: its thinking levels *)
   -> t option
 

@@ -12,6 +12,6 @@
  (enabled_if %{bin-available:tmux}))
 
 (cram
- (applies_to approvals basics connection signin terminal tools)
+ (applies_to approvals basics connection engines signin terminal tools)
  (enabled_if
   (= %{env:PRIGH_TEST_TIER=default} full)))

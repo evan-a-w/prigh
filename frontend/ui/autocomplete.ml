@@ -285,6 +285,19 @@ let pairs items =
   List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
 ;;
 
+let engine_items choices =
+  List.map choices ~f:(fun c ->
+    let key = P.Deployed_engines.Choice.key c in
+    Picker.Item.create
+      ~id:key
+      ~detail:
+        (sprintf
+           "%s: %s"
+           (P.Deployed_engines.Choice.label c)
+           (P.Deployed_engines.Choice.describe c))
+      key)
+;;
+
 let argument_items
       ~kind
       ~models
@@ -294,6 +307,7 @@ let argument_items
       ~snippets
       ~logged_in
       ~server
+      ~engines
       ~model
   =
   match (kind : Commands.Argument.t) with
@@ -354,6 +368,14 @@ let argument_items
   | Generate_model
   | Approval_model
   | Naming -> None
+  | Engine ->
+    Option.some_if
+      (P.Deployed_engines.has_choice engines)
+      (engine_items (P.Deployed_engines.choices engines))
+  | Adapter ->
+    (match P.Deployed_engines.switch_targets engines with
+     | [] -> None
+     | adapters -> Some (engine_items adapters))
   | Server -> Some (server_items server)
   | Budget ->
     Some
@@ -481,6 +503,7 @@ let compute_argument
       ~logged_in
       ~default_dir_host
       ~server
+      ~engines
       ~model
   =
   match String.chop_prefix line ~prefix:"/" with
@@ -637,6 +660,7 @@ let compute_argument
                        ~snippets
                        ~logged_in
                        ~server
+                       ~engines
                        ~model)
                     ~default:[]
                 in
@@ -759,6 +783,7 @@ let compute
       ~logged_in
       ~default_dir_host
       ~server
+      ~engines
       ~model
   =
   match
@@ -786,6 +811,7 @@ let compute
          ~logged_in
          ~default_dir_host
          ~server
+         ~engines
          ~model
      with
      | Some _ as t -> t

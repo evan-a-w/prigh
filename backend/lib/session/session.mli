@@ -27,6 +27,17 @@ module Home : sig
   [@@deriving sexp, jsonaf, equal]
 end
 
+(** Where a composer thread is forked or rolled back to: the last turn to
+    keep, as the external agent names it (its turn id; the id of its last
+    message, for Claude Code). *)
+module Fork_point : sig
+  type t =
+    { turn_id : string option
+    ; mark : string option
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Entry : sig
   module Payload : sig
     type t =
@@ -138,6 +149,50 @@ module Entry : sig
           and so are the results of its tool calls *)
       | Restore of { entry : string }
       (** cancels the [Trim], [Trim_after] or [Delete] entry [entry] *)
+      | Engine of
+          { engine : string (** an [Engine_id] *)
+          ; adapter : string option [@jsonaf.option] [@sexp.option]
+            (** an [Adapter_id], for the composer *)
+          }
+      (** the engine the session runs on from here on, see {!engine}; absent
+          from harness sessions (all of those from before engines) *)
+      | Thread of
+          { adapter : string
+          ; host : string (** the [Host.id] the external agent ran on *)
+          ; thread_id : string (** its own id of the conversation *)
+          ; cwd : string
+          ; fork_from : Fork_point.t option [@jsonaf.option] [@sexp.option]
+            (** the session is to continue a fork of [thread_id] (another
+                session's) at this point, not [thread_id] itself *)
+          }
+      (** the composer's adapter reported its thread, see {!threads}; not
+          copied by [fork], so a fork never writes to its parent's thread *)
+      | External_turn of
+          { thread_id : string
+          ; turn_id : string
+          ; through : string (** the last entry of the turn *)
+          ; first_turn_id : string option [@jsonaf.option] [@sexp.option]
+            (** the agent's first turn of the run, when it took several *)
+          ; mark : string option [@jsonaf.option] [@sexp.option]
+            (** where its conversation ended (Claude Code: its last message) *)
+          ; before : string option [@jsonaf.option] [@sexp.option]
+            (** the checkpoint of the files before the run ({!Checkpoint}) *)
+          ; after : string option [@jsonaf.option] [@sexp.option]
+            (** ... and after it *)
+          ; cost_total : float option [@jsonaf.option] [@sexp.option]
+            (** the running cost total the agent reported after it *)
+          }
+      (** an external agent's turn, for mapping rewinds onto its history;
+          not copied by [fork] *)
+      | Handoff of
+          { from_adapter : string option [@jsonaf.option] [@sexp.option]
+          ; to_adapter : string
+          ; text : string
+          }
+      (** the summary of the session pushed to [to_adapter] when it took
+          over (another adapter or host, a thread that could not resume);
+          [from_adapter] is an [Adapter_id], or [harness] after prigh's
+          harness engine *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -359,6 +414,72 @@ val timed_messages : t -> Timed_message.t list
 val identified_messages : t -> (string option * Timed_message.t) list
 
 val model : t -> (string * Thinking.t) option
+
+(** The latest model the session switched to, on its active path, of those
+    [f] accepts (by key). *)
+val last_model : t -> f:(string -> bool) -> (string * Thinking.t) option
+
+(** {2 Engines}
+
+    Which engine a session runs on (the last [Engine] entry on the active
+    path; the harness without one), and what the composer recorded of the
+    external agent it drives. *)
+
+(** An external agent's conversation, as its adapter reported it. *)
+module Thread : sig
+  type t =
+    { adapter : string (** an [Adapter_id] *)
+    ; host : string (** the [Host.id] it ran on *)
+    ; thread_id : string
+    ; cwd : string
+    ; fork_from : Fork_point.t option
+      (** to be forked at this point (from another session's thread) *)
+    }
+  [@@deriving sexp_of, equal]
+end
+
+(** A run of an external agent: its turns and what they did to the files. *)
+module External_turn : sig
+  type t =
+    { thread_id : string
+    ; turn_id : string (** its last turn *)
+    ; through : string (** the last entry of the run *)
+    ; first_turn_id : string option (** its first turn, if not [turn_id] *)
+    ; mark : string option
+      (** where the conversation ended, for an agent that rolls back to a
+          message (Claude Code) *)
+    ; before : string option (** the files' checkpoint before the run *)
+    ; after : string option (** ... and after it *)
+    ; cost_total : float option
+      (** the running cost total its agent reported after it, to seed a
+          resume (the composer's [Start.cost_total]) *)
+    }
+  [@@deriving sexp_of, equal]
+end
+
+(** The harness for a session with no [Engine] entry; an error for one
+    naming an engine or adapter this prigh does not know (a newer one's). *)
+val engine : t -> Engine_choice.t Or_error.t
+
+val set_engine : t -> Engine_choice.t -> Entry.t
+
+(** The [Thread] entries on the active path, newest first. *)
+val threads : t -> Thread.t list
+
+val record_thread : t -> Thread.t -> Entry.t
+
+(** The [External_turn] entries on the active path (with [all]: in the
+    whole file, abandoned branches too), oldest first. *)
+val external_turns : ?all:bool -> t -> External_turn.t list
+
+val record_external_turn : t -> External_turn.t -> Entry.t
+
+val record_handoff
+  :  t
+  -> from_adapter:string option
+  -> to_adapter:string
+  -> text:string
+  -> Entry.t
 
 (** The system prompt fixed for this conversation, if one was recorded on the
     active path. *)

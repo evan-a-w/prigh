@@ -17,16 +17,17 @@ val of_state : P.State.t -> t
 
 (** Alt+M: ask → auto-edit → smart → auto → plan → chat → ask. Entering plan
     or chat mode keeps the approval mode; leaving chat by cycling goes to
-    [ask]. *)
-val cycle : t -> t
+    [ask]. Without [plan] (an engine with no plan mode) plan is skipped. *)
+val cycle : ?plan:bool -> t -> t
 
 (** ["ask"], ["auto-edit"], ["smart"], ["auto"], ["plan"], ["chat"]. *)
 val label : t -> string
 
 (** The modes [/mode] offers, in cycle order, as from [current]: the
     approval modes leave plan and chat mode, [plan] keeps the approval mode
-    and leaves chat, [chat] keeps the mode to return to. *)
-val choices : current:t -> t list
+    and leaves chat, [chat] keeps the mode to return to; [plan] only with
+    [plan] (the default). *)
+val choices : ?plan:bool -> current:t -> unit -> t list
 
 (** What [/mode NAME] means, as from [current]; [None] for an unknown name. *)
 val of_name : current:t -> string -> t option

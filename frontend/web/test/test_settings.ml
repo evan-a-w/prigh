@@ -284,7 +284,7 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
 let%expect_test "the names of the settings' controls" =
   let h = H.create () in
   List.iter
-    (Prigh_web.Settings_section.available ~superuser:false)
+    (Prigh_web.Settings_section.available ~superuser:false ())
     ~f:(fun section ->
       H.quiet h (fun () -> H.act h (Settings_section section));
       print_endline ("-- " ^ Prigh_web.Settings_section.name section);
@@ -613,6 +613,7 @@ let%expect_test "superusers have the Nix store's section" =
        ; user = Some "root"
        ; superuser = true
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.quiet h (fun () -> H.act h Open_settings);
   H.text h ~selector:".settings-nav";

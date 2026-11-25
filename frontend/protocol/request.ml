@@ -171,6 +171,8 @@ module Method = struct
         ; task : string option
         }
     | Generate_cancel of { gen_id : string }
+    | List_adapters of { refresh : bool }
+    | Set_adapter of { adapter : string }
     | Nix_store_status
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
     | Get_memory
@@ -270,6 +272,8 @@ module Method = struct
     | Git_push _ -> "git_push"
     | Generate_text _ -> "generate_text"
     | Generate_cancel _ -> "generate_cancel"
+    | List_adapters _ -> "list_adapters"
+    | Set_adapter _ -> "set_adapter"
     | Nix_store_status -> "nix_store_status"
     | Nix_store_gc _ -> "nix_store_gc"
     | Get_memory -> "get_memory"
@@ -324,6 +328,9 @@ module Method = struct
     | Get_message_points
     | Undelete -> []
     | Nix_store_gc { delete_generations = None } -> []
+    | List_adapters { refresh = false } -> []
+    | List_adapters { refresh = true } -> [ "refresh", Json.bool true ]
+    | Set_adapter { adapter } -> [ "adapter", Json.str adapter ]
     | Save_memory { id; title; text } -> Memory.save_params ?id ?title text
     | Forget_memory { id } -> Memory.forget_params ~id
     | Forget_allowed_call { call = Some call } -> [ "call", Json.str call ]

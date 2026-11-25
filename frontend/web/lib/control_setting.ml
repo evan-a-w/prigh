@@ -35,6 +35,7 @@ type t =
   | Instructions
   | Mcp
   | Git_hosts
+  | Engines
   | Usage
   | Auto_resume
   | Nix_store
@@ -77,6 +78,7 @@ let name = function
   | Instructions -> "Custom instructions"
   | Mcp -> "MCP servers"
   | Git_hosts -> "Git hosts"
+  | Engines -> "Agent CLIs"
   | Usage -> "Usage limits"
   | Nix_store -> "Nix store"
   | Account -> "Account"
@@ -135,6 +137,8 @@ let keywords = function
   | Instructions -> "standing preferences"
   | Mcp -> "tools servers"
   | Git_hosts -> "github forgejo forge git hosting sign in"
+  | Engines ->
+    "engines composer adapters codex claude code acp installed logged in"
   | Usage -> "subscription quota rate limits claude chatgpt codex"
   | Nix_store -> "garbage collect disk"
   | Account -> "sign out user"
@@ -193,6 +197,7 @@ let page t : (Settings_section.t * string) option =
   | Instructions -> Some (Custom_instructions, "Your instructions")
   | Mcp -> Some (Mcp, "MCP servers")
   | Git_hosts -> Some (Git_hosting, "Git hosting")
+  | Engines -> Some (Engines, "Agent CLIs")
   | Usage -> Some (Usage, "Usage")
   | Nix_store -> Some (Nix_store, "Nix store")
   | Account -> Some (Account, "Account")
@@ -200,6 +205,11 @@ let page t : (Settings_section.t * string) option =
 
 let superuser_only = function
   | Nix_store -> true
+  | _ -> false
+;;
+
+let composer_only = function
+  | Engines -> true
   | _ -> false
 ;;
 

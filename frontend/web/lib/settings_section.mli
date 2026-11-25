@@ -7,6 +7,8 @@ type t =
   | Sessions
   | New_sessions (** what new sessions start with *)
   | Models
+  | Engines
+  (** the composer's agent CLIs on each host; only with the composer *)
   | Usage (** the subscriptions' usage limits *)
   | Memory
   | About_you
@@ -17,11 +19,12 @@ type t =
   | Account
 [@@deriving sexp_of, equal, enumerate]
 
-(** The sections [superuser] (or not) sees, in order. *)
-val available : superuser:bool -> t list
+(** The sections [superuser] (or not) sees, in order; [Engines] only when
+    the backend deploys the composer engine. *)
+val available : ?composer:bool -> superuser:bool -> unit -> t list
 
 (** [t], or the first section when [superuser] cannot see it. *)
-val visible : t -> superuser:bool -> t
+val visible : ?composer:bool -> t -> superuser:bool -> t
 
 (** The section's title. *)
 val name : t -> string
@@ -49,4 +52,4 @@ module Move : sig
   [@@deriving sexp_of, equal]
 end
 
-val move : t -> Move.t -> superuser:bool -> t
+val move : ?composer:bool -> t -> Move.t -> superuser:bool -> t

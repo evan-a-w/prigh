@@ -21,6 +21,7 @@ let%expect_test "in a browser: /quit says to close the tab, no Quit prigh" =
          ; user = Some "alice"
          ; superuser = false
          ; features = []
+         ; deployed = Prigh_protocol.Deployed_engines.harness_only
          }));
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
@@ -85,6 +86,7 @@ let%expect_test "under the desktop app: Quit prigh in the account menu" =
          ; user = Some "alice"
          ; superuser = false
          ; features = []
+         ; deployed = Prigh_protocol.Deployed_engines.harness_only
          });
     H.act h (Set_desktop true));
   H.act h Open_accounts;

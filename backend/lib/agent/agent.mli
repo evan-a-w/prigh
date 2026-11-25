@@ -102,6 +102,13 @@ module State : sig
       (** what prigh-web shows of the transcript ({!set_transcript_filter}) *)
     ; temporary : bool
       (** never saved or listed, deleted when left ({!Session.temporary}) *)
+    ; engine : Engine_choice.t
+      (** the engine the session runs on ({!Session.engine}; the harness for
+          one naming an engine this prigh does not know) *)
+    ; capabilities : Capabilities.t
+    ; unavailable : string option
+      (** why the session cannot run on this backend (its engine is not
+          deployed here), naming what to do; it can still be read *)
     }
   [@@deriving sexp_of]
 end
@@ -284,12 +291,63 @@ val create
        (** the user's custom instructions: in the system prompt of a new
            session, and the changes told with the next message to a session
            that knows others ({!Told_environment}); default: none *)
+  -> ?runner:Runner.t
+       (** the engine that does the session's runs; default: the harness, the
+           agent loop on [provider] with [tools] *)
   -> cwd:string
   -> unit
   -> t
 
 val subscribe : t -> f:(Event.t -> unit) -> unit
 val state : t -> State.t
+
+(** The engine doing the session's runs, and what it supports. *)
+val engine : t -> Engine_id.t
+
+val capabilities : t -> Capabilities.t
+
+(** Replaces the engine that does the session's runs ([None]: the harness),
+    closing the old one; between runs. *)
+val set_runner : t -> Runner.t option -> unit
+
+(** The models the session can switch to when an external harness runs it
+    (its, {!External_model}); [None]: prigh's ({!Model_registry}). *)
+val external_models : t -> Model.t list option
+
+(** How much of the external harness's login's usage limits it said were
+    used ([None] for the harness engine, or before it said). *)
+val external_limits : t -> Subscription_usage.Status.t option
+
+(** Whether the external harness's process is up for the session. *)
+val external_live : t -> bool
+
+(** Stops the external harness's process, if one runs: a later run starts
+    it again. *)
+val stop_engine : t -> unit
+
+(** prigh's own harness on the session's provider and model, whatever
+    runner the session has (for the composer's [prigh] adapter). *)
+val harness_runner : t -> Runner.t
+
+(** How errors name the session's engine: [Harness], [Composer]. *)
+val engine_label : t -> string
+
+(** [Ok ()] when the session's engine has [feature]; else an error saying
+    what to do instead. The vals below that need a feature check it. *)
+val require : t -> Capabilities.Feature.t -> unit Or_error.t
+
+(** The engine the session records ({!Session.engine}). *)
+val engine_choice : t -> Engine_choice.t
+
+(** Records [choice] as the session's engine (when it changes): for a new
+    session, before its first run. *)
+val set_engine : t -> Engine_choice.t -> unit
+
+(** Marks the session as one this backend cannot run, and why (its engine is
+    not deployed here): no run starts, it can still be read. [None] lifts
+    it. *)
+val set_unavailable : t -> string option -> unit
+
 val session : t -> Session.t
 val env : t -> Env.t
 val messages : t -> Message.t list
@@ -990,6 +1048,16 @@ val host_call
   -> Json.t
   -> Tool.Result.t
 
+(** Runs the host operation [name] on the connected tool host [host] (by
+    id), in [cwd] there; an error result when it is not connected. *)
+val host_call_on
+  :  t
+  -> host:string
+  -> cwd:string
+  -> name:string
+  -> Json.t
+  -> Tool.Result.t
+
 (** Directory completions for [prefix] (absolute, [~/] or relative to the
     session cwd on that host), listed on [host] (default: the active one),
     in the notation the prefix used. *)
@@ -1055,6 +1123,14 @@ val hosts : t -> Host.t list
 val tool_hosts : t -> Tool_on_host.Host.t list
 
 val active_host : t -> string
+
+(** The active host's name, for messages. *)
+val active_host_name : t -> string
+
+(** What the user set about themselves and their custom instructions, as the
+    harness's system prompt ends with them, for a composer's external
+    harness. *)
+val user_instructions : t -> string option
 
 (** Where the session runs, as it records it ({!Session.Host}): the active
     host, connected or not, and the cwd there; [None] while it has none. *)

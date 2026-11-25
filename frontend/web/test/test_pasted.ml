@@ -14,6 +14,7 @@ let hello ?(features = [ "pasted_text" ]) h =
        ; user = None
        ; superuser = false
        ; features
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        })
 ;;
 

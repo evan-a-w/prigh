@@ -114,6 +114,8 @@ module Message : sig
     ; select : bool
       (** offer Select text: on a phone, where a long press opens the menu
         rather than selecting *)
+    ; no_edit : string option
+      (** why the session's engine cannot trim or delete messages, if so *)
     }
   [@@deriving sexp_of, equal]
 

@@ -282,6 +282,7 @@ module Reply_tag = struct
     | Nix_collected
     | Memory_loaded
     | Usage_loaded
+    | Adapters_loaded
     | Instructions_loaded
     | Instruction_saved
     | Instruction_removed
@@ -449,6 +450,7 @@ module Action = struct
     | Complete_close
     | New_session
     | Set_temporary of bool
+    | Pick_engine (** the new-session screen's engine chip: [/new]'s choices *)
     | New_temporary
     (** Ctrl+Shift+O: a new temporary session; on the new-session screen,
         the Temporary chip *)
@@ -503,6 +505,13 @@ module Action = struct
     | Model_menu_step of int (** the next provider along the rail (← →) *)
     | Model_menu_more (** "Show more": the provider's older models *)
     | Model_menu_access (** opens or closes the access menu in its foot *)
+    | Model_menu_engine
+    (** opens or closes the engine menu in its foot (asking the adapters'
+        health the first time) *)
+    | Model_menu_engine_pick of string
+    (** a choice of the engine menu, by key: switches this session (a fresh
+        one gives way to a new session on it, as the engine chip) *)
+    | Model_menu_engine_picker (** Alt+E: the engine picker, by keyboard *)
     | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
     | Toggle_favourite of string option
     (** stars or unstars the model ([None]: the highlighted one) *)
@@ -510,6 +519,11 @@ module Action = struct
     | Open_help
     | Open_settings
     | Usage_refresh
+    | Adapters_refresh
+    | Copy_text of
+        { text : string
+        ; copied : string
+        }
     | Settings_section of Settings_section.t
     | Settings_home
     | Settings_move of Settings_section.Move.t
@@ -836,6 +850,7 @@ module Model = struct
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
     ; usage : Usage_page.t
+    ; adapters : Adapters_page.t
     ; memory : Memory_notes.t
     ; instructions : Instruction_notes.t
     ; about_you : About_you.t
@@ -947,6 +962,7 @@ module Model = struct
         ; forges
         ; nix_gc
         ; usage
+        ; adapters
         ; memory
         ; instructions
         ; about_you
@@ -1052,6 +1068,7 @@ module Model = struct
     && phys_equal forges b.forges
     && phys_equal nix_gc b.nix_gc
     && phys_equal usage b.usage
+    && phys_equal adapters b.adapters
     && phys_equal memory b.memory
     && phys_equal instructions b.instructions
     && phys_equal about_you b.about_you
@@ -1195,6 +1212,11 @@ module Model = struct
         ; newest = [%equal: int option] (Message_index.newest index) (Some n)
         ; running = running t
         ; select = t.narrow
+        ; no_edit =
+            Option.bind t.state ~f:(fun (s : State.t) ->
+              if Session_engine.supports s.engine Context_edit
+              then None
+              else Some (Session_engine.refusal s.engine Context_edit))
         }
     in
     match
@@ -1383,6 +1405,7 @@ let init =
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
   ; usage = Usage_page.empty
+  ; adapters = Adapters_page.empty
   ; memory = Memory_notes.empty
   ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
@@ -1426,6 +1449,19 @@ let toast (m : Model.t) ?(error = false) ?replaces ?undo text =
 ;;
 
 let error m text = toast m ~error:true text
+
+(* What new sessions can run on ([hello]'s engines and adapters). *)
+let deployed (m : Model.t) =
+  Option.value_map
+    m.hello
+    ~default:Deployed_engines.harness_only
+    ~f:(fun (h : Hello_reply.t) -> h.deployed)
+;;
+
+let current_choice (m : Model.t) =
+  Option.map m.state ~f:(fun (s : State.t) ->
+    Deployed_engines.Choice.of_session s.engine)
+;;
 
 (* In a browser there is nothing to quit: the tab is closed instead. *)
 let quit_desktop (m : Model.t) =
@@ -2053,6 +2089,19 @@ let set_state (m : Model.t) (state : State.t) =
       not (String.equal old.session_id state.session_id))
   in
   let m, cmds = set_state_without_files m state in
+  (* Another engine, adapter or host lists other models: none of the old
+     ones are shown meanwhile. *)
+  let m, models =
+    match old_state with
+    | Some old
+      when not
+             (String.equal old.engine.engine state.engine.engine
+              && [%equal: string option] old.engine.adapter state.engine.adapter
+              && (Session_engine.is_harness state.engine
+                  || String.equal old.active_host state.active_host)) ->
+      { m with models = [] }, [ rpc "list_models" [] ~tag:Models ]
+    | Some _ | None -> m, []
+  in
   let m = if hosts_changed then refresh_hosts m else m in
   let m, more = with_files m (Files.set_where m.files (files_where m)) in
   let m =
@@ -2075,13 +2124,12 @@ let set_state (m : Model.t) (state : State.t) =
          (Some state.session_id)
          ~watching:m.files.open_)
   in
-  m, cmds @ more @ review
+  m, cmds @ models @ more @ review
 ;;
 
-let logged_in (m : Model.t) provider =
-  List.exists m.auth ~f:(fun s ->
-    String.equal s.provider provider && Option.is_some s.configured)
-;;
+(* A provider prigh has no login for is a CLI's (Codex, Claude Code), which
+   lists only what its own login offers. *)
+let logged_in (m : Model.t) provider = Completion.logged_in m.auth provider
 
 let compact_tokens n =
   if n >= 1_000_000
@@ -2279,9 +2327,19 @@ let loading (m : Model.t) title cmds =
 
 let superuser (m : Model.t) = Option.exists m.hello ~f:(fun h -> h.superuser)
 
+let composer_engine (m : Model.t) =
+  Option.exists m.hello ~f:(fun h ->
+    List.mem h.features "engines" ~equal:String.equal)
+;;
+
 let fetch_nix_status (m : Model.t) ~open_settings =
   ( { m with nix_gc = Nix_gc.loading m.nix_gc }
   , [ call Nix_store_status ~tag:(Nix_status { open_settings }) ] )
+;;
+
+let fetch_adapters ?(refresh = false) (m : Model.t) =
+  ( { m with adapters = Adapters_page.loading m.adapters }
+  , [ call (List_adapters { refresh }) ~tag:Adapters_loaded ] )
 ;;
 
 let fetch_usage (m : Model.t) =
@@ -2347,6 +2405,8 @@ let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | Mcp -> fetch_mcp m
   | Custom_instructions -> fetch_instructions m
   | Usage -> fetch_usage m
+  | Engines when composer_engine m -> fetch_adapters m
+  | Engines -> m, []
   | Appearance
   | Sessions
   | New_sessions
@@ -2426,7 +2486,12 @@ let set_instructions_enabled (m : Model.t) enabled =
 
 (* [/settings SECTION]. *)
 let settings_command (m : Model.t) arg =
-  let sections = Settings_section.available ~superuser:(superuser m) in
+  let sections =
+    Settings_section.available
+      ~composer:(composer_engine m)
+      ~superuser:(superuser m)
+      ()
+  in
   match Settings_section.of_arg arg with
   | Some section when List.mem sections section ~equal:Settings_section.equal ->
     open_settings ~section m
@@ -2670,10 +2735,12 @@ let complete_draft (m : Model.t) ~skills =
            ~default:[]
            ~f:(fun (l : Worktree.Listing.t) -> l.worktrees))
       ?refs:(Option.map m.review.diff ~f:Git_diff.refs)
+      ~engines:(deployed m)
       ~sessions:m.sessions
       ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
+      ~composer:(composer_engine m)
       ~superuser:(superuser m)
       ~text:m.draft
       ~cursor:m.cursor
@@ -3869,20 +3936,29 @@ let set_mode ?(then_send = false) (m : Model.t) (mode : Session_mode.t) =
 
 let cycle_mode (m : Model.t) =
   current_state m ~f:(fun s ->
-    set_mode m (Session_mode.cycle (Session_mode.of_state s)))
+    set_mode
+      m
+      (Session_mode.cycle
+         ~plan:(Session_engine.supports s.engine Plan_mode)
+         (Session_mode.of_state s)))
 ;;
 
 let modes_picker (state : State.t) =
   let current = Session_mode.of_state state in
   Picker.create
     ~title:"When tools ask first (Alt+M cycles)"
-    (List.map (Session_mode.choices ~current) ~f:(fun mode ->
-       Picker.Item.create
-         ~id:(Session_mode.label mode)
-         ~detail:(Session_mode.describe mode)
-         ~search:(Session_mode.label mode ^ " " ^ Session_mode.title mode)
-         ~marked:(Session_mode.equal mode current)
-         (Session_mode.title mode)))
+    (List.map
+       (Session_mode.choices
+          ~plan:(Session_engine.supports state.engine Plan_mode)
+          ~current
+          ())
+       ~f:(fun mode ->
+         Picker.Item.create
+           ~id:(Session_mode.label mode)
+           ~detail:(Session_mode.describe mode)
+           ~search:(Session_mode.label mode ^ " " ^ Session_mode.title mode)
+           ~marked:(Session_mode.equal mode current)
+           (Session_mode.title mode)))
 ;;
 
 let mode_picker (m : Model.t) =
@@ -3957,7 +4033,11 @@ let model_menu_picker ?(query = "") (m : Model.t) =
   if String.is_empty query
   then (
     let rows, more =
-      Model_menu.rows m.model_menu offered ~favourites:m.favourite_models
+      Model_menu.rows
+        ?current
+        m.model_menu
+        offered
+        ~favourites:m.favourite_models
     in
     Picker.create
       ~title:"Model"
@@ -5390,6 +5470,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     ; usage = Usage_page.empty
+    ; adapters = Adapters_page.empty
     ; memory = Memory_notes.empty
     ; instructions = Instruction_notes.empty
     ; about_you = About_you.empty
@@ -6337,12 +6418,82 @@ let worktree_command (m : Model.t) rest =
     list_worktrees m (Target { command; action })
 ;;
 
+(* ---- engines ------------------------------------------------------------ *)
+
+(* [/new]'s choices, or [/engine]'s (the composer's adapters): this session's
+   first. *)
+let engine_choices (m : Model.t) ~switch =
+  let deployed = deployed m in
+  let choices =
+    if switch
+    then Deployed_engines.switch_targets deployed
+    else Deployed_engines.choices deployed
+  in
+  match current_choice m with
+  | Some c when List.mem choices c ~equal:Deployed_engines.Choice.equal ->
+    c :: List.filter choices ~f:(Fn.non (Deployed_engines.Choice.equal c))
+  | _ -> choices
+;;
+
+(* A new session runs on this one's engine, when the backend runs several. *)
+let new_session_params (m : Model.t) =
+  if Deployed_engines.has_choice (deployed m)
+  then (
+    match current_choice m with
+    | Some _
+      when Option.exists m.state ~f:(fun (s : State.t) ->
+             Option.is_some s.engine.unavailable) -> []
+    | Some c
+      when List.mem
+             (Deployed_engines.choices (deployed m))
+             c
+             ~equal:Deployed_engines.Choice.equal ->
+      Deployed_engines.Choice.params c
+    | _ -> [])
+  else []
+;;
+
+let engine_picker (m : Model.t) ~switch =
+  let current = current_choice m in
+  let items =
+    List.map (engine_choices m ~switch) ~f:(fun c ->
+      Picker.Item.create
+        ~id:(Deployed_engines.Choice.key c)
+        ~detail:(Deployed_engines.Choice.describe c)
+        ~search:
+          (Deployed_engines.Choice.key c ^ " " ^ Deployed_engines.Choice.label c)
+        ~marked:(Option.equal Deployed_engines.Choice.equal current (Some c))
+        (Deployed_engines.Choice.label c))
+  in
+  Dialog.Picker
+    { kind = Engines { switch }
+    ; picker =
+        Picker.create
+          ~title:(if switch then "Switch this session to" else "New session on")
+          items
+    }
+;;
+
+let switch_adapter (m : Model.t) (c : Deployed_engines.Choice.t) =
+  let target = Option.value c.adapter ~default:c.engine in
+  match c.adapter with
+  | _
+    when Option.equal Deployed_engines.Choice.equal (current_choice m) (Some c)
+    -> toast m (sprintf "Already on %s" (Deployed_engines.Choice.label c))
+  | Some _ | None ->
+    let m, toast =
+      toast m (sprintf "Switching to %s…" (Deployed_engines.Choice.label c))
+    in
+    m, call (Set_adapter { adapter = target }) :: toast
+;;
+
 let new_session (m : Model.t) =
   ( { (starting m) with
       sidebar_open = m.sidebar_open && not m.narrow
     ; review_drawer = false
     }
-  , [ rpc "new_session" [] ~tag:Reload_state; focus_editor ] )
+  , [ rpc "new_session" (new_session_params m) ~tag:Reload_state; focus_editor ]
+  )
 ;;
 
 let temporary (m : Model.t) = Option.exists m.state ~f:(fun s -> s.temporary)
@@ -6387,6 +6538,144 @@ let set_temporary (m : Model.t) on =
   if Bool.equal on (temporary_shown m)
   then m, [ focus_editor ]
   else new_temporary_session m ~temporary:on
+;;
+
+(* A new session on [c]. From the new-session screen the empty session shown
+   gives way to it, staying temporary if it was (as the Temporary chip). *)
+let new_session_on (m : Model.t) (c : Deployed_engines.Choice.t) =
+  let temporary = fresh m && temporary_shown m in
+  let m, cmds = new_session m in
+  ( (if temporary then { m with want_temporary = Some true } else m)
+  , List.map cmds ~f:(function
+      | Command.Rpc ({ method_ = "new_session"; _ } as r) ->
+        Command.Rpc
+          { r with
+            params =
+              (Deployed_engines.Choice.params c
+               @ if temporary then [ "temporary", Json.bool true ] else [])
+          }
+      | cmd -> cmd) )
+;;
+
+let engine_chosen (m : Model.t) ~switch arg =
+  let deployed = deployed m in
+  let choices =
+    if switch
+    then Deployed_engines.switch_targets deployed
+    else Deployed_engines.choices deployed
+  in
+  match Deployed_engines.find_in choices arg with
+  | Error e -> error m (Error.to_string_hum e)
+  | Ok c
+    when (not switch)
+         && fresh m
+         && [%equal: Deployed_engines.Choice.t option]
+              (current_choice m)
+              (Some c) -> m, [ focus_editor ]
+  | Ok c -> if switch then switch_adapter m c else new_session_on m c
+;;
+
+let engine_command (m : Model.t) ~switch arg =
+  let deployed = deployed m in
+  match String.strip arg with
+  | "" when switch && List.is_empty (Deployed_engines.switch_targets deployed)
+    ->
+    error
+      m
+      "This backend runs no composer adapters: start it with -engines \
+       harness,composer -adapters codex,claude to switch between them."
+  | "" when switch -> open_picker m (engine_picker m ~switch)
+  | "" ->
+    starting m, [ rpc "new_session" (new_session_params m) ~tag:Reload_state ]
+  | _ when (not switch) && not (Deployed_engines.has_choice deployed) ->
+    error m "This backend runs only the harness: /new starts a session on it."
+  | arg -> engine_chosen m ~switch arg
+;;
+
+(* ---- the model menu's engine ------------------------------------------- *)
+
+module Engine_option = struct
+  type t =
+    { choice : Deployed_engines.Choice.t
+    ; hint : string
+    ; trouble : bool
+    ; current : bool
+    }
+end
+
+let engine_busy = "Switch after this turn (Esc stops it)"
+
+(* The model menu's foot switches this session; a fresh one gives way to a
+   new session, as the new-session screen's engine chip. *)
+let engine_options (m : Model.t) =
+  let switch = not (fresh m) in
+  let choices = engine_choices m ~switch in
+  if List.length choices < 2
+  then []
+  else (
+    let current = current_choice m in
+    let host = Option.map m.state ~f:(fun (s : State.t) -> s.active_host) in
+    let status adapter =
+      match m.adapters.statuses with
+      | Some (Ok statuses) ->
+        List.find statuses ~f:(fun (s : Adapter_status.t) ->
+          String.equal s.adapter adapter
+          && Option.equal String.equal (Some s.host) host)
+      | Some (Error _) | None -> None
+    in
+    List.map choices ~f:(fun (c : Deployed_engines.Choice.t) ->
+      let hint, trouble =
+        match Option.bind c.adapter ~f:status with
+        | Some { problem = Some problem; _ } -> problem, true
+        | Some s -> Adapter_status.summary s, false
+        | None -> Deployed_engines.Choice.describe c, false
+      in
+      { Engine_option.choice = c
+      ; hint
+      ; trouble
+      ; current = Option.equal Deployed_engines.Choice.equal current (Some c)
+      }))
+;;
+
+let close_engine_menu (m : Model.t) =
+  { m with model_menu = { m.model_menu with engine_open = false } }
+;;
+
+let model_menu_engine (m : Model.t) =
+  let opening = not m.model_menu.engine_open in
+  let m =
+    { m with
+      model_menu =
+        { m.model_menu with engine_open = opening; access_open = false }
+    }
+  in
+  if
+    opening
+    && composer_engine m
+    && Option.is_none m.adapters.statuses
+    && not m.adapters.loading
+  then fetch_adapters m
+  else m, []
+;;
+
+let model_menu_engine_pick (m : Model.t) key =
+  let m = close_engine_menu m in
+  if Model.running m
+  then toast m engine_busy
+  else engine_chosen m ~switch:(not (fresh m)) key
+;;
+
+let model_menu_engine_picker (m : Model.t) =
+  let m = close_engine_menu m in
+  if List.is_empty (engine_options m)
+  then
+    toast
+      m
+      "This backend runs one engine: start it with more (-engines, \
+       -adapters) to switch here; Settings → Engines shows them"
+  else if Model.running m
+  then toast m engine_busy
+  else open_picker m (engine_picker m ~switch:(not (fresh m)))
 ;;
 
 let keep_session (m : Model.t) =
@@ -7061,7 +7350,7 @@ let hidden_messages (m : Model.t) ~path ~entry result =
   | _ -> m, []
 ;;
 
-let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
+let run_command_unchecked (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   let none = "" in
   let words =
     String.split rest ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
@@ -7101,7 +7390,8 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
          "/memory takes on or off, not %S; /memory alone shows the notes in \
           Settings."
          other)
-  | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
+  | "new", arg -> engine_command m ~switch:false arg
+  | "engine", arg -> engine_command m ~switch:true arg
   | "temporary", _ when temporary m -> open_dialog m Temporary_menu
   | "temporary", _ -> new_temporary_session m ~temporary:true
   | "model", "" -> open_picker m (model_picker m)
@@ -7508,6 +7798,29 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
            name
            spec.name
        | None -> sprintf "Unknown command /%s: /help lists the commands." name)
+;;
+
+(* The feature a slash command needs of the session's engine: checked before
+   any picker opens, so a refusal comes first. *)
+let command_feature ({ name; rest } : Slash.Parsed.t)
+  : Session_engine.Feature.t option
+  =
+  match name, String.strip rest with
+  | ("fork" | "clone"), _ -> Some Fork
+  | "rewind", _ -> Some Rewind
+  | ("trim" | "untrim"), _ | "delete", ("" | "undo") -> Some Context_edit
+  | "compact", _ -> Some Compact
+  | "downsize-images", _ -> Some Downsize_images
+  | "btw", q when not (String.is_empty q) -> Some Btw
+  | "plan", ("" | "on") -> Some Plan_mode
+  | _ -> None
+;;
+
+let run_command (m : Model.t) (parsed : Slash.Parsed.t) =
+  match m.state, command_feature parsed with
+  | Some s, Some feature when not (Session_engine.supports s.engine feature) ->
+    error m (Session_engine.refusal s.engine feature)
+  | _ -> run_command_unchecked m parsed
 ;;
 
 (* What the agent waits on the user for: confirmations first, then the
@@ -9246,6 +9559,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Nix_status { open_settings = true }, Error e ->
        error m (String.capitalize e)
      | _ -> m, [])
+  | Adapters_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Adapter_status.list_of_json json)
+          ~f:Error.to_string_hum)
+    in
+    { m with adapters = Adapters_page.loaded m.adapters result }, []
   | Usage_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -9496,7 +9817,24 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Refresh_sessions, Ok _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Models, Ok json ->
     decode m json (decode_list Llm.of_json) ~f:(fun models ->
-      { m with models }, [])
+      let m = { m with models } in
+      (* Another engine's models: the menu opens on the new current one's
+         provider rather than on one that offers nothing now. *)
+      let offered = offered_models m in
+      let model_menu =
+        if
+          List.mem
+            (Model_menu.tabs offered)
+            m.model_menu.tab
+            ~equal:Model_menu.Tab.equal
+        then m.model_menu
+        else
+          { (Model_menu.opening offered ~current:(menu_model_key m)) with
+            access_open = m.model_menu.access_open
+          ; engine_open = m.model_menu.engine_open
+          }
+      in
+      with_model_menu m model_menu)
   | Auth_status purpose, Ok json ->
     decode m json (decode_list Auth_status.of_json) ~f:(fun auth ->
       let m = { m with auth } in
@@ -10060,6 +10398,9 @@ let main_event (m : Model.t) (event : Event.t) =
   (* Saved, edited or forgotten here, elsewhere or by the model. *)
   | Custom_instructions_changed ci ->
     { m with instructions = Instruction_notes.changed m.instructions ci }, []
+  | Adapters_changed statuses ->
+    { m with adapters = Adapters_page.changed m.adapters statuses }, []
+  | Models_changed -> m, [ rpc "list_models" [] ~tag:Models ]
   | Memory_changed memory ->
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->
@@ -10732,6 +11073,7 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
       (match String.chop_prefix item.id ~prefix:"forge " with
        | Some host -> forge_logout m host
        | None -> logout m item.id)
+    | Engines { switch } -> engine_chosen m ~switch item.id
     | Verbosity ->
       (match
          List.find Prigh_ui.Verbosity.all ~f:(fun v ->
@@ -10971,6 +11313,7 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Instructions
   | Mcp
   | Git_hosts
+  | Engines
   | Usage
   | Nix_store
   | Account ->
@@ -11002,7 +11345,7 @@ let session_value (m : Model.t) (setting : Control_setting.t) =
   | None -> ""
   | Some state ->
     (match setting with
-     | Model -> state.model.name
+     | Model -> Session_engine.model_label state.engine ~model:state.model.name
      | Thinking -> Thinking.label (Thinking.normalize state.thinking)
      | Verbosity -> Prigh_ui.Verbosity.name m.verbosity
      | Host ->
@@ -11012,7 +11355,7 @@ let session_value (m : Model.t) (setting : Control_setting.t) =
         | Unset -> "none")
      | Mode -> Session_mode.label (Session_mode.of_state state)
      | Context ->
-       let cost = sprintf "$%.2f" state.cost_usd in
+       let cost = Prigh_ui.Loop_status.cost state in
        if state.model.context_window <= 0
        then cost
        else
@@ -11092,7 +11435,9 @@ let setting_value (m : Model.t) (setting : Control_setting.t) =
 
 let control_settings (m : Model.t) =
   List.filter_map Control_setting.all ~f:(fun setting ->
-    if Control_setting.superuser_only setting && not (superuser m)
+    if
+      (Control_setting.superuser_only setting && not (superuser m))
+      || (Control_setting.composer_only setting && not (composer_engine m))
     then None
     else
       Some
@@ -11686,6 +12031,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Complete_close -> { m with completion = None }, []
   | New_session -> new_session m
   | Set_temporary on -> set_temporary m on
+  | Pick_engine -> open_picker m (engine_picker m ~switch:false)
   | New_temporary when fresh m -> set_temporary m (not (temporary_shown m))
   | New_temporary -> new_temporary_session m ~temporary:true
   | Temporary_menu ->
@@ -11792,9 +12138,15 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Model_menu_access ->
     ( { m with
         model_menu =
-          { m.model_menu with access_open = not m.model_menu.access_open }
+          { m.model_menu with
+            access_open = not m.model_menu.access_open
+          ; engine_open = false
+          }
       }
     , [] )
+  | Model_menu_engine -> model_menu_engine m
+  | Model_menu_engine_pick key -> model_menu_engine_pick m key
+  | Model_menu_engine_picker -> model_menu_engine_picker m
   | Model_menu_nth n -> model_menu_nth m n
   | Toggle_favourite key ->
     let key =
@@ -11812,6 +12164,8 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
   | Usage_refresh -> fetch_usage m
+  | Adapters_refresh -> fetch_adapters ~refresh:true m
+  | Copy_text { text; copied } -> m, [ Command.Copy { text; copied } ]
   | Settings_section section ->
     (match m.dialog with
      | Some Settings ->
@@ -11821,7 +12175,11 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Settings_home -> { m with settings_home = true }, []
   | Settings_move move ->
     let section =
-      Settings_section.move m.settings_section move ~superuser:(superuser m)
+      Settings_section.move
+        ~composer:(composer_engine m)
+        m.settings_section
+        move
+        ~superuser:(superuser m)
     in
     let m, cmds =
       if Settings_section.equal m.settings_section section
@@ -12010,6 +12368,8 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with mcp = Option.value_exn (Mcp_page.escape m.mcp) }, []
      | Some (Popover { chip = Model; _ }), _ when m.model_menu.access_open ->
        { m with model_menu = { m.model_menu with access_open = false } }, []
+     | Some (Popover { chip = Model; _ }), _ when m.model_menu.engine_open ->
+       close_engine_menu m, []
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->
@@ -12395,6 +12755,26 @@ let settle (m : Model.t) cmds =
   | _ -> m, cmds
 ;;
 
+(* What the session's engine cannot do is refused here, in the backend's
+   words, rather than sent. *)
+let block_engine_refused (m : Model.t) cmds =
+  match m.state with
+  | None -> m, cmds
+  | Some (s : State.t) ->
+    let m, kept =
+      List.fold cmds ~init:(m, []) ~f:(fun (m, kept) cmd ->
+        match cmd with
+        | Command.Rpc { method_; params; _ } ->
+          (match Session_engine.refuse s.engine ~method_ ~params with
+           | Some why ->
+             let m, toast = error m why in
+             m, List.rev_append toast kept
+           | None -> m, cmd :: kept)
+        | _ -> m, cmd :: kept)
+    in
+    m, List.rev kept
+;;
+
 (* What leaves the session (for another, or another user). *)
 let leaves cmds =
   List.exists cmds ~f:(function
@@ -12442,6 +12822,7 @@ let rec update (m : Model.t) (action : Action.t) =
 
 and update_unguarded (m : Model.t) (action : Action.t) =
   let m', cmds = update_connected m action in
+  let m', cmds = block_engine_refused m' cmds in
   (* The drawer over the review goes with it. *)
   let m' =
     if m'.review_drawer && not m'.review.open_

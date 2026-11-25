@@ -19,6 +19,14 @@ module Home = struct
   [@@deriving sexp, jsonaf, equal]
 end
 
+module Fork_point = struct
+  type t =
+    { turn_id : string option [@jsonaf.option] [@sexp.option]
+    ; mark : string option [@jsonaf.option] [@sexp.option]
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Entry = struct
   module Payload = struct
     type t =
@@ -86,6 +94,32 @@ module Entry = struct
           }
       | Delete of { message : string }
       | Restore of { entry : string }
+      | Engine of
+          { engine : string
+          ; adapter : string option [@jsonaf.option] [@sexp.option]
+          }
+      | Thread of
+          { adapter : string
+          ; host : string
+          ; thread_id : string
+          ; cwd : string
+          ; fork_from : Fork_point.t option [@jsonaf.option] [@sexp.option]
+          }
+      | External_turn of
+          { thread_id : string
+          ; turn_id : string
+          ; through : string
+          ; first_turn_id : string option [@jsonaf.option] [@sexp.option]
+          ; mark : string option [@jsonaf.option] [@sexp.option]
+          ; before : string option [@jsonaf.option] [@sexp.option]
+          ; after : string option [@jsonaf.option] [@sexp.option]
+          ; cost_total : float option [@jsonaf.option] [@sexp.option]
+          }
+      | Handoff of
+          { from_adapter : string option [@jsonaf.option] [@sexp.option]
+          ; to_adapter : string
+          ; text : string
+          }
     [@@deriving sexp, jsonaf]
   end
 
@@ -206,6 +240,7 @@ module Path_state = struct
     ; reminders : Reminder.t list
     ; budget : float option option
     ; model : (string * Thinking.t) option
+    ; engine : (string * string option) option
     ; rev_allow_rules : string list
     ; rev_allowed_calls : Allowed_call.t list
     ; forgot_all : string option
@@ -226,6 +261,7 @@ module Path_state = struct
     ; reminders = []
     ; budget = None
     ; model = None
+    ; engine = None
     ; rev_allow_rules = []
     ; rev_allowed_calls = []
     ; forgot_all = None
@@ -400,6 +436,10 @@ let worth_saving (line : Line.t) =
           | Worktree_removed _
           | Home _
           | Transcript_filter _
+          | Engine _
+          | Thread _
+          | External_turn _
+          | Handoff _
           | Trim _
           | Untrim
           | Trim_after _
@@ -817,6 +857,10 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
     | Worktree_removed _
     | Home _
     | Transcript_filter _
+    | Engine _
+    | Thread _
+    | External_turn _
+    | Handoff _
     | Review _ -> acc
   in
   let reply : Path_state.Reply.t option =
@@ -846,6 +890,7 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
   | Reminders { reminders } -> { s with reminders }
   | Budget { usd } -> { s with budget = Some usd }
   | Model { model; thinking } -> { s with model = Some (model, thinking) }
+  | Engine { engine; adapter } -> { s with engine = Some (engine, adapter) }
   | Allow_rule { rule } ->
     { s with rev_allow_rules = rule :: s.rev_allow_rules }
   | Allowed_call call ->
@@ -873,6 +918,9 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
   | Worktree_removed _
   | Home _
   | Transcript_filter _
+  | Thread _
+  | External_turn _
+  | Handoff _
   | Trim _
   | Untrim
   | Trim_after _
@@ -1016,6 +1064,10 @@ let add_entry t (entry : Entry.t) =
   | Untrim
   | Trim_after _
   | Delete _
+  | Engine _
+  | Thread _
+  | External_turn _
+  | Handoff _
   | Restore _ -> ()
   | Repo { cwd; repo } ->
     Hashtbl.set t.repos ~key:cwd ~data:repo;
@@ -1502,6 +1554,10 @@ let context_cwds t =
       | Worktree_removed _
       | Home _
       | Transcript_filter _
+      | Engine _
+      | Thread _
+      | External_turn _
+      | Handoff _
       | Trim _
       | Untrim
       | Trim_after _
@@ -1544,6 +1600,126 @@ let reminder_names t =
 
 let budget t = (derived t).state.budget
 let model t = (derived t).state.model
+
+let last_model t ~f =
+  List.find_map
+    (List.rev (active_path t))
+    ~f:(fun (e : Entry.t) ->
+      match e.payload with
+      | Model { model; thinking } when f model -> Some (model, thinking)
+      | _ -> None)
+;;
+
+module Thread = struct
+  type t =
+    { adapter : string
+    ; host : string
+    ; thread_id : string
+    ; cwd : string
+    ; fork_from : Fork_point.t option
+    }
+  [@@deriving sexp_of, equal]
+end
+
+module External_turn = struct
+  type t =
+    { thread_id : string
+    ; turn_id : string
+    ; through : string
+    ; first_turn_id : string option
+    ; mark : string option
+    ; before : string option
+    ; after : string option
+    ; cost_total : float option
+    }
+  [@@deriving sexp_of, equal]
+end
+
+let engine t =
+  match (derived t).state.engine with
+  | None -> Ok Engine_choice.harness
+  | Some (engine, adapter) -> Engine_choice.of_strings ~engine ~adapter
+;;
+
+let set_engine t (choice : Engine_choice.t) =
+  append
+    t
+    (Engine
+       { engine = Engine_id.to_string choice.engine
+       ; adapter = Option.map choice.adapter ~f:Adapter_id.to_string
+       })
+;;
+
+let threads t =
+  List.rev_filter_map (active_path t) ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Thread { adapter; host; thread_id; cwd; fork_from } ->
+      Some { Thread.adapter; host; thread_id; cwd; fork_from }
+    | _ -> None)
+;;
+
+let record_thread t ({ adapter; host; thread_id; cwd; fork_from } : Thread.t) =
+  append t (Thread { adapter; host; thread_id; cwd; fork_from })
+;;
+
+let external_turns ?(all = false) t =
+  List.filter_map
+    (if all then entries t else active_path t)
+    ~f:(fun (e : Entry.t) ->
+      match e.payload with
+      | External_turn
+          { thread_id
+          ; turn_id
+          ; through
+          ; first_turn_id
+          ; mark
+          ; before
+          ; after
+          ; cost_total
+          } ->
+        Some
+          { External_turn.thread_id
+          ; turn_id
+          ; through
+          ; first_turn_id
+          ; mark
+          ; before
+          ; after
+          ; cost_total
+          }
+      | _ -> None)
+;;
+
+let record_external_turn
+      t
+      ({ thread_id
+       ; turn_id
+       ; through
+       ; first_turn_id
+       ; mark
+       ; before
+       ; after
+       ; cost_total
+       } :
+        External_turn.t)
+  =
+  append
+    t
+    (External_turn
+       { thread_id
+       ; turn_id
+       ; through
+       ; first_turn_id
+       ; mark
+       ; before
+       ; after
+       ; cost_total
+       })
+;;
+
+let record_handoff t ~from_adapter ~to_adapter ~text =
+  append t (Handoff { from_adapter; to_adapter; text })
+;;
 
 let in_context t id =
   List.exists (context t) ~f:(fun (i, _) ->
@@ -1640,6 +1816,8 @@ let fork ?at t ~dir =
          which may be on another branch. *)
       let texts = String.Hash_set.create () in
       let review = lazy (review t) in
+      let latest_thread = ref None in
+      let last_turns = String.Table.create () in
       let rec copy = function
         | [] -> ()
         | (e : Entry.t) :: rest ->
@@ -1688,6 +1866,11 @@ let fork ?at t ~dir =
             | Resume_at _
             | Agent_worktree _
             | Transcript_filter _ -> None
+            | Thread { adapter; host; thread_id; cwd; fork_from = _ } ->
+              latest_thread
+              := Some { Thread.adapter; host; thread_id; cwd; fork_from = None };
+              None
+            | External_turn _ -> None
             | payload -> Some payload
           in
           Option.iter payload ~f:(fun payload ->
@@ -1696,6 +1879,51 @@ let fork ?at t ~dir =
           if not (String.equal e.id at) then copy rest
       in
       copy path;
+      (* A run is recorded after its last entry: those whose entries were
+         copied, wherever they are. *)
+      List.iter path ~f:(fun (e : Entry.t) ->
+        match e.payload with
+        | External_turn { thread_id; turn_id; through; first_turn_id; mark; _ }
+          when Hashtbl.mem ids through ->
+          Hashtbl.set
+            last_turns
+            ~key:thread_id
+            ~data:(turn_id, renamed through, first_turn_id, mark)
+        | _ -> ());
+      (* The fork continues a fork of the thread its agent was on, from its
+         last turn in what was copied (agents that cannot fork one start
+         afresh, handed the session). *)
+      Option.iter !latest_thread ~f:(fun (thread : Thread.t) ->
+        Option.iter
+          (Hashtbl.find last_turns thread.thread_id)
+          ~f:(fun (turn_id, through, first_turn_id, mark) ->
+            ignore
+              (append
+                 forked
+                 (Thread
+                    { adapter = thread.adapter
+                    ; host = thread.host
+                    ; thread_id = thread.thread_id
+                    ; cwd = thread.cwd
+                    ; fork_from = Some { turn_id = Some turn_id; mark }
+                    })
+               : Entry.t);
+            (* What it saw, for handoffs; its files' checkpoints stay the
+               parent's. *)
+            ignore
+              (append
+                 forked
+                 (External_turn
+                    { thread_id = thread.thread_id
+                    ; turn_id
+                    ; through
+                    ; first_turn_id
+                    ; mark
+                    ; before = None
+                    ; after = None
+                    ; cost_total = None
+                    })
+               : Entry.t)));
       keep_hidden
         forked
         (List.map (hidden_kinds t) ~f:(fun (kind : Hidden.Kind.t) ->
@@ -1858,6 +2086,10 @@ let archived_and_activity t ~mtime =
         | Worktree_removed _
         | Home _
         | Transcript_filter _
+        | Engine _
+        | Thread _
+        | External_turn _
+        | Handoff _
         | Trim _
         | Untrim
         | Trim_after _
@@ -2305,6 +2537,10 @@ let to_markdown t =
     | Worktree_removed _
     | Home _
     | Transcript_filter _
+    | Engine _
+    | Thread _
+    | External_turn _
+    | Handoff _
     | Trim _
     | Untrim
     | Trim_after _

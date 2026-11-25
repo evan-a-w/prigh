@@ -313,3 +313,110 @@ let%expect_test "the ring opens its card; Esc closes it" =
     <div class="context-ring-anchor flex relative shrink-0">
     |}]
 ;;
+
+let%expect_test "the session's model is listed even when it is an old one" =
+  let h = many () in
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ ( "model"
+              , Jsonaf.of_string
+                  (H.model_json
+                     ~provider:"anthropic"
+                     ~id:"claude-opus-4-1"
+                     ~name:"Claude Opus 4.1"
+                     ()) )
+            ]
+          ()));
+  H.key h "l" ~ctrl:true;
+  menu h;
+  [%expect
+    {|
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    <button class="model-rail-tab on">
+    Claude Opus 5.5 Alt+1 (Star: into the favourites (Alt+F))
+    Claude Sonnet 5 Alt+2 (Star: into the favourites (Alt+F))
+    Claude Haiku 5 Alt+3 (Star: into the favourites (Alt+F))
+    Claude Opus 5 Alt+4 (Star: into the favourites (Alt+F))
+    Claude Sonnet 4.5 Alt+5 (Star: into the favourites (Alt+F))
+    Claude Haiku 4.5 Alt+6 (Star: into the favourites (Alt+F))
+    Claude Opus 4.1 Alt+7 (Star: into the favourites (Alt+F)) ✓
+    |}]
+;;
+
+let%expect_test "short names: only a maker's name goes" =
+  List.iter
+    [ "Claude Opus 4.6"
+    ; "Claude Opus 4.6 (Thinking)"
+    ; "GPT-6.2 Sol"
+    ; "GPT-6.2-Sol"
+    ; "GPT-OSS 120B (Medium)"
+    ; "Gemini 3.8 Flash"
+    ; "Opus 5.5 (1M context)"
+    ; "DeepSeek V4 Pro"
+    ; "Default"
+    ]
+    ~f:(fun name ->
+      printf "%s -> %s\n" name (Prigh_web.Model_menu.short_name name));
+  [%expect
+    {|
+    Claude Opus 4.6 -> Opus 4.6
+    Claude Opus 4.6 (Thinking) -> Opus 4.6 (Thinking)
+    GPT-6.2 Sol -> 6.2 Sol
+    GPT-6.2-Sol -> GPT-6.2-Sol
+    GPT-OSS 120B (Medium) -> GPT-OSS 120B (Medium)
+    Gemini 3.8 Flash -> Gemini 3.8 Flash
+    Opus 5.5 (1M context) -> Opus 5.5 (1M context)
+    DeepSeek V4 Pro -> V4 Pro
+    Default -> Default
+    |}]
+;;
+
+let%expect_test "newest first, a CLI's models in its own order where they stand"
+  =
+  let model provider id name : Prigh_protocol.Model.t =
+    { id
+    ; provider
+    ; key = provider ^ "/" ^ id
+    ; name
+    ; context_window = 0
+    ; max_output = 0
+    ; supports_thinking = false
+    ; thinking_options = []
+    ; thinking_default = None
+    ; cost = { input = 0.; output = 0.; cache_read = 0. }
+    ; image_limit = None
+    ; legacy = false
+    }
+  in
+  Prigh_web.Model_menu.newest_first
+    [ model "anthropic" "opus-4" "Opus 4"
+    ; model "codex" "default" "GPT-5"
+    ; model "codex" "gpt-6" "GPT-6"
+    ; model "anthropic" "opus-5" "Opus 5"
+    ; model "openai" "o3" "o3"
+    ; model "codex" "gpt-4" "GPT-4"
+    ; model "anthropic" "haiku" "Haiku"
+    ]
+  |> List.iter ~f:(fun (m : Prigh_protocol.Model.t) -> print_endline m.key);
+  List.iter [ "acp:opencode"; "acp:goose"; "custom" ] ~f:(fun p ->
+    printf "%s: %s\n" p (Prigh_web.Provider_mark.letter p));
+  [%expect
+    {|
+    anthropic/opus-5
+    codex/default
+    codex/gpt-6
+    anthropic/opus-4
+    openai/o3
+    codex/gpt-4
+    anthropic/haiku
+    acp:opencode: O
+    acp:goose: G
+    custom: C
+    |}]
+;;

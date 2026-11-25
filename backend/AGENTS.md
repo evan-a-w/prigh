@@ -8,24 +8,36 @@ subdirectories with `(include_subdirs unqualified)`, so a module's name
 does not depend on its directory: moving a file between groups changes no
 code. Put a new module in the group it belongs to:
 
-- `agent/` — `Agent`, `Agent_loop`, compaction, approvals, plans, goals,
-  reminders, subagents' log, the system prompt, skills
+- `agent/` — `Agent`, `Agent_loop`, `Harness_runner`, compaction,
+  approvals, plans, goals, reminders, review, subagents' log, the system
+  prompt, skills, memory
+- `engine/` — what both engines share: `Runner` (`Engine_intf`),
+  `Capabilities`, `Engines` (what is deployed), `Engine_choice`,
+  `Adapter_id`, `Adapter_event`, `External_model`, `Acp_agent`
+- `composer/` — the composer engine: `Composer_runner`,
+  `Composer_recorder`, adapters (`Adapter`, `Prigh_adapter`), transports
+  (`Line_transport`, `Host_transport`), `Injected_tools`, `Handoff`,
+  `Adapter_health`, `Fake_cli`; `codex/`, `claude/` and `acp/` hold each
+  CLI's codec and adapter
 - `session/` — the JSONL `Session` and what it records: `Message`,
-  `Content`, `Image`, `Usage`, pages and outlines of a transcript
+  `Content`, `Image`, `Usage`, pages, outlines and search of a transcript
 - `providers/` — `Provider`, `Provider_router`, Anthropic, OpenAI, DeepSeek,
-  custom and faux providers, models, SSE and the HTTP client
-- `auth/` — credentials, `Auth_store`, OAuth flows, `Login_manager`
+  custom and faux providers, `Model`, `Model_registry`, `Sse`, `Http_client`
+- `auth/` — `Credential`, `Auth_store`, `Provider_auth`, OAuth flows,
+  `Login_manager`
 - `tools/` — `Tool`, `Tools`, the built-in tools (`Tool_*`) and their
-  helpers (processes, patches, truncation, HTML to text)
-- `host/` — `Tool_host`, `Host_ops`, the tool host's files and git
+  helpers (`Process`, `Apply_patch`, `Truncate`, HTML to text)
+- `host/` — `Tool_host`, `Host_ops`, `Host_process`, `Host_stream`, the tool
+  host's files, git and worktrees
 - `forge/` — git hosting: GitHub and Forgejo sign-ins, their REST APIs,
   pull requests (`Forges`)
 - `mcp/` — MCP client, config, hub and tools
 - `computer/` — computer use: `Computer_action`, `Computer_info`, the
   `prigh-computer` client (`Computer_helper`, `Computer_fake` for tests),
   `Tool_computer`, `Computer_screenshots`
-- `rpc/` — `Rpc_server`, `Rpc_router`, `Rpc_json`, namespaces and access,
-  `Web_server`, `Websocket`, static and file HTTP
+- `rpc/` — `Rpc_server`, `Rpc_router`, `Rpc_json`, namespaces, users and
+  access, `Engine_gate`, `Web_server`, `Websocket`, static and file HTTP,
+  `prigh web` and `prigh desktop`
 - `acp/` — `prigh acp`, the Agent Client Protocol for editors: `Acp`
   and its `Acp_*` helpers, on `Json_rpc` and `Rpc_client`
 - `nix/` — the Nix store for superusers: `Nix_store` (status, one garbage
@@ -33,7 +45,8 @@ code. Put a new module in the group it belongs to:
   container's root helper), what Nix prints and the reports
 - `terminal/` — the browser terminals: `Terminal`, `Terminals`, tmux control,
   relays
-- `util/` — `Import`, `Config`, `Cancellation`, `Guarded`, UTF-8 and other
+- `trace/` — tracing (see "Tracing" in `ARCHITECTURE.md`)
+- `util/` — `Import`, `Config`, `Cancellation`, `Guarded`, `Utf8` and other
   small shared pieces
 
 `test/` stays flat: its subdirectories are separate dune targets

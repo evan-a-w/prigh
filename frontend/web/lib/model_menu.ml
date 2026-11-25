@@ -12,17 +12,26 @@ type t =
   { tab : Tab.t
   ; more : bool
   ; access_open : bool
+  ; engine_open : bool
   }
 [@@deriving sexp_of, equal]
 
-let init = { tab = Favourites; more = false; access_open = false }
+let init =
+  { tab = Favourites; more = false; access_open = false; engine_open = false }
+;;
+
 let shown = 6
 
 let offered (models : Llm.t list) ~(auth : Auth_status.t list) ~current =
+  (* A provider prigh has no login for is a CLI's (Codex, Claude Code), which
+     lists only what its own login offers. *)
   let signed_in provider =
-    List.is_empty auth
-    || List.exists auth ~f:(fun s ->
-      String.equal s.provider provider && Option.is_some s.configured)
+    match
+      List.find auth ~f:(fun (s : Auth_status.t) ->
+        String.equal s.provider provider)
+    with
+    | None -> true
+    | Some s -> Option.is_some s.configured
   in
   List.filter models ~f:(fun model ->
     Option.equal String.equal current (Some model.key)
@@ -32,7 +41,8 @@ let offered (models : Llm.t list) ~(auth : Auth_status.t list) ~current =
 (* The first run of digits and dots: "GPT-6.2 Sol" is [6; 2]. *)
 let version name =
   let start =
-    String.lfindi name ~f:(fun _ c -> Char.is_digit c) |> Option.value ~default:(-1)
+    String.lfindi name ~f:(fun _ c -> Char.is_digit c)
+    |> Option.value ~default:(-1)
   in
   if start < 0
   then None
@@ -48,12 +58,26 @@ let version name =
 ;;
 
 let newest_first models =
-  List.stable_sort models ~compare:(fun (a : Llm.t) (b : Llm.t) ->
-    match version a.name, version b.name with
-    | Some a, Some b -> List.compare Int.compare b a
-    | Some _, None -> -1
-    | None, Some _ -> 1
-    | None, None -> 0)
+  (* A CLI's (it has a [default]) stay in its order: its default first. *)
+  let cli =
+    List.filter_map models ~f:(fun (m : Llm.t) ->
+      Option.some_if (String.equal m.id "default") m.provider)
+  in
+  let is_cli (m : Llm.t) = List.mem cli m.provider ~equal:String.equal in
+  (* The others are sorted among themselves, in the places they held. *)
+  let sorted =
+    List.filter models ~f:(Fn.non is_cli)
+    |> List.stable_sort ~compare:(fun (a : Llm.t) (b : Llm.t) ->
+      match version a.name, version b.name with
+      | Some a, Some b -> List.compare Int.compare b a
+      | Some _, None -> -1
+      | None, Some _ -> 1
+      | None, None -> 0)
+  in
+  List.folding_map models ~init:sorted ~f:(fun sorted m ->
+    match sorted with
+    | next :: rest when not (is_cli m) -> rest, next
+    | _ -> sorted, m)
 ;;
 
 let providers (models : Llm.t list) =
@@ -83,7 +107,7 @@ let opening (models : Llm.t list) ~current =
   { init with tab }
 ;;
 
-let rows t (models : Llm.t list) ~favourites =
+let rows ?current t (models : Llm.t list) ~favourites =
   match t.tab with
   | Favourites ->
     ( List.filter_map favourites ~f:(fun key ->
@@ -96,7 +120,21 @@ let rows t (models : Llm.t list) ~favourites =
     in
     if t.more
     then all, 0
-    else List.take all shown, Int.max 0 (List.length all - shown)
+    else (
+      let first = List.take all shown in
+      (* The session's model is in the list even when it is an old one. *)
+      let first =
+        match
+          List.find all ~f:(fun (l : Llm.t) ->
+            Option.equal String.equal current (Some l.key))
+        with
+        | Some l
+          when not
+                 (List.exists first ~f:(fun (f : Llm.t) ->
+                    String.equal f.key l.key)) -> first @ [ l ]
+        | _ -> first
+      in
+      first, Int.max 0 (List.length all - List.length first))
 ;;
 
 let set_tab t tab =
@@ -113,16 +151,29 @@ let step t models delta =
   set_tab t tabs.((i + delta) % n)
 ;;
 
+let makers = [ "claude"; "gpt"; "gemini"; "deepseek"; "grok" ]
+
 let short_name name =
+  let maker word =
+    List.mem makers (String.lowercase word) ~equal:String.equal
+  in
   match String.split name ~on:' ' with
-  | first :: (_ :: _ as rest) ->
+  | first :: (second :: _ as rest) ->
     (match String.lsplit2 first ~on:'-' with
-     | Some (_, suffix)
-       when (not (String.is_empty suffix)) && Char.is_digit suffix.[0] ->
+     | Some (family, suffix)
+       when maker family
+            && (not (String.is_empty suffix))
+            && Char.is_digit suffix.[0] ->
        String.concat ~sep:" " (suffix :: rest)
      | _ ->
-       (match rest with
-        | _ :: _ :: _ -> String.concat ~sep:" " rest
-        | _ -> name))
+       (* Only a maker's name goes, and only before a word: "Claude Opus
+          4.6" is "Opus 4.6", "Gemini 3.8 Flash" stays. *)
+       if
+         maker first
+         && List.length rest >= 2
+         && (not (String.is_empty second))
+         && Char.is_alpha second.[0]
+       then String.concat ~sep:" " rest
+       else name)
   | _ -> name
 ;;

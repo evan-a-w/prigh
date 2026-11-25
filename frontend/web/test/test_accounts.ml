@@ -130,6 +130,7 @@ let signed_in_as ?(users = false) user =
        ; user = Some user
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.act
     h
@@ -198,6 +199,7 @@ let%expect_test "the settings page: the account, switching it, signing out" =
        ; user = Some "alice"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.quiet h (fun () -> H.act h (Settings_section Account));
   account h;
@@ -304,6 +306,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
        ; user = Some "alice"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.act h Start;
   [%expect
@@ -394,6 +397,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
        ; user = Some "bob"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.act h Start;
   H.fail h "list_users" "unauthorised: bob is not a superuser";
@@ -438,6 +442,7 @@ let%expect_test "switching user resets everything that was the old user's" =
        ; user = Some "alice"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.act
     h

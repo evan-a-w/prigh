@@ -3,8 +3,8 @@ open! Import
 
 (** The model chip's menu beyond its list ([Dialog.Popover] holds the list's
     filter and highlight): which provider's models it shows (or the
-    favourites), whether all of them, and whether the access menu in its
-    foot is open. Also what the menu offers, and in which order. *)
+    favourites), whether all of them, and whether the access or engine menu
+    in its foot is open. Also what the menu offers, and in which order. *)
 
 module Tab : sig
   type t =
@@ -17,6 +17,7 @@ type t =
   { tab : Tab.t
   ; more : bool (** the provider's older models too ("Show more") *)
   ; access_open : bool (** the foot's menu of modes *)
+  ; engine_open : bool (** the foot's menu of engines *)
   }
 [@@deriving sexp_of, equal]
 
@@ -35,7 +36,8 @@ val offered
   -> Llm.t list
 
 (** Newest first: by the version in the name ("GPT-6.2 Sol": 6.2), those
-    without one last; equal versions keep their order. *)
+    without one last; equal versions keep their order. A CLI's models (its
+    provider has a [default]) keep the order it gave. *)
 val newest_first : Llm.t list -> Llm.t list
 
 (** The rail: the favourites, then each provider with a model on offer, in
@@ -47,15 +49,20 @@ val opening : Llm.t list -> current:string option -> t
 
 (** The rows of the tab (favourites in the order they were starred, a
     provider's newest first, cut to {!shown} unless [more]), and how many
-    "Show more" adds. *)
-val rows : t -> Llm.t list -> favourites:string list -> Llm.t list * int
+    "Show more" adds; the [current] model is always among them. *)
+val rows
+  :  ?current:string
+  -> t
+  -> Llm.t list
+  -> favourites:string list
+  -> Llm.t list * int
 
 (** The next tab along the rail, wrapping. *)
 val step : t -> Llm.t list -> int -> t
 
 val set_tab : t -> Tab.t -> t
 
-(** Short for the composer's chip: the family goes ("GPT-6.2 Sol" is "6.2
-    Sol", "Claude Opus 5.5" "Opus 5.5"); names of two words or fewer stay
-    whole. *)
+(** Short for the composer's chip: a maker's name goes ("GPT-6.2 Sol" is
+    "6.2 Sol", "Claude Opus 5.5" "Opus 5.5"); others stay whole ("GPT-OSS
+    120B (Medium)", "Gemini 3.8 Flash"). *)
 val short_name : string -> string

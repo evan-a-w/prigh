@@ -44,6 +44,7 @@ module Argument = struct
     | Review
     | Trim
     | Delete
+    | Adapter
   [@@deriving sexp_of, equal]
 end
 
@@ -74,7 +75,17 @@ let every =
       "settings"
       "appearance, sessions, new sessions' defaults, models, git hosting and \
        your account; a section opens at it (Ctrl+,)"
-  ; c "new" "start a new session"
+  ; c
+      "new"
+      "start a new session (/new ENGINE: on another engine or adapter, e.g. \
+       codex or claude, when the backend runs several; the new-session screen \
+       picks one too)"
+  ; c
+      ~argument:Adapter
+      ~args:"[adapter]"
+      "engine"
+      "switch this session to another of the composer's adapters (codex, \
+       claude, ...): it carries on from a summary of the session so far"
   ; c
       "temporary"
       "a temporary session: not saved or listed, deleted when you leave it \

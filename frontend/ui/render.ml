@@ -986,18 +986,25 @@ let status (m : App.Model.t) : Content.Line.t =
     let cwd =
       if s.chat_mode then [] else [ span ~style:base (format_cwd m s) ]
     in
-    let model = [ span ~style:base s.model.id ] in
-    let after_model =
-      [ ( 4
-        , [ span
-              ~style:base
-              (sprintf
-                 "think:%s"
-                 (if s.model.supports_thinking
-                  then P.Thinking.normalize s.thinking
-                  else "n/a"))
-          ] )
+    let model =
+      [ span
+          ~style:base
+          (P.Session_engine.model_label s.engine ~model:s.model.id)
       ]
+    in
+    let after_model =
+      Option.value_map s.engine.unavailable ~default:[] ~f:(fun _ ->
+        [ 1, [ span ~style:attention "unavailable" ] ])
+      @ [ ( 4
+          , [ span
+                ~style:base
+                (sprintf
+                   "think:%s"
+                   (if s.model.supports_thinking
+                    then P.Thinking.normalize s.thinking
+                    else "n/a"))
+            ] )
+        ]
       @ mode_part s
       @ [ 7, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ] ]
       @ Option.value_map
@@ -1008,7 +1015,7 @@ let status (m : App.Model.t) : Content.Line.t =
       @ [ 2, [ span ~style:(context_style context) (context_text s) ]
         ; ( 4
           , match Loop_status.budget_part s with
-            | None -> [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
+            | None -> [ span ~style:base (Loop_status.cost s) ]
             | Some (text, level) -> [ span ~style:(level_style level) text ] )
         ]
       @ Option.value_map s.goal ~default:[] ~f:(fun goal ->
@@ -1747,6 +1754,17 @@ let composer (m : App.Model.t) : Content.t * (int * int) =
            ]
          ]
        , cursor )
+     | None when Editor.is_empty m.editor ->
+       (match Option.bind m.state ~f:(fun s -> s.engine.unavailable) with
+        | Some why ->
+          ( [ Content.Line.truncate
+                ~width:m.width
+                [ span ~style:marker_style "> "
+                ; span ~style:attention (" can't run here: " ^ why)
+                ]
+            ]
+          , cursor )
+        | None -> rows, cursor)
      | _ -> rows, cursor)
   | Picker _ | Question _ | Sign_in _ | Pr_form _ | Search _ ->
     editor_rows m ~marker:"> " ~marker_style:elsewhere ~mask:false

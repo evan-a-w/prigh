@@ -193,6 +193,7 @@ module Message = struct
     ; newest : bool
     ; running : bool
     ; select : bool
+    ; no_edit : string option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -230,18 +231,31 @@ let message_picker (msg : Message.t) =
         "Trim everything before this"
         ~command:"/trim"
         ~unless:
-          (if msg.running
-           then true, running
-           else msg.first, "The context starts here")
+          (match msg.no_edit with
+           | Some why -> true, why
+           | None ->
+             if msg.running
+             then true, running
+             else msg.first, "The context starts here")
     ; item
         Trim_after
         "Trim everything after this"
         ~command:"/trim after"
         ~unless:
-          (if msg.running
-           then true, running
-           else msg.newest, "Nothing after it: the newest message")
-    ; item Delete "Delete" ~command:"/delete" ~unless:(msg.running, running)
+          (match msg.no_edit with
+           | Some why -> true, why
+           | None ->
+             if msg.running
+             then true, running
+             else msg.newest, "Nothing after it: the newest message")
+    ; item
+        Delete
+        "Delete"
+        ~command:"/delete"
+        ~unless:
+          (match msg.no_edit with
+           | Some why -> true, why
+           | None -> msg.running, running)
     ]
 ;;
 

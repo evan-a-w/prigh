@@ -162,6 +162,8 @@ type t =
       ; kept : (string * string) list
       }
   | Prefs_changed of Prefs.Change.t list
+  | Adapters_changed of Adapter_status.t list
+  | Models_changed
   | Memory_changed of Memory.t
   | Custom_instructions_changed of Custom_instructions.t
   | User_info_changed of User_info.t
@@ -249,12 +251,15 @@ let rec of_json j =
     Temporary_ended { session; messages; kept }
   | "nix_gc_progress" ->
     Nix_gc_progress.of_json j >>| fun p -> Nix_gc_progress p
+  | "adapters_changed" ->
+    Adapter_status.list_of_json j >>| fun l -> Adapters_changed l
   | "memory_changed" -> Memory.of_json j >>| fun m -> Memory_changed m
   | "custom_instructions_changed" ->
     Custom_instructions.of_json j >>| fun c -> Custom_instructions_changed c
   | "user_info_changed" ->
     User_info.of_json j >>| fun info -> User_info_changed info
   | "mcp_auth_changed" -> Ok Mcp_auth_changed
+  | "models_changed" -> Ok Models_changed
   | "mcp_settings_changed" ->
     Mcp_settings.of_json j >>| fun servers -> Mcp_settings_changed servers
   | "prefs_changed" ->

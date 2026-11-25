@@ -300,6 +300,8 @@
 /* The model's sheet: the rail along the top, the list, then the reasoning
    levels as a row of choices under it; the access mode at its foot. */
 .app.narrow .chip-popover.model-menu { padding-left: 0 !important; padding-right: 0 !important; overflow: visible; }
+/* One height whatever the provider or engine: the sheet does not jump. */
+.app.narrow .chip-popover.model-menu { height: min(560px, 78dvh, calc(var(--vvh, 100dvh) - var(--safe-t) - 24px)); }
 .app.narrow .model-menu-body { flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
 .app.narrow .model-rail {
   flex-direction: row;

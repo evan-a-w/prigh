@@ -2402,7 +2402,8 @@ let%expect_test "MCP sign-ins: the listing, the event, an OAuth client" =
   in
   round_trip
     {|{"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}|};
-  [%expect {|
+  [%expect
+    {|
     (Http
       (url https://x.example/mcp)
       (headers ())
@@ -2450,5 +2451,103 @@ let%expect_test "remembered calls: in the state, and forgetting them" =
      "read {\"path\":\"a\"} on box in /work (by m)")
     {"id":1,"method":"forget_allowed_call","params":{"call":"bash {\"command\":\"make\"} on box in /work (by you)"}}
     {"id":1,"method":"forget_allowed_call","params":{"all":true}}
+    |}]
+;;
+
+let%expect_test "state: the session's engine (absent means the harness)" =
+  let engine json =
+    match Json.parse json |> Or_error.bind ~f:State.of_json with
+    | Ok state ->
+      print_s
+        [%sexp
+          (state.engine : Session_engine.t)
+        , (Session_engine.is_harness state.engine : bool)]
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  let base =
+    {|"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"m","provider":"p","key":"p/m","name":"M","context_window":1,"max_output":1,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0|}
+  in
+  engine (sprintf "{%s}" base);
+  engine
+    (sprintf
+       {|{%s,"engine":"composer","adapter":"codex","capabilities":{"rewind":"by_handoff","compact":"auto_only","steer":"between_turns","plan_mode":false,"subagents":"observe","something_new":true},"unavailable":"the composer engine isn't available in this build of prigh yet"}|}
+       base);
+  engine
+    (sprintf
+       {|{%s,"engine":"composer","capabilities":{"fork":"sideways"}}|}
+       base);
+  [%expect
+    {|
+    (((engine harness)
+      (capabilities (
+        (fork           Native)
+        (rewind         Native)
+        (context_edit   true)
+        (compact        Native)
+        (steer          In_run)
+        (plan_mode      true)
+        (btw            true)
+        (subagents      Full)
+        (model_fallback true)
+        (images         true)
+        (ask_user       true))))
+     true)
+    (((engine  composer)
+      (adapter codex)
+      (capabilities (
+        (fork           Native)
+        (rewind         By_handoff)
+        (context_edit   true)
+        (compact        Auto_only)
+        (steer          Between_turns)
+        (plan_mode      false)
+        (btw            true)
+        (subagents      Observe)
+        (model_fallback true)
+        (images         true)
+        (ask_user       true)))
+      (unavailable
+       "the composer engine isn't available in this build of prigh yet"))
+     false)
+    (((engine composer)
+      (capabilities (
+        (fork           Unsupported)
+        (rewind         Native)
+        (context_edit   true)
+        (compact        Native)
+        (steer          In_run)
+        (plan_mode      true)
+        (btw            true)
+        (subagents      Full)
+        (model_fallback true)
+        (images         true)
+        (ask_user       true))))
+     false)
+    |}]
+;;
+
+let%expect_test "hello reply: the engines a backend deploys" =
+  List.iter
+    [ {|{"client_id":"c"}|}
+    ; {|{"client_id":"c","features":["pasted_text","engines"],"engines":["harness","composer"],"adapters":["codex","claude"]}|}
+    ; {|{"client_id":"c","engines":"harness"}|}
+    ]
+    ~f:(fun json ->
+      let d =
+        Deployed_engines.of_hello_json (Or_error.ok_exn (Json.parse json))
+      in
+      print_s
+        [%sexp
+          (d : Deployed_engines.t Or_error.t)
+        , (Or_error.map d ~f:Deployed_engines.has_choice : bool Or_error.t)]);
+  [%expect
+    {|
+    ((Ok ((engines (harness)))) (Ok false))
+    ((Ok (
+       (engines  (harness composer))
+       (adapters (codex   claude))))
+     (Ok true))
+    ((Error "field \"engines\": expected array, got \"harness\"")
+     (Error "field \"engines\": expected array, got \"harness\""))
     |}]
 ;;

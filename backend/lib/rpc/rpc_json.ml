@@ -482,11 +482,72 @@ let hidden (h : Session.Hidden.t) =
     )
 ;;
 
+let history_op : Capabilities.History_op.t -> Json.t = function
+  | Unsupported -> str "unsupported"
+  | Native -> str "native"
+  | By_handoff -> str "by_handoff"
+;;
+
+let capabilities (c : Capabilities.t) =
+  let bool b = if b then `True else `False in
+  `Object
+    ([ "fork", history_op c.fork
+    ; "rewind", history_op c.rewind
+    ; "context_edit", bool c.context_edit
+    ; ( "compact"
+      , str
+          (match c.compact with
+           | Unsupported -> "unsupported"
+           | Native -> "native"
+           | Auto_only -> "auto_only") )
+    ; ( "steer"
+      , str
+          (match c.steer with
+           | Between_turns -> "between_turns"
+           | In_run -> "in_run") )
+    ; "plan_mode", bool c.plan_mode
+    ; "btw", bool c.btw
+    ; ( "subagents"
+      , str
+          (match c.subagents with
+           | Unsupported -> "unsupported"
+           | Observe -> "observe"
+           | Full -> "full") )
+    ; "model_fallback", bool c.model_fallback
+    ; "images", bool c.images
+    ; "ask_user", bool c.ask_user
+    ]
+    @ Option.value_map c.rewind_note ~default:[] ~f:(fun note ->
+      [ "rewind_note", str note ]))
+;;
+
+(* The harness's sessions (every one from before engines) carry none of
+   this, so frontends treat its absence as the harness with everything. *)
+let engine_fields (s : Agent.State.t) =
+  (if Engine_choice.is_harness s.engine
+   then []
+   else
+     [ "engine", str (Engine_id.to_string s.engine.engine)
+     ; ( "adapter"
+       , Option.value_map s.engine.adapter ~default:`Null ~f:(fun a ->
+           str (Adapter_id.to_string a)) )
+     ])
+  @ (if
+       Sexp.equal
+         (Capabilities.sexp_of_t s.capabilities)
+         (Capabilities.sexp_of_t Capabilities.harness)
+     then []
+     else [ "capabilities", capabilities s.capabilities ])
+  @ Option.value_map s.unavailable ~default:[] ~f:(fun u ->
+    [ "unavailable", str u ])
+;;
+
 let state (s : Agent.State.t) =
   match state s with
   | `Object fields ->
     `Object
       (fields
+       @ engine_fields s
        @ home s.home
        @ Option.value_map s.trim ~default:[] ~f:(fun t -> [ "trim", trim t ])
        @ Option.value_map s.transcript_filter ~default:[] ~f:(fun f ->
@@ -631,6 +692,30 @@ let entry (e : Session.Entry.t) =
       [ "kind", str "trim_after"; "after", str after; "through", str through ]
     | Delete { message } -> [ "kind", str "delete"; "message", str message ]
     | Restore { entry } -> [ "kind", str "restore"; "entry", str entry ]
+    | Engine { engine; adapter } ->
+      [ "kind", str "engine"
+      ; "engine", str engine
+      ; "adapter", Option.value_map adapter ~default:`Null ~f:str
+      ]
+    | Thread { adapter; host; thread_id; cwd; fork_from = _ } ->
+      [ "kind", str "thread"
+      ; "adapter", str adapter
+      ; "host", str host
+      ; "thread_id", str thread_id
+      ; "cwd", str cwd
+      ]
+    | External_turn { thread_id; turn_id; through; _ } ->
+      [ "kind", str "external_turn"
+      ; "thread_id", str thread_id
+      ; "turn_id", str turn_id
+      ; "through", str through
+      ]
+    | Handoff { from_adapter; to_adapter; text } ->
+      [ "kind", str "handoff"
+      ; "from_adapter", Option.value_map from_adapter ~default:`Null ~f:str
+      ; "to_adapter", str to_adapter
+      ; "text", str text
+      ]
   in
   `Object
     ([ "id", str e.id

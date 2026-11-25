@@ -259,6 +259,7 @@ let%expect_test
        ; user = Some "alice"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   run h "/accent teal";
   [%expect

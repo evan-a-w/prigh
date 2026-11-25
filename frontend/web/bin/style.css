@@ -1217,10 +1217,15 @@ kbd {
    A rail of the favourites and the providers; the search over the tab's
    models; the current model's reasoning levels; the access mode in its
    foot. */
-/* Not clipped: the access mode's menu rises out of its foot, over the rest
-   (and past its top when the list is short); the body clips its own. */
+/* Not clipped: the access mode's menu rises out of its foot, over the rest;
+   the body clips its own. Its size and place hold while it is open, whatever
+   the provider, engine or the chip's label (place_popover sets its right
+   edge from the chip's, which stays put): a short list leaves room. */
 .chip-popover.model-menu {
   width: 600px;
+  left: auto;
+  right: var(--popover-right, 0px);
+  height: min(420px, var(--popover-room, 70vh));
   max-height: min(420px, var(--popover-room, 70vh));
   overflow: visible;
 }
@@ -1366,7 +1371,18 @@ kbd {
   border-top: 1px solid var(--border);
 }
 .model-menu-foot > .menu-keys { padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-foot-controls { display: flex; align-items: center; gap: 2px; flex: none; min-width: 0; }
 .model-access { position: relative; flex: none; }
+.model-engine .model-access-button { width: 132px; justify-content: flex-start; }
+.model-engine .model-access-button .chevron { margin-left: auto; }
+.model-engine .model-access-button .chip-label { flex: 0 1 auto; min-width: 0; }
+.model-engine .model-access-button .chip-label { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-engine .model-access-button .provider-mark, .model-engine .model-access-item .provider-mark { width: 14px; height: 14px; flex: none; }
+.model-engine .model-access-menu { width: 300px; }
+.model-engine .model-access-item .menu-detail { white-space: normal; }
+.model-engine .model-access-item.trouble .menu-detail { color: var(--destructive); }
+.model-engine .model-access-item:disabled { opacity: 0.55; cursor: default; }
+.model-engine-busy { padding: 6px 8px; color: var(--muted-foreground); font-size: 12px; }
 .model-access-button {
   display: inline-flex;
   align-items: center;

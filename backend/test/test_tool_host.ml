@@ -477,6 +477,68 @@ let%expect_test "stdio worker: exec, output, cancel" =
     |}]
 ;;
 
+let%expect_test "stdio worker: $process lines both ways" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let w = Worker.start t ~sw in
+  let peer =
+    Filename.concat (Sys_unix.getcwd ()) "fake_line_peer/fake_line_peer.exe"
+  in
+  (* The pid and the paths of the peer and of prigh vary. *)
+  let mask line =
+    Re.replace
+      (Re.compile (Re.Perl.re {|\\"(pid|path|prigh)\\":(\\"[^\\]*\\"|[0-9]+)|}))
+      ~f:(fun group ->
+        sprintf {|\"%s\":<%s>|} (Re.Group.get group 1) (Re.Group.get group 1))
+      line
+    |> mask t
+  in
+  let input frame =
+    Worker.send
+      w
+      (Json.to_string
+         (`Object
+             [ "type", `String "input"
+             ; "exec_id", `String "p1"
+             ; "data", `String (Host_process.Down.to_line frame)
+             ]))
+  in
+  let next () =
+    Option.iter (Worker.read_line w) ~f:(fun l -> print_endline (mask l))
+  in
+  Worker.send
+    w
+    (Json.to_string
+       (`Object
+           [ "type", `String "exec"
+           ; "exec_id", `String "p1"
+           ; "name", `String Host_process.op
+           ; ( "arguments"
+             , Host_process.Arguments.to_json
+                 (Host_process.Arguments.create ~argv:[ peer ]) )
+           ; "cwd", `String t.dir
+           ; "stdin", `True
+           ]));
+  next ();
+  input (In "hello");
+  next ();
+  input Close;
+  next ();
+  next ();
+  Worker.close w;
+  ignore (Worker.read_line w : string option);
+  [%expect
+    {|
+    {"type":"output","exec_id":"p1","chunk":"{\"t\":\"started\",\"pid\":<pid>,\"path\":<path>,\"prigh\":<prigh>}\n"}
+    {"type":"output","exec_id":"p1","chunk":"{\"t\":\"out\",\"s\":1,\"line\":\"echo hello\"}\n"}
+    {"type":"output","exec_id":"p1","chunk":"{\"t\":\"err\",\"text\":\"bye\\n\"}\n"}
+    {"type":"result","exec_id":"p1","text":"{\"exit\":{\"code\":0},\"stderr_tail\":\"bye\"}","is_error":false}
+    (worker finished)
+    |}]
+;;
+
 let%expect_test "stdio worker: instructions come from the host's own home" =
   with_sandbox
   @@ fun t ->

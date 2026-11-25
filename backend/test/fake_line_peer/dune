@@ -1,0 +1,6 @@
+; A line-oriented program on stdio for the Host_process and Host_stream tests:
+; it echoes its input and misbehaves on request.
+
+(executable
+ (name fake_line_peer)
+ (libraries unix))

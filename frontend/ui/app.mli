@@ -148,6 +148,7 @@ module Reply_tag : sig
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Adapters_shown (** [/adapters] *)
     | Nix_store_shown (** [/nix-gc] *)
     | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
@@ -367,6 +368,8 @@ module Model : sig
     ; pasted_text : bool
       (** the backend takes prompts' [pasted] texts ([hello]'s [features]);
           else they go inline *)
+    ; deployed : Prigh_protocol.Deployed_engines.t
+      (** what new sessions can run on ([hello]'s [engines], [adapters]) *)
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list

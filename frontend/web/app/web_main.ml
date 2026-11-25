@@ -231,17 +231,25 @@ let place_popover () =
           (Js.string (if down then "below" else "above"));
         set "--popover-room" (if down then below else above);
         set "--popover-shift" 0.;
-        let menu = el##getBoundingClientRect in
         let right =
           Float.min
             (Js.to_float box##.right)
             (Float.of_int Dom_html.window##.innerWidth -. margin)
         in
-        let over = Js.to_float menu##.right -. right in
-        if Float.(over > 0.)
+        if Js.to_bool (el##.classList##contains (Js.string "model-menu"))
         then (
-          let room = Js.to_float menu##.left -. Js.to_float box##.left in
-          set "--popover-shift" (-.Float.min over room));
+          (* Its right edge on what holds it, measured from the chip's
+             right, which stays put when the chip's label changes. *)
+          let width = Float.of_int el##.offsetWidth in
+          let left = Float.max margin (right -. width) in
+          set "--popover-right" (Js.to_float chip##.right -. (left +. width)))
+        else (
+          let menu = el##getBoundingClientRect in
+          let over = Js.to_float menu##.right -. right in
+          if Float.(over > 0.)
+          then (
+            let room = Js.to_float menu##.left -. Js.to_float box##.left in
+            set "--popover-shift" (-.Float.min over room)));
         (* The current choice in the middle of a long list. *)
         Js.Opt.iter
           (el##querySelector

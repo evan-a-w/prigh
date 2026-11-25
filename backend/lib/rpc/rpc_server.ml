@@ -66,6 +66,8 @@ let methods =
   ; "resume_now"
   ; "downsize_images"
   ; "new_session"
+  ; "set_adapter"
+  ; "list_adapters"
   ; "keep_session"
   ; "switch_session"
   ; "list_sessions"
@@ -417,6 +419,13 @@ type t =
   ; cwd : string
   ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
   ; default_agent : Agent.t option
+  ; engines : Engines.t (** what this backend deploys *)
+  ; adapter_health : Adapter_health.Cache.t
+    (** whether the composer's CLIs are installed and logged in, by host *)
+  ; catalogs : Adapter_catalog.t
+    (** the composer's CLIs' models and usage limits, by host *)
+  ; spawn_external :
+      (Agent.t -> Adapter.Launch.t -> Line_transport.t Or_error.t) option
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
@@ -761,6 +770,14 @@ let list_sessions t client =
   `Array (List.map (listings t client) ~f:(listing_json t))
 ;;
 
+(* The clients that have signed in: the namespace's events (its sessions,
+   settings, hosts and agent CLIs) are not for a connection that has not. *)
+let iter_authed t ~f =
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> if c.authed then f c)
+;;
+
+let broadcast t json = iter_authed t ~f:(fun (c : Client.t) -> c.send json)
+
 (* Every client of the server, whichever session it is in. With [changed]
    (sessions whose entries changed, in memory as they are now) or
    [removed] (session ids), they get those sessions' [list_sessions]
@@ -772,9 +789,7 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
       ([ "type", `String "event"; "event", `String "sessions_changed" ] @ fields)
   in
   if List.is_empty changed && List.is_empty removed
-  then (
-    let json = event [] in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json))
+  then broadcast t (event [])
   else (
     let live_now = live_sessions t in
     let live path =
@@ -803,7 +818,7 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
              ~f:(fun id -> `String id)) )
     in
     let now = t.now () in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+    iter_authed t ~f:(fun (c : Client.t) ->
       let archive_after_days = archive_after_days t c in
       c.send
         (event
@@ -832,6 +847,7 @@ let maybe_evict t agent =
   then (
     Hashtbl.remove t.agents (session_id agent);
     Hashtbl.remove t.listed (session_id agent);
+    Agent.stop_engine agent;
     let session = Agent.session agent in
     if Session.persisted session && not (Session.gone session)
     then (
@@ -999,9 +1015,325 @@ let route t agent (event : Agent.Event.t) =
   | _ -> ()
 ;;
 
+(* Why [agent]'s session cannot run here: its engine is not deployed, or it
+   names one this prigh does not know. *)
+let engine_unavailable t agent =
+  match Session.engine (Agent.session agent) with
+  | Ok choice -> Engines.unavailable t.engines choice
+  | Error e ->
+    Some
+      (sprintf
+         "this session was made by a newer prigh (%s): update prigh to run it; \
+          it can still be read here"
+         (Error.to_string_hum e))
+;;
+
+(* The statuses of the deployed adapters on [hosts], in that order. *)
+let adapter_statuses t hosts =
+  List.concat_map hosts ~f:(fun (host : Agent.Host.t) ->
+    List.filter_map t.engines.adapters ~f:(fun adapter ->
+      Adapter_health.Cache.find t.adapter_health ~host:host.id adapter))
+;;
+
+let adapters_json statuses =
+  `Array (List.map statuses ~f:Adapter_health.Status.to_json)
+;;
+
+let adapters_changed t ~hosts =
+  let json =
+    `Object
+      [ "type", `String "event"
+      ; "event", `String "adapters_changed"
+      ; "adapters", adapters_json (adapter_statuses t hosts)
+      ]
+  in
+  broadcast t json
+;;
+
+(* The session's active tool host by name, for messages. *)
+let active_host_label agent =
+  let id = Agent.active_host agent in
+  match
+    List.find (Agent.hosts agent) ~f:(fun (h : Agent.Host.t) ->
+      String.equal h.id id)
+  with
+  | Some host when not (String.is_empty host.name) -> host.name
+  | _ ->
+    let name = Agent.active_host_name agent in
+    if String.is_empty name then id else name
+;;
+
+(* The harness on the session's active tool host, in its cwd. *)
+let host_spawn t agent launch =
+  Host_transport.spawn
+    ~sw:t.sw
+    ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
+      Agent.host_call agent ~stdin ~cancel ~on_output ~name args)
+    ~host:(active_host_label agent)
+    launch
+;;
+
+(* [adapter]'s harness failed to start on the session's host: what was
+   known of it there is checked again, and the frontends told. *)
+let recheck_adapter t agent adapter =
+  let host = Agent.active_host agent in
+  Adapter_health.Cache.forget t.adapter_health ~host adapter;
+  Fiber.fork ~sw:t.sw (fun () ->
+    let statuses =
+      Adapter_health.probe
+        ~exec:(fun ~name arguments ->
+          Agent.host_call_on
+            agent
+            ~host
+            ~cwd:(Session.cwd (Agent.session agent))
+            ~name
+            arguments)
+        [ adapter ]
+        ~host
+        ~host_name:(active_host_label agent)
+        ~now:(t.now ())
+    in
+    Adapter_health.Cache.set t.adapter_health statuses;
+    adapters_changed t ~hosts:(Agent.state agent).hosts)
+;;
+
+(* The session's model list changed: its clients ask for it again. *)
+let models_changed t agent =
+  let json =
+    `Object [ "type", `String "event"; "event", `String "models_changed" ]
+  in
+  List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json)
+;;
+
+(* The harness [adapter] said its catalog on [host]: the sessions it runs
+   there show its models. *)
+let catalog_changed t ~host adapter =
+  Hashtbl.iter t.agents ~f:(fun agent ->
+    match Agent.engine_choice agent with
+    | { engine = Composer; adapter = Some a }
+      when String.equal (Adapter_id.to_string a) adapter
+           && String.equal (Agent.active_host agent) host ->
+      models_changed t agent
+    | _ -> ())
+;;
+
+(* Runs [adapter]'s harness on the session's tool host only to ask its
+   catalog ({!Adapter.S.catalog}). *)
+let fetch_catalog t agent (module A : Adapter.S) () =
+  let start = Adapter.Start.default ~cwd:(Session.cwd (Agent.session agent)) in
+  let launch = A.launch start in
+  let%bind.Or_error transport =
+    match t.spawn_external with
+    | Some spawn -> spawn agent launch
+    | None -> host_spawn t agent launch
+  in
+  Switch.run (fun sw ->
+    Exn.protect
+      ~finally:(fun () -> Line_transport.stop transport)
+      ~f:(fun () ->
+        A.catalog
+          ~sw
+          ~request_timeout:(Time_float.Span.of_sec 30.)
+          transport
+          start))
+;;
+
+(* Asks, in the background, the catalog of a Codex, Claude Code or ACP
+   session's harness on its tool host, unless one younger than [max_age]
+   seconds is kept. *)
+let ensure_catalog ?(max_age = 1800.) t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer
+    ; adapter = Some ((Codex | Claude | Acp _) as adapter_id)
+    } ->
+    (match Composer_adapters.find t.engines adapter_id with
+     | Error _ -> ()
+     | Ok adapter ->
+       let host = Agent.active_host agent in
+       let name = Adapter_id.to_string adapter_id in
+       Adapter_catalog.refresh
+         t.catalogs
+         ~sw:t.sw
+         ~host
+         name
+         ~max_age
+         ~fetch:(fetch_catalog t agent adapter)
+         ~on_done:(fun () -> catalog_changed t ~host name))
+  | _ -> ()
+;;
+
+(* Why a composer session's harness could not say its models, and what to
+   do. *)
+let catalog_failure t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) } ->
+    let host = Agent.active_host agent in
+    Option.map
+      (Adapter_catalog.failure t.catalogs ~host (Adapter_id.to_string a))
+      ~f:(fun e ->
+        sprintf
+          "%s on %s did not list its models, so the picker shows only its \
+           default: %s. Check that it is installed and logged in there \
+           (Settings → Engines)."
+          (Adapter_id.label a)
+          host
+          (Error.to_string_hum e))
+  | _ -> None
+;;
+
+(* The session's harness listed no models when asked last (Goose): it has
+   only its default, and is not asked again. *)
+let lists_no_models t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some a } ->
+    (match
+       Adapter_catalog.find
+         t.catalogs
+         ~host:(Agent.active_host agent)
+         (Adapter_id.to_string a)
+     with
+     | Some { models = []; _ } -> true
+     | Some _ | None -> false)
+  | _ -> false
+;;
+
+(* The models of a session an external harness runs: its own, never
+   prigh's, even before it runs here. *)
+let external_models t agent =
+  match Agent.external_models agent, Agent.engine_choice agent with
+  | Some models, _ -> Some models
+  | None, { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) }
+    ->
+    let adapter = Adapter_id.to_string a in
+    Some
+      (match
+         Adapter_catalog.find t.catalogs ~host:(Agent.active_host agent) adapter
+       with
+       | Some { models = _ :: _ as models; _ } -> models
+       | Some _ | None -> [ External_model.default ~adapter ])
+  | None, _ -> None
+;;
+
+(* A composer session's harness login's usage, as the harness says (asked
+   when it has not said lately). *)
+let harness_usage t agent : Subscription_usage.Harness_usage.t list =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some ((Codex | Claude) as adapter_id) } ->
+    let host = Agent.active_host agent in
+    let name = Adapter_id.to_string adapter_id in
+    ensure_catalog ~max_age:60. t agent;
+    if Option.is_none (Agent.external_limits agent)
+    then Adapter_catalog.await t.catalogs ~host name;
+    let label = Adapter_id.label adapter_id in
+    let status : Subscription_usage.Status.t =
+      match Agent.external_limits agent with
+      | Some status -> status
+      | None ->
+        Failed
+          (sprintf
+             "%s on %s did not say: check that it is installed and logged in \
+              there (Settings → Engines)"
+             label
+             (active_host_label agent))
+    in
+    [ { adapter = name; name = label; status } ]
+  | _ -> []
+;;
+
+(* A composer session's runner, driving its adapter's harness on the
+   session's tool host and continuing the thread the session recorded there
+   (each process records the threads it starts). *)
+let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
+  match adapter_id with
+  | Prigh ->
+    Ok (Prigh_adapter.runner ~harness:(fun () -> Agent.harness_runner agent))
+  | _ ->
+    let%map.Or_error adapter = Composer_adapters.find t.engines adapter_id in
+    let session = Agent.session agent in
+    let adapter_name = Adapter_id.to_string adapter_id in
+    let start ~cwd =
+      let host = Agent.active_host agent in
+      let (module A : Adapter.S) = adapter in
+      let thread =
+        List.find
+          (Session.threads session)
+          ~f:(fun (thread : Session.Thread.t) ->
+            String.equal thread.adapter adapter_name
+            && String.equal thread.host host)
+      in
+      (* A forked session continues a fork of its parent's thread, where the
+         agent forks one. *)
+      let resume, fork, at =
+        match thread with
+        | None -> None, false, None
+        | Some { fork_from = None; thread_id; _ } -> Some thread_id, false, None
+        | Some { fork_from = Some at; thread_id; _ } ->
+          if A.fork_native
+          then Some thread_id, true, Some at
+          else None, false, None
+      in
+      { (Adapter.Start.default ~cwd) with
+        resume
+      ; fork
+      ; at
+      ; developer_instructions = Agent.user_instructions agent
+      }
+    in
+    let on_thread thread_id =
+      ignore
+        (Session.record_thread
+           session
+           { adapter = adapter_name
+           ; host = Agent.active_host agent
+           ; thread_id
+           ; cwd = Session.cwd session
+           ; fork_from = None
+           }
+         : Session.Entry.t)
+    in
+    Composer_runner.runner
+      (Composer_runner.create
+         ~sw:t.sw
+         ~adapter
+         ~spawn:(fun launch ->
+           let spawned =
+             match t.spawn_external with
+             | Some spawn -> spawn agent launch
+             | None -> host_spawn t agent launch
+           in
+           if Result.is_error spawned then recheck_adapter t agent adapter_id;
+           spawned)
+         ~start
+         ~on_thread
+         ~checkpoint:(fun args ->
+           Agent.host_call agent ~name:Checkpoint.op args)
+         ~host:(fun () -> Agent.active_host agent)
+         ?handoff_from
+         ~catalog:(fun () ->
+           Adapter_catalog.find
+             t.catalogs
+             ~host:(Agent.active_host agent)
+             adapter_name)
+         ~on_change:(fun () -> models_changed t agent)
+         ())
+;;
+
+(* Gives a composer session (that can run here) its runner. *)
+let attach_engine t agent =
+  match Agent.engine_choice agent, (Agent.state agent).unavailable with
+  | { engine = Composer; adapter = Some adapter }, None
+    when not (Engine_id.equal (Agent.engine agent) Composer) ->
+    (match composer_runner t agent adapter with
+     | Ok runner -> Agent.set_runner agent (Some runner)
+     | Error e -> Agent.set_unavailable agent (Some (Error.to_string_hum e)))
+  | _ -> ()
+;;
+
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
 let register t agent =
+  Agent.set_unavailable agent (engine_unavailable t agent);
+  attach_engine t agent;
   Agent.set_hosts agent (hosts t) ~returning:(returning t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
@@ -1035,7 +1367,7 @@ let memory_changed (t : t) memory =
       `Object
         ([ "type", `String "event"; "event", `String "memory_changed" ] @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let custom_instructions_json ci =
@@ -1063,7 +1395,7 @@ let custom_instructions_changed (t : t) ci =
          ]
          @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let user_info_json user_info =
@@ -1090,7 +1422,7 @@ let user_info_changed (t : t) user_info =
         ([ "type", `String "event"; "event", `String "user_info_changed" ]
          @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let mcp_listing_json agent listing =
@@ -1112,7 +1444,7 @@ let mcp_settings_changed (t : t) mcp_settings =
          ([ "type", `String "event"; "event", `String "mcp_settings_changed" ]
           @ mcp_settings_json entries)
      in
-     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json));
+     broadcast t json);
   Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
 ;;
 
@@ -1122,7 +1454,7 @@ let mcp_auth_changed (t : t) =
   let json =
     `Object [ "type", `String "event"; "event", `String "mcp_auth_changed" ]
   in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json);
+  broadcast t json;
   Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
 ;;
 
@@ -1149,6 +1481,8 @@ let create
       ~login
       ~sessions_dir
       ~cwd
+      ?(engines = Engines.default)
+      ?spawn_external
       ~new_agent
       ?default_agent
       ()
@@ -1175,6 +1509,13 @@ let create
     ; cwd
     ; new_agent
     ; default_agent
+    ; engines
+    ; adapter_health = Adapter_health.Cache.create ~ttl:60.
+    ; catalogs =
+        Adapter_catalog.create
+          ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
+          ()
+    ; spawn_external
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
     ; client_seq = 0
@@ -1262,9 +1603,9 @@ let create
         (Option.bind t.login_owner ~f:(Hashtbl.find t.clients))
         ~f:(fun c -> c.send json)
     | Done _ | Failed _ | Logged_out _ | Forge_done _ | Forge_logged_out _ ->
-      Hashtbl.iter t.clients ~f:(fun c -> c.send json));
+      broadcast t json);
   Model_registry.subscribe (Login_manager.models login) ~f:(fun problem ->
-    Hashtbl.iter t.clients ~f:(fun c -> tell_problems c [ problem ]));
+    iter_authed t ~f:(fun c -> tell_problems c [ problem ]));
   t
 ;;
 
@@ -1995,6 +2336,35 @@ let clean_leftovers t =
     Agent.shutdown agent)
 ;;
 
+let composer_deployed t =
+  List.mem t.engines.engines Composer ~equal:Engine_id.equal
+;;
+
+(* A host that (re)connects may have had its CLIs installed or logged in
+   meanwhile: its statuses are checked again when next asked for. *)
+let host_connected t (client : Client.t) =
+  if composer_deployed t
+  then (
+    Adapter_health.Cache.forget_host t.adapter_health ~host:client.host_id;
+    adapters_changed t ~hosts:(Agent.state client.agent).hosts)
+;;
+
+(* A backend deploying more than the harness says what, so that frontends
+   offer the choice; one with the harness alone says nothing, as before
+   engines. *)
+let engine_features t =
+  if Engines.equal t.engines Engines.default then [] else [ "engines" ]
+;;
+
+let engines_json t =
+  if Engines.equal t.engines Engines.default
+  then []
+  else
+    [ "engines", strings (Engines.engine_strings t.engines)
+    ; "adapters", strings (Engines.adapter_strings t.engines)
+    ]
+;;
+
 let hello t (client : Client.t) params =
   let string name =
     match param params name with
@@ -2083,22 +2453,24 @@ let hello t (client : Client.t) params =
             Fiber.fork ~sw:t.sw (fun () ->
               Guarded.run ~what:"cleaning up temporary sessions" (fun () ->
                 clean_leftovers t));
+          if tools then host_connected t client;
           `Object
-            [ "client_id", `String client.id
-            ; "host_id", `String client.host_id
-            ; ( "namespace"
-              , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
-                  `String n) )
-            ; ( "user"
-              , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
-                  `String s.user) )
-            ; ( "superuser"
-              , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
-                then `True
-                else `False )
-            ; "features", strings backend_features
-            ; "state", Rpc_json.state (Agent.state agent)
-            ]))))
+            ([ "client_id", `String client.id
+             ; "host_id", `String client.host_id
+             ; ( "namespace"
+               , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
+                   `String n) )
+             ; ( "user"
+               , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
+                   `String s.user) )
+             ; ( "superuser"
+               , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
+                 then `True
+                 else `False )
+             ; "features", strings (backend_features @ engine_features t)
+             ; "state", Rpc_json.state (Agent.state agent)
+             ]
+             @ engines_json t)))))
 ;;
 
 (* The namespace's file as it is now, which another session may have
@@ -2121,6 +2493,59 @@ let config_saved t agent =
 (* What a client changing session needs first, saving it a [get_state]. *)
 let attached_state (client : Client.t) =
   `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
+;;
+
+(* Moves the attached session to another of the composer's adapters (the
+   new one's harness takes over at the next turn, handed what it has not
+   seen of the session), or back to prigh's harness engine ([harness]),
+   which reads the session itself. Not while a run goes on. *)
+let set_adapter t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let agent = client.agent in
+  let%bind name = string_param params "adapter" in
+  let%bind choice =
+    if String.equal name "harness"
+    then Engines.choose t.engines ~engine:(Some "harness") ~adapter:None
+    else Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
+  in
+  let previous = Agent.engine_choice agent in
+  if Engine_choice.equal choice previous
+  then Ok (attached_state client)
+  else if Agent.is_running agent
+  then
+    Or_error.errorf
+      "%s is still running: wait for the run to end (or abort it with Esc), \
+       then switch to %s"
+      (Agent.engine_label agent)
+      (Option.value_map
+         choice.adapter
+         ~default:(Engine_choice.label choice)
+         ~f:Adapter_id.label)
+  else (
+    let%bind () =
+      match Engines.unavailable t.engines choice with
+      | None -> Ok ()
+      | Some why -> Error (Error.of_string why)
+    in
+    match choice with
+    | { engine = Harness; _ } ->
+      Agent.set_engine agent choice;
+      Agent.set_unavailable agent None;
+      Agent.set_runner agent None;
+      models_changed t agent;
+      Ok (attached_state client)
+    | { engine = Composer; _ } ->
+      let%bind adapter =
+        Result.of_option
+          choice.adapter
+          ~error:(Error.of_string "the composer needs an adapter")
+      in
+      let%map runner = composer_runner t agent adapter ~handoff_from:previous in
+      Agent.set_engine agent choice;
+      Agent.set_unavailable agent None;
+      Agent.set_runner agent (Some runner);
+      models_changed t agent;
+      attached_state client)
 ;;
 
 (* A temporary session is not saved or listed, and ends when its client
@@ -2168,7 +2593,12 @@ let new_session_start t (client : Client.t) =
     | _ -> start)
 ;;
 
-let new_session t (client : Client.t) ~temporary =
+let new_session
+      ?(engine = Engine_choice.harness)
+      t
+      (client : Client.t)
+      ~temporary
+  =
   let start = new_session_start t client in
   let cwd =
     match start with
@@ -2191,7 +2621,13 @@ let new_session t (client : Client.t) ~temporary =
       eprintf
         "prigh: the ledger of a temporary session: %s\n%!"
         (Exn.to_string exn));
-  start_new_agent t session start |> attach t client;
+  let agent = start_new_agent t session start in
+  (* Attached first: recording the engine changes the state, and a session
+     no client has is evicted when its state changes. *)
+  attach t client agent;
+  Agent.set_engine agent engine;
+  Agent.set_unavailable agent (engine_unavailable t agent);
+  attach_engine t agent;
   match attached_state client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])
@@ -2338,10 +2774,47 @@ module Deleted = struct
 end
 
 (* Deletes the session's files and everything kept for it in memory. *)
+(* Where a session kept checkpoints of its files (the tool hosts and
+   directories of its composer threads), for them to go with it. *)
+let checkpointed_places (summary : Session.Summary.t) =
+  match Session.load summary.path with
+  | Error _ -> []
+  | Ok session ->
+    if
+      List.exists (Session.external_turns ~all:true session) ~f:(fun run ->
+        Option.is_some run.after)
+    then
+      List.map (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
+        thread.host, thread.cwd)
+      |> List.dedup_and_sort ~compare:[%compare: string * string]
+    else []
+;;
+
+(* Best effort, in the background: a host away keeps them (hidden refs,
+   which git's gc keeps too). *)
+let drop_checkpoints t (client : Client.t) id places =
+  if not (List.is_empty places)
+  then
+    Fiber.fork ~sw:t.sw (fun () ->
+      List.iter places ~f:(fun (host, cwd) ->
+        ignore
+          (Agent.host_call_on
+             client.agent
+             ~host
+             ~cwd
+             ~name:Checkpoint.op
+             (`Object
+                 [ "action", `String "drop"
+                 ; "prefix", `String (Checkpoint.session_prefix ~session:id)
+                 ])
+           : Tool.Result.t)))
+;;
+
 let delete_saved ?leaving t client (summary : Session.Summary.t) =
   match refusal ?leaving t client summary with
   | Some refused -> Or_error.error_string refused
   | None ->
+    let checkpointed = checkpointed_places summary in
     Or_error.try_with (fun () ->
       let bytes = Session.disk_usage summary.path in
       Session.delete_files summary.path;
@@ -2350,8 +2823,11 @@ let delete_saved ?leaving t client (summary : Session.Summary.t) =
       Hashtbl.remove t.listed summary.id;
       Option.iter agent ~f:(fun agent ->
         if Agent.resume_pending agent
-        then ignore (Agent.cancel_resume agent : unit Or_error.t));
+        then ignore (Agent.cancel_resume agent : unit Or_error.t);
+        (* Its external harness, idle, would run on its host for good. *)
+        Agent.stop_engine agent);
       forget_session t summary.id;
+      drop_checkpoints t client summary.id checkpointed;
       { Deleted.path = summary.path; id = summary.id; bytes })
 ;;
 
@@ -2843,7 +3319,7 @@ let prefs_changed t (from : Client.t) changes =
         ; "prefs", User_prefs.Change.to_json changes
         ]
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+    iter_authed t ~f:(fun (c : Client.t) ->
       if not (String.equal c.id from.id) then c.send json))
 ;;
 
@@ -3097,6 +3573,76 @@ let set_config t agent params =
     Config.to_json (Agent.config agent)
 ;;
 
+(* Every deployed adapter on every connected host, the session's host
+   first; statuses older than the cache's ttl (all of them with [refresh])
+   are probed again, the hosts in parallel. *)
+let list_adapters t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind () =
+    if composer_deployed t
+    then Ok ()
+    else
+      Or_error.error_string
+        "this backend does not run the composer engine, so it drives no agent \
+         CLIs: start one with prigh serve -engines composer"
+  in
+  let%map refresh = bool_param params "refresh" ~default:false in
+  let state = Agent.state client.agent in
+  let hosts =
+    let active, rest =
+      List.partition_tf state.hosts ~f:(fun (h : Agent.Host.t) ->
+        String.equal h.id state.active_host)
+    in
+    active @ rest
+  in
+  let cache = t.adapter_health in
+  let now = t.now () in
+  let changed =
+    Fiber.List.map
+      (fun (host : Agent.Host.t) ->
+         let stale =
+           List.filter t.engines.adapters ~f:(fun adapter ->
+             refresh
+             || not
+                  (Adapter_health.Cache.fresh cache ~now ~host:host.id adapter))
+         in
+         if List.is_empty stale
+         then false
+         else (
+           let statuses =
+             Adapter_health.probe
+               ~acp:(Engines.acp_agent t.engines)
+               ~exec:(fun ~name arguments ->
+                 Agent.host_call_on
+                   client.agent
+                   ~host:host.id
+                   ~cwd:host.cwd
+                   ~name
+                   arguments)
+               stale
+               ~host:host.id
+               ~host_name:host.name
+               ~now
+           in
+           let differs (s : Adapter_health.Status.t) =
+             match Adapter_health.Cache.find cache ~host:s.host s.adapter with
+             | None -> true
+             | Some old ->
+               not
+                 (Adapter_health.Status.equal
+                    { old with checked_at = 0. }
+                    { s with checked_at = 0. })
+           in
+           let changed = List.exists statuses ~f:differs in
+           Adapter_health.Cache.set cache statuses;
+           changed))
+      hosts
+    |> List.exists ~f:Fn.id
+  in
+  if changed then adapters_changed t ~hosts:state.hosts;
+  `Object [ "adapters", adapters_json (adapter_statuses t hosts) ]
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
@@ -3114,6 +3660,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some
       (Or_error.map (switch_user client params) ~f:(fun user ->
          `Object [ "user", `String user ]))
+  | "list_adapters" -> Some (list_adapters t client params)
   | "set_active_host" ->
     Some
       (Or_error.bind (string_param params "host") ~f:(fun host ->
@@ -3192,11 +3739,16 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (Or_error.map (Agent.save_as_default client.agent) ~f:(fun () ->
          config_saved t client.agent;
          Config.to_json (Agent.config client.agent)))
+  | "set_adapter" -> Some (set_adapter t client params)
   | "new_session" ->
     Some
-      (Or_error.map
-         (bool_param params "temporary" ~default:false)
-         ~f:(fun temporary -> new_session t client ~temporary))
+      (let%bind.Or_error temporary =
+         bool_param params "temporary" ~default:false
+       in
+       let%bind.Or_error engine = string_param_opt params "engine" in
+       let%bind.Or_error adapter = string_param_opt params "adapter" in
+       let%map.Or_error engine = Engines.choose t.engines ~engine ~adapter in
+       new_session ~engine t client ~temporary)
   | "keep_session" -> Some (keep_session t client)
   | "switch_session" ->
     Some
@@ -3328,15 +3880,29 @@ let dispatch_server t (client : Client.t) ~meth ~params
       then t.login_owner <- previous;
       unit_result result)
   | "usage_limits" ->
-    Some
-      (ok
-         (Subscription_usage.to_json
-            (Subscription_usage.fetch
-               ~env:(Agent.env agent)
-               ~getenv:(Login_manager.getenv t.login)
-               ~http:t.usage_http
-               ~now:t.now
-               (Login_manager.store t.login))))
+    let harnesses = harness_usage t agent in
+    let usage =
+      Subscription_usage.fetch
+        ~env:(Agent.env agent)
+        ~getenv:(Login_manager.getenv t.login)
+        ~http:t.usage_http
+        ~now:t.now
+        (Login_manager.store t.login)
+    in
+    (* With a harness's own login shown, prigh's logins it lacks are noise. *)
+    let usage =
+      if List.is_empty harnesses
+      then usage
+      else
+        { usage with
+          providers =
+            List.filter
+              usage.providers
+              ~f:(fun (p : Subscription_usage.Provider_usage.t) ->
+                not (Subscription_usage.Status.equal p.status Not_signed_in))
+        }
+    in
+    Some (ok (Subscription_usage.to_json ~harnesses usage))
   | "forge_status" ->
     Some
       (Or_error.map (Forges.accounts t.forges) ~f:(fun accounts ->
@@ -3382,11 +3948,28 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
   | "list_models" ->
-    let models = Login_manager.models t.login in
-    Model_registry.reload models;
-    tell_problems client (Model_registry.problems models);
-    Some
-      (ok (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model)))
+    let agent = client.agent in
+    (match external_models t agent with
+     | Some models ->
+       (* Only the harness's default until it says its models: asked now,
+          unless its process is up (its session says them) or it listed
+          none before. *)
+       if
+         List.length models <= 1
+         && (not (Agent.external_live agent))
+         && not (lists_no_models t agent)
+       then (
+         ensure_catalog t agent;
+         Option.iter (catalog_failure t agent) ~f:(fun why ->
+           tell_problems client [ why ]));
+       Some (ok (`Array (List.map models ~f:Rpc_json.model)))
+     | None ->
+       let models = Login_manager.models t.login in
+       Model_registry.reload models;
+       tell_problems client (Model_registry.problems models);
+       Some
+         (ok
+            (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model))))
   | _ -> None
 ;;
 
@@ -3406,7 +3989,28 @@ let ui_action_param params ~meth =
           "a prompt with ui_action takes no text: send text \"\"")
 ;;
 
-let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t =
+(* One of an external harness's models, by key ([codex/gpt-5]), id or
+   name. *)
+let resolve_external (models : Model.t list) query ~who =
+  let q = String.lowercase query in
+  match
+    List.find models ~f:(fun m ->
+      String.equal (Model.key m) query
+      || String.equal m.id query
+      || String.equal (String.lowercase m.name) q)
+  with
+  | Some m -> Ok m
+  | None ->
+    Or_error.errorf
+      "%s has no model %S: pick one of %s (/model lists them)"
+      who
+      query
+      (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
+;;
+
+let dispatch agent login ~external_models ~(client : Client.t) ~meth ~params
+  : Json.t Or_error.t
+  =
   match meth with
   | "ping" -> ok (`String "pong")
   | "resync" ->
@@ -3618,7 +4222,10 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
   | "set_model" ->
     Or_error.bind (string_param params "model") ~f:(fun id ->
       Or_error.map
-        (Model_registry.resolve (Login_manager.models login) id)
+        (match external_models () with
+         | Some models ->
+           resolve_external models id ~who:(Agent.engine_label agent)
+         | None -> Model_registry.resolve (Login_manager.models login) id)
         ~f:(fun model ->
           Agent.set_model agent model;
           `Object []))
@@ -3903,9 +4510,14 @@ let handle t client (request : Json.t) : Json.t =
             Or_error.error_string
               "unauthorised: send hello with the token first"
           else (
-            match dispatch_server t client ~meth ~params with
-            | Some result -> result
-            | None ->
+            match
+              Or_error.bind
+                (Engine_gate.check client.agent ~meth ~params)
+                ~f:(fun () -> Ok (dispatch_server t client ~meth ~params))
+            with
+            | Error e -> Error e
+            | Ok (Some result) -> result
+            | Ok None ->
               let agent = agent_of_client t client in
               let by =
                 Option.map client.signed_in ~f:(fun s ->
@@ -3924,7 +4536,14 @@ let handle t client (request : Json.t) : Json.t =
                       (Git_rpc.dispatch agent ~meth ~params))
                with
                | Some result -> result
-               | None -> dispatch agent t.login ~client ~meth ~params))
+               | None ->
+                 dispatch
+                   agent
+                   t.login
+                   ~external_models:(fun () -> external_models t agent)
+                   ~client
+                   ~meth
+                   ~params))
         with
         | result -> result
         | exception exn ->

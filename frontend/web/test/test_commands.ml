@@ -31,6 +31,7 @@ let%expect_test "every command does something (none is unknown)" =
       ; user = Some "alice"
       ; superuser = true
       ; features = []
+      ; deployed = Prigh_protocol.Deployed_engines.harness_only
       }
     in
     let m', commands =
@@ -76,6 +77,7 @@ let%expect_test "every command does something (none is unknown)" =
     /hotkeys                   Hotkeys
     /settings                  Settings
     /new                       rpc new_session
+    /engine                    toast: This backend runs no composer adapters: start it with -engines harness,composer -adapters codex,claude to switch between them.
     /temporary                 rpc new_session
     /model                     picker: Switch model
     /scoped-models             scoped models dialog
@@ -206,6 +208,7 @@ let%expect_test "/help <command> and /hotkeys" =
     ← → / ↑ ↓ (in the model menu) ← → the previous or next provider (or the favourites); ↑ ↓ the models; Enter switches, Esc closes
     Alt+1…9 (in the model menu) switch to the list's Nth model
     Alt+F (in the model menu) star or unstar the highlighted model
+    Alt+E (in the model menu) pick the session's engine (Codex, Claude Code, …), as its foot's engine menu does
     ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models or hosts
     Tab (a chip's menu; ← → in the host's) the next chip's menu (host, model)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
@@ -1112,6 +1115,7 @@ let%expect_test "/host: pick a host, then the directory there" =
        ; user = None
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   run h "/host";
   H.text h ~selector:".picker-items";
@@ -1194,6 +1198,7 @@ let%expect_test "/cd and /host to a missing directory ask to create it" =
        ; user = None
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   run h "/cd /work/new";
   H.reply h "set_cwd" {|{"missing":"/work/new"}|};
@@ -1722,6 +1727,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
        ; user = Some "alice"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   run h "/setusr";
   H.reply h "list_users" {|["alice","bob","carol"]|};

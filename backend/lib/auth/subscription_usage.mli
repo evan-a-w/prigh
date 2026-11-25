@@ -58,10 +58,20 @@ type t =
   }
 [@@deriving sexp_of, equal]
 
+(** An external harness's login (a composer adapter: [codex], named
+    ["Codex"]), as the harness said. *)
+module Harness_usage : sig
+  type t =
+    { adapter : string
+    ; name : string
+    ; status : Status.t
+    }
+end
+
 (** [{fetched_at_ms, providers: [{provider, name, status, plan?, windows?,
     error?}]}], [status] one of [not_signed_in], [api_key], [limits] and
     [error]; a window is [{id, label, used_percent, resets_at_ms}]. *)
-val to_json : t -> Json.t
+val to_json : ?harnesses:Harness_usage.t list -> t -> Json.t
 
 (** The providers with subscription limits: [anthropic], [openai-codex]. *)
 val providers : Provider_id.t list
