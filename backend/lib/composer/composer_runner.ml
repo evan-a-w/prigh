@@ -776,6 +776,12 @@ and run_turn'
              (match e with
               | Thread_started { model = Some model; _ } ->
                 t.thread_model <- Some model
+              | Usage { usage; cost_usd; _ } ->
+                Option.iter (L.login a) ~f:(fun login ->
+                  Cli_credential.record
+                    login
+                    usage
+                    ~cost_usd:(Option.value cost_usd ~default:0.))
               | _ -> ());
              Composer_recorder.feed recorder e;
              events ~sw

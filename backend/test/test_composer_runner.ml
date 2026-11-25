@@ -149,7 +149,7 @@ let print_event t (e : Agent.Event.t) =
   | _ -> ()
 ;;
 
-let with_composer ?(approval : Approval_mode.t option) ~adapter ~peer f =
+let with_composer ?(approval : Approval_mode.t option) ?start ~adapter ~peer f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -166,6 +166,7 @@ let with_composer ?(approval : Approval_mode.t option) ~adapter ~peer f =
           !launches
           (String.concat ~sep:" " (List.take launch.argv 2));
         Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
+      ?start
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
       ()
   in
@@ -521,5 +522,169 @@ let%expect_test "spawn failing: the run says why" =
     {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
     assistant (codex/default, (Error"Codex is not installed on laptop: install it (npm i -g @openai/codex), then try again")): ""
+    |}]
+;;
+
+(* Codex taking prigh's login ([refuse]: one too old for it), asking for a
+   fresh token in the turn, and reporting usage. *)
+let codex_on_login ~refuse (p : Line_transport.Peer.t) =
+  let field k j = Option.bind (Json.member k j) ~f:Json.string in
+  let rec until meth =
+    match Line_transport.Peer.read_line p with
+    | None -> None
+    | Some line ->
+      let j = Json.parse line |> Or_error.ok_exn in
+      if Option.equal String.equal (field "method" j) (Some meth)
+      then Some j
+      else until meth
+  in
+  let write s = Line_transport.Peer.write_line p s in
+  let reply j result =
+    write
+      (Json.to_string
+         (`Object
+             [ "id", Option.value_exn (Json.member "id" j)
+             ; "result", Json.parse result |> Or_error.ok_exn
+             ]))
+  in
+  let tokens j =
+    let params = Option.value_exn (Json.member "params" j) in
+    sprintf
+      "%s %s %s"
+      (Option.value (field "accessToken" params) ~default:"-")
+      (Option.value (field "chatgptAccountId" params) ~default:"-")
+      (match Json.member "chatgptPlanType" params with
+       | Some (`String p) -> p
+       | _ -> "null")
+  in
+  Option.iter (until "initialize") ~f:(fun j ->
+    reply j {|{"userAgent":"prigh/0.120.0 (Linux; test)"}|});
+  let rec turns () =
+    match Line_transport.Peer.read_line p with
+    | None -> ()
+    | Some line ->
+      let j = Json.parse line |> Or_error.ok_exn in
+      (match field "method" j with
+       | Some "account/login/start" ->
+         printf "codex login: %s\n" (tokens j);
+         if refuse
+         then
+           write
+             (sprintf
+                {|{"id":%s,"error":{"code":-32600,"message":"unknown variant `chatgptAuthTokens`"}}|}
+                (Json.to_string (Option.value_exn (Json.member "id" j))))
+         else reply j {|{"type":"chatgptAuthTokens"}|}
+       | Some "thread/start" ->
+         reply j {|{"thread":{"id":"t1"},"model":"gpt-5"}|}
+       | Some "turn/start" ->
+         reply j {|{"turn":{"id":"u1"}}|};
+         write
+           {|{"method":"turn/started","params":{"threadId":"t1","turn":{"id":"u1"}}}|};
+         write
+           {|{"method":"account/chatgptAuthTokens/refresh","id":0,"params":{"reason":"unauthorized","previousAccountId":"acct-1"}}|};
+         (match Line_transport.Peer.read_line p with
+          | Some answer -> printf "codex refreshed: %s\n" answer
+          | None -> ());
+         write
+           {|{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"ok"},"threadId":"t1","turnId":"u1"}}|};
+         write
+           {|{"method":"thread/tokenUsage/updated","params":{"threadId":"t1","turnId":"u1","tokenUsage":{"total":{"totalTokens":12,"inputTokens":10,"cachedInputTokens":0,"outputTokens":2,"reasoningOutputTokens":0},"last":{"totalTokens":12,"inputTokens":10,"cachedInputTokens":0,"outputTokens":2,"reasoningOutputTokens":0},"modelContextWindow":1000}}}|};
+         write
+           {|{"method":"turn/completed","params":{"threadId":"t1","turn":{"id":"u1","status":"completed"}}}|}
+       | _ -> ());
+      turns ()
+  in
+  turns ()
+;;
+
+(* prigh's login [work]: its tokens [tok-N], the first about to expire. *)
+let prigh_login ?(fail = false) () =
+  let n = ref 0 in
+  Cli_credential.create
+    ~provider:Openai_codex
+    ~account:(Own (Account_id.of_string "work" |> Or_error.ok_exn))
+    ~label:"work"
+    ~fetch:(fun ?refused ?valid_for_ms:_ () ->
+      incr n;
+      printf
+        "prigh fetches a token%s\n"
+        (Option.value_map refused ~default:"" ~f:(sprintf ", refused %s"));
+      if fail
+      then Or_error.error_string "refreshing failed: /login openai-codex"
+      else
+        Ok
+          { Provider_auth.Resolved.token = sprintf "tok-%d" !n
+          ; method_ = Oauth
+          ; account_id = Some "acct-1"
+          ; source = "oauth"
+          ; account = None
+          ; expires_ms =
+              Some (Credential.now_ms () + if !n = 1 then 60_000 else 3_600_000)
+          })
+    ~record:(fun usage ~cost_usd ->
+      printf
+        "recorded on work: %s, $%.2f\n"
+        (Sexp.to_string [%sexp (usage : Usage.t)])
+        cost_usd)
+    ()
+;;
+
+let with_login ?fail () ~cwd =
+  { (Adapter.Start.default ~cwd) with login = Some (prigh_login ?fail ()) }
+;;
+
+let%expect_test "codex on prigh's login: over stdin, refreshed, recorded" =
+  with_composer
+    ~adapter:(module Codex_adapter)
+    ~start:(with_login ())
+    ~peer:(fun _ -> codex_on_login ~refuse:false)
+  @@ fun _ agent _ ->
+  prompt agent "hi";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    spawn #1: codex app-server
+    prigh fetches a token
+    codex login: tok-1 acct-1 null
+    prigh fetches a token
+    codex login: tok-2 acct-1 null
+    prigh fetches a token, refused tok-2
+    codex refreshed: {"id":0,"result":{"accessToken":"tok-3","chatgptAccountId":"acct-1","chatgptPlanType":null}}
+    recorded on work: ((input 10)(output 2)(cache_read 0)), $0.00
+    assistant (codex/gpt-5, End_turn): "ok"
+    |}]
+;;
+
+let%expect_test "codex without the mode, or no token: its own login, saying so" =
+  with_composer
+    ~adapter:(module Codex_adapter)
+    ~start:(with_login ())
+    ~peer:(fun _ -> codex_on_login ~refuse:true)
+  @@ fun _ agent _ ->
+  prompt agent "hi";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    spawn #1: codex app-server
+    prigh fetches a token
+    codex login: tok-1 acct-1 null
+    notice: Codex 0.120.0 did not take prigh's ChatGPT login "work" (unknown variant `chatgptAuthTokens`): this session runs on Codex's own login on its tool host (codex login there). Update Codex there (npm install -g @openai/codex) to run on prigh's, or choose Codex's own login in Settings → Engines.
+    codex refreshed: {"id":0,"error":{"code":-32603,"message":"prigh handed this Codex no login: it runs on its own"}}
+    assistant (codex/gpt-5, End_turn): "ok"
+    |}];
+  with_composer
+    ~adapter:(module Codex_adapter)
+    ~start:(with_login ~fail:true ())
+    ~peer:(fun _ -> codex_on_login ~refuse:false)
+  @@ fun _ agent _ ->
+  prompt agent "hi";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    spawn #1: codex app-server
+    prigh fetches a token
+    notice: prigh's ChatGPT login "work" has no token for Codex (refreshing failed: /login openai-codex): this session runs on Codex's own login on its tool host (codex login there).
+    codex refreshed: {"id":0,"error":{"code":-32603,"message":"prigh handed this Codex no login: it runs on its own"}}
+    assistant (codex/gpt-5, End_turn): "ok"
     |}]
 ;;
