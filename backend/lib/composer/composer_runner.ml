@@ -14,6 +14,8 @@ type t =
   ; host : unit -> string
   ; mutable live : live option
   ; mutable live_host : string option
+  ; mutable live_login : Account_ref.t option
+    (** the login of prigh's the live process was given ([Start.login]) *)
   ; mutable thread_id : string option
   ; mutable resumed : string option
   ; mutable fresh : bool
@@ -62,6 +64,7 @@ let create
   ; host
   ; live = None
   ; live_host = None
+  ; live_login = None
   ; thread_id = None
   ; resumed = None
   ; fresh = false
@@ -298,11 +301,20 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
      t.live <- None;
      t.thread_id <- None
    | Some _ | None -> ());
+  let base = t.start ~cwd:s.cwd in
+  let login = Option.map base.login ~f:Cli_credential.account in
+  (* The user chose another login for the harness: a process on it, on the
+     same thread. *)
+  (match t.live with
+   | Some (Live ((module A), a))
+     when not (Option.equal Account_ref.equal t.live_login login) ->
+     A.stop a;
+     t.live <- None
+   | Some _ | None -> ());
   match t.live with
   | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
   | _ ->
     let (module A) = t.adapter in
-    let base = t.start ~cwd:s.cwd in
     let resume = Option.first_some t.thread_id base.resume in
     let fork = base.fork && Option.is_none t.thread_id in
     let resume, at, revert =
@@ -391,6 +403,7 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
        t.live <- Some live;
        t.on_change ();
        t.live_host <- Some host;
+       t.live_login <- login;
        Ok live
      | Error (`Spawn e | `Start e) -> Error e)
 ;;

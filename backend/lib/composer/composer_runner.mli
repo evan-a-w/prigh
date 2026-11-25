@@ -19,7 +19,8 @@ type t
     host; it fails saying what to do when the harness is not installed
     there. [start]: the process's settings besides the turn's
     ([developer_instructions], [mcp_servers], [resume] to continue a thread
-    the session had). [on_thread]: the harness started or moved to a thread
+    the session had). Asked before each turn: when its [login] changed, the
+    process stops and the next one continues the thread on the new login. [on_thread]: the harness started or moved to a thread
     (for the session to record). [host]: the session's tool host now (default:
     always ["local"]): when it changes, the process stops and the next turn
     starts one there, on that host's thread. [handoff_from]: the engine the

@@ -274,7 +274,7 @@ let%expect_test "the cache" =
 ;;
 
 (* Over the RPC, on the backend's own host, with fake CLIs on its PATH. *)
-let with_server ?(engines = Engines.default) f =
+let with_server ?(engines = Engines.default) ?(home = false) f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -309,6 +309,7 @@ let with_server ?(engines = Engines.default) f =
       ~cwd:t.dir
       ~engines
       ~new_agent
+      ?home:(Option.some_if home t.dir)
       ()
   in
   let events = Queue.create () in
@@ -510,4 +511,88 @@ esac
       "codex" installed=false version=- auth="unknown" account=-
         problem="Codex is not installed on <host>, please install it"
       |}])
+;;
+
+let%expect_test "Codex on one of prigh's ChatGPT logins: chosen, listed, shown" =
+  let engines =
+    Or_error.ok_exn
+      (Engines.create ~engines:[ Harness; Composer ] ~adapters:[ Codex ] ())
+  in
+  with_server ~engines ~home:true
+  @@ fun t ~call ~events:_ ->
+  let store = Auth_store.create ~path:(Filename.concat t.dir "auth.json") in
+  ignore
+    (Or_error.ok_exn
+       (Provider_accounts.save_login
+          ~label:"Work"
+          store
+          Openai_codex
+          (Oauth
+             { access = "a"
+             ; refresh = "r"
+             ; expires_ms = Int.max_value
+             ; account_id = Some "acct"
+             }))
+     : Account_id.t);
+  script t "codex" {|echo "codex-cli 0.166.0"|};
+  with_path t (fun () ->
+    ignore (call "hello" : Json.t);
+    let result json =
+      match json with
+      | `Object fields ->
+        (match List.Assoc.find fields "result" ~equal:String.equal with
+         | Some r -> r
+         | None -> json)
+      | _ -> json
+    in
+    let logins json =
+      match Json.member "adapter_logins" (result json) with
+      | Some l -> print_endline (Json.to_string l)
+      | None -> print_endline (Json.to_string json)
+    in
+    let state_login () =
+      let state = result (call "get_state") in
+      print_s
+        [%message
+          ""
+            ~adapter_login:
+              (Option.map (Json.member "adapter_login" state) ~f:Json.to_string
+               : string option)]
+    in
+    logins (call "list_adapters");
+    logins
+      (call ~params:{|{"adapter":"codex","login":"work"}|} "set_adapter_login");
+    print_endline
+      (In_channel.read_all (Filename.concat t.dir ".prigh/config.json"));
+    state_login ();
+    ignore (call ~params:{|{"adapter":"codex"}|} "set_adapter" : Json.t);
+    state_login ();
+    logins
+      (call ~params:{|{"adapter":"codex","login":"home"}|} "set_adapter_login");
+    logins
+      (call ~params:{|{"adapter":"claude","login":"work"}|} "set_adapter_login");
+    logins
+      (call ~params:{|{"adapter":"codex","login":"own"}|} "set_adapter_login");
+    state_login ();
+    print_endline
+      (In_channel.read_all (Filename.concat t.dir ".prigh/config.json")));
+  [%expect
+    {|
+    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]}]
+    [{"adapter":"codex","provider":"openai-codex","login":"main","label":"Work","choices":[{"ref":"main","label":"Work"}]}]
+    {
+      "adapters": {
+        "codex": {
+          "login": "main"
+        }
+      }
+    }
+    (adapter_login ())
+    (adapter_login ("\"Work\""))
+    {"type":"response","id":"r","ok":false,"error":"ChatGPT has no account \"home\": it has Work (main)"}
+    {"type":"response","id":"r","ok":false,"error":"claude runs only on its own login (prigh can hand one of its logins to: codex)"}
+    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]}]
+    (adapter_login ())
+    {}
+    |}]
 ;;

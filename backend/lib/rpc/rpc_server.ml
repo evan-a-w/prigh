@@ -68,6 +68,7 @@ let methods =
   ; "new_session"
   ; "set_adapter"
   ; "list_adapters"
+  ; "set_adapter_login"
   ; "keep_session"
   ; "switch_session"
   ; "list_sessions"
@@ -1037,9 +1038,76 @@ let send_to_clients t agent ~now (event : Agent.Event.t) json =
       | Resync -> c.send_shared (force resync) ~line:resync_line)
 ;;
 
+(* The login of prigh's the user runs [adapter]'s CLI on (Settings →
+   Engines), if one. *)
+let adapter_login t ~adapter =
+  match t.home, Cli_login.provider ~adapter with
+  | Some home, Some provider ->
+    (match Cli_login.find ~home ~adapter with
+     | Own -> None
+     | Prigh ref_ -> Some (provider, ref_))
+  | _ -> None
+;;
+
+let login_label t provider ref_ =
+  match
+    Login_choice.find
+      ?member:t.member
+      (Login_manager.store t.login)
+      provider
+      (Account_ref.to_string ref_)
+  with
+  | Ok choice -> choice.label
+  | Error _ -> Account_ref.to_string ref_
+;;
+
+(* What a composer session's CLI is handed: one of prigh's logins, whose
+   problems (gone, unshared) the CLI's start reports. *)
+let cli_credential t agent ~adapter =
+  Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
+    match
+      Cli_credential.of_store
+        ~env:(Agent.env agent)
+        ?member:t.member
+        ?ledger:t.ledger
+        (Login_manager.store t.login)
+        provider
+        ref_
+    with
+    | Ok credential -> credential
+    | Error e ->
+      Cli_credential.create
+        ~provider
+        ~account:ref_
+        ~label:(Account_ref.to_string ref_)
+        ~fetch:(fun ?refused:_ ?valid_for_ms:_ () -> Error e)
+        ())
+;;
+
+(* A session's state, with the label of prigh's login its CLI runs on. *)
+let state_json t (s : Agent.State.t) =
+  let json = Rpc_json.state s in
+  match s.engine, json with
+  | { engine = Composer; adapter = Some a }, `Object fields ->
+    (match adapter_login t ~adapter:(Adapter_id.to_string a) with
+     | Some (provider, ref_) ->
+       `Object
+         (fields @ [ "adapter_login", `String (login_label t provider ref_) ])
+     | None -> json)
+  | _ -> json
+;;
+
 let route t agent (event : Agent.Event.t) =
   let now = Eio.Time.now (Eio.Stdenv.clock (Agent.env agent)) in
   let json = Rpc_json.event ~now event in
+  let json =
+    match event, json with
+    | State_changed s, `Object fields ->
+      `Object
+        (List.map fields ~f:(fun (k, v) ->
+           if String.equal k "state" then k, state_json t s else k, v))
+    | _ -> json
+  in
   (match event with
    | Tool_exec { host; exec_id; _ } ->
      (match host_client t host with
@@ -1347,6 +1415,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
       ; fork
       ; at
       ; developer_instructions = Agent.user_instructions agent
+      ; login = cli_credential t agent ~adapter:adapter_name
       }
     in
     let on_thread thread_id =
@@ -2587,7 +2656,7 @@ let hello t (client : Client.t) params =
                  then `True
                  else `False )
              ; "features", strings (backend_features @ engine_features t)
-             ; "state", Rpc_json.state (Agent.state agent)
+             ; "state", state_json t (Agent.state agent)
              ]
              @ engines_json t)))))
 ;;
@@ -2610,8 +2679,8 @@ let config_saved t agent =
 ;;
 
 (* What a client changing session needs first, saving it a [get_state]. *)
-let attached_state (client : Client.t) =
-  `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
+let attached_state t (client : Client.t) =
+  `Object [ "state", state_json t (Agent.state client.agent) ]
 ;;
 
 (* Moves the attached session to another of the composer's adapters (the
@@ -2629,7 +2698,7 @@ let set_adapter t (client : Client.t) params =
   in
   let previous = Agent.engine_choice agent in
   if Engine_choice.equal choice previous
-  then Ok (attached_state client)
+  then Ok (attached_state t client)
   else if Agent.is_running agent
   then
     Or_error.errorf
@@ -2652,7 +2721,7 @@ let set_adapter t (client : Client.t) params =
       Agent.set_unavailable agent None;
       Agent.set_runner agent None;
       models_changed t agent;
-      Ok (attached_state client)
+      Ok (attached_state t client)
     | { engine = Composer; _ } ->
       let%bind adapter =
         Result.of_option
@@ -2664,7 +2733,7 @@ let set_adapter t (client : Client.t) params =
       Agent.set_unavailable agent None;
       Agent.set_runner agent (Some runner);
       models_changed t agent;
-      attached_state client)
+      attached_state t client)
 ;;
 
 (* A temporary session is not saved or listed, and ends when its client
@@ -2747,7 +2816,7 @@ let new_session
   Agent.set_engine agent engine;
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
-  match attached_state client, key with
+  match attached_state t client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])
   | state, _ -> state
@@ -2993,7 +3062,7 @@ let leave_for_deletion t (client : Client.t) ~switch_to keys =
               "switch_to is among the sessions to delete: name another one"
           else (
             attach t client target;
-            Ok (Some (attached_state client)))))
+            Ok (Some (attached_state t client)))))
 ;;
 
 (* One [sessions_changed] for the lot. *)
@@ -3655,7 +3724,7 @@ let keep_session t (client : Client.t) =
     Agent.keep agent;
     Hashtbl.set t.listed ~key:id ~data:(Listed.of_agent agent);
     sessions_changed t ~changed:[ Agent.session agent ];
-    Ok (attached_state client))
+    Ok (attached_state t client))
 ;;
 
 let set_config t agent params =
@@ -3695,6 +3764,84 @@ let set_config t agent params =
 (* Every deployed adapter on every connected host, the session's host
    first; statuses older than the cache's ttl (all of them with [refresh])
    are probed again, the hosts in parallel. *)
+(* Which login each adapter that can take one of prigh's runs on, and the
+   logins it could. *)
+let adapter_logins_json t =
+  `Array
+    (List.filter_map Cli_login.adapters ~f:(fun adapter ->
+       Option.map (Cli_login.provider ~adapter) ~f:(fun provider ->
+         let choices =
+           Login_choice.list
+             ?member:t.member
+             (Login_manager.store t.login)
+             provider
+           |> Result.ok
+           |> Option.value ~default:[]
+         in
+         let login = adapter_login t ~adapter in
+         `Object
+           [ "adapter", `String adapter
+           ; "provider", `String (Provider_id.to_string provider)
+           ; ( "login"
+             , Option.value_map login ~default:`Null ~f:(fun (_, r) ->
+                 `String (Account_ref.to_string r)) )
+           ; ( "label"
+             , Option.value_map login ~default:`Null ~f:(fun (p, r) ->
+                 `String (login_label t p r)) )
+           ; ( "choices"
+             , `Array
+                 (List.map choices ~f:(fun (c : Login_choice.t) ->
+                    `Object
+                      [ "ref", `String (Account_ref.to_string c.ref_)
+                      ; "label", `String c.label
+                      ])) )
+           ])))
+;;
+
+(* [login]: a login of prigh's (ref, id or label), or ["own"] / null for the
+   CLI's own. The sessions on it show it, and take it at their next turn. *)
+let set_adapter_login t params =
+  let open Or_error.Let_syntax in
+  let%bind adapter = string_param params "adapter" in
+  let%bind login = string_param_opt params "login" in
+  let%bind home =
+    match t.home with
+    | Some home -> Ok home
+    | None -> Or_error.error_string "this backend keeps no settings"
+  in
+  let%bind provider =
+    match Cli_login.provider ~adapter with
+    | Some provider -> Ok provider
+    | None ->
+      Or_error.errorf
+        "%s runs only on its own login (prigh can hand one of its logins to: \
+         %s)"
+        adapter
+        (String.concat ~sep:", " Cli_login.adapters)
+  in
+  let%bind choice =
+    match login with
+    | None | Some "own" -> Ok Cli_login.Own
+    | Some login ->
+      let%map found =
+        Login_choice.find
+          ?member:t.member
+          (Login_manager.store t.login)
+          provider
+          login
+      in
+      Cli_login.Prigh found.ref_
+  in
+  let%map () = Cli_login.save ~home ~adapter choice in
+  Hashtbl.iter t.agents ~f:(fun agent ->
+    match Agent.engine_choice agent with
+    | { engine = Composer; adapter = Some a }
+      when String.equal (Adapter_id.to_string a) adapter ->
+      route t agent (State_changed (Agent.state agent))
+    | _ -> ());
+  `Object [ "adapter_logins", adapter_logins_json t ]
+;;
+
 let list_adapters t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let%bind () =
@@ -3759,7 +3906,10 @@ let list_adapters t (client : Client.t) params =
     |> List.exists ~f:Fn.id
   in
   if changed then adapters_changed t ~hosts:state.hosts;
-  `Object [ "adapters", adapters_json (adapter_statuses t hosts) ]
+  `Object
+    [ "adapters", adapters_json (adapter_statuses t hosts)
+    ; "adapter_logins", adapter_logins_json t
+    ]
 ;;
 
 let via_host_token (client : Client.t) =
@@ -3923,6 +4073,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (Or_error.map (switch_user client params) ~f:(fun user ->
          `Object [ "user", `String user ]))
   | "list_adapters" -> Some (list_adapters t client params)
+  | "set_adapter_login" -> Some (set_adapter_login t params)
   | "set_active_host" ->
     Some
       (Or_error.bind (string_param params "host") ~f:(fun host ->
@@ -4017,7 +4168,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (Or_error.bind (string_param params "path") ~f:(fun key ->
          Or_error.map (find_agent t client key) ~f:(fun target ->
            attach t client target;
-           attached_state client)))
+           attached_state t client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
   | "search_sessions" -> Some (search_sessions t params)
   | "list_worktrees" -> Some (list_worktrees t client params)
@@ -4105,7 +4256,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            start_agent t session start |> attach t client;
            if Session.persisted session
            then sessions_changed t ~changed:[ session ];
-           attached_state client))
+           attached_state t client))
   | "login" ->
     (* The flow may emit its first event before it is started. *)
     let owned start =
@@ -4383,6 +4534,7 @@ let dispatch
       agent
       login
       ~external_models
+      ~state_json
       ~(client : Client.t)
       ~meth
       ~params
@@ -4549,7 +4701,7 @@ let dispatch
                   [ "text", `String result.text
                   ; ("is_error", if result.is_error then `True else `False)
                   ])))
-  | "get_state" -> ok (Rpc_json.state (Agent.state agent))
+  | "get_state" -> ok (state_json (Agent.state agent))
   | "get_pending" ->
     let steer, follow_up = Agent.queued_texts agent in
     ok
@@ -4831,7 +4983,7 @@ let dispatch
     let%bind plan = flag "plan_mode" in
     let%bind chat = flag "chat_mode" in
     Agent.set_mode ?approval ?plan ?chat agent;
-    ok (Rpc_json.state (Agent.state agent))
+    ok (state_json (Agent.state agent))
   | "forget_allowed_call" ->
     let open Or_error.Let_syntax in
     let%bind all = bool_param params "all" ~default:false in
@@ -4966,6 +5118,7 @@ let handle t client (request : Json.t) : Json.t =
                    agent
                    t.login
                    ~external_models:(fun () -> external_models t agent)
+                   ~state_json:(state_json t)
                    ~client
                    ~meth
                    ~params))
