@@ -1620,6 +1620,16 @@ let last_model t ~f =
       | _ -> None)
 ;;
 
+let last_account t ~f =
+  List.find_map
+    (List.rev (active_path t))
+    ~f:(fun (e : Entry.t) ->
+      match e.payload with
+      | Model { model; account; thinking = _ } when f model -> Some account
+      | _ -> None)
+  |> Option.join
+;;
+
 module Thread = struct
   type t =
     { adapter : string

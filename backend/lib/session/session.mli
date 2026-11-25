@@ -423,6 +423,10 @@ val account : t -> string option
     [f] accepts (by key). *)
 val last_model : t -> f:(string -> bool) -> (string * Thinking.t) option
 
+(** The account of the latest model choice on the active path whose model
+    [f] accepts. *)
+val last_account : t -> f:(string -> bool) -> string option
+
 (** {2 Engines}
 
     Which engine a session runs on (the last [Engine] entry on the active

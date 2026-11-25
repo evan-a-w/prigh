@@ -298,7 +298,14 @@ let with_server f =
      | _ -> ());
     Agent.wait_idle (agent ())
   in
-  f ~call ~prompt ~agent ~refuse_resume;
+  (* The session as a backend that starts again would have it. *)
+  let reload () =
+    let session =
+      Or_error.ok_exn (Session.load (Session.path (Agent.session (agent ()))))
+    in
+    new_agent ~session ~cwd:t.dir ()
+  in
+  f ~call ~prompt ~agent ~refuse_resume ~reload;
   Rpc_server.shutdown server
 ;;
 
@@ -329,7 +336,7 @@ let print_result json =
 
 let%expect_test "switching adapters hands each what it has not seen" =
   with_server
-  @@ fun ~call ~prompt ~agent ~refuse_resume:_ ->
+  @@ fun ~call ~prompt ~agent ~refuse_resume:_ ~reload:_ ->
   print_result (call ~params:{|{"adapter": "codex"}|} "new_session");
   prompt "first";
   prompt "second";
@@ -436,7 +443,7 @@ let%expect_test "switching adapters hands each what it has not seen" =
 
 let%expect_test "a thread that cannot be continued gets the whole session" =
   with_server
-  @@ fun ~call ~prompt ~agent:_ ~refuse_resume ->
+  @@ fun ~call ~prompt ~agent:_ ~refuse_resume ~reload:_ ->
   print_result (call ~params:{|{"adapter": "codex"}|} "new_session");
   prompt "first";
   print_result (call ~params:{|{"adapter": "claude"}|} "set_adapter");
@@ -505,7 +512,7 @@ let%expect_test
     "a fork of a Codex session forks its thread, with nothing to hand over"
   =
   with_server
-  @@ fun ~call ~prompt ~agent ~refuse_resume:_ ->
+  @@ fun ~call ~prompt ~agent ~refuse_resume:_ ~reload:_ ->
   print_result (call ~params:{|{"adapter": "codex"}|} "new_session");
   prompt "first";
   print_result (call "clone");
@@ -543,7 +550,7 @@ let%expect_test
 
 let%expect_test "a harness session moves to an adapter" =
   with_server
-  @@ fun ~call ~prompt:_ ~agent:_ ~refuse_resume:_ ->
+  @@ fun ~call ~prompt:_ ~agent:_ ~refuse_resume:_ ~reload:_ ->
   print_result (call "new_session");
   print_result (call ~params:{|{"adapter": "claude"}|} "set_adapter");
   [%expect
@@ -638,7 +645,7 @@ let%expect_test "moving to another tool host: a new process and thread there" =
 
 let%expect_test "back to the harness engine and out again; models follow" =
   with_server
-  @@ fun ~call ~prompt ~agent ~refuse_resume:_ ->
+  @@ fun ~call ~prompt ~agent ~refuse_resume:_ ~reload:_ ->
   let models () =
     match call "list_models" with
     | `Object fields ->
@@ -696,5 +703,43 @@ let%expect_test "back to the harness engine and out again; models follow" =
     {|
     ok: engine composer, adapter codex
     codex/gpt-5
+    |}]
+;;
+
+let%expect_test "back from an agent CLI, the session has its login again" =
+  with_server
+  @@ fun ~call ~prompt:_ ~agent ~refuse_resume:_ ~reload ->
+  let show agent =
+    let state = Agent.state agent in
+    printf
+      "%s%s\n"
+      (Model.key state.model)
+      (Option.value_map state.account ~default:"" ~f:(fun a ->
+         "@" ^ Account_ref.to_string a))
+  in
+  print_result (call "new_session");
+  Agent.set_model
+    ~account:(Or_error.ok_exn (Account_ref.of_string "work"))
+    (agent ())
+    (Agent.state (agent ())).model;
+  show (agent ());
+  print_result (call ~params:{|{"adapter": "codex"}|} "set_adapter");
+  show (agent ());
+  print_result (call ~params:{|{"adapter": "harness"}|} "set_adapter");
+  show (agent ());
+  (* A session is written once it has a message. *)
+  ignore
+    (Session.append_message (Agent.session (agent ())) (Message.user "hi")
+     : Session.Entry.t);
+  show (reload ());
+  [%expect
+    {|
+    ok: engine -, adapter -
+    deepseek/deepseek-flash@work
+    ok: engine composer, adapter codex
+    codex/default
+    ok: engine -, adapter -
+    deepseek/deepseek-flash@work
+    deepseek/deepseek-flash@work
     |}]
 ;;

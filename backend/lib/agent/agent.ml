@@ -3133,11 +3133,12 @@ let runner t =
 ;;
 
 (* The session records the model it is on, unless it is [current]. *)
-let record_model t ~current =
+let record_model ?account t ~current =
   if not (Option.equal String.equal current (Some (Model.key t.model)))
   then
     ignore
       (Session.set_model
+         ?account
          t.session
          ~model:(Model.key t.model)
          ~thinking:t.thinking
@@ -3178,7 +3179,16 @@ let settle_runner_model t =
     then (
       t.model <- t.harness_model;
       t.thinking <- settle_thinking t.model t.thinking;
-      record_model t ~current:(Option.map (Session.model t.session) ~f:fst))
+      (* The login the session last pinned on one of prigh's models. *)
+      t.login
+      <- Option.bind
+           (Session.last_account t.session ~f:(fun m ->
+              not (External_model.is_external m)))
+           ~f:(fun id -> Result.ok (Account_ref.of_string id));
+      record_model
+        ?account:(Option.map t.login ~f:Account_ref.to_string)
+        t
+        ~current:(Option.map (Session.model t.session) ~f:fst))
 ;;
 
 let set_runner t runner =
