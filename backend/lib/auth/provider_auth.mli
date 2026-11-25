@@ -51,6 +51,14 @@ end
 val methods : Provider_id.t -> Method.t list
 val env_vars : Provider_id.t -> string list
 
+(** Refreshes an OAuth login at its provider's token endpoint. *)
+val refresh_oauth
+  :  env:Env.t
+  -> cancel:Cancellation.t
+  -> Provider_id.t
+  -> refresh_token:string
+  -> Credential.Oauth.t Or_error.t
+
 (** Refreshes OAuth tokens that expire within five minutes, persisting the
     rotated credential under the store lock. [None] means not configured.
     [account] (default: the provider's default one) must be logged in.

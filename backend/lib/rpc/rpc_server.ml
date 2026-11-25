@@ -69,6 +69,7 @@ let methods =
   ; "set_adapter"
   ; "list_adapters"
   ; "set_adapter_login"
+  ; "import_adapter_login"
   ; "keep_session"
   ; "switch_session"
   ; "list_sessions"
@@ -3928,6 +3929,81 @@ let check_manages_logins (client : Client.t) =
   else Ok ()
 ;;
 
+(* The tool host [host] names (id or name; default: the session's active
+   one). *)
+let import_host agent host =
+  let state = Agent.state agent in
+  let host = Option.value host ~default:state.active_host in
+  match
+    List.find state.hosts ~f:(fun (h : Agent.Host.t) ->
+      String.equal h.id host || String.equal h.name host)
+  with
+  | Some h -> Ok h
+  | None ->
+    Or_error.errorf
+      "no tool host %S is connected (connected: %s)"
+      host
+      (String.concat
+         ~sep:", "
+         (List.map state.hosts ~f:(fun (h : Agent.Host.t) -> h.name)))
+;;
+
+(* Moves a tool host's own CLI login into prigh ({!Cli_import}). Without
+   [confirm] it only finds it, answering what the user consents to; with
+   it, the login becomes prigh's and the adapter runs on it. *)
+let import_adapter_login t (client : Client.t) agent params =
+  let open Or_error.Let_syntax in
+  let%bind () = check_manages_logins client in
+  let%bind adapter = string_param params "adapter" in
+  let%bind host = string_param_opt params "host" in
+  let%bind confirm = bool_param params "confirm" ~default:false in
+  let%bind home =
+    match t.home with
+    | Some home -> Ok home
+    | None -> Or_error.error_string "this backend keeps no settings"
+  in
+  let%bind host = import_host agent host in
+  let exec ~name arguments =
+    Agent.host_call_on agent ~host:host.id ~cwd:host.cwd ~name arguments
+  in
+  let host_name = if String.is_empty host.name then host.id else host.name in
+  let%bind found = Cli_import.find ~exec ~adapter ~host:host_name in
+  let found_json =
+    [ "adapter", `String adapter
+    ; "provider", `String (Provider_id.to_string found.provider)
+    ; "host", `String host_name
+    ; "path", `String found.path
+    ; "label", `String (Cli_import.Found.label found)
+    ; "warning", `String (Cli_import.Found.warning found)
+    ]
+  in
+  if not confirm
+  then Ok (`Object (("confirmed", `False) :: found_json))
+  else (
+    let env = Agent.env agent in
+    let%bind id, note =
+      Cli_import.take
+        ~exec
+        ~refresh:(Provider_auth.refresh_oauth ~env ~cancel:Cancellation.never)
+        (Login_manager.store t.login)
+        found
+    in
+    let%map () = Cli_login.save ~home ~adapter (Prigh (Account_ref.Own id)) in
+    send_accounts_changed t;
+    Hashtbl.iter t.agents ~f:(fun agent ->
+      match Agent.engine_choice agent with
+      | { engine = Composer; adapter = Some a }
+        when String.equal (Adapter_id.to_string a) adapter ->
+        route t agent (State_changed (Agent.state agent))
+      | _ -> ());
+    `Object
+      ((("confirmed", `True) :: found_json)
+       @ [ "account", `String (Account_id.to_string id)
+         ; "note", Option.value_map note ~default:`Null ~f:(fun n -> `String n)
+         ; "adapter_logins", adapter_logins_json t
+         ]))
+;;
+
 let member_of t =
   match t.member with
   | Some m -> Ok m
@@ -4074,6 +4150,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
          `Object [ "user", `String user ]))
   | "list_adapters" -> Some (list_adapters t client params)
   | "set_adapter_login" -> Some (set_adapter_login t params)
+  | "import_adapter_login" -> Some (import_adapter_login t client agent params)
   | "set_active_host" ->
     Some
       (Or_error.bind (string_param params "host") ~f:(fun host ->

@@ -518,9 +518,15 @@ let%expect_test "sharing over RPC: share, use, revoke mid-session, host tokens" 
     bob_host
     "account_share"
     {|{"ref": "openai-codex/main", "users": []}|};
+  call
+    bob
+    bob_host
+    "import_adapter_login"
+    {|{"adapter": "codex", "confirm": true}|};
   codex_accounts bob bob_host;
   [%expect
     {|
+    "this connection signed in with a host token, which cannot change model logins: sign in as the user (prigh-web, or the user's own token)"
     "this connection signed in with a host token, which cannot change model logins: sign in as the user (prigh-web, or the user's own token)"
     "this connection signed in with a host token, which cannot change model logins: sign in as the user (prigh-web, or the user's own token)"
     "this connection signed in with a host token, which cannot change model logins: sign in as the user (prigh-web, or the user's own token)"
