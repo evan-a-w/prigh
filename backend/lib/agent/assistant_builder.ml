@@ -135,9 +135,15 @@ let snapshot t =
   ; stop_reason = End_turn
   ; usage = Usage.zero
   ; model = t.model
+  ; account = None
   }
 ;;
 
 let finish t ~stop_reason ~usage =
-  { Message.Assistant.content = content t; stop_reason; usage; model = t.model }
+  { Message.Assistant.content = content t
+  ; stop_reason
+  ; usage
+  ; model = t.model
+  ; account = None
+  }
 ;;

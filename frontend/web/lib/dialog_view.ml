@@ -19,6 +19,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Hosts -> "Hosts"
   | Users -> "Users"
   | Accounts -> "Accounts"
+  | Logins _ -> "Logins"
   | Menu _ -> "Menu"
   | Skills -> "Skills"
   | Snippets -> "Snippets"
@@ -93,7 +94,10 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
       ]
     (Picker_view.view
        p
-       ~noun:(String.lowercase (picker_title kind))
+       ~noun:
+         (match kind with
+          | Logins { noun } -> noun
+          | _ -> String.lowercase (picker_title kind))
        ?empty:
          (match kind with
           | Mcp { servers = []; _ } -> Some (Node.text Mcp_servers.none)
@@ -602,6 +606,24 @@ let forge_host ~input ~error ~inject =
     ]
 ;;
 
+let login_label ~title ~input ~error ~inject =
+  Modal.view
+    ~title
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:(cancel_accept ~inject "Save")
+    [ Node.p
+        [ Node.text
+            "The login's name in Settings, /accounts and beside the model \
+             (model@label)."
+        ]
+    ; text_input ~placeholder:"Work" ~label:"Label" ~value:input ~inject ()
+    ; (match error with
+       | Some e ->
+         div ~cls:"dialog-error" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
+       | None -> Node.none)
+    ]
+;;
+
 let auth (m : App.Model.t) (statuses : Auth_status.t list) ~inject =
   Modal.view
     ~cls:"auth-dialog"
@@ -700,6 +722,8 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Login flow) -> login m flow ~inject
   | Some (Auth statuses) -> auth m statuses ~inject
   | Some (Forge_host { input; error }) -> forge_host ~input ~error ~inject
+  | Some (Login_label { title; input; error; command = _ }) ->
+    login_label ~title ~input ~error ~inject
   | Some (Pulls l) -> Pull_requests_view.list l ~inject
   | Some (Pull p) -> Pull_requests_view.page m p ~inject
   | Some (Pr_create f) -> Pull_requests_view.create m.generate f ~inject

@@ -575,7 +575,9 @@ let%expect_test
   H.mode h;
   [%expect {| editing |}];
   H.event h (Auth (Progress "exchanging code"));
-  H.event h (Auth (Done { provider = "anthropic"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "anthropic"; method_ = "api_key"; account = None }));
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
@@ -780,7 +782,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 84
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -797,7 +799,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 84
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -814,7 +816,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 84
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -1324,7 +1326,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.keys h "y";
   [%expect
     {| (Rpc (method_ logout) (params ((provider deepseek))) (tag Show_error)) |}];
-  H.event h (Auth (Logged_out "deepseek"));
+  H.event h (Auth (Logged_out { provider = "deepseek"; account = None }));
   [%expect {| (Rpc (method_ auth_status) (params ()) (tag Auth_refresh)) |}]
 ;;
 
@@ -3084,17 +3086,17 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     {|
     ┌─ Help ───────────────────────────────────────────────────┐
     │ Commands                                                 │
-    │ /help                              show commands and     │
+    │ /help                                  show commands and │
     │ keys                                                     │
-    │ /hotkeys                           show keyboard         │
+    │ /hotkeys                               show keyboard     │
     │ shortcuts                                                │
-    │ /model [name|id|provider/id]       pick or switch the    │
-    │ model                                                    │
-    │ /scoped-models                     pick the models       │
+    │ /model [name|id|provider/id]           pick or switch    │
+    │ the model                                                │
+    │ /scoped-models                         pick the models   │
     │ Ctrl+P cycles through                                    │
-    │ /change_default                    save the current      │
+    │ /change_default                        save the current  │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 376 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 396 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -6980,7 +6982,9 @@ let%expect_test "login end to end includes a prompt_cancelled" =
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.event h (Auth (Progress "exchanging code"));
-  H.event h (Auth (Done { provider = "anthropic"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "anthropic"; method_ = "api_key"; account = None }));
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
@@ -8739,7 +8743,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 84
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8756,7 +8760,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 84
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -9041,7 +9045,7 @@ let%expect_test
                                 │   /fallback [off|model...]      show or set the models that take over, in order, when a model's usa…
                                 │   /default-dir [off|path]       show or set the directory new sessions start in (on the default hos…
                                 │   /default-host [off|name]      show or set the tool host prigh-web's new sessions start on (a term…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 84
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 87
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
@@ -9745,7 +9749,9 @@ let%expect_test
       (tag Show_error))
     |}];
   H.event h (Auth (Progress "Found 1 models: gpt-4o"));
-  H.event h (Auth (Done { provider = "aiproxy"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "aiproxy"; method_ = "api_key"; account = None }));
   H.reply
     ~quiet:true
     h
@@ -9830,7 +9836,7 @@ let%expect_test
                 }
           }));
   H.enter h;
-  H.event h (Auth (Logged_out "ollama"));
+  H.event h (Auth (Logged_out { provider = "ollama"; account = None }));
   [%expect
     {|
     (Rpc

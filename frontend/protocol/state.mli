@@ -87,6 +87,10 @@ type t =
         [temporary] made it, and only its [temporary_key] reaches it *)
   ; engine : Session_engine.t
     (** the engine it runs on: the harness when the backend says nothing *)
+  ; account : string option
+    (** the login of [model]'s provider the session chose ([set_model]
+        with [account], or [model@account]); [None]: the provider's
+        default *)
   }
 [@@deriving sexp_of, equal]
 

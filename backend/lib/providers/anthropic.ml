@@ -226,8 +226,8 @@ let tool_result_block
      | _ -> [])
 ;;
 
-let same_provider ~provider (a : Message.Assistant.t) =
-  Model.written_by a.model provider
+let same_provider ~provider ~account (a : Message.Assistant.t) =
+  Model.written_by a.model provider && Account_ref.same a.account account
 ;;
 
 (* Not on thinking or a [server_tool_use], which a continued turn (after a
@@ -252,7 +252,13 @@ let add_cache_control = function
    cached prefix, so with the end alone a turn that adds more blocks (many
    parallel tool calls and their results) would miss the cache and process
    the whole context again. *)
-let wire_messages ~oauth ~provider ~computer (messages : Message.t list) =
+let wire_messages
+      ~oauth
+      ~provider
+      ~account
+      ~computer
+      (messages : Message.t list)
+  =
   let last = List.length messages - 1 in
   let first_screenshot =
     List.findi messages ~f:(fun _ m ->
@@ -278,7 +284,7 @@ let wire_messages ~oauth ~provider ~computer (messages : Message.t list) =
           , assistant_blocks
               ~oauth
               ~computer
-              ~replay_thinking:(same_provider ~provider a)
+              ~replay_thinking:(same_provider ~provider ~account a)
               ~continuing:(i = last)
               a )
       in
@@ -443,6 +449,7 @@ let request_body ~oauth (r : Provider.Request.t) : Json.t =
                (wire_messages
                   ~oauth
                   ~provider:r.model.provider
+                  ~account:r.account
                   ~computer
                   r.messages) )
          ]

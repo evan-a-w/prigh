@@ -506,6 +506,7 @@ let run
           ; thinking = config.thinking
           ; max_tokens = config.max_tokens
           ; cache_key = config.cache_key
+          ; account = None
           }
         in
         let builder = Assistant_builder.create ~model:config.model.id in

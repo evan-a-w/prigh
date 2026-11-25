@@ -21,6 +21,10 @@ module Assistant : sig
     ; stop_reason : Stop_reason.t
     ; usage : Usage.t
     ; model : string
+    ; account : string option [@sexp.option] [@jsonaf.option]
+      (** the login that wrote it ({!Account_id}) when not the provider's
+        [main] one: encrypted reasoning is only replayed to the same
+        account *)
     }
   [@@deriving sexp, jsonaf, equal]
 

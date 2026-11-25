@@ -1039,6 +1039,57 @@ A
 alice
 === webkit: accounts: errors ===
 none
+=== webkit: sharing: bob's logins before ===
+0
+=== webkit: sharing: 390x844: alice's logins ===
+ok
+API key
+API key, default.
+Share…
+Manage
+TODAY
+5 req 22k tok $0.67
+7 DAYS
+5 req 22k tok $0.67
+30 DAYS
+5 req 22k tok $0.67
+=== webkit: sharing: 390x844: share with ===
+ok
+bob
+pick to share: they never see its key
+=== webkit: sharing: bob's logins after ===
+API key (from alice)
+API key, default, shared by alice.
+Hide
+Manage
+TODAY
+2 req 8.6k tok $0.25
+7 DAYS
+2 req 8.6k tok $0.25
+30 DAYS
+2 req 8.6k tok $0.25
+=== webkit: sharing: 320x640: alice's logins ===
+ok
+API key
+API key, default, shared with bob.
+Share…
+Manage
+TODAY
+5 req 22k tok $0.67
+7 DAYS
+5 req 22k tok $0.67
+30 DAYS
+5 req 22k tok $0.67
+You
+today 3 req 13k tok $0.42 · 30 days 3 req 13k tok $0.42
+bob
+today 2 req 8.6k tok $0.25 · 30 days 2 req 8.6k tok $0.25
+=== webkit: sharing: 320x640: share with ===
+ok
+bob
+shared with them: pick to stop sharing
+=== webkit: sharing: bob's logins once revoked ===
+0
 === webkit: reconnect: a long session, halfway up ===
 scrolled: true
 draft: half-written thought
@@ -4088,14 +4139,17 @@ back: Memory | What you asked the model to remember, for later sessions. Kept on
 (none)
 === webkit: usage: opened ===
 Usage
-How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 At a limit
 Resume after a usage limit
 A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-Claude
+Anthropic
+Claude Pro/Max
+Subscription, default, takes over at usage limits.
+Manage
 5-hour session
 Resets in 2h 15m · TIME
 33% used
@@ -4105,8 +4159,10 @@ Resets in 3d 4h · TIME
 Weekly · Opus
 Reset time not reported
 4% used
-ChatGPT
-Plus
+OpenAI Codex (ChatGPT)
+ChatGPT Plus/Pro
+Subscription, default, takes over at usage limits. Plus plan.
+Manage
 5-hour session
 Resets in 43m · TIME
 72% used
@@ -4119,18 +4175,22 @@ asked: Claude 1, ChatGPT 1
 asked: Claude 2, ChatGPT 2; ChatGPT's session: 75% used
 === webkit: usage: Claude rate limited ===
 Usage
-How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 At a limit
 Resume after a usage limit
 A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-Claude
-Could not read the limits
-Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
-ChatGPT
-Plus
+Anthropic
+Claude Pro/Max
+Subscription, default, takes over at usage limits.
+Manage
+Limits unknown: Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
+OpenAI Codex (ChatGPT)
+ChatGPT Plus/Pro
+Subscription, default, takes over at usage limits. Plus plan.
+Manage
 5-hour session
 Resets in 43m · TIME
 75% used
@@ -4142,10 +4202,10 @@ bars: 5-hour session used=75, Weekly used=12
 asked again: 2
 === webkit: usage: phone 390x844 ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+back: Usage | Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 === webkit: usage: phone 320x640 ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+back: Usage | Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 === webkit: usage: errors ===
 (none)
 === webkit: user info: moved from user_info.md ===

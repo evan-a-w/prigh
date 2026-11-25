@@ -290,6 +290,7 @@ let%expect_test
           ; usage = Usage.zero
           ; stop_reason = Tool_use
           ; model = Model.key flash
+          ; account = None
           }
       ; Tool_result
           { tool_call_id = "c0"

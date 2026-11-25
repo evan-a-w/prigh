@@ -180,6 +180,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
            ~default:"none")
     ; line ~cls:"mode-line" "Mode" (Session_mode.title mode)
     ; line "Model" state.model.name
+    ; Node.fragment (Login_usage_view.card_lines m state ~line)
     ; (match state.git_branch with
        | Some branch -> line ~cls:"branch-line" "Branch" branch
        | None -> Node.none)

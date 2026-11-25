@@ -155,6 +155,8 @@ let%expect_test "every command does something (none is unknown)" =
     /jobs                      rpc list_subagents, rpc list_jobs
     /login                     loading Log in: rpc push_pref, rpc auth_status
     /logout                    loading Log out: rpc push_pref, rpc auth_status
+    /accounts                  toast: No logins yet: /login signs in to a provider.
+    /account                   toast: Anthropic has no stored login: /login anthropic as LABEL adds another.
     /auth                      loading Providers: rpc push_pref, rpc auth_status, rpc forge_status
     /pr                        pull requests: rpc push_pref, rpc pr_list
     /setusr                    loading Act as: rpc push_pref, rpc list_users

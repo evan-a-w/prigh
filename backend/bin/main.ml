@@ -123,7 +123,7 @@ let common_params =
         "PATH JSON array of scripted provider replies (implies -faux; loops \
          when exhausted)"
   and auth_file = auth_file_path_flag in
-  fun ~env ~sw ?(backend_host = true) ?world () ->
+  fun ~env ~sw ?(backend_host = true) ?world ?member () ->
     let world =
       match world with
       | Some world -> world
@@ -181,7 +181,15 @@ let common_params =
         then
           Faux_provider.create
             (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
-        else Provider_router.create ~env ~getenv ~models ~store ()
+        else
+          Provider_router.create
+            ~env
+            ~getenv
+            ~models
+            ?member
+            ~ledger:(Account_ledger.create ~home)
+            ~store
+            ()
     in
     let session =
       Option.map session ~f:(fun key ->
@@ -272,7 +280,7 @@ let common_params =
           ~user_info:(fun () -> User_info.text user_info)
           ~custom_instructions:(fun () ->
             Custom_instructions.for_model custom_instructions)
-          ~provider
+          ~provider:(Agent.following_account (fun () -> !agent_ref) provider)
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
           ~home
@@ -283,6 +291,10 @@ let common_params =
           ~env
           ~sw
           ~provider
+          ~accounts:(fun provider ->
+            Login_choice.list ?member store provider
+            |> Result.ok
+            |> Option.value ~default:[])
           ~tools:
             (if no_tools
              then []
@@ -664,6 +676,13 @@ let serve_command =
          ~doc:
            " never run tools on the backend machine, only on connected tool \
             hosts (also: $PRIGH_NO_BACKEND_HOST=1)"
+     and no_sharing =
+       flag
+         "-no-sharing"
+         no_arg
+         ~doc:
+           " -tokens users cannot share their model logins with each other \
+            (also: $PRIGH_SHARING=off)"
      and web =
        flag
          "-web"
@@ -813,7 +832,29 @@ let serve_command =
             | Some dir -> Nix_store_ops.helper ~env ~dir
             | None -> Nix_store_ops.local ~env)
        in
+       let shares =
+         Option.map access ~f:(fun _ ->
+           Account_shares.create
+             ~enabled:
+               (not
+                  (no_sharing
+                   || Option.equal
+                        String.equal
+                        (Sys.getenv "PRIGH_SHARING")
+                        (Some "off")))
+             ())
+       in
        let create_server ?token ?namespace ?world () =
+         let member =
+           Option.map2 shares namespace ~f:(fun shares user ->
+             Option.iter world ~f:(fun (world : Namespace.World.t) ->
+               Account_shares.register
+                 shares
+                 ~user
+                 ~store:world.store
+                 ~home:world.home);
+             { Account_shares.Member.shares; user })
+         in
          let { Setup.session
              ; cwd
              ; new_agent
@@ -829,7 +870,7 @@ let serve_command =
              ; search
              }
            =
-           make_agent ~env ~sw ~backend_host ?world ()
+           make_agent ~env ~sw ~backend_host ?world ?member ()
          in
          let login =
            Login_manager.create
@@ -854,6 +895,8 @@ let serve_command =
              ~sw
              ?token
              ?namespace
+             ?member
+             ~ledger:(Account_ledger.create ~home:world.home)
              ~backend_host
              ~home:world.home
              ~nix_store
@@ -2101,7 +2144,7 @@ let login_command =
             (match
                Provider_auth.login ~env store provider method_ interaction
              with
-             | Ok () ->
+             | Ok (_ : Account_id.t) ->
                eprintf
                  "Logged in to %s (%s); saved to %s\n"
                  (Provider_id.display_name provider)
@@ -2676,7 +2719,13 @@ let compaction_eval_command =
              Model_registry.create ~env ~sw ~home ~store ~getenv ()
            in
            let provider =
-             Provider_router.create ~env ~getenv ~models ~store ()
+             Provider_router.create
+               ~env
+               ~getenv
+               ~models
+               ~ledger:(Account_ledger.create ~home)
+               ~store
+               ()
            in
            let resolve id =
              match Model_registry.resolve models id with

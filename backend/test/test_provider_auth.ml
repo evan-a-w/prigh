@@ -191,7 +191,7 @@ let%expect_test "login with an api key prompt; logout" =
            provider
            method_
            (Auth_interaction.scripted answers)
-         : unit Or_error.t)]
+         : Account_id.t Or_error.t)]
   in
   login Deepseek Api_key [ "  sk-typed  " ];
   print_s
@@ -205,7 +205,7 @@ let%expect_test "login with an api key prompt; logout" =
     [%sexp (Auth_store.read store Deepseek : Credential.t option Or_error.t)];
   [%expect
     {|
-    (Ok ())
+    (Ok main)
     (Ok ((Api_key sk-typed)))
     (Error "empty API key")
     (Error "login cancelled")
@@ -246,7 +246,7 @@ let%expect_test
     (Error "a login is already in progress")
     (Error "no pending login prompt \"nope\"")
     (Ok ())
-    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
+    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"main"}
     |}];
   print_s [%sexp (Login_manager.start login Openai Api_key : unit Or_error.t)];
   Eio.Fiber.yield ();
@@ -295,6 +295,7 @@ let%expect_test "provider router: unauthenticated request fails with a hint" =
         ; thinking = Off
         ; max_tokens = None
         ; cache_key = None
+        ; account = None
         }
         ~cancel:Cancellation.never
         ~on_event:ignore

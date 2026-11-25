@@ -94,6 +94,7 @@ module State = struct
     ; cwd : string
     ; git_branch : string option
     ; model : Model.t
+    ; account : Account_ref.t option
     ; thinking : Thinking.t
     ; running : bool
     ; message_count : int
@@ -219,6 +220,9 @@ type t =
   ; mutable runner : Runner.t option
     (** the session's engine when it is not the harness on [provider] *)
   ; mutable unavailable : string option
+  ; accounts : Provider_id.t -> Login_choice.t list
+  ; mutable login : Account_ref.t option
+    (** the account of [model]'s provider to use ([None]: its default) *)
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
   ; user_info : User_info.t option
@@ -390,8 +394,11 @@ let restore_settings t =
      Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
        t.model <- m;
        t.harness_model <- m);
-     t.thinking <- settle_thinking t.model thinking
-   | None -> ());
+     t.thinking <- settle_thinking t.model thinking;
+     t.login
+     <- Option.bind (Session.account t.session) ~f:(fun id ->
+          Result.ok (Account_ref.of_string id))
+   | None -> t.login <- None);
   restore_approvals t
 ;;
 
@@ -742,6 +749,7 @@ let state t =
   ; cwd = t.cwd
   ; git_branch = t.git_branch
   ; model = shown_model t
+  ; account = (if is_external t.model then None else t.login)
   ; thinking = t.thinking
   ; running = is_running t
   ; message_count = List.length messages
@@ -3411,9 +3419,10 @@ let deliveries t =
 ;;
 
 (* The system prompt names the tools of the model it was built for. *)
-let set_model t model =
+let set_model ?account t model =
   t.model <- model;
   if not (is_external model) then t.harness_model <- model;
+  t.login <- (if is_external model then None else account);
   let thinking = settle_thinking model t.thinking in
   if not (Thinking.equal thinking t.thinking)
   then (
@@ -3433,9 +3442,51 @@ let set_model t model =
     t.thinking <- thinking);
   environment_changed t;
   ignore
-    (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
+    (Session.set_model
+       ?account:(Option.map account ~f:Account_ref.to_string)
+       t.session
+       ~model:(Model.key model)
+       ~thinking:t.thinking
      : Session.Entry.t);
   state_changed t
+;;
+
+let notice t text = broadcast t (Notice text)
+
+let model_ref t =
+  match t.login with
+  | None -> Model.key t.model
+  | Some id -> Model.key t.model ^ "@" ^ Account_ref.to_string id
+;;
+
+(* The account the current model's requests use: the pinned one, else the
+   provider's default. *)
+let current_account t =
+  match t.login with
+  | Some id -> Some id
+  | None ->
+    List.find_map (t.accounts t.model.provider) ~f:(fun a ->
+      Option.some_if a.default a.ref_)
+;;
+
+(* Before handing over to another model, another login of the same
+   provider: the next account after the current one (in the user's order)
+   that may be fallen over to and that this chain has not tried. *)
+let next_account t ~tried =
+  let accounts = t.accounts t.model.provider in
+  match current_account t with
+  | None -> None
+  | Some current ->
+    let after =
+      match
+        List.findi accounts ~f:(fun _ a -> Account_ref.equal a.ref_ current)
+      with
+      | Some (i, _) -> List.drop accounts (i + 1) @ List.take accounts i
+      | None -> accounts
+    in
+    List.find_map after ~f:(fun (a : Login_choice.t) ->
+      let key = Model.key t.model ^ "@" ^ Account_ref.to_string a.ref_ in
+      Option.some_if (a.fallback && not (Set.mem tried key)) a)
 ;;
 
 (* The model to continue with when [model] cannot be used: the next one in
@@ -3840,19 +3891,38 @@ and run_now ~kind ~tried ~then_ t prompts =
          t.thinking <- settle_thinking t.model t.thinking);
        Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
        sweep_orphans t ~main_running:false;
-       let tried = Set.add tried (Model.key t.model) in
        let cancelled = Cancellation.is_cancelled cancel in
        let current = phys_equal session t.session in
        let unavailable =
          if cancelled || not current then None else unavailable_error added
+       in
+       let tried =
+         let tried = Set.add tried (Model.key t.model) in
+         match Option.bind unavailable ~f:(fun _ -> current_account t) with
+         | None -> tried
+         | Some id ->
+           Set.add tried (Model.key t.model ^ "@" ^ Account_ref.to_string id)
        in
        let handover =
          Option.bind
            (Option.some_if (capabilities t).model_fallback unavailable
             |> Option.join)
            ~f:(fun error ->
-             match next_model t ~tried with
-             | None ->
+             match next_account t ~tried, next_model t ~tried with
+             | Some (account : Login_choice.t), _ ->
+               let from = model_ref t in
+               broadcast
+                 t
+                 (Notice
+                    (sprintf
+                       "%s: %s; carrying on with the %s login (%s)"
+                       from
+                       error
+                       account.label
+                       (Account_ref.to_string account.ref_)));
+               set_model ~account:account.ref_ t t.model;
+               Some []
+             | None, None ->
                if not (List.is_empty t.config.fallback_models)
                then
                  broadcast
@@ -3863,8 +3933,8 @@ and run_now ~kind ~tried ~then_ t prompts =
                           is left to hand over to; /model picks another"
                          (Model.key t.model)));
                None
-             | Some next ->
-               let from = Model.key t.model in
+             | None, Some next ->
+               let from = model_ref t in
                broadcast
                  t
                  (Notice
@@ -4268,10 +4338,39 @@ let restore_resume t =
     else Session.set_resume_at t.session None
 ;;
 
+(* [provider] with requests that name no account sent with [pinned]'s, when
+   [pinned] names one of the request model's provider. *)
+let with_pinned ~pinned (provider : Provider.t) : Provider.t =
+  { name = provider.name
+  ; stream =
+      (fun request ->
+        let request =
+          match (request : Provider.Request.t).account, pinned () with
+          | None, Some (p, account)
+            when Provider_id.equal p request.model.provider ->
+            { request with account = Some account }
+          | _ -> request
+        in
+        provider.stream request)
+  }
+;;
+
+let pinned_account t =
+  if is_external t.model
+  then None
+  else Option.map t.login ~f:(fun a -> t.model.provider, a)
+;;
+
+let following_account agent provider =
+  with_pinned provider ~pinned:(fun () ->
+    Option.bind (agent ()) ~f:pinned_account)
+;;
+
 let create
       ~env
       ~sw
       ~provider
+      ?(accounts = fun (_ : Provider_id.t) -> [])
       ~tools
       ~sessions_dir
       ~home
@@ -4337,12 +4436,16 @@ let create
       Session.create ~dir:sessions_dir ~cwd ()
   in
   let cwd = Session.cwd session in
+  let pinned = ref (fun () -> None) in
+  let provider = with_pinned provider ~pinned:(fun () -> !pinned ()) in
   let t =
     { env
     ; sw
     ; provider
     ; runner
     ; unavailable = None
+    ; accounts
+    ; login = None
     ; tools
     ; offered
     ; user_info
@@ -4435,6 +4538,7 @@ let create
     ; on_noted = ignore
     }
   in
+  (pinned := fun () -> pinned_account t);
   restore_settings t;
   restore_host t;
   restore_told t;
@@ -5346,6 +5450,7 @@ let complete t ~model ~system ~user ~max_tokens ~cancel ~on_delta =
     ; thinking = Off
     ; max_tokens = Some max_tokens
     ; cache_key = None
+    ; account = None
     }
   in
   let reply =

@@ -12,6 +12,9 @@ module Reply_tag = struct
     | Auth_show
     | Auth_login_picker
     | Auth_logout_picker
+    | Share_targets of string (** the login's ref *)
+    | Usage_limits of { show : bool }
+    (** [usage_limits]: kept for [/accounts]; [show]: [/usage] shows them *)
     | Forge_refresh
     | Prs_picker of string option (** the state asked for *)
     | Pr_shown
@@ -300,6 +303,8 @@ module Model = struct
     { state : P.State.t option
     ; models : P.Model.t list
     ; auth : P.Auth_status.t list
+    ; usage_limits : P.Subscription_usage.t option
+      (** the last [usage_limits] answer: the logins' limits *)
     ; forge : P.Forge_account.t list
     ; transcript : Transcript.t
     ; agents : Agent_view.t list
@@ -689,6 +694,7 @@ let init =
   { state = None
   ; models = []
   ; auth = []
+  ; usage_limits = None
   ; forge = []
   ; transcript = Transcript.empty
   ; agents = []
@@ -1248,6 +1254,196 @@ let restore_command m command =
   if Editor.is_empty m.editor
   then { m with editor = Editor.set_text m.editor command }
   else m
+;;
+
+(* ---- provider logins -------------------------------------------------- *)
+
+let logins_picker ?(query = "") m ~title rows =
+  let items =
+    List.map rows ~f:(fun (r : Provider_logins.Row.t) ->
+      Picker.Item.create ~id:r.id ~detail:r.detail ~marked:r.marked r.label)
+  in
+  open_picker m Commands (Picker.create ~query ~title items)
+;;
+
+let logins_request m command (r : Provider_logins.Request.t) =
+  ( m
+  , [ rpc
+        r.method_
+        ~params:r.params
+        ~tag:
+          (Retry_in_editor
+             { command; hint = ""; then_ = Notice_on_success r.done_ })
+    ] )
+;;
+
+let confirm_logout m (l : Provider_logins.Login.t) =
+  { m with
+    mode =
+      Confirm
+        { question =
+            sprintf
+              "Log out of %s and delete its credential? (y/n)"
+              (Provider_logins.title l)
+        ; action =
+            Logout_login
+              { provider = l.provider.provider; account = l.account.id }
+        }
+  }
+;;
+
+let share_picker m ~ref_ users =
+  match Provider_logins.find m.auth ref_, users with
+  | Error e, _ -> error m e
+  | Ok _, [] -> notice m "no other users on this server to share with"
+  | Ok l, users ->
+    logins_picker
+      m
+      ~title:(Provider_logins.share_title l)
+      (Provider_logins.share_rows_for l users)
+;;
+
+let logins_picker_title = "Logins"
+
+(* An open [/accounts] picker shows the logins' latest usage. *)
+let logins_refreshed m =
+  match m.mode with
+  | Picker { kind = Commands; picker }
+    when String.equal (Picker.title picker) logins_picker_title ->
+    { m with
+      mode =
+        Picker
+          { kind = Commands
+          ; picker =
+              Picker.set_items
+                picker
+                (List.map
+                   (Provider_logins.rows
+                      ?usage:m.usage_limits
+                      m.auth
+                      ~session:m.state)
+                   ~f:(fun (r : Provider_logins.Row.t) ->
+                     Picker.Item.create
+                       ~id:r.id
+                       ~detail:r.detail
+                       ~marked:r.marked
+                       r.label))
+          }
+    }
+  | _ -> m
+;;
+
+(* [/usage]: each login's limits and what ran on it. *)
+let format_usage m (usage : P.Subscription_usage.t) : Content.t =
+  let now = usage.fetched_at in
+  let dim text = { Content.Span.text; style = Style.dim Style.plain } in
+  let logins = Provider_logins.all m.auth in
+  if List.is_empty logins
+  then [ [ dim "no logins yet: /login signs in to a provider" ] ]
+  else
+    List.concat_map logins ~f:(fun l ->
+      let windows =
+        match Login_usage_text.limits_of (Some usage) ~ref_:l.account.ref_ with
+        | Some (Limits { windows; _ }) ->
+          List.map windows ~f:(fun (w : P.Subscription_usage.Window.t) ->
+            let style =
+              if Float.( >= ) w.used_percent 90.
+              then Style.fg Red
+              else if Float.( >= ) w.used_percent 70.
+              then Style.fg Yellow
+              else Style.plain
+            in
+            [ { Content.Span.text = "  " ^ Login_usage_text.window ~now w
+              ; style
+              }
+            ])
+        | Some (Failed e) -> [ [ dim ("  limits unknown: " ^ e) ] ]
+        | Some (Not_signed_in | Api_key) | None -> []
+      in
+      ([ { Content.Span.text = Provider_logins.title l
+         ; style = Style.bold Style.plain
+         }
+       ; dim ("  " ^ l.account.ref_)
+       ]
+       :: windows)
+      @ List.map
+          (Login_usage_text.period_lines
+             ~cost:(Login_usage_text.billed l.account)
+             l.account.usage)
+          ~f:(fun line -> [ dim ("  " ^ line) ]))
+    @ [ []
+      ; [ dim
+            "Limits as the providers report them; requests and tokens per \
+             login (UTC days), with the cost of API keys. /accounts manages \
+             the logins."
+        ]
+      ]
+;;
+
+let accounts_command m (cmd : Commands.Parsed.t) =
+  let command = "/accounts " ^ cmd.rest in
+  match Provider_logins.Command.parse cmd.rest with
+  | Share { account; user = "" } ->
+    (match Provider_logins.shareable m.auth account with
+     | Ok l ->
+       m, [ rpc "account_share_targets" ~tag:(Share_targets l.account.ref_) ]
+     | Error e -> error (restore_command m command) e, [])
+  | Pick query ->
+    if List.is_empty (Provider_logins.all m.auth)
+    then notice m "no logins yet: /login signs in to a provider", []
+    else
+      ( logins_picker
+          m
+          ~query
+          ~title:logins_picker_title
+          (Provider_logins.rows ?usage:m.usage_limits m.auth ~session:m.state)
+      , [ rpc "auth_status" ~tag:Auth_refresh
+        ; rpc "usage_limits" ~tag:(Usage_limits { show = false })
+        ] )
+  | Menu arg ->
+    (match Provider_logins.find m.auth arg with
+     | Ok l ->
+       ( logins_picker
+           m
+           ~title:(Provider_logins.title l)
+           (Provider_logins.menu l ~session:m.state)
+       , [] )
+     | Error e -> error (restore_command m command) e, [])
+  | Remove arg ->
+    (match Provider_logins.find m.auth arg with
+     | Ok l when Option.is_none l.account.shared_by -> confirm_logout m l, []
+     | Ok _ ->
+       (match Provider_logins.request m.auth (Remove arg) with
+        | Ok r -> logins_request m command r
+        | Error e -> error (restore_command m command) e, [])
+     | Error e -> error (restore_command m command) e, [])
+  | c ->
+    (match Provider_logins.request m.auth c with
+     | Ok r -> logins_request m command r
+     | Error e -> error (restore_command m command) e, [])
+;;
+
+let account_command m (cmd : Commands.Parsed.t) =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some state
+    when String.is_empty cmd.rest
+         && Option.is_some (Provider_logins.no_choice m.auth state) ->
+    notice m (Option.value_exn (Provider_logins.no_choice m.auth state)), []
+  | Some state when String.is_empty cmd.rest ->
+    ( logins_picker
+        m
+        ~title:
+          (sprintf
+             "%s login for this session"
+             (Provider_logins.provider_name m.auth state.model.provider))
+        (Provider_logins.session_rows m.auth state)
+    , [] )
+  | Some state ->
+    let command = "/account " ^ cmd.rest in
+    (match Provider_logins.session_request m.auth state cmd.rest with
+     | Ok r -> logins_request m command r
+     | Error e -> error (restore_command m command) e, [])
 ;;
 
 (* ---- git hosting ------------------------------------------------------ *)
@@ -2447,7 +2643,7 @@ let format_auth m : Content.t =
     List.fold statuses ~init:0 ~f:(fun acc s ->
       Int.max acc (String.length s.provider))
   in
-  List.map statuses ~f:(fun (s : P.Auth_status.t) ->
+  List.concat_map statuses ~f:(fun (s : P.Auth_status.t) ->
     let methods =
       String.concat
         ~sep:", "
@@ -2473,15 +2669,42 @@ let format_auth m : Content.t =
         ]
       | None, None -> [ { text = "not configured"; style = Style.fg Gray } ]
     in
-    [ { Content.Span.text = Text_width.pad_right s.provider ~width ^ "  "
-      ; style = Style.bold Style.plain
-      }
-    ]
-    @ state
-    @
-    if Option.is_some s.custom
-    then []
-    else [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ])
+    let line : Content.Line.t =
+      [ { Content.Span.text = Text_width.pad_right s.provider ~width ^ "  "
+        ; style = Style.bold Style.plain
+        }
+      ]
+      @ state
+      @
+      if Option.is_some s.custom
+      then []
+      else [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ]
+    in
+    line
+    ::
+    (if Option.is_some s.custom || List.length s.accounts < 2
+     then []
+     else
+       List.map s.accounts ~f:(fun account ->
+         let l = { Provider_logins.Login.provider = s; account } in
+         [ { Content.Span.text =
+               String.make (width + 2) ' '
+               ^ "@ "
+               ^ Provider_logins.label account
+           ; style = Style.plain
+           }
+         ; { text = sprintf "  %s  %s" (Provider_logins.detail l) account.ref_
+           ; style = Style.dim Style.plain
+           }
+         ])))
+  @ (if List.is_empty (Provider_logins.all statuses)
+     then []
+     else
+       [ [ { Content.Span.text = "/accounts manages a provider's logins"
+           ; style = Style.dim Style.plain
+           }
+         ]
+       ])
   @ [ [ { Content.Span.text = "/login custom adds an OpenAI-compatible endpoint"
         ; style = Style.dim Style.plain
         }
@@ -2629,6 +2852,7 @@ let reset_connection m =
     state = None
   ; models = []
   ; auth = []
+  ; usage_limits = None
   ; forge = []
   ; sessions = None
   ; known_sessions = Session_link.Known.empty
@@ -3035,8 +3259,24 @@ let reconnect_reply m ~generation result =
 
 (* ---- slash commands --------------------------------------------------- *)
 
-let set_model_command key =
-  rpc "set_model" ~params:[ "model", str key ] ~tag:(Set_model_done key)
+(* A login pinned for the session carries over to a model of its provider. *)
+let set_model_command ?(account = []) key =
+  rpc
+    "set_model"
+    ~params:(("model", str key) :: account)
+    ~tag:(Set_model_done key)
+;;
+
+let set_model_keeping m key =
+  let account =
+    match
+      List.find m.models ~f:(fun (model : P.Model.t) ->
+        String.equal model.key key)
+    with
+    | Some model -> Provider_logins.keep_pin m.state ~provider:model.provider
+    | None -> []
+  in
+  set_model_command ~account key
 ;;
 
 let export_command path =
@@ -3050,8 +3290,21 @@ let export_command path =
 ;;
 
 let switch_model m arg =
+  let arg, login = Model_match.split_account m.models arg in
   match Model_match.resolve m.models arg with
-  | Found model -> m, [ set_model_command model.key ]
+  | Found model ->
+    (match login with
+     | None -> m, [ set_model_keeping m model.key ]
+     | Some login ->
+       (match Provider_logins.find ~provider:model.provider m.auth login with
+        | Ok l ->
+          ( m
+          , [ set_model_command
+                ~account:[ "account", str l.account.id ]
+                model.key
+            ] )
+        | Error e ->
+          error (restore_command m ("/model " ^ arg ^ "@" ^ login)) e, []))
   | Ambiguous _ ->
     ( model_picker (notice m (sprintf "several models match %S" arg)) ~query:arg
     , [] )
@@ -3086,12 +3339,13 @@ let cycle_model m ~step =
           ~f:fst
     in
     let next = List.nth_exn models ((index + step + n) mod n) in
+    let set = set_model_keeping m next.key in
     let m =
       match m.state with
       | Some s -> { m with state = Some { s with model = next } }
       | None -> m
     in
-    m, [ set_model_command next.key ]
+    m, [ set ]
 ;;
 
 let cycle_thinking m =
@@ -4771,6 +5025,24 @@ let run_command_unchecked m (cmd : Commands.Parsed.t) =
     , [ rpc "auth_status" ~tag:Auth_login_picker
       ; call Forge_status ~tag:Forge_refresh
       ] )
+  | "login", _ :: _ when List.mem cmd.args "as" ~equal:String.equal ->
+    (match Provider_logins.split_as cmd.args with
+     | provider :: rest, Some label ->
+       ( m
+       , [ rpc
+             "login"
+             ~params:
+               (Provider_logins.login_params
+                  m.auth
+                  ~provider
+                  ~method_:(List.hd rest)
+                  ~label:(Some label))
+         ] )
+     | _ ->
+       ( error
+           (restore_command m ("/login " ^ cmd.rest))
+           "/login PROVIDER [METHOD] as LABEL: type the login's label after as"
+       , [] ))
   | "login", provider :: rest ->
     (match Forge_accounts.Login.parse m.forge cmd.args with
      | Some (Ok login) -> forge_login m login
@@ -4787,6 +5059,20 @@ let run_command_unchecked m (cmd : Commands.Parsed.t) =
     , [ rpc "auth_status" ~tag:Auth_logout_picker
       ; call Forge_status ~tag:Forge_refresh
       ] )
+  | "logout", _ :: _ when Provider_logins.names_login cmd.rest ->
+    (match Provider_logins.find m.auth cmd.rest with
+     | Ok l when Option.is_some l.account.shared_by ->
+       logins_request m ("/logout " ^ cmd.rest) (Provider_logins.logout l)
+     | Ok l -> confirm_logout m l, []
+     | Error e -> error (restore_command m ("/logout " ^ cmd.rest)) e, [])
+  | "accounts", _ -> accounts_command m cmd
+  | "usage", [] ->
+    ( notice m "reading the logins' usage…"
+    , [ rpc "auth_status" ~tag:Auth_refresh
+      ; rpc "usage_limits" ~tag:(Usage_limits { show = true })
+      ] )
+  | "usage", _ -> error m "usage: /usage", []
+  | "account", _ -> account_command m cmd
   | "logout", provider :: _ ->
     (match Forge_accounts.logout_host m.forge provider with
      | Some host -> forge_logout m host
@@ -5767,7 +6053,7 @@ let rec editing m (intent : Intent.t) =
 let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   let m = { m with mode = Editing } in
   match kind with
-  | Models _ -> m, [ set_model_command item.id ]
+  | Models _ -> m, [ set_model_keeping m item.id ]
   | Scoped_models | Transcript_filter -> m, []
   | Thinking -> m, [ rpc "set_thinking" ~params:[ "thinking", str item.id ] ]
   | Modes -> mode_by_name m item.id
@@ -5795,6 +6081,13 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
      | Some host -> forge_logout m host
      | None -> logout m item.id)
   | Pull_requests -> pr_command m item.id
+  | Commands ->
+    if Provider_logins.asks item.id
+    then { m with editor = Editor.set_text m.editor item.id }, []
+    else (
+      match Commands.parse item.id with
+      | Some cmd -> run_command m cmd
+      | None -> m, [])
   | Sessions _ ->
     ( m
     , [ rpc
@@ -6614,6 +6907,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     match action with
     | Logout provider ->
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
+    | Logout_login { provider; account } ->
+      ( m
+      , [ rpc
+            "logout"
+            ~params:[ "provider", str provider; "account", str account ]
+        ] )
     | Forge_logout host -> m, [ call (Forge_logout host) ]
     | Cd_to_checkout path ->
       m, [ call (Enter_worktree path) ~tag:(Dir_changed Cwd) ]
@@ -6698,6 +6997,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
            and /terminal from the proxy (see DOCKER.md)"
       , [] )
     | Logout _
+    | Logout_login _
     | Forge_logout _
     | Rewind _
     | Trim _
@@ -6954,7 +7254,7 @@ let auth_event m (e : P.Auth_event.t) =
        { m with mode = Editing; login_lines = [] }, []
      | _ -> m, [])
   | Progress message -> { m with login_lines = m.login_lines @ [ message ] }, []
-  | Done { provider; method_ } ->
+  | Done { provider; method_; account = _ } ->
     let m =
       match m.mode with
       | Login_prompt _ -> { m with mode = Editing }
@@ -6980,7 +7280,7 @@ let auth_event m (e : P.Auth_event.t) =
     in
     let m = { m with login_lines = [] } in
     error m (sprintf "login to %s failed: %s" provider e), []
-  | Logged_out provider ->
+  | Logged_out { provider; account = _ } ->
     ( notice m (sprintf "logged out of %s" provider)
     , [ rpc "auth_status" ~tag:Auth_refresh ] )
   | Forge_done { host; user; method_ } ->
@@ -7141,6 +7441,7 @@ let apply_event m (e : P.Event.t) =
     (match m.nix_gc with
      | Some _ -> { m with nix_gc = Some progress }, []
      | None -> m, [])
+  | Accounts_changed -> m, [ rpc "auth_status" ~tag:Auth_refresh ]
   | Temporary_ended _ -> m, []
   | Sessions_changed change ->
     (match change, Option.first_some m.sessions (picker_sessions m) with
@@ -7933,7 +8234,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          (sessions_refreshed m)
      | Auth_refresh ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
-         { m with auth }, [])
+         logins_refreshed { m with auth }, [])
+     | Usage_limits { show } ->
+       decode json ~f:P.Subscription_usage.of_json (fun usage ->
+         let m = logins_refreshed { m with usage_limits = Some usage } in
+         if show
+         then output m ~title:"Usage" (format_usage m usage), []
+         else m, [])
      | Auth_show ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          let m = { m with auth } in
@@ -7944,6 +8251,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Auth_logout_picker ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          logout_picker { m with auth }, [])
+     | Share_targets ref_ ->
+       decode json ~f:strings (fun users -> share_picker m ~ref_ users, [])
      | Forge_refresh ->
        decode json ~f:P.Forge_account.list_of_json (fun forge ->
          forge_refreshed m forge, [])

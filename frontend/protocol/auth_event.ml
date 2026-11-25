@@ -72,12 +72,16 @@ type t =
   | Done of
       { provider : string
       ; method_ : string
+      ; account : string option (** its id; [None] from an older backend *)
       }
   | Failed of
       { provider : string
       ; error : string
       }
-  | Logged_out of string
+  | Logged_out of
+      { provider : string
+      ; account : string option
+      }
   | Forge_done of
       { host : string
       ; user : string option
@@ -103,13 +107,17 @@ let of_json j =
   | "progress" -> Json.string_field j "message" >>| fun m -> Progress m
   | "done" ->
     let%bind provider = Json.string_field j "provider" in
-    let%map method_ = Json.string_field j "method" in
-    Done { provider; method_ }
+    let%bind method_ = Json.string_field j "method" in
+    let%map account = Json.string_opt_field j "account" in
+    Done { provider; method_; account }
   | "failed" ->
     let%bind provider = Json.string_field j "provider" in
     let%map error = Json.string_field j "error" in
     Failed { provider; error }
-  | "logged_out" -> Json.string_field j "provider" >>| fun p -> Logged_out p
+  | "logged_out" ->
+    let%bind provider = Json.string_field j "provider" in
+    let%map account = Json.string_opt_field j "account" in
+    Logged_out { provider; account }
   | "forge_done" ->
     let%bind host = Json.string_field j "host" in
     let%bind user = Json.string_opt_field j "user" in

@@ -16,6 +16,7 @@ let assistant ?(text = "") calls =
     ; stop_reason = (if List.is_empty calls then End_turn else Tool_use)
     ; usage = Usage.zero
     ; model = "codex/gpt-5"
+    ; account = None
     }
 ;;
 

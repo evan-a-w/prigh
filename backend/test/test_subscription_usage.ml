@@ -180,6 +180,7 @@ let oauth ?(expires_ms = Int.max_value / 2) ?account_id access : Credential.t =
 let fetch
       ?(env_vars = [])
       ?(answers = [])
+      ?(labelled = [])
       ~(store_with : (Provider_id.t * Credential.t) list)
       ()
   =
@@ -188,6 +189,10 @@ let fetch
   let store = Auth_store.create ~path:(Filename.concat t.dir "auth.json") in
   List.iter store_with ~f:(fun (provider, credential) ->
     ok_exn (Auth_store.set store provider credential));
+  List.iter labelled ~f:(fun (provider, label, credential) ->
+    ignore
+      (ok_exn (Provider_accounts.save_login ~label store provider credential)
+       : Account_id.t));
   let http, print_requests = fake_http answers in
   let usage =
     Subscription_usage.fetch
@@ -212,7 +217,16 @@ let fetch
   printf "fetched at %s\n" (utc usage.fetched_at);
   List.iter usage.providers ~f:(fun p ->
     printf "%s: " (Subscription_usage.name p.provider);
-    print_status p.status)
+    print_status p.status;
+    if List.length p.accounts > 1
+    then
+      List.iter p.accounts ~f:(fun a ->
+        printf
+          "  account %s%s (%s): "
+          (Account_id.to_string a.id)
+          (if a.default then "*" else "")
+          a.label;
+        print_status a.status))
 ;;
 
 let%expect_test "nobody signed in, or with API keys" =
@@ -484,8 +498,8 @@ let%expect_test "rpc: usage_limits" =
   [%expect
     {|
     fetched_at_ms is a number: true
-    {"provider":"anthropic","name":"Claude","status":"limits","plan":null,"windows":[{"id":"five_hour","label":"5-hour session","used_percent":33,"resets_at_ms":1795183200445},{"id":"seven_day","label":"Weekly · all models","used_percent":13,"resets_at_ms":1795510800000},{"id":"seven_day_opus","label":"Weekly · Opus","used_percent":1,"resets_at_ms":null},{"id":"cinder_cove","label":"Cinder cove","used_percent":5,"resets_at_ms":1795700000000}]}
-    {"provider":"openai-codex","name":"ChatGPT","status":"not_signed_in"}
+    {"provider":"anthropic","name":"Claude","status":"limits","plan":null,"windows":[{"id":"five_hour","label":"5-hour session","used_percent":33,"resets_at_ms":1795183200445},{"id":"seven_day","label":"Weekly · all models","used_percent":13,"resets_at_ms":1795510800000},{"id":"seven_day_opus","label":"Weekly · Opus","used_percent":1,"resets_at_ms":null},{"id":"cinder_cove","label":"Cinder cove","used_percent":5,"resets_at_ms":1795700000000}],"accounts":[{"ref":"anthropic/main","id":"main","label":"Anthropic (Claude Pro/Max)","default":true,"status":"limits","plan":null,"windows":[{"id":"five_hour","label":"5-hour session","used_percent":33,"resets_at_ms":1795183200445},{"id":"seven_day","label":"Weekly · all models","used_percent":13,"resets_at_ms":1795510800000},{"id":"seven_day_opus","label":"Weekly · Opus","used_percent":1,"resets_at_ms":null},{"id":"cinder_cove","label":"Cinder cove","used_percent":5,"resets_at_ms":1795700000000}]}]}
+    {"provider":"openai-codex","name":"ChatGPT","status":"not_signed_in","accounts":[]}
     |}]
 ;;
 
@@ -516,5 +530,138 @@ let%expect_test "PRIGH_USAGE_ORIGIN stands in for both origins" =
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: plan: -
     ChatGPT: plan: -
+    |}]
+;;
+
+let%expect_test "each account's usage; the provider's is the default's" =
+  fetch
+    ~answers:[ codex_url, Ok (200, [], codex) ]
+    ~store_with:[ Openai_codex, oauth "codex-main" ~account_id:"acc-1" ]
+    ~labelled:
+      [ Openai_codex, "Work", oauth "codex-work" ~account_id:"acc-2"
+      ; Openai_codex, "No id", oauth "codex-noid"
+      ]
+    ();
+  [%expect
+    {|
+    GET https://chatgpt.com/backend-api/wham/usage
+      Authorization: Bearer codex-main
+      chatgpt-account-id: acc-1
+      originator: prigh
+      User-Agent: prigh/0.1.0
+    GET https://chatgpt.com/backend-api/wham/usage
+      Authorization: Bearer codex-work
+      chatgpt-account-id: acc-2
+      originator: prigh
+      User-Agent: prigh/0.1.0
+    fetched at 2026-11-26T05:13:20.000000Z
+    Claude: not signed in
+    ChatGPT: plan: pro
+      5-hour session               [primary]                           42.0%  resets 2026-11-26T09:00:00.000000Z
+      Weekly                       [secondary]                         84.0%  resets 2026-11-28T12:46:40.000000Z
+      GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
+      Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
+      Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
+      account main* (OpenAI (ChatGPT Plus/Pro)): plan: pro
+      5-hour session               [primary]                           42.0%  resets 2026-11-26T09:00:00.000000Z
+      Weekly                       [secondary]                         84.0%  resets 2026-11-28T12:46:40.000000Z
+      GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
+      Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
+      Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
+      account work (Work): plan: pro
+      5-hour session               [primary]                           42.0%  resets 2026-11-26T09:00:00.000000Z
+      Weekly                       [secondary]                         84.0%  resets 2026-11-28T12:46:40.000000Z
+      GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
+      Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
+      Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
+      account no-id (No id): error: The ChatGPT sign-in has no account id: sign in again with /login openai-codex
+    |}]
+;;
+
+let%expect_test "logins shared with the user: asked with the owner's token" =
+  with_sandbox
+  @@ fun t ->
+  let store = Auth_store.create ~path:(Filename.concat t.dir "auth.json") in
+  let http, print_requests = fake_http [ codex_url, Ok (200, [], codex) ] in
+  let shared ~owner resolve =
+    { Subscription_usage.Shared.owner
+    ; provider = Openai_codex
+    ; id = Or_error.ok_exn (Account_id.of_string "work")
+    ; label = "Work"
+    ; resolve
+    }
+  in
+  let usage =
+    Subscription_usage.fetch
+      ~env:t.env
+      ~getenv:(fun _ -> None)
+      ~shared:
+        [ shared ~owner:"alice" (fun () ->
+            Ok
+              (Some
+                 { Provider_auth.Resolved.token = "alice-token"
+                 ; method_ = Oauth
+                 ; account_id = Some "acct-alice"
+                 ; source = "oauth"
+                 ; account = None
+                 }))
+        ; shared ~owner:"carol" (fun () ->
+            Or_error.error_string
+              "carol does not share the login with you (any more)")
+        ]
+      ~http
+      ~now:(fun () -> now)
+      store
+  in
+  print_requests ();
+  List.iter usage.providers ~f:(fun p ->
+    printf "%s: " (Subscription_usage.name p.provider);
+    print_status p.status;
+    List.iter p.accounts ~f:(fun a ->
+      printf
+        "  %s's %s%s: "
+        (Option.value a.shared_by ~default:"own")
+        a.label
+        (if a.default then "*" else "");
+      print_status a.status));
+  (match Subscription_usage.to_json usage with
+   | `Object fields ->
+     (match List.Assoc.find fields ~equal:String.equal "providers" with
+      | Some (`Array [ _; `Object codex ]) ->
+        (match List.Assoc.find codex ~equal:String.equal "accounts" with
+         | Some (`Array (`Object first :: _)) ->
+           List.iter [ "ref"; "id"; "shared_by" ] ~f:(fun k ->
+             printf
+               "%s: %s\n"
+               k
+               (Json.to_string
+                  (List.Assoc.find_exn first ~equal:String.equal k)))
+         | _ -> print_endline "?")
+      | _ -> print_endline "?")
+   | _ -> print_endline "?");
+  [%expect
+    {|
+    GET https://chatgpt.com/backend-api/wham/usage
+      Authorization: Bearer alice-token
+      chatgpt-account-id: acct-alice
+      originator: prigh
+      User-Agent: prigh/0.1.0
+    Claude: not signed in
+    ChatGPT: plan: pro
+      5-hour session               [primary]                           42.0%  resets 2026-11-26T09:00:00.000000Z
+      Weekly                       [secondary]                         84.0%  resets 2026-11-28T12:46:40.000000Z
+      GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
+      Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
+      Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
+      alice's Work*: plan: pro
+      5-hour session               [primary]                           42.0%  resets 2026-11-26T09:00:00.000000Z
+      Weekly                       [secondary]                         84.0%  resets 2026-11-28T12:46:40.000000Z
+      GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
+      Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
+      Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
+      carol's Work: error: carol does not share the login with you (any more)
+    ref: "~alice/openai-codex/work"
+    id: "~alice/work"
+    shared_by: "alice"
     |}]
 ;;

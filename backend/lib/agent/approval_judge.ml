@@ -193,6 +193,7 @@ let request ?cache_key ~model input =
   ; max_tokens =
       Some (600 + Option.value (Thinking.budget_tokens thinking) ~default:0)
   ; cache_key
+  ; account = None
   }
 ;;
 

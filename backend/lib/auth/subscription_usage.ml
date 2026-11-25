@@ -23,10 +23,22 @@ module Status = struct
   [@@deriving sexp_of, equal]
 end
 
+module Account_usage = struct
+  type t =
+    { id : Account_id.t
+    ; shared_by : string option
+    ; label : string
+    ; default : bool
+    ; status : Status.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Provider_usage = struct
   type t =
     { provider : Provider_id.t
     ; status : Status.t
+    ; accounts : Account_usage.t list
     }
   [@@deriving sexp_of, equal]
 end
@@ -92,7 +104,44 @@ let to_json ?(harnesses = []) t =
                ([ "provider", `String (Provider_id.to_string p.provider)
                 ; "name", `String (name p.provider)
                 ]
-                @ status_fields p.status))) )
+                @ status_fields p.status
+                @ [ ( "accounts"
+                    , `Array
+                        (List.map p.accounts ~f:(fun (a : Account_usage.t) ->
+                           `Object
+                             ([ ( "ref"
+                                , `String
+                                    (match a.shared_by with
+                                     | None ->
+                                       sprintf
+                                         "%s/%s"
+                                         (Provider_id.to_string p.provider)
+                                         (Account_id.to_string a.id)
+                                     | Some owner ->
+                                       sprintf
+                                         "~%s/%s/%s"
+                                         owner
+                                         (Provider_id.to_string p.provider)
+                                         (Account_id.to_string a.id)) )
+                              ; ( "id"
+                                , `String
+                                    (match a.shared_by with
+                                     | None -> Account_id.to_string a.id
+                                     | Some owner ->
+                                       sprintf
+                                         "~%s/%s"
+                                         owner
+                                         (Account_id.to_string a.id)) )
+                              ; "label", `String a.label
+                              ; ("default", if a.default then `True else `False)
+                              ]
+                              @ Option.value_map
+                                  a.shared_by
+                                  ~default:[]
+                                  ~f:(fun owner ->
+                                    [ "shared_by", `String owner ])
+                              @ status_fields a.status))) )
+                  ]))) )
     ]
 ;;
 
@@ -435,14 +484,14 @@ let answer provider ~parse result =
             detail))
 ;;
 
-let fetch_one ~env ?getenv ?refresh ~(http : Http.t) ~now store provider =
+let of_resolved ?getenv ~(http : Http.t) ~now provider resolved =
   let login = "/login " ^ Provider_id.to_string provider in
-  match Provider_auth.resolve ~env ?getenv ?refresh store provider with
+  match resolved with
   | Error e ->
     Status.Failed
       (sprintf "%s: sign in again with %s" (Error.to_string_hum e) login)
   | Ok None -> Not_signed_in
-  | Ok (Some resolved) ->
+  | Ok (Some (resolved : Provider_auth.Resolved.t)) ->
     (match (provider : Provider_id.t) with
      | Anthropic ->
        (match
@@ -486,13 +535,78 @@ let fetch_one ~env ?getenv ?refresh ~(http : Http.t) ~now store provider =
      | Openai | Deepseek | Custom _ -> Not_signed_in)
 ;;
 
-let fetch ~env ?getenv ?refresh ~http ~now store =
+module Shared = struct
+  type t =
+    { owner : string
+    ; provider : Provider_id.t
+    ; id : Account_id.t
+    ; label : string
+    ; resolve : unit -> Provider_auth.Resolved.t option Or_error.t
+    }
+end
+
+let fetch ~env ?getenv ?refresh ?(shared = []) ~http ~now store =
   let providers =
     Fiber.List.map
       (fun provider ->
-         { Provider_usage.provider
-         ; status = fetch_one ~env ?getenv ?refresh ~http ~now store provider
-         })
+         let fetch ?account () =
+           of_resolved
+             ?getenv
+             ~http
+             ~now
+             provider
+             (Provider_auth.resolve
+                ~env
+                ?getenv
+                ?refresh
+                ?account
+                store
+                provider)
+         in
+         let shared =
+           Fiber.List.map
+             (fun (s : Shared.t) ->
+                { Account_usage.id = s.id
+                ; shared_by = Some s.owner
+                ; label = s.label
+                ; default = false
+                ; status =
+                    (match s.resolve () with
+                     | Error e -> Failed (Error.to_string_hum e)
+                     | resolved ->
+                       of_resolved ?getenv ~http ~now provider resolved)
+                })
+             (List.filter shared ~f:(fun (s : Shared.t) ->
+                Provider_id.equal s.provider provider))
+         in
+         match Provider_accounts.list store provider with
+         | Error _ | Ok [] ->
+           (match shared with
+            | [] ->
+              { Provider_usage.provider; status = fetch (); accounts = [] }
+            | first :: rest ->
+              { provider
+              ; status = first.status
+              ; accounts = { first with default = true } :: rest
+              })
+         | Ok accounts ->
+           let accounts =
+             Fiber.List.map
+               (fun (a : Provider_accounts.Account.t) ->
+                  { Account_usage.id = a.id
+                  ; shared_by = None
+                  ; label = a.label
+                  ; default = a.default
+                  ; status = fetch ~account:a.id ()
+                  })
+               accounts
+           in
+           let status =
+             match List.find accounts ~f:(fun a -> a.default) with
+             | Some a -> a.status
+             | None -> fetch ()
+           in
+           { provider; status; accounts = accounts @ shared })
       providers
   in
   { fetched_at = now (); providers }

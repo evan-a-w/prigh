@@ -171,6 +171,12 @@ module Reply_tag = struct
         { command : string
         ; notice : string
         }
+    | Share_targets
+    | Login_users of string (** [account_usage] of the login with this ref *)
+    | Logins_changed of
+        { command : string
+        ; notice : string
+        }
     | Mcp_settings_loaded
     | Mcp_host_listed
     | Mcp_sign_in_url of
@@ -770,6 +776,10 @@ module Model = struct
     ; sessions_asked : int
     ; models : Llm.t list
     ; auth : Auth_status.t list
+    ; share_targets : string list
+      (** the other users the user's logins can be shared with *)
+    ; login_users : Login_usage.User.t list String.Map.t
+      (** by login ref: who used the logins the user shares ([account_usage]) *)
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t
     ; browser_time_zone : string option
@@ -882,6 +892,8 @@ module Model = struct
         ; drops
         ; hello
         ; saved_login
+        ; share_targets
+        ; login_users
         ; state
         ; chat
         ; sessions
@@ -992,6 +1004,8 @@ module Model = struct
     && phys_equal drops b.drops
     && phys_equal hello b.hello
     && phys_equal saved_login b.saved_login
+    && phys_equal share_targets b.share_targets
+    && phys_equal login_users b.login_users
     && phys_equal state b.state
     && (transcript || phys_equal chat b.chat)
     && phys_equal sessions b.sessions
@@ -1331,6 +1345,8 @@ let init =
   ; sessions_asked = 0
   ; models = []
   ; auth = []
+  ; share_targets = []
+  ; login_users = String.Map.empty
   ; now = None
   ; utc_offset = Time_ns.Span.zero
   ; browser_time_zone = None
@@ -1564,13 +1580,14 @@ let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
   | ( true
     , Some
-        ( Login _ | Forge_host _ | Nix_gc_confirm _
+        ( Login _ | Forge_host _ | Nix_gc_confirm _ | Login_label _
         | Picker
             { kind =
                 ( Compaction_models
                 | Generate_models
                 | Approval_models
                 | Naming_models
+                | Logins _
                 | Defaults _ )
             ; _
             } ) ) ->
@@ -2347,6 +2364,21 @@ let fetch_usage (m : Model.t) =
   , [ call Usage_limits ~tag:Usage_loaded ] )
 ;;
 
+(* Settings → Models and Usage: each login's limits and what ran on it, and
+   who used the logins the user shares. *)
+let fetch_logins_usage (m : Model.t) =
+  let m, limits = fetch_usage m in
+  let limits = rpc "auth_status" [] ~tag:(Auth_status Refresh) :: limits in
+  let shared =
+    List.concat_map m.auth ~f:(fun (p : Auth_status.t) ->
+      List.filter_map p.accounts ~f:(fun a ->
+        Option.some_if
+          (Option.is_none a.shared_by && not (List.is_empty a.shared_with))
+          (rpc "account_usage" [ "ref", str a.ref_ ] ~tag:(Login_users a.ref_))))
+  in
+  m, limits @ shared
+;;
+
 let fetch_memory (m : Model.t) =
   ( { m with memory = Memory_notes.loading m.memory }
   , [ call Get_memory ~tag:Memory_loaded ] )
@@ -2404,16 +2436,11 @@ let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | About_you -> fetch_about_you m
   | Mcp -> fetch_mcp m
   | Custom_instructions -> fetch_instructions m
-  | Usage -> fetch_usage m
+  | Usage | Models -> fetch_logins_usage m
   | Engines when composer_engine m -> fetch_adapters m
   | Engines -> m, []
-  | Appearance
-  | Sessions
-  | New_sessions
-  | Models
-  | Git_hosting
-  | Nix_store
-  | Account -> m, []
+  | Appearance | Sessions | New_sessions | Git_hosting | Nix_store | Account ->
+    m, []
 ;;
 
 (* Superusers see the Nix store there, as it is now; everyone their memory. *)
@@ -2695,8 +2722,24 @@ let set_thinking (m : Model.t) level =
     , [ rpc "set_thinking" [ "thinking", str level ] ~tag:Thinking_set ] )
 ;;
 
-let set_model (m : Model.t) key =
-  let set = rpc "set_model" [ "model", str key ] ~tag:Model_set in
+(* [login]: on that login ([Some None]: the provider's default); else a
+   pinned login carries over to a model of its provider. *)
+let set_model ?login (m : Model.t) key =
+  let params =
+    match login with
+    | Some login ->
+      Prigh_ui.Provider_logins.set_model_params ~model_key:key login
+    | None ->
+      ("model", str key)
+      ::
+      (match
+         List.find m.models ~f:(fun model -> String.equal model.key key)
+       with
+       | Some model ->
+         Prigh_ui.Provider_logins.keep_pin m.state ~provider:model.provider
+       | None -> [])
+  in
+  let set = rpc "set_model" params ~tag:Model_set in
   let m =
     match m.state with
     | Some state when String.equal state.model.key key -> m
@@ -3738,7 +3781,15 @@ let cycle_model (m : Model.t) step =
         toast m ~replaces:[ "Model: " ] (sprintf "Model: %s" next.name)
       in
       ( { m with pending = { m.pending with model = Some next.key } }
-      , cmds @ [ rpc "set_model" [ "model", str next.key ] ~tag:Model_set ] ))
+      , cmds
+        @ [ rpc
+              "set_model"
+              (("model", str next.key)
+               :: Prigh_ui.Provider_logins.keep_pin
+                    (Some state)
+                    ~provider:next.provider)
+              ~tag:Model_set
+          ] ))
 ;;
 
 let cycle_thinking (m : Model.t) =
@@ -5431,6 +5482,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
   let m =
     { m with
       hello = Some hello
+    ; login_users = String.Map.empty
     ; state = None
     ; chat = Chat.empty
     ; paging = Paging.all
@@ -6671,8 +6723,8 @@ let model_menu_engine_picker (m : Model.t) =
   then
     toast
       m
-      "This backend runs one engine: start it with more (-engines, \
-       -adapters) to switch here; Settings → Engines shows them"
+      "This backend runs one engine: start it with more (-engines, -adapters) \
+       to switch here; Settings → Engines shows them"
   else if Model.running m
   then toast m engine_busy
   else open_picker m (engine_picker m ~switch:(not (fresh m)))
@@ -7350,6 +7402,132 @@ let hidden_messages (m : Model.t) ~path ~entry result =
   | _ -> m, []
 ;;
 
+(* ---- a provider's logins ------------------------------------------------ *)
+
+module Logins = Prigh_ui.Provider_logins
+
+let logins_picker (m : Model.t) ?(query = "") ?(noun = "logins") ~title rows =
+  let items =
+    List.map rows ~f:(fun (r : Logins.Row.t) ->
+      Picker.Item.create ~id:r.id ~detail:r.detail ~marked:r.marked r.label)
+  in
+  open_picker
+    m
+    (Picker
+       { kind = Logins { noun }; picker = Picker.create ~query ~title items })
+;;
+
+let logins_request (m : Model.t) ~command (r : Logins.Request.t) =
+  ( m
+  , [ rpc r.method_ r.params ~tag:(Logins_changed { command; notice = r.done_ })
+    ] )
+;;
+
+(* What a login's picker or label dialog led to: from the settings page,
+   back there once done. *)
+let back_to_settings ~back ((m : Model.t), cmds) =
+  if not back
+  then m, cmds
+  else (
+    match m.dialog with
+    | None ->
+      ( { m with dialog = Some Settings; return_to_settings = false }
+      , cmds @ [ Command.Focus "dialog" ] )
+    | Some (Login _ | Login_label _ | Picker { kind = Logins _; _ }) ->
+      { m with return_to_settings = true }, cmds
+    | Some _ -> m, cmds)
+;;
+
+let login_label (m : Model.t) ~title ~command =
+  open_dialog
+    m
+    ~focus:"dialog-input"
+    (Login_label { title; command; input = ""; error = None })
+;;
+
+let start_login_as (m : Model.t) ~provider ~method_ ~label =
+  let m, cmds = open_dialog m (Login (Login_flow.start provider)) in
+  ( m
+  , cmds
+    @ [ rpc
+          "login"
+          (Logins.login_params m.auth ~provider ~method_ ~label:(Some label))
+          ~tag:Login_started
+      ] )
+;;
+
+let accounts_command (m : Model.t) rest =
+  let command = String.strip ("/accounts " ^ rest) in
+  match Logins.Command.parse rest with
+  | Share { account; user = "" } ->
+    (match Logins.shareable m.auth account, m.share_targets with
+     | Error e, _ -> error m (String.capitalize e)
+     | Ok _, [] -> error m "No other users on this server to share with."
+     | Ok l, users ->
+       logins_picker
+         m
+         ~noun:"users"
+         ~title:(Logins.share_title l)
+         (Logins.share_rows_for l users))
+  | Pick query ->
+    if List.is_empty (Logins.all m.auth)
+    then error m "No logins yet: /login signs in to a provider."
+    else
+      logins_picker
+        m
+        ~query
+        ~title:"Logins"
+        (Logins.rows
+           ?usage:(Option.bind m.usage.usage ~f:Result.ok)
+           m.auth
+           ~session:m.state)
+  | Menu arg ->
+    (match Logins.find m.auth arg with
+     | Ok l ->
+       logins_picker
+         m
+         ~noun:"actions"
+         ~title:(Logins.title l)
+         (Logins.menu l ~session:m.state)
+     | Error e -> error m (String.capitalize e))
+  | Remove arg ->
+    (match Logins.find m.auth arg with
+     | Ok l -> logins_request m ~command (Logins.logout l)
+     | Error e -> error m (String.capitalize e))
+  | Rename arg when not (String.is_substring arg ~substring:" to ") ->
+    (match Logins.find m.auth (String.strip arg) with
+     | Ok l ->
+       login_label
+         m
+         ~title:(sprintf "Rename %s" (Logins.title l))
+         ~command:(sprintf "/accounts rename %s to " l.account.ref_)
+     | Error e -> error m (String.capitalize e))
+  | c ->
+    (match Logins.request m.auth c with
+     | Ok r -> logins_request m ~command r
+     | Error e -> error m (String.capitalize e))
+;;
+
+let account_command (m : Model.t) rest =
+  current_state m ~f:(fun state ->
+    match Logins.no_choice m.auth state with
+    | Some why when String.is_empty rest -> error m (String.capitalize why ^ ".")
+    | _ ->
+      if String.is_empty rest
+      then
+        logins_picker
+          m
+          ~title:
+            (sprintf
+               "%s login for this session"
+               (Logins.provider_name m.auth state.model.provider))
+          (Logins.session_rows m.auth state)
+      else (
+        match Logins.session_request m.auth state rest with
+        | Ok r -> logins_request m ~command:("/account " ^ rest) r
+        | Error e -> error m (String.capitalize e)))
+;;
+
 let run_command_unchecked (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   let none = "" in
   let words =
@@ -7396,8 +7574,15 @@ let run_command_unchecked (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "temporary", _ -> new_temporary_session m ~temporary:true
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
+    let query, login = Prigh_ui.Model_match.split_account m.models query in
     (match Prigh_ui.Model_match.resolve m.models query with
-     | Found model -> set_model m model.key
+     | Found model ->
+       (match login with
+        | None -> set_model m model.key
+        | Some login ->
+          (match Logins.find ~provider:model.provider m.auth login with
+           | Ok l -> set_model ~login:(Some l) m model.key
+           | Error e -> error m (String.capitalize e)))
      | Ambiguous _ -> open_picker m (model_picker ~query m)
      | Not_found suggestions ->
        error
@@ -7742,6 +7927,20 @@ let run_command_unchecked (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | _ -> error m "Usage: /jobs [kill <id>] (/jobs shows them)")
   | "login", "" ->
     loading m "Log in" [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
+  | "login", _ when List.mem words "as" ~equal:String.equal ->
+    (match Logins.split_as words with
+     | provider :: rest, Some label ->
+       start_login_as m ~provider ~method_:(List.hd rest) ~label
+     | provider :: _, None when String.equal (List.last_exn words) "as" ->
+       login_label
+         m
+         ~title:
+           (sprintf "Add a %s login" (Logins.provider_name m.auth provider))
+         ~command:(String.strip ("/login " ^ rest) ^ " ")
+     | _ ->
+       error
+         m
+         "/login PROVIDER [METHOD] as LABEL: type the login's label after as.")
   | "login", _ ->
     (match Forges.parse_login m.forges words with
      | Provider { provider; method_ } -> start_login m ~provider ~method_
@@ -7754,6 +7953,12 @@ let run_command_unchecked (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       m
       "Log out"
       [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
+  | "logout", arg when Logins.names_login arg ->
+    (match Logins.find m.auth arg with
+     | Ok l -> logins_request m ~command:("/logout " ^ arg) (Logins.logout l)
+     | Error e -> error m (String.capitalize e))
+  | "accounts", _ -> accounts_command m rest
+  | "account", _ -> account_command m rest
   | "logout", arg ->
     (match Forges.logout_host m.forges arg with
      | Some host -> forge_logout m host
@@ -9123,7 +9328,13 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
-      | Subagent _ | Subagents | Jobs | Config | Prompt_paths _
+      | Share_targets
+      | Login_users _
+      | Subagent _
+      | Subagents
+      | Jobs
+      | Config
+      | Prompt_paths _
       | Users Probe )
     , Error _ ) -> m, []
   | Btw id, Error e -> update_btw m id ~f:(fun b -> Btw.fail b e), []
@@ -9287,6 +9498,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
     else error m (String.capitalize e)
   | Mcp_command { notice; _ }, Ok _ -> toast m (String.capitalize notice)
+  | Logins_changed { command; _ }, Error e ->
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft m command)
+        (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
+    else error m (String.capitalize e)
+  | Logins_changed { notice; _ }, Ok _ -> toast m (String.capitalize notice)
   | Mcp_settings_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -9838,20 +10057,35 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Auth_status purpose, Ok json ->
     decode m json (decode_list Auth_status.of_json) ~f:(fun auth ->
       let m = { m with auth } in
-      match purpose with
-      | Refresh ->
-        (match m.dialog with
-         | Some (Auth _) -> { m with dialog = Some (Auth auth) }, []
-         | _ -> m, [])
-      | Show -> open_dialog m (Auth auth)
-      | Login_picker -> open_picker m (login_picker auth ~forges:m.forges)
-      | Logout_picker ->
-        (match logout_picker auth ~forges:m.forges with
-         | Some dialog -> open_picker m dialog
-         | None ->
-           toast
-             m
-             "No provider or git host is logged in: /login logs in to one."))
+      let targets =
+        if
+          List.exists auth ~f:(fun (p : Auth_status.t) ->
+            List.exists p.accounts ~f:(fun a -> a.shareable))
+        then [ rpc "account_share_targets" [] ~tag:Share_targets ]
+        else []
+      in
+      let m, cmds =
+        match purpose with
+        | Refresh ->
+          (match m.dialog with
+           | Some (Auth _) -> { m with dialog = Some (Auth auth) }, []
+           | _ -> m, [])
+        | Show -> open_dialog m (Auth auth)
+        | Login_picker -> open_picker m (login_picker auth ~forges:m.forges)
+        | Logout_picker ->
+          (match logout_picker auth ~forges:m.forges with
+           | Some dialog -> open_picker m dialog
+           | None ->
+             toast
+               m
+               "No provider or git host is logged in: /login logs in to one.")
+      in
+      m, cmds @ targets)
+  | Login_users ref_, Ok json ->
+    decode m json Login_usage.User.list_of_json ~f:(fun users ->
+      { m with login_users = Map.set m.login_users ~key:ref_ ~data:users }, [])
+  | Share_targets, Ok json ->
+    decode m json strings ~f:(fun share_targets -> { m with share_targets }, [])
   | Paths prefix, Ok json ->
     (match m.completion, strings json with
      | Some c, Ok paths ->
@@ -10213,7 +10447,7 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
 
 let auth_event (m : Model.t) (e : Auth_event.t) =
   match e, m.dialog with
-  | Done { provider; method_ }, dialog ->
+  | Done { provider; method_; account = _ }, dialog ->
     let custom =
       is_custom m.auth provider
       ||
@@ -10242,7 +10476,7 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
       @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh)
         ; rpc "list_models" [] ~tag:Models
         ] )
-  | Logged_out provider, dialog ->
+  | Logged_out { provider; account = _ }, dialog ->
     let m =
       match dialog with
       | Some (Login { purpose = Logout; _ }) -> { m with dialog = None }
@@ -10373,6 +10607,7 @@ let main_event (m : Model.t) (event : Event.t) =
   | Tool_end { call; _ } ->
     (* An older backend's way to say a confirmation is no longer waited for. *)
     remove_confirm m ~call_id:call.id ~agent_id:None
+  | Accounts_changed -> m, [ rpc "auth_status" [] ~tag:(Auth_status Refresh) ]
   | Sessions_changed None -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Sessions_changed (Some change) ->
     ( sessions_listed
@@ -11239,6 +11474,20 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some w -> open_worktree m w ~new_session:false
        | None -> m, [])
+    | Logins _ ->
+      back_to_settings
+        ~back:m.return_to_settings
+        (match String.chop_suffix item.id ~suffix:" to " with
+         | Some rename ->
+           accounts_command
+             m
+             (String.chop_prefix_if_exists rename ~prefix:"/accounts ")
+         | None when Logins.asks item.id ->
+           login_label m ~title:item.label ~command:item.id
+         | None ->
+           (match Slash.parse item.id with
+            | Some parsed -> run_command m parsed
+            | None -> m, []))
     | Menu menu -> menu_chosen m menu item.id
   in
   let refocus =
@@ -11808,6 +12057,24 @@ let dialog_accept (m : Model.t) =
            ~again:("forgejo " ^ host)
        in
        { m with return_to_settings = back }, cmds)
+  | Some (Login_label ({ command; input; _ } as l)) ->
+    (match String.strip input with
+     | "" ->
+       ( { m with
+           dialog =
+             Some
+               (Login_label
+                  { l with
+                    error = Some "Type a label, e.g. Work (Esc cancels)."
+                  })
+         }
+       , [] )
+     | label ->
+       let back = m.return_to_settings in
+       let m = { m with dialog = None; return_to_settings = false } in
+       (match Slash.parse (command ^ label) with
+        | Some parsed -> back_to_settings ~back (run_command m parsed)
+        | None -> m, []))
   | Some (Annotate a) ->
     if a.strokes > 0 then m, [ Command.Annotate_export ] else m, []
 ;;
@@ -11834,7 +12101,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     when Option.is_some m.session_gone
          &&
          match e with
-         | Sessions_changed _ | Nix_gc_progress _ -> false
+         | Sessions_changed _ | Nix_gc_progress _ | Accounts_changed -> false
          | _ -> true -> m, []
   | Event e ->
     let m, cmds = event m e in
@@ -12163,7 +12430,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
-  | Usage_refresh -> fetch_usage m
+  | Usage_refresh -> fetch_logins_usage m
   | Adapters_refresh -> fetch_adapters ~refresh:true m
   | Copy_text { text; copied } -> m, [ Command.Copy { text; copied } ]
   | Settings_section section ->
@@ -12327,6 +12594,11 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Prompt prompt) -> prompt_input m (Prompt.set_input prompt text)
      | Some (Forge_host _) ->
        { m with dialog = Some (Forge_host { input = text; error = None }) }, []
+     | Some (Login_label l) ->
+       ( { m with
+           dialog = Some (Login_label { l with input = text; error = None })
+         }
+       , [] )
      | Some (Pulls _) -> with_picker m ~f:(fun p -> Picker.set_query p text)
      | Some (Review_pick p) ->
        ( { m with dialog = Some (Review_pick (Review_picker.set_query p text)) }
@@ -12488,7 +12760,12 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with review_drawer = not m.review_drawer }, []
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Toggle_status_tray -> { m with status_tray = not m.status_tray }, []
-  | Toggle_context_card -> { m with context_card = not m.context_card }, []
+  | Toggle_context_card ->
+    let m = { m with context_card = not m.context_card } in
+    (* The card shows the session's login's limits. *)
+    if m.context_card && Option.is_none m.usage.usage && not m.usage.loading
+    then fetch_usage m
+    else m, []
   | Toggle_session_card -> toggle_session_card m
   | Session_card action ->
     { m with session_card = Session_card.apply m.session_card action }, []
@@ -12656,13 +12933,14 @@ let update_connected (m : Model.t) (action : Action.t) =
         | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
         | ( Some Settings
           , Some
-              ( Login _ | Forge_host _ | Nix_gc_confirm _
+              ( Login _ | Forge_host _ | Nix_gc_confirm _ | Login_label _
               | Picker
                   { kind =
                       ( Compaction_models
                       | Generate_models
                       | Approval_models
                       | Naming_models
+                      | Logins _
                       | Defaults _ )
                   ; _
                   } ) ) -> { m' with return_to_settings = true }, cmds

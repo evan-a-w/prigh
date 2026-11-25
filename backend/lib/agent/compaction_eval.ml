@@ -329,6 +329,7 @@ module Live_run = struct
       ; thinking = Off
       ; max_tokens = Some (Int.min t.setup.model.max_output 4096)
       ; cache_key = None
+      ; account = None
       }
     in
     let fits =

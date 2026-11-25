@@ -252,6 +252,8 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
   [%expect
     {|
     (Settings_section Models)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Model providers
     Logged in to Anthropic.
     (Manage providers)
@@ -642,7 +644,7 @@ let%expect_test "/settings completes the sections" =
     sessions How the session list shows sessions, and how this browser tells you that something happened. Kept on the backend.
     new-sessions What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
     models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.
-    usage How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    usage Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
     memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.
     user-info What the model should know about you, given to it in every session. Kept on the backend, for your account.
     instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
@@ -678,13 +680,15 @@ let%expect_test
     General
     (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How the session list shows sessions, and how this browser tells you that something happened. Kept on the backend.) (New sessions What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.)
     Models
-    (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Usage How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.)
+    (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Usage Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.)
     You
     (Memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.) (About you What the model should know about you, given to it in every session. Kept on the backend, for your account.) (Custom instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.)
     Integrations
     (MCP servers Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.) (Git hosting The hosts agents push branches to and open pull requests on.)
     (Account Who you are on this backend.)
     (Settings_section Models)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     <button class="btn ghost modal-back">
     <h2 class="">
     <button class="btn ghost icon">

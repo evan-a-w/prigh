@@ -73,9 +73,9 @@ let about = function
      agents) on each tool host: whether they are installed and logged in. \
      prigh only checks: install them and log in on the host itself."
   | Usage ->
-    "How much of your Claude and ChatGPT subscriptions' usage limits you have \
-     used, as the providers report it (read when you open this page), and \
-     whether a run stopped by one carries on when it resets."
+    "Each login's usage: how much of its subscription's limits it has used, as \
+     the provider reports it (read when you open this page), and what ran on \
+     it. And whether a run stopped by a limit carries on when it resets."
   | Memory ->
     "What you asked the model to remember, for later sessions. Kept on the \
      backend, for your account."

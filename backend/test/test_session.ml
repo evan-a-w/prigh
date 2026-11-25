@@ -19,6 +19,7 @@ let assistant text =
     ; stop_reason = End_turn
     ; usage = Usage.zero
     ; model = "m"
+    ; account = None
     }
 ;;
 
@@ -616,6 +617,7 @@ let%expect_test "markdown export renders user, assistant, tool and result" =
          ; stop_reason = Tool_use
          ; usage = Usage.zero
          ; model = "m"
+         ; account = None
          })
   in
   let (_ : Session.Entry.t) =

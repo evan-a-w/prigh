@@ -43,6 +43,9 @@ module State : sig
     ; cwd : string
     ; git_branch : string option
     ; model : Model.t
+    ; account : Account_ref.t option
+      (** the login of [model]'s provider the session chose; [None]: the
+          provider's default *)
     ; thinking : Thinking.t
     ; running : bool
     ; message_count : int
@@ -238,6 +241,11 @@ val create
   :  env:Env.t
   -> sw:Switch.t
   -> provider:Provider.t
+  -> ?accounts:(Provider_id.t -> Login_choice.t list)
+       (** a provider's logins, in the user's order: a session that hits
+           a usage limit carries on with the next one that allows
+           fallback before handing over to [fallback_models] (default:
+           none) *)
   -> tools:Tool.t list
   -> sessions_dir:string
   -> home:string
@@ -587,8 +595,18 @@ val job_output : t -> job_id:string -> lines:int -> string Or_error.t
 val start_job : t -> command:string -> string
 
 (** Switches model; a thinking setting the new model does not take becomes
-    the closest one it does ({!Model.clamp_thinking}), with a notice. *)
-val set_model : t -> Model.t -> unit
+    the closest one it does ({!Model.clamp_thinking}), with a notice. [account]
+    pins one of the provider's logins (default: whichever is its default
+    when a request is made). *)
+val set_model : ?account:Account_ref.t -> t -> Model.t -> unit
+
+(** Tells the session's clients (a [Notice]). *)
+val notice : t -> string -> unit
+
+(** [provider] sending a request that names no account with [agent ()]'s
+    pinned login when the request's model is of the same provider: what the
+    session's subagents use, so that they run on the account it chose. *)
+val following_account : (unit -> t option) -> Provider.t -> Provider.t
 
 (** Fails, listing the model's options, when the model does not take it. *)
 val set_thinking : t -> Thinking.t -> unit Or_error.t

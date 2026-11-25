@@ -34,6 +34,7 @@ module Entry = struct
       | Model of
           { model : string
           ; thinking : Thinking.t
+          ; account : string option [@jsonaf.option] [@sexp.option]
           }
       | Compaction of
           { summary : string
@@ -241,6 +242,7 @@ module Path_state = struct
     ; budget : float option option
     ; model : (string * Thinking.t) option
     ; engine : (string * string option) option
+    ; account : string option
     ; rev_allow_rules : string list
     ; rev_allowed_calls : Allowed_call.t list
     ; forgot_all : string option
@@ -262,6 +264,7 @@ module Path_state = struct
     ; budget = None
     ; model = None
     ; engine = None
+    ; account = None
     ; rev_allow_rules = []
     ; rev_allowed_calls = []
     ; forgot_all = None
@@ -889,7 +892,8 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
   | Goal { goal } -> { s with goal }
   | Reminders { reminders } -> { s with reminders }
   | Budget { usd } -> { s with budget = Some usd }
-  | Model { model; thinking } -> { s with model = Some (model, thinking) }
+  | Model { model; thinking; account } ->
+    { s with model = Some (model, thinking); account }
   | Engine { engine; adapter } -> { s with engine = Some (engine, adapter) }
   | Allow_rule { rule } ->
     { s with rev_allow_rules = rule :: s.rev_allow_rules }
@@ -1302,7 +1306,12 @@ let append ?(at = Core_unix.gettimeofday ()) t payload =
 ;;
 
 let append_message t ?at message = append ?at t (Message message)
-let set_model t ~model ~thinking = append t (Model { model; thinking })
+
+let set_model ?account t ~model ~thinking =
+  append t (Model { model; thinking; account })
+;;
+
+let account t = (derived t).state.account
 let set_name t ~name = append t (Name { name })
 let set_description t ~text = append t (Description { text })
 let set_cwd t ?host ~cwd () = append t (Cwd { cwd; host })
@@ -1606,7 +1615,8 @@ let last_model t ~f =
     (List.rev (active_path t))
     ~f:(fun (e : Entry.t) ->
       match e.payload with
-      | Model { model; thinking } when f model -> Some (model, thinking)
+      | Model { model; thinking; account = _ } when f model ->
+        Some (model, thinking)
       | _ -> None)
 ;;
 
@@ -2594,6 +2604,7 @@ module For_testing = struct
         ~reminders
         ~budget
         ~model
+        ~account
         ~allow_rules
         ~allowed_calls
         ~spend
@@ -2619,6 +2630,7 @@ module For_testing = struct
         (reminders : Reminder.t list)
         (budget : float option option)
         (model : (string * Thinking.t) option)
+        (account : string option)
         (allow_rules : string list)
         (allowed_calls : Allowed_call.t list)
         (spend : Usage.t * float)
@@ -2646,6 +2658,7 @@ module For_testing = struct
       ~reminders:(reminders t)
       ~budget:(budget t)
       ~model:(model t)
+      ~account:(account t)
       ~allow_rules:(allow_rules t)
       ~allowed_calls:(allowed_calls t)
       ~spend:(spend t)
@@ -2789,8 +2802,13 @@ module For_testing = struct
            | _ -> None))
       ~model:
         (path_last (function
-           | Model { model; thinking } -> Some (model, thinking)
+           | Model { model; thinking; account = _ } -> Some (model, thinking)
            | _ -> None))
+      ~account:
+        (Option.join
+           (path_last (function
+              | Model { account; _ } -> Some account
+              | _ -> None)))
       ~allow_rules:
         (List.filter_map path ~f:(fun (e : Entry.t) ->
            match e.payload with

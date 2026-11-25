@@ -419,7 +419,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /unpin [session] unpin a session (this one without an argument)
     /mkdir [path] create a directory (and its parents) and change to it
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
-    /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
+    /login [provider [as LABEL]|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom; as LABEL: another login of it), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
     /engine [adapter] switch this session to another of the composer's adapters (codex, claude, ...): it carries on from a summary of the session so far
     /filter [all|KIND...|-KIND|+KIND] show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden

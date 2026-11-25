@@ -69,6 +69,7 @@ let ask
     ; thinking = Off
     ; max_tokens = Some 60
     ; cache_key = None
+    ; account = None
     }
   in
   let reply = provider.stream request ~cancel ~on_event:ignore in

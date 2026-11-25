@@ -1,4 +1,4 @@
-// The settings page's Usage section: Claude's and ChatGPT's subscription
+// The settings page's Usage section: the Claude and ChatGPT logins' subscription
 // limits from a fake of both providers' usage endpoints (PRIGH_USAGE_ORIGIN),
 // read as the section opens and on Refresh, then a provider that fails; and
 // the section on phones (390x844, 320x640; touch, and Chromium as an
@@ -146,7 +146,7 @@ const loaded = p => p.locator(".usage-refresh button:not([disabled])", { hasText
 const openUsage = async p => {
   await run(p, "/usage");
   await p.locator(".settings-dialog").waitFor();
-  await p.locator(".usage-window").first().waitFor();
+  await p.locator(".login-usage-window").first().waitFor();
   await loaded(p);
 };
 // The clock and the date depend on when and where this runs.
@@ -202,7 +202,7 @@ try {
 
   claudeFails = true;
   await page.locator(".usage-refresh button").click();
-  await page.locator(".usage-failed").waitFor();
+  await page.locator(".login-usage-failed").waitFor();
   await loaded(page);
   section("Claude rate limited");
   await show(page);
@@ -214,7 +214,7 @@ try {
   await page.waitForSelector(".modal-backdrop", { state: "detached" });
   const before = asked.claude + asked.chatgpt;
   await openUsage(page);
-  await page.locator(".usage-failed").waitFor({ state: "detached" });
+  await page.locator(".login-usage-failed").waitFor({ state: "detached" });
   section("reopened");
   console.log(`asked again: ${asked.claude + asked.chatgpt - before}`);
 
@@ -227,7 +227,7 @@ try {
     section(`phone ${tag}`);
     console.log(`fits: ${await fits(phone)}; targets: ${await targets(phone)}`);
     await screenshot(phone, `phone-${tag}`);
-    await phone.locator(".usage-window").last().scrollIntoViewIfNeeded();
+    await phone.locator(".login-usage-window").last().scrollIntoViewIfNeeded();
     await screenshot(phone, `phone-${tag}-end`);
     await phone.locator(".modal-back").tap();
     await phone.locator(".settings-home-row.settings-tab-usage").waitFor();

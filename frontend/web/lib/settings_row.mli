@@ -20,6 +20,7 @@ end
 val row
   :  ?cls:string
   -> ?note:string * string
+  -> ?below:Node.t (** across the row, under the text and the controls *)
   -> ?scope:Scope.t
   -> ?wide:bool
   -> ?keys:string

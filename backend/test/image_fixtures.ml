@@ -60,6 +60,7 @@ let conversation ~model =
       ; stop_reason = Tool_use
       ; usage = Usage.zero
       ; model
+      ; account = None
       }
   ; Tool_result
       { tool_call_id = "call_1"

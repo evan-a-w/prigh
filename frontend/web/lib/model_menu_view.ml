@@ -218,6 +218,45 @@ let reasoning (m : App.Model.t) ~inject =
   | _ -> Node.none
 ;;
 
+(* The session's login of its provider, when it has several: a tap pins the
+   session to one ([/account]). *)
+let logins (m : App.Model.t) ~inject =
+  let module Logins = Prigh_ui.Provider_logins in
+  match m.state with
+  | Some state when Option.is_some (Logins.of_session m.auth state) ->
+    let provider = Logins.provider_name m.auth state.model.provider in
+    Node.div
+      ~attrs:
+        [ Attr.class_ "model-reasoning model-logins"
+        ; Attr.role "group"
+        ; Attr.create "aria-label" (provider ^ " login")
+        ]
+      (div
+         ~cls:"model-reasoning-head"
+         [ span ~cls:"model-reasoning-title" "Login"
+         ; span ~cls:"model-reasoning-model" provider
+         ]
+       :: List.map
+            (Logins.session_rows m.auth state)
+            ~f:(fun (r : Logins.Row.t) ->
+              let on = r.marked in
+              Node.button
+                ~attrs:
+                  [ classes [ "reasoning-row" ] [ "on", on ]
+                  ; Attr.type_ "button"
+                  ; Attr.tabindex (-1)
+                  ; Attr.title (sprintf "%s (%s)" r.detail r.id)
+                  ; Attr.create "aria-pressed" (Bool.to_string on)
+                  ; Attr.on_click (fun _ -> inject (Action.Run r.id))
+                  ]
+                [ span ~cls:"reasoning-label" r.label
+                ; (if on
+                   then Html.mark ~cls:"reasoning-check" Check
+                   else Node.span ~attrs:[ Attr.class_ "reasoning-check" ] [])
+                ]))
+  | _ -> Node.none
+;;
+
 let access (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
@@ -472,6 +511,7 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
                            ~inject)))
             ]
         ; reasoning m ~inject
+        ; logins m ~inject
         ]
     ; div
         ~cls:"model-menu-foot"

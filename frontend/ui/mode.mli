@@ -38,6 +38,9 @@ module Picker_kind : sig
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string (** login prompt id *)
+    | Commands
+    (** item ids are slash commands, run when picked; one ending in a space
+        goes to the editor to be finished *)
   [@@deriving sexp_of, equal]
 end
 
@@ -76,6 +79,10 @@ end
 module Confirm_action : sig
   type t =
     | Logout of string
+    | Logout_login of
+        { provider : string
+        ; account : string (** its id *)
+        }
     | Forge_logout of string (** the host *)
     | Rewind of string
     | Trim of string (** the message's entry id: [trim] before it *)

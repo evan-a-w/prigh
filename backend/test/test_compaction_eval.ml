@@ -15,6 +15,7 @@ let assistant content : Message.t =
          then Tool_use
          else End_turn)
     ; model = "anthropic/claude-opus-4-5"
+    ; account = None
     }
 ;;
 

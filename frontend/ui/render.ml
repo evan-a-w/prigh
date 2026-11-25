@@ -989,7 +989,12 @@ let status (m : App.Model.t) : Content.Line.t =
     let model =
       [ span
           ~style:base
-          (P.Session_engine.model_label s.engine ~model:s.model.id)
+          (P.Session_engine.model_label
+             s.engine
+             ~model:
+               (match Provider_logins.of_session m.auth s with
+                | Some l -> s.model.id ^ "@" ^ Provider_logins.short l.account
+                | None -> s.model.id))
       ]
     in
     let after_model =

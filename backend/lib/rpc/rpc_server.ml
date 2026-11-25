@@ -112,6 +112,11 @@ let methods =
   ; "auth_respond"
   ; "auth_cancel"
   ; "logout"
+  ; "account_update"
+  ; "account_share"
+  ; "account_share_targets"
+  ; "account_hide"
+  ; "account_usage"
   ; "usage_limits"
   ; "forge_status"
   ; "forge_login"
@@ -291,6 +296,68 @@ let provider_param login params =
   Or_error.bind (string_param params "provider") ~f:(provider_of_string login)
 ;;
 
+(* An account named by [ref] (["<provider>/<id>"], as [auth_status] lists
+   it) or by [provider] and [account] (an id or a label). *)
+let account_param login params =
+  let open Or_error.Let_syntax in
+  let%bind provider, account =
+    match%bind string_param_opt params "ref" with
+    | Some r ->
+      (match String.rsplit2 r ~on:'/' with
+       | Some (p, a) ->
+         let%map provider = provider_of_string login p in
+         provider, a
+       | None ->
+         Or_error.errorf
+           "account ref %S is not <provider>/<account> (as auth_status lists \
+            it)"
+           r)
+    | None ->
+      let%bind provider = provider_param login params in
+      let%map account = string_param params "account" in
+      provider, account
+  in
+  let%map account =
+    Provider_accounts.find (Login_manager.store login) provider account
+  in
+  provider, account.id
+;;
+
+let optional_account_param login params =
+  match param params "account", param params "ref" with
+  | (None | Some `Null), (None | Some `Null) -> Ok None
+  | _ -> Or_error.map (account_param login params) ~f:(fun (_, id) -> Some id)
+;;
+
+(* A model key, or [key@account] (an account's id or label); [account]
+   instead of the suffix. A key with an [@] of its own still resolves. *)
+let model_with_account ?member login key ~account =
+  let open Or_error.Let_syntax in
+  let models = Login_manager.models login in
+  let%bind model, account =
+    match Model_registry.resolve models key, account with
+    | Ok model, _ -> Ok (model, account)
+    | (Error _ as error), Some _ -> Or_error.map error ~f:(fun m -> m, account)
+    | (Error _ as error), None ->
+      (match String.rsplit2 key ~on:'@' with
+       | Some (key, account) when not (String.is_empty account) ->
+         let%map model = Model_registry.resolve models key in
+         model, Some account
+       | Some _ | None -> Or_error.map error ~f:(fun m -> m, None))
+  in
+  match account with
+  | None -> Ok (model, None)
+  | Some account ->
+    let%map found =
+      Login_choice.find
+        ?member
+        (Login_manager.store login)
+        (model : Model.t).provider
+        account
+    in
+    model, Some found.ref_
+;;
+
 (* Confirmations and questions waiting for the user. *)
 let waiting agent =
   List.length (Agent.pending_confirms agent)
@@ -411,6 +478,9 @@ end
 
 type t =
   { login : Login_manager.t
+  ; member : Account_shares.Member.t option
+    (** the user and the logins shared among users ([-tokens]) *)
+  ; ledger : Account_ledger.t option (** what ran on the user's logins *)
   ; forges : Forges.t
   ; token : string option (** required in [hello] before anything else *)
   ; namespace : string option
@@ -1458,6 +1528,39 @@ let mcp_auth_changed (t : t) =
   Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
 ;;
 
+let send_accounts_changed t =
+  let json = Rpc_json.login_event Accounts_changed in
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
+(* Another user shared or stopped sharing a login with this one: sessions
+   pinned to one no longer shared go back to the default login. *)
+let shares_changed t =
+  send_accounts_changed t;
+  Option.iter t.member ~f:(fun { shares; user } ->
+    Hashtbl.iter t.agents ~f:(fun agent ->
+      let state = Agent.state agent in
+      match state.account with
+      | Some (Shared { owner; id } as ref_)
+        when not
+               (Account_shares.granted
+                  shares
+                  ~recipient:user
+                  state.model.provider
+                  ~owner
+                  id) ->
+        Agent.set_model agent state.model;
+        Agent.notice
+          agent
+          (sprintf
+             "%s stopped sharing the %s login %s with you: carrying on with \
+              your default login (/account picks another)"
+             owner
+             (Provider_id.display_name state.model.provider)
+             (Account_ref.to_string ref_))
+      | _ -> ()))
+;;
+
 let create
       ~env
       ~sw
@@ -1468,6 +1571,8 @@ let create
       ?(host_timeout = 30.)
       ?heartbeat_clock
       ?namespace
+      ?member
+      ?ledger
       ?(backend_host = true)
       ?home
       ?forges
@@ -1501,6 +1606,8 @@ let create
   in
   let t =
     { login
+    ; member
+    ; ledger
     ; forges
     ; token
     ; namespace
@@ -1602,8 +1709,20 @@ let create
       Option.iter
         (Option.bind t.login_owner ~f:(Hashtbl.find t.clients))
         ~f:(fun c -> c.send json)
-    | Done _ | Failed _ | Logged_out _ | Forge_done _ | Forge_logged_out _ ->
-      broadcast t json);
+    | Done _
+    | Failed _
+    | Logged_out _
+    | Accounts_changed
+    | Forge_done _
+    | Forge_logged_out _ -> broadcast t json);
+  (* Recipients see a login's new label, or that it is gone. *)
+  Login_manager.subscribe login ~f:(function
+    | Done _ | Logged_out _ | Accounts_changed ->
+      Option.iter t.member ~f:(fun { shares; user } ->
+        Account_shares.changed shares ~owner:user)
+    | _ -> ());
+  Option.iter t.member ~f:(fun { shares; user } ->
+    Account_shares.subscribe shares ~user ~f:(fun () -> shares_changed t));
   Model_registry.subscribe (Login_manager.models login) ~f:(fun problem ->
     iter_authed t ~f:(fun c -> tell_problems c [ problem ]));
   t
@@ -3643,12 +3762,155 @@ let list_adapters t (client : Client.t) params =
   `Object [ "adapters", adapters_json (adapter_statuses t hosts) ]
 ;;
 
+let via_host_token (client : Client.t) =
+  Option.exists client.signed_in ~f:(fun s ->
+    s.User_access.Signed_in.via_host_token)
+;;
+
+(* An agent that has its tool host's token must not be able to log its
+   user in or out, or give their logins away. *)
+let check_manages_logins (client : Client.t) =
+  if via_host_token client
+  then
+    Or_error.error_string
+      "this connection signed in with a host token, which cannot change model \
+       logins: sign in as the user (prigh-web, or the user's own token)"
+  else Ok ()
+;;
+
+let member_of t =
+  match t.member with
+  | Some m -> Ok m
+  | None ->
+    Or_error.error_string
+      "sharing logins needs users (prigh serve -tokens): this server has one"
+;;
+
+(* A login another user shares, named by its ref
+   (["~<owner>/<provider>/<id>"], as [auth_status] lists it). *)
+let shared_ref_param login params =
+  let open Or_error.Let_syntax in
+  match param params "ref" with
+  | Some (`String r) when String.is_prefix r ~prefix:"~" ->
+    (match String.split (String.drop_prefix r 1) ~on:'/' with
+     | [ owner; p; id ] when not (String.is_empty owner) ->
+       let%bind provider = provider_of_string login p in
+       let%map id = Account_id.of_string id in
+       Some (provider, owner, id)
+     | _ ->
+       Or_error.errorf
+         "shared login ref %S is not ~OWNER/PROVIDER/ACCOUNT (as auth_status \
+          lists it)"
+         r)
+  | _ -> Ok None
+;;
+
+let set_shared_pref t ~provider ~owner id ~f =
+  let open Or_error.Let_syntax in
+  let%bind { Account_shares.Member.shares; user } = member_of t in
+  let%map () = Account_shares.set_pref shares ~user provider ~owner id ~f in
+  send_accounts_changed t
+;;
+
+let account_methods t (client : Client.t) ~meth ~params =
+  let open Or_error.Let_syntax in
+  match meth with
+  | "account_share" ->
+    Some
+      (let%bind () = check_manages_logins client in
+       let%bind { Account_shares.Member.shares; user } = member_of t in
+       let%bind provider, account = account_param t.login params in
+       let%bind users =
+         match param params "users" with
+         | Some (`Array users) ->
+           Or_error.all
+             (List.map users ~f:(function
+                | `String u -> Ok u
+                | _ -> Or_error.error_string "param \"users\" must be names"))
+         | _ ->
+           Or_error.error_string
+             "missing param \"users\" (the user names to share with; [] stops \
+              sharing)"
+       in
+       let%map grants =
+         Account_shares.share shares ~owner:user provider account ~users
+       in
+       send_accounts_changed t;
+       `Object
+         [ ( "shared_with"
+           , `Array
+               (List.map grants ~f:(fun (g : Account_meta.Grant.t) ->
+                  `Object
+                    [ "user", `String g.user
+                    ; "since_ms", `Number (Int.to_string g.since_ms)
+                    ])) )
+         ])
+  | "account_share_targets" ->
+    Some
+      (let%bind { Account_shares.Member.shares; user } = member_of t in
+       let%map users = Account_shares.targets shares ~user in
+       `Array (List.map users ~f:(fun u -> `String u)))
+  | "account_hide" ->
+    Some
+      (let%bind () = check_manages_logins client in
+       let%bind hidden = bool_param params "hidden" ~default:true in
+       match%bind shared_ref_param t.login params with
+       | None ->
+         Or_error.error_string
+           "account_hide takes a shared login's ref (~OWNER/PROVIDER/ACCOUNT); \
+            your own logins are logged out instead"
+       | Some (provider, owner, id) ->
+         let%map () =
+           set_shared_pref t ~provider ~owner id ~f:(fun p -> { p with hidden })
+         in
+         `Object [])
+  | "account_usage" ->
+    Some
+      (let self =
+         Option.value_map
+           t.member
+           ~default:Account_ledger.single_user
+           ~f:(fun m -> m.user)
+       in
+       let%map rows =
+         match%bind shared_ref_param t.login params with
+         | Some (provider, owner, id) ->
+           let%bind { Account_shares.Member.shares; user } = member_of t in
+           Account_shares.usage shares ~user provider ~owner id
+         | None ->
+           let%map provider, id = account_param t.login params in
+           (match t.member, t.ledger with
+            | Some { shares; user }, _ ->
+              Account_shares.usage shares ~user provider ~owner:user id
+              |> Result.ok
+              |> Option.value ~default:[]
+            | None, Some ledger ->
+              Account_ledger.rows
+                ledger
+                ~login:(Account_ledger.login provider id)
+            | None, None -> [])
+       in
+       `Array
+         (List.map rows ~f:(fun (r : Account_ledger.Row.t) ->
+            match Account_ledger.Periods.to_json r.usage with
+            | `Object periods ->
+              `Object
+                ((("user", `String r.user)
+                  :: (if String.equal r.user self then [ "you", `True ] else [])
+                 )
+                 @ periods)
+            | json -> json)))
+  | _ -> None
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
   let agent = client.agent in
   match meth with
   | "hello" -> Some (hello t client params)
+  | "account_share" | "account_share_targets" | "account_hide" | "account_usage"
+    -> account_methods t client ~meth ~params
   | "list_users" ->
     Some
       (match client.signed_in with
@@ -3854,8 +4116,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
       unit_result started
     in
     Option.some
-    @@
-      (match param params "provider" with
+    @@ Or_error.bind (check_manages_logins client) ~f:(fun () ->
+      match param params "provider" with
       | Some (`String "custom") -> owned (Login_manager.start_custom t.login)
       | _ ->
         Or_error.bind (provider_param t.login params) ~f:(fun provider ->
@@ -3867,23 +4129,128 @@ let dispatch_server t (client : Client.t) ~meth ~params
                | None -> Or_error.errorf "unknown login method %S" s)
             | _ -> Ok (List.hd_exn (Provider_auth.methods provider))
           in
-          Or_error.bind method_ ~f:(fun method_ ->
-            owned (fun () -> Login_manager.start t.login provider method_))))
+          let open Or_error.Let_syntax in
+          let%bind method_ = method_ in
+          let%bind account =
+            match%bind string_param_opt params "account" with
+            | None -> Ok None
+            | Some a -> Or_error.map (Account_id.of_string a) ~f:Option.some
+          in
+          let%bind label = string_param_opt params "label" in
+          owned (fun () ->
+            Login_manager.start t.login ?account ?label provider method_)))
   | "logout" ->
     (* A custom provider's logout asks the caller a question. *)
     Option.some
-    @@ Or_error.bind (provider_param t.login params) ~f:(fun provider ->
-      let previous = t.login_owner in
-      t.login_owner <- Some client.id;
-      let result = Login_manager.logout t.login provider in
-      if Result.is_error result || not (Login_manager.in_progress t.login)
-      then t.login_owner <- previous;
-      unit_result result)
+    @@ Or_error.bind (check_manages_logins client) ~f:(fun () ->
+      match shared_ref_param t.login params with
+      | Error e -> Error e
+      | Ok (Some (provider, owner, id)) ->
+        Or_error.map
+          (set_shared_pref t ~provider ~owner id ~f:(fun p ->
+             { p with hidden = true }))
+          ~f:(fun () -> `Object [])
+      | Ok None ->
+        Or_error.bind (provider_param t.login params) ~f:(fun provider ->
+          let previous = t.login_owner in
+          t.login_owner <- Some client.id;
+          let result =
+            Or_error.bind
+              (optional_account_param t.login params)
+              ~f:(fun account -> Login_manager.logout t.login ?account provider)
+          in
+          if Result.is_error result || not (Login_manager.in_progress t.login)
+          then t.login_owner <- previous;
+          unit_result result))
+  | "account_update" ->
+    Some
+      (let open Or_error.Let_syntax in
+       let%bind () = check_manages_logins client in
+       match%bind shared_ref_param t.login params with
+       | Some (provider, owner, id) ->
+         if
+           List.exists [ "label"; "default"; "before" ] ~f:(fun name ->
+             Option.is_some (param params name))
+         then
+           Or_error.errorf
+             "%s shares this login with you: you can hide it or let it take \
+              over at usage limits (fallback), not rename, reorder or make it \
+              the default"
+             owner
+         else (
+           let%bind fallback = bool_param params "fallback" ~default:false in
+           set_shared_pref t ~provider ~owner id ~f:(fun p ->
+             { p with fallback })
+           |> unit_result)
+       | None ->
+         let%bind provider, account = account_param t.login params in
+         let%bind label = string_param_opt params "label" in
+         let%bind make_default = bool_param params "default" ~default:false in
+         let%bind fallback =
+           match param params "fallback" with
+           | None | Some `Null -> Ok None
+           | Some _ ->
+             Or_error.map
+               (bool_param params "fallback" ~default:false)
+               ~f:Option.some
+         in
+         let%bind move_before =
+           match param params "before" with
+           | None -> Ok None
+           | Some `Null -> Ok (Some None)
+           | Some (`String r) ->
+             let%bind before_provider, before =
+               account_param t.login (`Object [ "ref", `String r ])
+             in
+             if Provider_id.equal before_provider provider
+             then Ok (Some (Some before))
+             else
+               Or_error.errorf
+                 "%S is another provider's account: accounts move among their \
+                  provider's"
+                 r
+           | Some _ ->
+             Or_error.error_string
+               "param \"before\" must be an account ref or null"
+         in
+         Login_manager.update_account
+           t.login
+           provider
+           account
+           { label; make_default; fallback; move_before }
+         |> unit_result)
   | "usage_limits" ->
+    let env = Agent.env agent in
+    let shared =
+      match t.member with
+      | None -> []
+      | Some { shares; user } ->
+        Account_shares.shared_with shares ~user
+        |> List.filter ~f:(fun (s : Account_shares.Shared.t) ->
+          not s.pref.hidden)
+        |> List.map ~f:(fun (s : Account_shares.Shared.t) ->
+          { Subscription_usage.Shared.owner = s.owner
+          ; provider = s.provider
+          ; id = s.id
+          ; label = s.label
+          ; resolve =
+              (fun () ->
+                Or_error.map
+                  (Account_shares.resolve
+                     shares
+                     ~env
+                     ~recipient:user
+                     s.provider
+                     ~owner:s.owner
+                     s.id)
+                  ~f:Option.some)
+          })
+    in
     let harnesses = harness_usage t agent in
     let usage =
       Subscription_usage.fetch
-        ~env:(Agent.env agent)
+        ~env
+        ~shared
         ~getenv:(Login_manager.getenv t.login)
         ~http:t.usage_http
         ~now:t.now
@@ -3899,7 +4266,9 @@ let dispatch_server t (client : Client.t) ~meth ~params
             List.filter
               usage.providers
               ~f:(fun (p : Subscription_usage.Provider_usage.t) ->
-                not (Subscription_usage.Status.equal p.status Not_signed_in))
+                not
+                  (Subscription_usage.Status.equal p.status Not_signed_in
+                   && List.is_empty p.accounts))
         }
     in
     Some (ok (Subscription_usage.to_json ~harnesses usage))
@@ -4008,7 +4377,15 @@ let resolve_external (models : Model.t list) query ~who =
       (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
 ;;
 
-let dispatch agent login ~external_models ~(client : Client.t) ~meth ~params
+let dispatch
+      ?member
+      ?ledger
+      agent
+      login
+      ~external_models
+      ~(client : Client.t)
+      ~meth
+      ~params
   : Json.t Or_error.t
   =
   match meth with
@@ -4220,15 +4597,37 @@ let dispatch agent login ~external_models ~(client : Client.t) ~meth ~params
           ; "entries", `Array (List.map entries ~f:Rpc_json.entry)
           ])
   | "set_model" ->
-    Or_error.bind (string_param params "model") ~f:(fun id ->
-      Or_error.map
-        (match external_models () with
-         | Some models ->
-           resolve_external models id ~who:(Agent.engine_label agent)
-         | None -> Model_registry.resolve (Login_manager.models login) id)
-        ~f:(fun model ->
-          Agent.set_model agent model;
-          `Object []))
+    let open Or_error.Let_syntax in
+    let%bind id = string_param params "model" in
+    let%bind account = string_param_opt params "account" in
+    (match external_models () with
+     | Some models ->
+       let who = Agent.engine_label agent in
+       let%bind () =
+         match account with
+         | None -> Ok ()
+         | Some _ ->
+           Or_error.errorf
+             "%s uses its own login, not prigh's: pick the model without @LOGIN"
+             who
+       in
+       let%map model =
+         match resolve_external models id ~who, String.rsplit2 id ~on:'@' with
+         | Ok model, _ -> Ok model
+         | Error _, Some (key, _)
+           when Result.is_ok (resolve_external models key ~who) ->
+           Or_error.errorf
+             "%s uses its own login, not prigh's: pick %s without @LOGIN"
+             who
+             key
+         | (Error _ as error), _ -> error
+       in
+       Agent.set_model agent model;
+       `Object []
+     | None ->
+       let%map model, account = model_with_account ?member login id ~account in
+       Agent.set_model ?account agent model;
+       `Object [])
   | "set_thinking" ->
     Or_error.bind (string_param params "thinking") ~f:(fun s ->
       Or_error.bind (Rpc_json.thinking_of_string s) ~f:(fun thinking ->
@@ -4479,8 +4878,32 @@ let dispatch agent login ~external_models ~(client : Client.t) ~meth ~params
     in
     unit_result (Agent.answer_question agent ~call_id reply)
   | "auth_status" ->
+    let shared, shareable =
+      match member with
+      | None -> [], false
+      | Some { shares; user } ->
+        ( Account_shares.shared_with shares ~user
+        , (not (via_host_token client))
+          &&
+            (match Account_shares.targets shares ~user with
+            | Ok (_ :: _) -> true
+            | Ok [] | Error _ -> false) )
+    in
+    let usage provider (ref_ : Account_ref.t) =
+      match ref_, ledger, member with
+      | Own id, Some ledger, _ ->
+        Account_ledger.usage ledger ~login:(Account_ledger.login provider id)
+      | Shared { owner; id }, _, Some { shares; user } ->
+        (match Account_shares.usage shares ~user provider ~owner id with
+         | Ok rows ->
+           List.fold rows ~init:Account_ledger.Periods.zero ~f:(fun acc r ->
+             Account_ledger.Periods.add acc r.usage)
+         | Error _ -> Account_ledger.Periods.zero)
+      | _ -> Account_ledger.Periods.zero
+    in
     Or_error.map (Login_manager.status login) ~f:(fun statuses ->
-      `Array (List.map statuses ~f:Rpc_json.auth_status))
+      `Array
+        (List.map statuses ~f:(Rpc_json.auth_status ~shared ~shareable ~usage)))
   | "auth_respond" ->
     Or_error.bind (string_param params "id") ~f:(fun id ->
       Or_error.bind (string_param params "value") ~f:(fun value ->
@@ -4538,6 +4961,8 @@ let handle t client (request : Json.t) : Json.t =
                | Some result -> result
                | None ->
                  dispatch
+                   ?member:t.member
+                   ?ledger:t.ledger
                    agent
                    t.login
                    ~external_models:(fun () -> external_models t agent)

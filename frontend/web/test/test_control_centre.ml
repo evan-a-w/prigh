@@ -561,6 +561,8 @@ let%expect_test "nothing found says what to do; a command runs" =
     Commands
     /name
     rename the session
+    /accounts
+    a provider's logins: pick one to use, rename, make the default or log out of
     ↑↓ move ↵ open ⌫ back esc close
     Dialog_accept
     (Focus editor)

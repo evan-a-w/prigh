@@ -372,6 +372,21 @@ The composer (`composer/`), from the bottom up:
 - `Auth_store` (`auth/`): `~/.config/prigh/auth.json` (pi's format), atomic
   0600 writes under an in-process mutex and a cross-process lock.
   `Credential` is an API key or OAuth tokens.
+- `Provider_accounts`: several logins per provider in the same file (the
+  provider's own key is account `main`, others `account:PROVIDER:ID`;
+  `Account_meta` holds labels, order, default and fallback under
+  `"prigh:accounts"`). Requests name an account (`Provider.Request.account`,
+  pinned per session by the agent); replies record it so encrypted
+  reasoning is only replayed to the account that wrote it. The agent tries
+  the provider's other fallback accounts before `fallback_models`.
+- `Account_shares` (`-tokens`): the logins users share with each other.
+  Grants live in the owner's `Account_meta`; a recipient's request names
+  `Account_ref.Shared` (`~OWNER/ID`), and the router resolves (and
+  refreshes) it on the owner's store in-process, so no client sees the
+  secret. `Account_ledger` keeps each login's usage per user and day (the
+  owner's own and recipients'; `auth_status`, `account_usage`);
+  `Login_choice` lists a user's own and shared logins for pinning and
+  fallback. Revoking pushes `accounts_changed` and unpins recipients.
 - `Provider_auth`: which methods each provider supports, environment
   fallbacks, `resolve` (refreshing OAuth under the lock).
 - `Login_manager`: runs one login flow at a time and turns its prompts into

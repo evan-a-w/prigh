@@ -46,6 +46,7 @@ module Scripted = struct
         ; stop_reason = End_turn
         ; usage = { input = 3; output = 2; cache_read = 0 }
         ; model = "scripted/model"
+        ; account = None
         }
     in
     services.emit (Message_start reply);

@@ -371,10 +371,11 @@ let state (s : Agent.State.t) =
      ; "plan", Option.value_map s.plan ~default:`Null ~f:Plan.to_json
      ; "session_rules", `Array (List.map s.session_rules ~f:str)
      ]
-     @
-     if List.is_empty s.allowed_calls
-     then []
-     else [ "allowed_calls", `Array (List.map s.allowed_calls ~f:str) ])
+     @ (if List.is_empty s.allowed_calls
+        then []
+        else [ "allowed_calls", `Array (List.map s.allowed_calls ~f:str) ])
+     @ Option.value_map s.account ~default:[] ~f:(fun id ->
+       [ "account", str (Account_ref.to_string id) ]))
 ;;
 
 let job ~now task =
@@ -618,7 +619,7 @@ let entry (e : Session.Entry.t) =
   let payload =
     match e.payload with
     | Message m -> [ "kind", str "message"; "message", message m ]
-    | Model { model; thinking = t } ->
+    | Model { model; thinking = t; account = _ } ->
       [ "kind", str "model"; "model", str model; "thinking", thinking t ]
     | Compaction { summary; kept_from; pinned } ->
       [ "kind", str "compaction"
@@ -725,7 +726,85 @@ let entry (e : Session.Entry.t) =
      @ payload)
 ;;
 
-let auth_status (s : Provider_auth.Status.t) =
+let account_ref provider account =
+  sprintf
+    "%s/%s"
+    (Provider_id.to_string provider)
+    (Account_id.to_string account)
+;;
+
+let grant (g : Account_meta.Grant.t) =
+  `Object [ "user", str g.user; "since_ms", int g.since_ms ]
+;;
+
+let usage_fields ~usage provider ref_ =
+  match usage with
+  | None -> []
+  | Some usage ->
+    let (u : Account_ledger.Periods.t) = usage provider ref_ in
+    if u.last_30_days.requests = 0
+    then []
+    else [ "usage", Account_ledger.Periods.to_json u ]
+;;
+
+let auth_account ~shareable ~usage provider (a : Provider_auth.Account_status.t)
+  =
+  `Object
+    ([ "ref", str (account_ref provider a.id)
+     ; "id", str (Account_id.to_string a.id)
+     ; "label", str a.label
+     ; "method", str (Provider_auth.Method.to_string a.method_)
+     ; "source", str a.source
+     ; "default", bool a.default
+     ; "fallback", bool a.fallback
+     ]
+     @ Option.value_map a.expires_ms ~default:[] ~f:(fun e ->
+       [ "expires_ms", int e ])
+     @ (if shareable && not (Provider_id.is_custom provider)
+        then [ "shareable", bool true ]
+        else [])
+     @ usage_fields ~usage provider (Account_ref.Own a.id)
+     @
+     match a.shared_with with
+     | [] -> []
+     | grants -> [ "shared_with", `Array (List.map grants ~f:grant) ])
+;;
+
+let shared_account ~usage ~default (s : Account_shares.Shared.t) =
+  `Object
+    ([ "ref", str (Account_shares.Shared.key s)
+     ; "id", str (Account_ref.to_string (Account_shares.Shared.ref_ s))
+     ; "label", str s.label
+     ; "method", str (Provider_auth.Method.to_string s.method_)
+     ; "source", str ("shared by " ^ s.owner)
+     ; "default", bool default
+     ; "fallback", bool s.pref.fallback
+     ; "shared_by", str s.owner
+     ]
+     @ usage_fields ~usage s.provider (Account_shares.Shared.ref_ s)
+     @ if s.pref.hidden then [ "hidden", bool true ] else [])
+;;
+
+let auth_status
+      ?(shared = [])
+      ?(shareable = false)
+      ?usage
+      (s : Provider_auth.Status.t)
+  =
+  let shared =
+    List.filter shared ~f:(fun (sh : Account_shares.Shared.t) ->
+      Provider_id.equal sh.provider s.provider)
+  in
+  let shared_default =
+    if List.is_empty s.accounts
+    then List.find shared ~f:(fun sh -> not sh.pref.hidden)
+    else None
+  in
+  let configured =
+    match s.configured, shared_default with
+    | None, Some sh -> Some (sh.method_, "shared by " ^ sh.owner)
+    | configured, _ -> configured
+  in
   `Object
     ([ "provider", str (Provider_id.to_string s.provider)
      ; "name", str (Provider_id.display_name s.provider)
@@ -737,7 +816,7 @@ let auth_status (s : Provider_auth.Status.t) =
                 ; "label", str (Provider_auth.Method.label s.provider m)
                 ])) )
      ; ( "configured"
-       , match s.configured with
+       , match configured with
          | None -> `Null
          | Some (m, source) ->
            `Object
@@ -745,6 +824,15 @@ let auth_status (s : Provider_auth.Status.t) =
              ; "source", str source
              ] )
      ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
+     ; ( "accounts"
+       , `Array
+           (List.map s.accounts ~f:(auth_account ~shareable ~usage s.provider)
+            @ List.map shared ~f:(fun sh ->
+              shared_account
+                ~usage
+                ~default:
+                  (Option.exists shared_default ~f:(fun d -> phys_equal d sh))
+                sh)) )
      ]
      @
      match s.custom with
@@ -798,17 +886,21 @@ let login_event (e : Login_manager.Event.t) =
     | Prompt_cancelled { id } ->
       [ "kind", str "prompt_cancelled"; "id", str id ]
     | Progress message -> [ "kind", str "progress"; "message", str message ]
-    | Done { provider; method_ } ->
+    | Done { provider; method_; account } ->
       [ "kind", str "done"
       ; "provider", str (Provider_id.to_string provider)
       ; "method", str (Provider_auth.Method.to_string method_)
+      ; "account", str (Account_id.to_string account)
       ]
     | Failed { provider; error } ->
       [ "kind", str "failed"; "provider", str provider; "error", str error ]
-    | Logged_out provider ->
+    | Logged_out { provider; account } ->
       [ "kind", str "logged_out"
       ; "provider", str (Provider_id.to_string provider)
       ]
+      @ Option.value_map account ~default:[] ~f:(fun a ->
+        [ "account", str (Account_id.to_string a) ])
+    | Accounts_changed -> []
     | Forge_done { host; user; method_ } ->
       [ "kind", str "forge_done"
       ; "host", str host
@@ -818,7 +910,10 @@ let login_event (e : Login_manager.Event.t) =
     | Forge_logged_out host ->
       [ "kind", str "forge_logged_out"; "host", str host ]
   in
-  `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
+  match e with
+  | Accounts_changed ->
+    `Object [ "type", str "event"; "event", str "accounts_changed" ]
+  | _ -> `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;
 
 let agent_queues agents =

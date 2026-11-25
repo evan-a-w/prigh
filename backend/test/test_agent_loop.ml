@@ -501,6 +501,7 @@ let%expect_test "existing context is sent but not returned" =
         ; stop_reason = End_turn
         ; usage = Usage.zero
         ; model = "m"
+        ; account = None
         }
     ]
   in

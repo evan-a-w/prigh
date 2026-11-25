@@ -375,6 +375,26 @@ The file has the same shape as pi's `auth.json`. To share pi's logins,
 symlink it (`ln -s ~/.pi/agent/auth.json ~/.config/prigh/auth.json`)
 rather than copying it, because Anthropic rotates refresh tokens.
 
+A provider can have several logins (accounts): `/login PROVIDER as LABEL`
+adds one (prigh-web: Settings → Models, Add login). `/accounts` lists them
+to use, rename, make the default, reorder or log out of (prigh-web: each
+login's Manage), and `/account` picks the session's. The first stays under pi's key;
+the others are `account:PROVIDER:ID`, with labels, order and the default
+in `"prigh:accounts"`. `/model openai-codex/gpt-6-sol@work` pins a login
+for the session. When a usage limit stops a run, prigh carries on with the
+provider's next login that allows fallback (OAuth ones by default, API
+keys only if you turn it on) before handing over to `fallback_models`.
+
+With `prigh serve -tokens`, a user can share one of their built-in
+providers' logins with other users: `/accounts share LOGIN [with USER]`
+(prigh-web: the login's Share…, a picker of the other users) and
+`/accounts unshare LOGIN from USER`. The others see it as "LABEL (from
+OWNER)" to pick or pin (`/account`, the model chip), or hide; they never
+get its key, and what they spend on it is theirs, though its owner sees it
+per user. Revoking moves their sessions back to their default login.
+Host-token connections cannot manage logins, and `-no-sharing` (or
+`PRIGH_SHARING=off`) turns sharing off.
+
 ### Custom OpenAI-compatible providers
 
 Any server that speaks OpenAI chat completions, the Responses API or
@@ -481,10 +501,10 @@ These are the main ones. `/help` lists them all, with their arguments.
 | Area | Commands |
 |---|---|
 | Model | `/model`, `/thinking`, `/scoped-models`, `/change_default`, `/fallback` |
-| Credentials | `/login`, `/logout`, `/auth` |
+| Credentials | `/login`, `/logout`, `/auth`, `/accounts`, `/account` |
 | Sessions | `/new`, `/sessions`, `/switch`, `/name`, `/fork`, `/rewind`, `/tree`, `/clone`, `/pin`, `/archive`, `/delete`, `/export`, `/import`, `/temporary` (web) |
 | Context | `/compact`, `/trim`, `/delete`, `/compaction`, `/session`, `/trace` |
-| Long runs | `/goal`, `/budget`, `/remind`, `/resume`, `/usage` (web) |
+| Long runs | `/goal`, `/budget`, `/remind`, `/resume`, `/usage` |
 | Modes | `/mode`, `/plan`, `/chat`, `/confirm`, `/permissions`, `/todos` |
 | Agents | `/agents`, `/jobs`, `/queue`, `/btw`, `/abort` |
 | Where | `/host`, `/cd`, `/mkdir`, `/terminal` and `/files` (web), `/default-dir`, `/default-host` |

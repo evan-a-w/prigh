@@ -45,6 +45,7 @@ module Entry : sig
       | Model of
           { model : string
           ; thinking : Thinking.t
+          ; account : string option [@jsonaf.option] [@sexp.option]
           }
       | Compaction of
           { summary : string
@@ -415,6 +416,9 @@ val identified_messages : t -> (string option * Timed_message.t) list
 
 val model : t -> (string * Thinking.t) option
 
+(** The account of the latest model choice. *)
+val account : t -> string option
+
 (** The latest model the session switched to, on its active path, of those
     [f] accepts (by key). *)
 val last_model : t -> f:(string -> bool) -> (string * Thinking.t) option
@@ -576,7 +580,14 @@ val forget_allowed_call : t -> Allowed_call.Call.t option -> Entry.t
 (** [at] defaults to now. *)
 val append_message : t -> ?at:float -> Message.t -> Entry.t
 
-val set_model : t -> model:string -> thinking:Thinking.t -> Entry.t
+(** [account]: the login chosen for the model's provider ({!Account_id};
+    [None]: its default). *)
+val set_model
+  :  ?account:string
+  -> t
+  -> model:string
+  -> thinking:Thinking.t
+  -> Entry.t
 val set_name : t -> name:string -> Entry.t
 val set_description : t -> text:string -> Entry.t
 (** Archiving a pinned session unpins it too. *)

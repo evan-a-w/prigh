@@ -54,3 +54,14 @@ let resolve (models : Model.t list) query =
                 |> List.map ~f:snd
                 |> fun l -> List.take l 3))))
 ;;
+
+let split_account models query =
+  match resolve models query, String.rsplit2 (String.strip query) ~on:'@' with
+  | Found _, _ | _, None -> query, None
+  | _, Some (model, account) ->
+    if
+      String.is_empty (String.strip model)
+      || String.is_empty (String.strip account)
+    then query, None
+    else String.strip model, Some (String.strip account)
+;;
