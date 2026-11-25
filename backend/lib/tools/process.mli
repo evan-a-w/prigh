@@ -27,7 +27,9 @@ end
     [input] and SIGTERM, and is killed only if it has not exited within
     [term_grace]; without it, it is killed straight away. [on_spawn] gets
     its pid once it started. [unset_env] are removed from the environment
-    the child inherits. *)
+    the child inherits. [extra_fds] are the child's besides its stdio: each
+    descriptor as the number given (3 or more), and still the caller's to
+    close. *)
 val run
   :  env:Env.t
   -> ?cwd:string
@@ -42,6 +44,7 @@ val run
   -> ?merge_stderr:bool
   -> ?term_grace:Time_ns.Span.t
   -> ?on_spawn:(Pid.t -> unit)
+  -> ?extra_fds:(int * Eio_unix.Fd.t) list
   -> prog:string
   -> args:string list
   -> unit

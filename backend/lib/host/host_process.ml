@@ -44,6 +44,7 @@ module Up = struct
         ; prigh : string
         ; mcp_socket : string option
         ; mcp_token : string option
+        ; secret : bool
         }
     | Out of
         { seq : int
@@ -59,13 +60,14 @@ module Up = struct
   [@@deriving sexp_of, equal]
 
   let to_line = function
-    | Started { pid; path; prigh; mcp_socket; mcp_token } ->
+    | Started { pid; path; prigh; mcp_socket; mcp_token; secret } ->
       frame
         ([ "t", `String "started"
          ; "pid", number pid
          ; "path", `String path
          ; "prigh", `String prigh
          ]
+         @ (if secret then [ "secret", `True ] else [])
          @ Option.value_map mcp_socket ~default:[] ~f:(fun s ->
            [ "mcp_socket", `String s ])
          @ Option.value_map mcp_token ~default:[] ~f:(fun s ->
@@ -95,6 +97,10 @@ module Up = struct
           ; prigh
           ; mcp_socket = string_field json "mcp_socket"
           ; mcp_token = string_field json "mcp_token"
+          ; secret =
+              (match field json "secret" with
+               | Some `True -> true
+               | _ -> false)
           }
       | "out" ->
         let%bind seq = int_field json "s" in
@@ -252,6 +258,30 @@ end
    the frame under the RPC's 64 MiB, whose excess would drop the host. *)
 let max_line = 12 * 1024 * 1024
 
+(* A secret goes to the program on this descriptor, as one line. *)
+let secret_fd = 3
+let max_secret = 16 * 1024
+
+module Secret = struct
+  type t =
+    { fd_env : string
+    ; value : string
+    }
+
+  let to_json t =
+    `Object [ "fd_env", `String t.fd_env; "value", `String t.value ]
+  ;;
+
+  let of_json json =
+    match string_field json "fd_env", string_field json "value" with
+    | Some fd_env, Some value
+      when (not (String.is_empty fd_env))
+           && String.length value <= max_secret
+           && not (String.mem value '\n') -> Some { fd_env; value }
+    | _ -> None
+  ;;
+end
+
 module Arguments = struct
   type t =
     { argv : string list
@@ -263,6 +293,7 @@ module Arguments = struct
     ; term_grace : Time_ns.Span.t
     ; path : string option
     ; mcp : bool
+    ; secret : Secret.t option
     }
 
   let create ~argv =
@@ -275,6 +306,7 @@ module Arguments = struct
     ; term_grace = Time_ns.Span.of_int_ms 3000
     ; path = None
     ; mcp = false
+    ; secret = None
     }
   ;;
 
@@ -289,6 +321,8 @@ module Arguments = struct
        ; ("mcp", if t.mcp then `True else `False)
        ]
        @ Option.value_map t.path ~default:[] ~f:(fun p -> [ "path", `String p ])
+       @ Option.value_map t.secret ~default:[] ~f:(fun s ->
+         [ "secret", Secret.to_json s ])
        @
        if List.is_empty t.env_unset
        then []
@@ -346,6 +380,7 @@ module Arguments = struct
           (match field json "mcp" with
            | Some `True -> true
            | _ -> false)
+      ; secret = Option.bind (field json "secret") ~f:Secret.of_json
       }
     | _ -> Or_error.error_string "argv must be a non-empty list of strings"
   ;;
@@ -749,11 +784,26 @@ let run ~env ~self ~outer ~cancel ~on_output ~cwd (args : Arguments.t) =
     in
     let socket = Option.map mcp ~f:(fun mcp -> mcp.socket) in
     let fill = Placeholder.fill ~self ~socket in
+    (* The secret, written into a socket whose other end is the program's
+       [secret_fd] and then closed: what reads it (Claude Code reads a socket
+       directly, then closes it) leaves nothing for the commands it runs. *)
+    let secret =
+      Option.bind args.secret ~f:(fun (secret : Secret.t) ->
+        match Eio_unix.Net.socketpair_stream ~sw () with
+        | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+        | exception _ -> None
+        | ours, theirs ->
+          Eio.Flow.copy_string (secret.value ^ "\n") ours;
+          Eio.Flow.close ours;
+          Some (secret.fd_env, theirs))
+    in
     (* The socket goes only to the bridge, in its MCP config (a
        [{{mcp_socket}}] placeholder): not into the program's environment,
        which every command it runs would inherit. *)
     let extra_env =
       List.map args.env ~f:(fun (key, value) -> key, fill value)
+      @ Option.value_map secret ~default:[] ~f:(fun (fd_env, _) ->
+        [ fd_env, Int.to_string secret_fd ])
     in
     Fiber.fork_daemon ~sw (fun () ->
       Cancellation.await cancel;
@@ -772,6 +822,7 @@ let run ~env ~self ~outer ~cancel ~on_output ~cwd (args : Arguments.t) =
          ~cancel:stopped
          ~term_grace:args.term_grace
          ~on_spawn:(fun p ->
+           Option.iter secret ~f:(fun (_, theirs) -> Eio.Flow.close theirs);
            pid := Some p;
            on_output
              (Up.to_line
@@ -781,11 +832,15 @@ let run ~env ~self ~outer ~cancel ~on_output ~cwd (args : Arguments.t) =
                    ; prigh = self
                    ; mcp_socket = socket
                    ; mcp_token = Option.map mcp ~f:(fun mcp -> mcp.token)
+                   ; secret = Option.is_some secret
                    })))
          ~on_stdout:(Lines.add lines)
          ~on_stderr:(Stderr.add stderr)
          ~prog:path
          ~args:(List.map (List.tl_exn args.argv) ~f:fill)
+         ~extra_fds:
+           (Option.value_map secret ~default:[] ~f:(fun (_, theirs) ->
+              [ secret_fd, Eio_unix.Resource.fd theirs ]))
          ()
      with
      | exit ->

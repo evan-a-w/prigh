@@ -20,8 +20,14 @@ open! Import
     [stderr_rate] (bytes of stderr forwarded per minute, default 64 KiB),
     [term_grace_ms] (how long a cancelled program has after SIGTERM,
     default 3000), [path] (the program's path, instead of looking
-    [argv]'s first element up on [PATH]) and [mcp]. It runs in the exec's
-    cwd.
+    [argv]'s first element up on [PATH]), [mcp] and [secret]. It runs in the
+    exec's cwd.
+
+    With [secret], the program gets [secret.value] and a newline on a
+    socket as its descriptor {!secret_fd}, whose number is in its
+    environment as [secret.fd_env]: not the secret itself, which every
+    command it runs would inherit. The host closes its end once it wrote
+    it. [Started] says whether it got it: an older host ignores [secret].
 
     With [mcp], the host also listens on a Unix socket in a private (0700)
     directory, for as long as the program runs (its path is
@@ -51,6 +57,9 @@ module Up : sig
         ; mcp_socket : string option
         ; mcp_token : string option
           (** what a bridge presents first, else the socket closes *)
+        ; secret : bool
+          (** it got [secret] on its descriptor (a host predating that, or
+              unable to, does not say so) *)
         }
     | Out of
         { seq : int
@@ -116,6 +125,16 @@ module Outcome : sig
   val of_result : Tool.Result.t -> t option
 end
 
+(** The program's descriptor carrying [secret]. *)
+val secret_fd : int
+
+module Secret : sig
+  type t =
+    { fd_env : string (** the variable naming the descriptor *)
+    ; value : string (** one line, at most 16 KiB *)
+    }
+end
+
 module Arguments : sig
   type t =
     { argv : string list
@@ -127,6 +146,7 @@ module Arguments : sig
     ; term_grace : Time_ns.Span.t
     ; path : string option
     ; mcp : bool
+    ; secret : Secret.t option
     }
 
   (** The defaults for everything but [argv]. *)

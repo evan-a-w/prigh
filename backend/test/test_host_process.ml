@@ -317,6 +317,42 @@ let%expect_test "stream: the program exits by itself" =
     |}]
 ;;
 
+let%expect_test "stream: a secret on a descriptor, not in the environment" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let s =
+    Host_stream.start
+      ~sw
+      ~exec:(exec t)
+      ~host:"laptop"
+      { (args
+           [ "sh"
+           ; "-c"
+           ; {|echo "fd $SECRET_FD"; read -r s <&"$SECRET_FD"; echo "read $s"
+read -r more <&"$SECRET_FD" || echo "then the end"
+env | grep -c hunter2|}
+           ])
+        with
+        secret = Some { fd_env = "SECRET_FD"; value = "hunter2" }
+      }
+  in
+  let rec lines () =
+    Option.iter (Host_stream.read_line s) ~f:(fun line ->
+      print_endline line;
+      lines ())
+  in
+  lines ();
+  [%expect
+    {|
+    fd 3
+    read hunter2
+    then the end
+    0
+    |}]
+;;
+
 let alive pid =
   match Signal_unix.send Signal.zero (`Pid (Pid.of_int pid)) with
   | `Ok -> true
@@ -481,6 +517,7 @@ let%expect_test "stream: lost lines, old hosts and hosts that went away" =
           ; prigh = "/bin/prigh"
           ; mcp_socket = None
           ; mcp_token = None
+          ; secret = false
           }
       ; Out { seq = 1; line = "one" }
       ; Out { seq = 3; line = "three" }

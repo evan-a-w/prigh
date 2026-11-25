@@ -42,6 +42,7 @@ let run
       ?(merge_stderr = false)
       ?term_grace
       ?(on_spawn = ignore)
+      ?(extra_fds = [])
       ~prog
       ~args
       ()
@@ -75,15 +76,16 @@ let run
       ?cwd:(Option.map cwd ~f:(fun d -> Eio.Path.(Eio.Stdenv.fs env / d)))
       ~pgid:0
       ~fds:
-        [ 0, Eio_unix.Resource.fd stdin_r, `Blocking
-        ; 1, Eio_unix.Resource.fd stdout_w, `Blocking
-        ; ( 2
-          , Eio_unix.Resource.fd
-              (match stderr with
-               | Some (_, stderr_w) -> stderr_w
-               | None -> stdout_w)
-          , `Blocking )
-        ]
+        ([ 0, Eio_unix.Resource.fd stdin_r, `Blocking
+         ; 1, Eio_unix.Resource.fd stdout_w, `Blocking
+         ; ( 2
+           , Eio_unix.Resource.fd
+               (match stderr with
+                | Some (_, stderr_w) -> stderr_w
+                | None -> stdout_w)
+           , `Blocking )
+         ]
+         @ List.map extra_fds ~f:(fun (n, fd) -> n, fd, `Blocking))
       ?env:process_env
       (prog :: args)
   in
