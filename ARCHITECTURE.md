@@ -242,6 +242,17 @@ logged in: run `claude auth login` there"); prigh never installs a CLI or
 logs in. prigh-web shows them in Settings → Engines (composer deployed
 only), the TUI with `/adapters`.
 
+Codex can run on one of prigh's ChatGPT logins (`Cli_login`: the user's
+choice per adapter in their config's `adapters`; `Cli_credential`: an
+`Account_ref`, own or shared through `Account_shares`, resolved and
+refreshed on the owner's store, its usage in that login's ledger).
+`Codex_login` sends `account/login/start {type: chatgptAuthTokens}` after
+`initialize`, answers `account/chatgptAuthTokens/refresh` with freshly
+refreshed tokens, and pushes new ones before a turn when they near expiry;
+a Codex refusing the mode keeps its own login and the session gets a
+notice. `set_adapter_login` changes the choice; a live process on another
+login is restarted on the same thread at the next turn.
+
 `Engine_gate` (`rpc/`) refuses, before dispatch, the methods the attached
 session's engine lacks (`Capabilities.method_feature`: fork, rewind, trim
 and delete, compact, `downsize_images`, `btw`, steering subagents, plan

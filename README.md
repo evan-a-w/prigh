@@ -385,7 +385,12 @@ for the session. When a usage limit stops a run, prigh carries on with the
 provider's next login that allows fallback (OAuth ones by default, API
 keys only if you turn it on) before handing over to `fallback_models`.
 A composer session on Codex, Claude Code or an ACP agent runs on that
-CLI's own login: it has no prigh login to pin.
+CLI's own login, except that Codex can run on one of your ChatGPT logins in
+prigh (yours or one shared with you): Settings → Engines, or `/adapters
+login codex [LOGIN|own]` in the TUI. prigh hands Codex short-lived access
+tokens over its stdin (never a file on the host), refreshes them, and
+counts the usage on that login; the status line reads `Codex · MODEL@LOGIN`.
+A Codex too old for that runs on its own login, with a notice to update it.
 
 With `prigh serve -tokens`, a user can share one of their built-in
 providers' logins with other users: `/accounts share LOGIN [with USER]`
