@@ -163,6 +163,7 @@ type t =
   ; adapter : string option [@sexp.option]
   ; capabilities : Capabilities.t
   ; unavailable : string option [@sexp.option]
+  ; login : string option [@sexp.option]
   }
 [@@deriving sexp_of, equal]
 
@@ -171,6 +172,7 @@ let harness =
   ; adapter = None
   ; capabilities = Capabilities.harness
   ; unavailable = None
+  ; login = None
   }
 ;;
 
@@ -185,11 +187,13 @@ let of_state_json j =
     | None | Some `Null -> Ok Capabilities.harness
     | Some c -> Capabilities.of_json c
   in
-  let%map unavailable = Json.string_opt_field j "unavailable" in
+  let%bind unavailable = Json.string_opt_field j "unavailable" in
+  let%map login = Json.string_opt_field j "adapter_login" in
   { engine = Option.value engine ~default:"harness"
   ; adapter
   ; capabilities
   ; unavailable
+  ; login
   }
 ;;
 
@@ -222,7 +226,12 @@ let who t =
 
 let model_label t ~model =
   match t.adapter with
-  | Some adapter -> sprintf "%s · %s" (adapter_label adapter) model
+  | Some adapter ->
+    sprintf
+      "%s · %s%s"
+      (adapter_label adapter)
+      model
+      (Option.value_map t.login ~default:"" ~f:(fun l -> "@" ^ l))
   | None when is_harness t || String.equal t.engine "harness" -> model
   | None -> sprintf "%s · %s" (engine_label t.engine) model
 ;;

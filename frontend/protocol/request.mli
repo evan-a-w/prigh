@@ -220,6 +220,12 @@ module Method : sig
         connected host; [refresh] checks again rather than answering from
         what was checked in the last minute *)
     | Set_adapter of { adapter : string }
+    | Set_adapter_login of
+        { adapter : string
+        ; login : string option (** a login's ref; [None]: the CLI's own *)
+        }
+    (** {!Adapter_login.list_of_json}: the CLI runs the user's composer
+        sessions on that login from their next turn *)
     (** moves the attached session to [adapter] (or ["harness"]), with a
         handoff; replies with its {!State} *)
     | Nix_store_status (** superusers: {!Nix_store_status} *)

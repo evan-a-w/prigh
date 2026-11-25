@@ -65,6 +65,9 @@ type t =
   ; unavailable : string option
     (** why the session cannot run on this backend (it can still be read),
         naming what to do *)
+  ; login : string option
+    (** the label of prigh's login its agent CLI runs on ([adapter_login]);
+        [None]: the CLI's own *)
   }
 [@@deriving sexp_of, equal]
 
