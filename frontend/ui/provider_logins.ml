@@ -163,17 +163,27 @@ let find ?provider auth arg =
 
 let names_login arg = String.mem arg '@' || String.mem (String.strip arg) '/'
 
+(* A composer session on an external agent's CLI runs on that CLI's login. *)
+let own_login (state : P.State.t) =
+  match state.engine.adapter with
+  | None | Some "prigh" -> false
+  | Some _ -> true
+;;
+
 let of_session auth (state : P.State.t) =
-  let logins =
-    List.filter (all ~hidden:true auth) ~f:(fun l ->
-      String.equal l.provider.provider state.model.provider)
-  in
-  match state.account with
-  | Some id -> List.find logins ~f:(fun l -> String.equal l.account.id id)
-  | None ->
-    (match logins with
-     | [] | [ _ ] -> None
-     | logins -> List.find logins ~f:(fun l -> l.account.default))
+  if own_login state
+  then None
+  else (
+    let logins =
+      List.filter (all ~hidden:true auth) ~f:(fun l ->
+        String.equal l.provider.provider state.model.provider)
+    in
+    match state.account with
+    | Some id -> List.find logins ~f:(fun l -> String.equal l.account.id id)
+    | None ->
+      (match logins with
+       | [] | [ _ ] -> None
+       | logins -> List.find logins ~f:(fun l -> l.account.default)))
 ;;
 
 let split_as words =
@@ -739,20 +749,28 @@ let session_rows auth (state : P.State.t) =
 ;;
 
 let no_choice auth (state : P.State.t) =
-  let provider = state.model.provider in
-  let n =
-    List.count (all auth) ~f:(fun l ->
-      String.equal l.provider.provider provider)
-  in
-  if n >= 2 || Option.is_some state.account
-  then None
-  else
+  if own_login state
+  then
     Some
       (sprintf
-         "%s has %s login: /login %s as LABEL adds another"
-         (provider_name auth provider)
-         (if n = 0 then "no stored" else "one")
-         provider)
+         "%s uses its own login, not prigh's: sign in through its CLI to \
+          change it"
+         (P.Session_engine.who state.engine))
+  else (
+    let provider = state.model.provider in
+    let n =
+      List.count (all auth) ~f:(fun l ->
+        String.equal l.provider.provider provider)
+    in
+    if n >= 2 || Option.is_some state.account
+    then None
+    else
+      Some
+        (sprintf
+           "%s has %s login: /login %s as LABEL adds another"
+           (provider_name auth provider)
+           (if n = 0 then "no stored" else "one")
+           provider))
 ;;
 
 let shareable auth account =

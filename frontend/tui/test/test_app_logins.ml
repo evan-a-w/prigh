@@ -594,3 +594,37 @@ let%expect_test "/accounts and /usage show each login's usage" =
     gpt-5.5@Personal  ↑↓ scroll · Esc closes · typing goes to the editor
     |}]
 ;;
+
+let%expect_test "a composer session on an agent CLI has no prigh login" =
+  let h = connected () in
+  H.reply
+    ~quiet:true
+    h
+    Initial_state
+    (state_json
+       ~model:gpt
+       ~extra:
+         [ "engine", {|"composer"|}
+         ; "adapter", {|"codex"|}
+         ; "account", {|"work"|}
+         ]
+       ());
+  H.keys h "/account";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Notice ─────────────────────────────────────────────────────────────┐
+    │ Codex uses its own login, not prigh's: sign in through its CLI to    │
+    │ change it                                                            │
+    └────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  Codex · gpt-5.5  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;

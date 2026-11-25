@@ -663,6 +663,9 @@ let%expect_test "back to the harness engine and out again; models follow" =
   model ();
   models ();
   print_result (call ~params:{|{"model": "nope"}|} "set_model");
+  print_result (call ~params:{|{"model": "default@work"}|} "set_model");
+  print_result
+    (call ~params:{|{"model": "default", "account": "work"}|} "set_model");
   [%expect
     {|
     ok: engine composer, adapter codex
@@ -675,6 +678,8 @@ let%expect_test "back to the harness engine and out again; models follow" =
     codex/gpt-5
     models: codex/default
     error: "Codex has no model \"nope\": pick one of default (/model lists them)"
+    error: "Codex uses its own login, not prigh's: pick default without @LOGIN"
+    error: "Codex uses its own login, not prigh's: pick the model without @LOGIN"
     |}];
   print_result (call ~params:{|{"adapter": "harness"}|} "set_adapter");
   model ();
