@@ -3086,17 +3086,17 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     {|
     ┌─ Help ───────────────────────────────────────────────────┐
     │ Commands                                                 │
-    │ /help                                  show commands and │
-    │ keys                                                     │
-    │ /hotkeys                               show keyboard     │
-    │ shortcuts                                                │
-    │ /model [name|id|provider/id]           pick or switch    │
-    │ the model                                                │
-    │ /scoped-models                         pick the models   │
-    │ Ctrl+P cycles through                                    │
-    │ /change_default                        save the current  │
-    │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 396 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    │ /help                                              show  │
+    │ commands and keys                                        │
+    │ /hotkeys                                           show  │
+    │ keyboard shortcuts                                       │
+    │ /model [name|id|provider/id]                       pick  │
+    │ or switch the model                                      │
+    │ /scoped-models                                     pick  │
+    │ the models Ctrl+P cycles through                         │
+    │ /change_default                                    save  │
+    │ the current model and thinking level as the default for  │
+    └───────── 1–11 of 416 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes

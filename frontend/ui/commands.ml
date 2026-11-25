@@ -466,10 +466,11 @@ let every =
       "act as another user (superusers only); without a user, list them"
   ; c
       "adapters"
-      "[refresh]"
+      "[refresh | login [ADAPTER] [LOGIN|own]]"
       "whether the composer's agent CLIs (Codex, Claude Code, ACP agents) are \
        installed and logged in on each tool host, and what to run there when \
-       not; refresh checks again"
+       not; refresh checks again; login runs Codex on one of prigh's ChatGPT \
+       logins or its own"
   ; c
       "nix-gc"
       "[run [DAYS|all]]"

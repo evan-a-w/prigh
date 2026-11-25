@@ -620,8 +620,8 @@ let%expect_test "a composer session on an agent CLI has no prigh login" =
       earlier answer
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ┌─ Notice ─────────────────────────────────────────────────────────────┐
-    │ Codex uses its own login, not prigh's: sign in through its CLI to    │
-    │ change it                                                            │
+    │ Codex uses its own login: /adapters login codex runs it on one of    │
+    │ prigh's, or sign in through its CLI                                  │
     └────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────
     > ▏

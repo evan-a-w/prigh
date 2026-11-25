@@ -138,6 +138,8 @@ module Reply_tag = struct
     | Btw of string (** btw id *)
     | Users_list
     | Adapters_shown (** [/adapters] *)
+    | Adapter_login_picker of string option (** the adapter named *)
+    | Adapter_login_set of string (** the adapter *)
     | Nix_store_shown (** [/nix-gc] *)
     | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
@@ -4288,9 +4290,26 @@ let adapters_command m rest =
         (restore_command m (String.strip ("/adapters " ^ rest)))
         (Error.to_string_hum e)
     , [] )
-  | Ok refresh ->
+  | Ok (List { refresh }) ->
     ( notice m "checking the agent CLIs on the tool hosts…"
     , [ call (List_adapters { refresh }) ~tag:Adapters_shown ] )
+  | Ok (Login { adapter; login = None }) ->
+    ( notice m "reading the logins…"
+    , [ call
+          (List_adapters { refresh = false })
+          ~tag:(Adapter_login_picker adapter)
+      ] )
+  | Ok (Login { adapter; login = Some login }) ->
+    let adapter = Option.value adapter ~default:"codex" in
+    ( notice m "changing the login…"
+    , [ call
+          (Set_adapter_login
+             { adapter
+             ; login =
+                 (if String.Caseless.equal login "own" then None else Some login)
+             })
+          ~tag:(Adapter_login_set adapter)
+      ] )
 ;;
 
 let nix_gc_command m rest =
@@ -6258,6 +6277,15 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   | Engines { switch } -> engine_chosen m ~switch item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
+  | Adapter_login adapter ->
+    ( notice m "changing the login…"
+    , [ call
+          (Set_adapter_login
+             { adapter
+             ; login = (if String.equal item.id "own" then None else Some item.id)
+             })
+          ~tag:(Adapter_login_set adapter)
+      ] )
 ;;
 
 let save_scoped_models m picker =
@@ -7756,12 +7784,52 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          , [] ))
      | Adapters_shown ->
        decode json ~f:P.Adapter_status.list_of_json (fun statuses ->
+         decode json ~f:P.Adapter_login.list_of_json (fun logins ->
          ( output
              { m with notice = None }
              ~title:"Agent CLIs"
              (Content.lines
-                (String.concat ~sep:"\n" (Adapters_command.lines statuses)))
-         , [] ))
+                (String.concat
+                   ~sep:"\n"
+                   (Adapters_command.lines statuses logins)))
+         , [] )))
+     | Adapter_login_picker adapter ->
+       decode json ~f:P.Adapter_login.list_of_json (fun logins ->
+         match Adapters_command.find_login logins ~adapter with
+         | Error e -> error { m with notice = None } (Error.to_string_hum e), []
+         | Ok l ->
+           let current ref_ =
+             Option.equal String.equal (Option.map l.login ~f:(fun c -> c.ref_)) ref_
+           in
+           let items =
+             Picker.Item.create
+               ~id:"own"
+               ~detail:"on the session's tool host (log in there)"
+               ~marked:(current None)
+               (P.Session_engine.adapter_label l.adapter ^ "'s own login")
+             :: List.map l.choices ~f:(fun (c : P.Adapter_login.Choice.t) ->
+               Picker.Item.create
+                 ~id:c.ref_
+                 ~detail:(c.ref_ ^ ", prigh hands it short-lived tokens")
+                 ~marked:(current (Some c.ref_))
+                 c.label)
+           in
+           ( open_picker
+               { m with notice = None }
+               (Adapter_login l.adapter)
+               (Picker.create
+                  ~title:
+                    (P.Session_engine.adapter_label l.adapter ^ " runs on")
+                  items)
+           , [] ))
+     | Adapter_login_set adapter ->
+       decode json ~f:P.Adapter_login.list_of_json (fun logins ->
+         match
+           List.find logins ~f:(fun (l : P.Adapter_login.t) ->
+             String.equal l.adapter adapter)
+         with
+         | None -> notice m "changed", []
+         | Some l -> notice m (Adapters_command.changed l), [])
      | Nix_store_shown ->
        decode json ~f:P.Nix_store_status.of_json (fun status ->
          ( output

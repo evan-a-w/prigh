@@ -152,6 +152,8 @@ module Reply_tag : sig
     | Btw of string (** btw id *)
     | Users_list
     | Adapters_shown (** [/adapters] *)
+    | Adapter_login_picker of string option (** the adapter named *)
+    | Adapter_login_set of string (** the adapter *)
     | Nix_store_shown (** [/nix-gc] *)
     | Nix_gc_done (** [/nix-gc run] *)
     | User_switched

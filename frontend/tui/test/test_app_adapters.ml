@@ -31,7 +31,8 @@ let statuses =
      {"adapter":"codex","label":"Codex","host":"h2","host_name":"server",
       "installed":false,"auth":"unknown",
       "problem":"Codex is not installed on server, please install it",
-      "checked_at":0}]}|}
+      "checked_at":0}],
+   "adapter_logins":[{"adapter":"codex","provider":"openai-codex","login":"work","label":"Work","choices":[]}]}|}
 ;;
 
 let%expect_test "/adapters lists each host's CLIs and what to run" =
@@ -46,9 +47,6 @@ let%expect_test "/adapters lists each host's CLIs and what to run" =
     {|
     (Rpc (method_ list_adapters) (params ()) (tag Adapters_shown))
 
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     ┌─ Agent CLIs ───────────────────────────────────────────────────────────────────────────┐
@@ -61,6 +59,9 @@ let%expect_test "/adapters lists each host's CLIs and what to run" =
     │       Codex is not installed on server, please install it                              │
     │                                                                                        │
     │ prigh never installs them or logs in: run that on the host                             │
+    │                                                                                        │
+    │ Logins:                                                                                │
+    │   Codex runs on ChatGPT (prigh) · Work  (/adapters login codex [LOGIN|own])            │
     └─────────────────────────────────────────────────────────────────────────── Esc closes ─┘
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
@@ -83,7 +84,7 @@ let%expect_test "/adapters lists each host's CLIs and what to run" =
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────── unknown argument "now": /adapters [refresh] ───
+    ── unknown argument "now": /adapters [refresh] | /adapters login [ADAPTER] [LOGIN|own] ───
     > /adapters now▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
@@ -121,5 +122,143 @@ let%expect_test "/adapters on a backend without the composer" =
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let logins ~login =
+  sprintf
+    {|{"adapter_logins":[
+       {"adapter":"codex","provider":"openai-codex","login":%s,"label":%s,
+        "choices":[{"ref":"work","label":"Work"},
+                   {"ref":"~alice/main","label":"Alice's ChatGPT"}]}]}|}
+    (match login with
+     | Some _ -> {|"work"|}
+     | None -> "null")
+    (match login with
+     | Some l -> sprintf "%S" l
+     | None -> "null")
+;;
+
+let%expect_test "/adapters login: Codex on one of prigh's ChatGPT logins" =
+  let h = connected () in
+  run h "/adapters login";
+  H.reply h (Adapter_login_picker None) (logins ~login:None);
+  H.show h;
+  H.key h (Key.plain Down);
+  H.enter h;
+  H.reply h (Adapter_login_set "codex") (logins ~login:(Some "Work"));
+  H.show h;
+  run h "/adapters login codex own";
+  run h "/adapters login claude";
+  H.reply h (Adapter_login_picker (Some "claude")) (logins ~login:None);
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_adapters) (params ()) (tag (Adapter_login_picker ())))
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Codex runs on  (3)
+    / ▏
+    ▸* Codex's own login  on the session's tool host (log in there)
+       Work               work, prigh hands it short-lived tokens
+       Alice's ChatGPT    ~alice/main, prigh hands it short-lived tokens
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Enter selects · Esc closes
+    (Rpc
+      (method_ set_adapter_login)
+      (params (
+        (adapter codex)
+        (login   work)))
+      (tag (Adapter_login_set codex)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────── Codex runs on ChatGPT (prigh) · Work from its next turn ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    (Rpc
+      (method_ set_adapter_login)
+      (params (
+        (adapter codex)
+        (login   null)))
+      (tag (Adapter_login_set codex)))
+    (Rpc
+      (method_ list_adapters)
+      (params ())
+      (tag (Adapter_login_picker (claude))))
+
+
+
+
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────── claude runs only on its own login; prigh can hand one of its logins to: codex ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "a Codex session on prigh's login says so" =
+  let h = connected () in
+  H.reply
+    ~quiet:true
+    h
+    Initial_state
+    (state_json
+       ~model:(model_json ~provider:"openai-codex" "gpt-5.5" "GPT-5.5")
+       ~extra:
+         [ "engine", {|"composer"|}
+         ; "adapter", {|"codex"|}
+         ; "adapter_login", {|"Work"|}
+         ]
+       ());
+  run h "/account";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ─────────────────── Codex runs on prigh's login Work: /adapters login codex changes it ───
+    > ▏
+    /work  Codex · gpt-5.5@Work  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;

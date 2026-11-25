@@ -38,6 +38,7 @@ module Picker_kind : sig
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string (** login prompt id *)
+    | Adapter_login of string (** [/adapters login]: the adapter's *)
     | Commands
     (** item ids are slash commands, run when picked; one ending in a space
         goes to the editor to be finished *)

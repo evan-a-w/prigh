@@ -760,12 +760,28 @@ let session_rows auth (state : P.State.t) =
 
 let no_choice auth (state : P.State.t) =
   if own_login state
-  then
+  then (
+    let who = P.Session_engine.who state.engine in
+    let adapter = Option.value state.engine.adapter ~default:"" in
     Some
-      (sprintf
-         "%s uses its own login, not prigh's: sign in through its CLI to \
-          change it"
-         (P.Session_engine.who state.engine))
+      (match state.engine.login, adapter with
+       | Some label, _ ->
+         sprintf
+           "%s runs on prigh's login %s: /adapters login %s changes it"
+           who
+           label
+           adapter
+       | None, "codex" ->
+         sprintf
+           "%s uses its own login: /adapters login %s runs it on one of \
+            prigh's, or sign in through its CLI"
+           who
+           adapter
+       | None, _ ->
+         sprintf
+           "%s uses its own login, not prigh's: sign in through its CLI to \
+            change it"
+           who))
   else (
     let provider = state.model.provider in
     let n =

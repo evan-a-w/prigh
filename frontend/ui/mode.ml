@@ -32,6 +32,7 @@ module Picker_kind = struct
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string
+    | Adapter_login of string (** [/adapters login]: the adapter's *)
     | Commands
   [@@deriving sexp_of, equal]
 end
