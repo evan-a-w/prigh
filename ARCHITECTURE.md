@@ -278,6 +278,19 @@ can't rewind in place: fork from that message instead (/fork)"); the
 `Agent` vals behind them check too, and the frontends mirror the check
 (`Session_engine`) to hide or disable the controls.
 
+Compaction of composer sessions: Codex and Claude Code compact natively
+(`Native`); an ACP agent listing a `compact` (or `compress`) command is
+sent it as a prompt (`Command`, Antigravity's `/compact`); any other
+(`Summary`) is compacted by prigh: `Agent.summarise_for_agent` summarises
+the session with the compaction (else prigh's) model, records the
+`Compaction`, and `Runner.compacted` stops the process so the next turn
+starts a new thread handed the compacted session (`Handoff`). Both on
+request and, between turns, when the agent's context passes the threshold.
+Its context is what the agent reports (`usage_update`), else the session's
+estimate capped by the turn's reported input; its window the agent's, else
+its model family's (`External_model.known_window`), else unknown (0: no
+percentage, no automatic compaction).
+
 The composer (`composer/`), from the bottom up:
 
 - **Codecs** (`codex/`, `claude/`, `acp/`): pure, no I/O. Each turns its
