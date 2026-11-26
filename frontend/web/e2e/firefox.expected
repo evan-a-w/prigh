@@ -5098,6 +5098,54 @@ prigh: Cleaned up. (time)
 === firefox: quiet small: errors ===
 (none)
 found: src/compact.ml
+=== firefox: overscroll desktop: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== firefox: overscroll desktop: a turn up (the wheel) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== firefox: overscroll desktop: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== firefox: overscroll desktop: errors ===
+none
+=== firefox: overscroll phone: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== firefox: overscroll phone: a turn up (a swipe) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== firefox: overscroll phone: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== firefox: overscroll phone: errors ===
+none
+=== firefox: overscroll small: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== firefox: overscroll small: a turn up (a swipe) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== firefox: overscroll small: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== firefox: overscroll small: errors ===
+none
 === firefox: editor desktop: a file open ===
 ok
 strip: src/ compact.ml

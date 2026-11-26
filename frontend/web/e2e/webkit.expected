@@ -5110,6 +5110,54 @@ prigh: Cleaned up. (time)
 === webkit: quiet small: errors ===
 (none)
 found: src/compact.ml
+=== webkit: overscroll desktop: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== webkit: overscroll desktop: a turn up (the wheel) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== webkit: overscroll desktop: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== webkit: overscroll desktop: errors ===
+none
+=== webkit: overscroll phone: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== webkit: overscroll phone: a turn up (the wheel) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== webkit: overscroll phone: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== webkit: overscroll phone: errors ===
+none
+=== webkit: overscroll small: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== webkit: overscroll small: a turn up (the wheel) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== webkit: overscroll small: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== webkit: overscroll small: errors ===
+none
 === webkit: editor desktop: a file open ===
 ok
 strip: src/ compact.ml
