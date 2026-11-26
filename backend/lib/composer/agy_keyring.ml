@@ -100,8 +100,9 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then echo "keyring-error nobus"
 elif have busctl; then
   if r=$(busctl --user call org.freedesktop.secrets /org/freedesktop/secrets org.freedesktop.Secret.Service SearchItems 'a{ss}' 2 service gemini username antigravity 2>&1); then
     set -- $r
-    if [ "${3:-0}" -gt 0 ] 2>/dev/null; then echo "keyring $rd"
-    elif [ "${4:-0}" -gt 0 ] 2>/dev/null; then echo keyring-locked
+    n=${2:-0}; shift 2 2>/dev/null; shift "$n" 2>/dev/null
+    if [ "$n" -gt 0 ] 2>/dev/null; then echo "keyring $rd"
+    elif [ "${1:-0}" -gt 0 ] 2>/dev/null; then echo keyring-locked
     else echo keyring-empty; fi
   elif [ "$rd" = secret-tool ]; then
     if e=$(st lookup service gemini username antigravity 2>&1 >/dev/null); then echo "keyring $rd"

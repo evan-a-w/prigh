@@ -527,16 +527,16 @@ let%expect_test "the keyring probe in bash: the bus, busctl, secret-tool" =
   case
     ~name:"busctl finds it, secret-tool reads"
     ~tools:[ "busctl"; "secret-tool" ]
-    (search {|echo 'ao ao 1 "/org/freedesktop/secrets/collection/login/5" 0'|});
+    (search {|echo 'aoao 1 "/org/freedesktop/secrets/collection/login/5" 0'|});
   case
     ~name:"busctl finds it, nothing reads"
     ~tools:[ "busctl" ]
-    (search {|echo 'ao ao 1 "/org/freedesktop/secrets/collection/login/5" 0'|});
+    (search {|echo 'aoao 1 "/org/freedesktop/secrets/collection/login/5" 0'|});
   case
     ~name:"locked"
     ~tools:[ "busctl" ]
-    (search {|echo 'ao ao 0 1 "/org/freedesktop/secrets/collection/login/5"'|});
-  case ~name:"empty" ~tools:[ "busctl" ] (search {|echo 'ao ao 0 0'|});
+    (search {|echo 'aoao 0 1 "/org/freedesktop/secrets/collection/login/5"'|});
+  case ~name:"empty" ~tools:[ "busctl" ] (search {|echo 'aoao 0 0'|});
   case
     ~name:"no Secret Service"
     ~tools:[ "busctl" ]
