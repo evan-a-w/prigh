@@ -469,7 +469,7 @@ let%expect_test "capabilities come from what the agent advertises" =
   [%expect
     {|
     ((fork By_handoff) (rewind Unsupported) (context_edit false)
-     (compact Unsupported) (steer Between_turns) (plan_mode true) (btw false)
+     (compact Summary) (steer Between_turns) (plan_mode true) (btw false)
      (subagents Unsupported) (model_fallback false) (images true)
      (ask_user true))
     |}]

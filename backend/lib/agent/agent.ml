@@ -683,6 +683,8 @@ let listed t (m : Model.t) =
       name = l.name
     ; thinking_levels = l.thinking_levels
     ; can_disable_thinking = l.can_disable_thinking
+    ; context_window =
+        (if m.context_window > 0 then m.context_window else l.context_window)
     })
 ;;
 
@@ -740,6 +742,12 @@ let state t =
        reports per turn covers every request of the turn. *)
     match Option.bind t.runner ~f:(fun r -> fst (Runner.context r)) with
     | Some tokens -> tokens
+    | None when is_external t.model ->
+      (* What its last reply reported may sum a turn's requests. *)
+      let estimate = Message.estimate_tokens (Session.messages t.session) in
+      (match Session.context_tokens t.session with
+       | 0 -> estimate
+       | reported -> Int.min reported estimate)
     | None -> Session.context_tokens t.session
   in
   { State.session_id = Session.id t.session
@@ -3233,6 +3241,13 @@ let require t feature =
   Capabilities.check (capabilities t) feature ~who:(engine_label t)
 ;;
 
+(* An external harness that cannot compact: prigh does it for it. *)
+let agent_summarises t =
+  match (capabilities t).compact with
+  | Summary -> true
+  | Native | Command | Auto_only | Unsupported -> false
+;;
+
 let set_engine t (choice : Engine_choice.t) =
   if not (Engine_choice.equal choice (engine_choice t))
   then (
@@ -3554,6 +3569,29 @@ let compacted t (outcome : Compaction.Outcome.t) =
   broadcast t (Compacted { summary = outcome.summary })
 ;;
 
+(* A composer session whose agent cannot compact its context: prigh
+   summarises the session as it compacts its own (with [compaction_model],
+   else prigh's own model), and the agent drops its thread for a new one, handed
+   the compacted session. *)
+let summarise_for_agent ?instructions ?cancel t =
+  let%map.Or_error outcome =
+    Compaction.compact
+      ~env:t.env
+      ~provider:t.provider
+      ~model:
+        (Compaction_settings.summary_model
+           (compaction_settings t)
+           (aux_model t))
+      ~prompt:Compaction.Prompt.none
+      ?cancel
+      ?instructions
+      t.session
+  in
+  compacted t outcome;
+  Option.iter t.runner ~f:Runner.compacted;
+  outcome
+;;
+
 let mail t =
   match t.questions with
   | None -> []
@@ -3595,6 +3633,41 @@ let resume_message =
     ~origin:{ Injected.empty with source = Some Resume }
     "[prigh: the usage limit has reset. Carry on with the interrupted task \
      where it left off.]"
+;;
+
+(* After a composer turn that left its agent's context past the compaction
+   threshold, between turns: an agent with a compact command is asked to
+   compact ([compact_turn]); one without is compacted by prigh. Codex and
+   Claude Code compact by themselves. A model whose window is unknown has no
+   threshold. Whether prigh summarised (a new thread follows). *)
+let composer_auto_compact
+      t
+      ~(kind : Engine_intf.Turn.Kind.t)
+      ~added
+      ~cancel
+      ~compact_turn
+  =
+  let over_threshold () =
+    match kind, last_stop added, fst (Runner.context (runner t)) with
+    | Prompt, (Some (End_turn | Length | Tool_use) | None), Some tokens ->
+      t.model.context_window > 0
+      && Compaction_settings.should_compact
+           (compaction_settings t)
+           t.model
+           ~input_tokens:tokens
+    | Compact _, _, _ | _, Some (Error _ | Aborted), _ | _, _, None -> false
+  in
+  match (capabilities t).compact with
+  | Command when over_threshold () ->
+    compact_turn ();
+    false
+  | Summary when over_threshold () ->
+    (match summarise_for_agent ~cancel t with
+     | Ok _ -> true
+     | Error e ->
+       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
+       false)
+  | Command | Summary | Native | Auto_only | Unsupported -> false
 ;;
 
 let duration_hum seconds =
@@ -3933,10 +4006,20 @@ and run_now ~kind ~tried ~then_ t prompts =
                String.equal m.id t.model.id))
            |> Option.value ~default:t.model
          in
-         t.model
-         <- (match Runner.context r with
-             | _, Some context_window -> { model with context_window }
-             | _, None -> model);
+         let tokens, window = Runner.context r in
+         let window =
+           match tokens, window with
+           | Some tokens, Some window when tokens <= window -> window
+           | None, Some window -> window
+           | _ -> model.context_window
+         in
+         (* A window its context is over is not its model's: unknown. *)
+         let window =
+           match tokens with
+           | Some tokens when tokens > window -> 0
+           | _ -> window
+         in
+         t.model <- { model with context_window = window };
          t.thinking <- settle_thinking t.model t.thinking);
        Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
        sweep_orphans t ~main_running:false;
@@ -4018,7 +4101,27 @@ and run_now ~kind ~tried ~then_ t prompts =
        (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
        if Steer_queue.steers_first t.queue then queue_update t;
-       if own_loop t then auto_compact t;
+       let summarised =
+         if own_loop t
+         then (
+           auto_compact t;
+           false)
+         else if current && not cancelled
+         then
+           composer_auto_compact t ~kind ~added ~cancel ~compact_turn:(fun () ->
+             ignore
+               (Runner.run_turn
+                  (runner t)
+                  services
+                  ~cancel
+                  (turn_input
+                     t
+                     ~context:(Session.messages session)
+                     ~prompts:[]
+                     ~kind:(Compact { instructions = None }))
+                : Message.t list))
+         else false
+       in
        (* The goal carries on after a run that ended normally; anything else
        stops it, except a hand-over or a resume, which carry on the run. *)
        let goal_continues =
@@ -4123,6 +4226,7 @@ and run_now ~kind ~tried ~then_ t prompts =
          prompt_span
          ~status:(if Cancellation.is_cancelled cancel then Cancelled else Ok);
        finish ~idle:(Option.is_none next);
+       if summarised && Option.is_none next then prewarm t;
        Option.iter next ~f:(function
          | `Handover prompts -> start_run ~tried t prompts
          | `Prompts prompts -> start_run t prompts);
@@ -4972,6 +5076,16 @@ let compact ?instructions t =
   let%bind.Or_error () = require t Compact in
   if is_running t
   then Or_error.error_string "cannot compact while a run is in progress"
+  else if (not (own_loop t)) && agent_summarises t
+  then (
+    let result =
+      summarise_for_agent ?instructions t
+      |> Or_error.map ~f:(fun (outcome : Compaction.Outcome.t) ->
+        outcome.summary)
+    in
+    state_changed t;
+    prewarm t;
+    result)
   else if not (own_loop t)
   then (
     (* The external harness compacts its own context, in a run of its own;
@@ -5922,10 +6036,9 @@ let session_stats t =
     Session.spend_for t.session ~purpose:Approval_judge.purpose
   in
   let context_percent =
-    match state.context_tokens with
-    | 0 -> 0.
-    | tokens ->
-      Float.of_int tokens /. Float.of_int t.model.context_window *. 100.
+    match state.context_tokens, state.model.context_window with
+    | 0, _ | _, 0 -> 0.
+    | tokens, window -> Float.of_int tokens /. Float.of_int window *. 100.
   in
   { Session_stats.message_count = List.length messages
   ; turns = List.length assistants

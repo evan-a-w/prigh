@@ -12,6 +12,7 @@ type t =
       ; limits : unit -> Subscription_usage.Status.t option
       ; live : unit -> bool
       ; prewarm : Engine_intf.Services.t -> Engine_intf.Turn.Input.t -> unit
+      ; compacted : unit -> unit
       }
       -> t
 
@@ -21,10 +22,11 @@ let create
       ?(limits = fun () -> None)
       ?(live = fun () -> false)
       ?(prewarm = fun _ _ -> ())
+      ?(compacted = ignore)
       runner
       value
   =
-  T { runner; value; close; rewind; limits; live; prewarm }
+  T { runner; value; close; rewind; limits; live; prewarm; compacted }
 ;;
 
 let close (T { close; _ }) = close ()
@@ -41,3 +43,4 @@ let context (T { runner = (module R); value; _ }) = R.context value
 let limits (T { limits; _ }) = limits ()
 let live (T { live; _ }) = live ()
 let prewarm (T { prewarm; _ }) services input = prewarm services input
+let compacted (T { compacted; _ }) = compacted ()

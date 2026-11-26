@@ -20,6 +20,12 @@ module Compact : sig
     | Unsupported
     | Native (** on request ([/compact]) and automatically *)
     | Auto_only (** the engine compacts by itself; [/compact] is refused *)
+    | Command
+    (** on request through the agent's own command (an ACP agent's
+        [/compact]), and prigh asks for it when the context fills *)
+    | Summary
+    (** the agent cannot compact: prigh summarises the session and hands the
+        summary to a new thread, on request and when the context fills *)
   [@@deriving sexp_of, equal]
 end
 

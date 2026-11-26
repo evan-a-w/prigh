@@ -317,3 +317,24 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
     Toggle_status_tray
     |}]
 ;;
+
+let%expect_test "an agent's model of unknown window: its tokens, no percentage" =
+  let fields =
+    List.Assoc.add
+      (fields ())
+      ~equal:String.equal
+      "model"
+      (Jsonaf.of_string
+         {|{"id":"default","provider":"acp:antigravity","key":"acp:antigravity/default","name":"Default","context_window":0,"max_output":0,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}}|})
+  in
+  let h = H.create ~state:(H.state_json ~fields ()) () in
+  H.names h ~selector:".context-ring";
+  H.text h ~selector:".context-card .context-card-head";
+  H.text h ~selector:".context-card .context-card-sub";
+  [%expect
+    {|
+    button "Context and cost ($1.30): details"
+    Context 10k
+    Window unknown: no automatic compaction
+    |}]
+;;

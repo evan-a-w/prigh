@@ -75,6 +75,11 @@ val cost_usd : t -> float
 (** The latest context size the harness reported: tokens, window. *)
 val context : t -> int option * int option
 
+(** The input tokens of the latest usage the harness reported (its latest
+    request's, or its turn's): how full its context was, for a harness
+    that does not say ({!context}). *)
+val last_input : t -> int option
+
 (** The assistant message's error text for a failed turn: what
     [Usage_limit.unavailable] recognises for a usage limit (with the reset
     time), the hint for missing credentials or installs. *)

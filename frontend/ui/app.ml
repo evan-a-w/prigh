@@ -985,10 +985,11 @@ let model_items m ~logged_in_only =
       ~detail:
         (String.concat
            ~sep:"  "
-           ([ model.key ^ scoped_mark
-            ; "ctx " ^ format_tokens model.context_window
-            ; format_price model.cost
-            ]
+           ([ model.key ^ scoped_mark ]
+            @ (if model.context_window > 0
+               then [ "ctx " ^ format_tokens model.context_window ]
+               else [])
+            @ [ format_price model.cost ]
             @ if logged then [] else [ "not logged in" ]))
       ~search:(model.name ^ " " ^ model.key)
       ~marked:

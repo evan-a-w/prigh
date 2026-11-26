@@ -56,6 +56,7 @@ type t =
   ; mutable usage : Usage.t (* not yet attached to a message *)
   ; mutable cost_usd : float
   ; mutable context : int option * int option
+  ; mutable last_input : int option
   ; mutable thread_id : string option
   ; mutable stop : Adapter_event.Stop.t option
   ; mutable plans : int
@@ -86,6 +87,7 @@ let create ~adapter ~model ~cwd ~emit ~notice ~prompts =
   ; usage = Usage.zero
   ; cost_usd = 0.
   ; context = None, None
+  ; last_input = None
   ; thread_id = None
   ; stop = None
   ; plans = 0
@@ -100,6 +102,7 @@ let thread_id t = t.thread_id
 let model t = t.model
 let cost_usd t = t.cost_usd
 let context t = t.context
+let last_input t = t.last_input
 
 let note_approval t ~tool_id reply =
   Hashtbl.set t.approvals ~key:tool_id ~data:reply
@@ -555,6 +558,7 @@ let feed t (event : Adapter_event.t) =
   | Plan p -> plan t p
   | Usage { usage; cost_usd; context_tokens; context_window } ->
     t.usage <- Usage.add t.usage usage;
+    if usage.input > 0 then t.last_input <- Some usage.input;
     Option.iter cost_usd ~f:(fun c -> t.cost_usd <- t.cost_usd +. c);
     let tokens, window = t.context in
     t.context
