@@ -16,9 +16,7 @@ let confirmed ~now ~at ~ago =
   match now with
   | Some now ->
     Some
-      (Rel_time.ago
-         ~now
-         (Time_ns.of_span_since_epoch (Time_ns.Span.of_sec at)))
+      (Rel_time.ago ~now (Time_ns.of_span_since_epoch (Time_ns.Span.of_sec at)))
   | None -> ago
 ;;
 

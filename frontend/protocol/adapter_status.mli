@@ -30,8 +30,7 @@ module Via : sig
     | Session of
         { at : float (** Unix seconds *)
         ; ago : string option (** ["5m ago"], when the backend answered *)
-        }
-    (** an ACP agent opened a session on its own login then *)
+        } (** an ACP agent opened a session on its own login then *)
     | Login_file of string (** its token file is there (Antigravity) *)
   [@@deriving sexp_of, equal]
 end

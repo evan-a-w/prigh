@@ -479,3 +479,49 @@ let%expect_test "/adapters import antigravity: from the keyring, then cleared" =
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
+
+let%expect_test "/adapters: what is known of each ACP agent's login" =
+  let h = connected () in
+  run h "/adapters";
+  H.reply
+    h
+    Adapters_shown
+    {|{"adapters":[
+       {"adapter":"acp:antigravity","label":"Antigravity","host":"h1","host_name":"desktop",
+        "installed":true,"version":"1.5.13","auth":"logged_in","via":"session",
+        "confirmed_at":100,"confirmed":"5m ago","checked_at":0},
+       {"adapter":"acp:grok","label":"Grok Build","host":"h1","host_name":"desktop",
+        "installed":true,"auth":"logged_out","checked_at":0,
+        "problem":"Grok Build on desktop is not logged in: run `grok login` there"},
+       {"adapter":"acp:opencode","label":"OpenCode","host":"h1","host_name":"desktop",
+        "installed":true,"auth":"logged_in","via":"prigh_login","prigh_login":"Work",
+        "checked_at":0},
+       {"adapter":"acp:gemini","label":"Gemini CLI","host":"h1","host_name":"desktop",
+        "installed":true,"auth":"unknown","checkable":true,"checked_at":0,
+        "hint":"Login not checked yet: Check (/adapters refresh) starts Gemini CLI on desktop briefly to see"}]}|};
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_adapters) (params ()) (tag Adapters_shown))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Agent CLIs ───────────────────────────────────────────────────────────────────────────┐
+    │ desktop:                                                                               │
+    │   ✓ Antigravity  1.5.13 · logged in (confirmed 5m ago)                                 │
+    │   ✗ Grok Build  installed · not logged in                                              │
+    │       Grok Build on desktop is not logged in: run `grok login` there                   │
+    │   ✓ OpenCode  installed · logged in (prigh login Work)                                 │
+    │   ? Gemini CLI  installed · login not checked yet                                      │
+    │       Login not checked yet: Check (/adapters refresh) starts Gemini CLI on desktop    │
+    │ briefly to see                                                                         │
+    │                                                                                        │
+    │ prigh never installs them or logs in: run that on the host                             │
+    └─────────────────────────────────────────────────────────────────────────── Esc closes ─┘
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  ctx:0.1%/1.0M  $0.01  ↑↓ scroll · Esc closes · typing goes to the editor
+    |}]
+;;

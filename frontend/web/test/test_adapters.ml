@@ -96,8 +96,8 @@ let statuses =
            ~installed:"true"
            ~version:"1.5.13"
            ~hint:
-             "prigh can't tell whether Antigravity is logged in on laptop: if \
-              it asks, run `agy acp --login` there"
+             "Login not checked yet: Check (/adapters refresh) starts \
+              Antigravity on laptop briefly to see"
        ])
 ;;
 
@@ -187,8 +187,7 @@ let%expect_test
     (Copy)
     Claude Code Could not tell whether it is installed Unknown
     laptop
-    Antigravity 1.5.13 · /usr/bin/acp:antigravity Installed prigh can't tell whether Antigravity is logged in on laptop: if it asks, run `agy acp --login` there
-    (Copy)
+    Antigravity 1.5.13 · /usr/bin/acp:antigravity Installed Login not checked yet: Check (/adapters refresh) starts Antigravity on laptop briefly to see
     (Copy_text (text "claude auth login")
      (copied "Copied the command to the clipboard"))
     (Copy (text "claude auth login")
@@ -451,5 +450,77 @@ let%expect_test
     (Looking…)
     Antigravity on desktop has no login in the keyring or ~/.gemini/…antigravity-oauth-token: run `agy acp --login` there, or log prigh in with /login google-antigravity (Dismiss)
     (Import)
+    |}]
+;;
+
+(* What the backend knows of each ACP agent's own login, and Check. *)
+let acp_states =
+  let row ?(extra = "") adapter label auth hint_or_problem =
+    sprintf
+      {|{"adapter":"acp:%s","label":%S,"host":"h1","host_name":"desktop","installed":true,"version":"1.0","path":"/usr/bin/%s","auth":%S,"checked_at":1791194400%s%s}|}
+      adapter
+      label
+      adapter
+      auth
+      extra
+      hint_or_problem
+  in
+  sprintf
+    {|{"adapters":[%s]}|}
+    (String.concat
+       ~sep:","
+       [ row
+           "antigravity"
+           "Antigravity"
+           "logged_in"
+           ~extra:
+             {|,"via":"session","confirmed_at":1791194100,"confirmed":"5m ago"|}
+           ""
+       ; row
+           "grok"
+           "Grok Build"
+           "logged_out"
+           {|,"problem":"Grok Build on desktop is not logged in: run `grok login` there"|}
+       ; row
+           "opencode"
+           "OpenCode"
+           "logged_in"
+           ~extra:{|,"via":"prigh_login","prigh_login":"Work"|}
+           ""
+       ; row
+           "gemini"
+           "Gemini CLI"
+           "unknown"
+           ~extra:{|,"checkable":true|}
+           {|,"hint":"Login not checked yet: Check (/adapters refresh) starts Gemini CLI on desktop briefly to see"|}
+       ; row
+           "goose"
+           "Goose"
+           "unknown"
+           ~extra:{|,"checking":true|}
+           {|,"hint":"Checking whether Goose is logged in on desktop: prigh starts it briefly to see"|}
+       ])
+;;
+
+let%expect_test
+    "ACP agents: logged in, not, on a prigh login, unchecked, checking"
+  =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (hello ~features:[ "engines" ]));
+  H.act h (Settings_section Engines);
+  H.reply h "list_adapters" acp_states;
+  H.texts h ~selector:".adapter-status" |> List.iter ~f:print_endline;
+  H.click h ~selector:".adapter-acp-gemini .adapter-check";
+  [%expect
+    {|
+    (Focus dialog)
+    (Rpc (method_ list_adapters) (params ()) (tag Adapters_loaded))
+    Antigravity 1.0 · /usr/bin/antigravity Logged in · confirmed 5m ago
+    Grok Build 1.0 · /usr/bin/grok Not logged in Grok Build on desktop is not logged in: run `grok login` there Copy
+    OpenCode 1.0 · /usr/bin/opencode Logged in · prigh login Work
+    Gemini CLI 1.0 · /usr/bin/gemini Login not checked yet Login not checked yet: Check (/adapters refresh) starts Gemini CLI on desktop briefly to see Check
+    Goose 1.0 · /usr/bin/goose Checking login… Checking whether Goose is logged in on desktop: prigh starts it briefly to see Checking…
+    Adapters_refresh
+    (Rpc (method_ list_adapters) (params ((refresh true))) (tag Adapters_loaded))
     |}]
 ;;

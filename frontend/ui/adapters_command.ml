@@ -90,7 +90,12 @@ let lines (statuses : P.Adapter_status.t list) logins =
        let name = (List.hd_exn here).host_name in
        (name ^ ":")
        :: List.concat_map here ~f:(fun (s : P.Adapter_status.t) ->
-         let mark = if Option.is_some s.problem then "✗" else "✓" in
+         let mark =
+           match s.problem, s.auth with
+           | Some _, _ -> "✗"
+           | None, Unknown when s.checking || s.checkable -> "?"
+           | None, _ -> "✓"
+         in
          sprintf "  %s %s  %s" mark s.label (P.Adapter_status.summary s)
          :: List.map
               (Option.to_list (Option.first_some s.problem s.hint))
