@@ -35,9 +35,7 @@ type t
     session cannot rewind. [catalog]: what the harness said of its login
     without a thread ({!Adapter_catalog}), for its models and limits before
     its process runs. [on_change]: the harness's models or limits changed.
-    [slow_start]: a run whose first output from the harness came later than
-    this (3 s) after it started gets a notice of where the time went
-    ({!Turn_timings}). {!Runner.prewarm} starts the process before the
+    The phases of a run's start ({!Turn_timings}) go in its trace. {!Runner.prewarm} starts the process before the
     first turn.
 
     A turn ends when the user aborts it (Esc), also while the process
@@ -66,7 +64,6 @@ val create
   -> ?checkpoint:(Json.t -> Tool.Result.t)
   -> ?catalog:(unit -> Adapter.Catalog.t option)
   -> ?on_change:(unit -> unit)
-  -> ?slow_start:Time_float.Span.t
   -> unit
   -> t
 

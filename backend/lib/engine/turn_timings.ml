@@ -86,13 +86,3 @@ let rec to_string_hum phases =
        | notes -> sprintf " (%s)" (String.concat ~sep:"; " notes)))
   |> String.concat ~sep:", "
 ;;
-
-let notice ~harness ~total phases =
-  sprintf
-    "%s took %.1f s to start answering: %s"
-    harness
-    total
-    (match to_string_hum phases with
-     | "" -> "no phases"
-     | s -> s)
-;;

@@ -558,8 +558,8 @@ only; `Nix_store` runs one collection at a time through `Nix_store_ops`
 - `Turn_timings` (`engine/`) — the phases of an external harness's start
   in a run (`mcp_refresh`, `login`, `process`: `spawn`, `handshake`:
   `initialize`, `session/new|resume|load`; `handoff`, `checkpoint`
-  alongside, `send`, `first_output`), each also a span; a run whose
-  harness took over 3 s to start answering gets a notice listing them.
+  alongside, `send`, `first_output`), each also a span; the run's
+  trace records them (`start_phases`; `prigh trace`).
   ACP agents (`starts_early`) are started when a session opens on one
   (`Runner.prewarm`), so the first message does not wait for them.
 

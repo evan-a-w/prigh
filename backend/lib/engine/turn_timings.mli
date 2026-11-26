@@ -42,6 +42,3 @@ val phases : t -> Phase.t list
 
 (** The phases, in order: [name 1.2 s (child 0.4 s, ...)]. *)
 val to_string_hum : Phase.t list -> string
-
-(** The notice for a slow start. *)
-val notice : harness:string -> total:float -> Phase.t list -> string

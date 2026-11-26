@@ -43,7 +43,6 @@ type t =
   ; catalog : unit -> Adapter.Catalog.t option
   ; on_change : unit -> unit
   ; mutable warming : unit Promise.t option (* a [prewarm] starting *)
-  ; slow_start : Time_float.Span.t
   ; mutable epoch : int (* [close]s: a start that outlived one stops *)
   }
 
@@ -62,7 +61,6 @@ let create
       ?checkpoint
       ?(catalog = fun () -> None)
       ?(on_change = ignore)
-      ?(slow_start = Time_float.Span.of_sec 3.)
       ()
   =
   { sw
@@ -100,7 +98,6 @@ let create
   ; catalog
   ; on_change
   ; warming = None
-  ; slow_start
   ; epoch = 0
   }
 ;;
@@ -765,23 +762,21 @@ and run_turn'
       (Turn_end { turn_id = None; stop = Failed { kind = Other; message } })
   in
   let timings = Turn_timings.current () in
-  (* Said once a run: how long it took the harness to start answering, when
-     that was slow. *)
+  (* Once a run: where the time went before the harness answered, in the
+     trace. *)
   let reported = ref false in
   let report () =
     Option.iter timings ~f:(fun timings ->
       if not !reported
       then (
         reported := true;
-        let total = Turn_timings.elapsed timings in
-        Trace.add_attrs ~under:"prompt" [ "first_output_s", Float total ];
-        if Float.(total > Time_float.Span.to_sec t.slow_start)
-        then
-          s.notice
-            (Turn_timings.notice
-               ~harness:A.display_name
-               ~total
-               (Turn_timings.phases timings))))
+        Trace.add_attrs
+          ~under:"prompt"
+          [ "first_output_s", Float (Turn_timings.elapsed timings)
+          ; ( "start_phases"
+            , String (Turn_timings.to_string_hum (Turn_timings.phases timings))
+            )
+          ]))
   in
   (* The files are checkpointed while the harness starts: it is sent
      nothing before they are. *)

@@ -185,7 +185,6 @@ let with_acp
       ?(approval : Approval_mode.t option)
       ?(on_launch = ignore)
       ?start
-      ?slow_start
       ~peer
       f
   =
@@ -213,7 +212,6 @@ let with_acp
         on_launch launch;
         Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
       ?start
-      ?slow_start
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
       ()
   in
@@ -1193,11 +1191,8 @@ let%expect_test "Antigravity: no token for agy, so its own login, saying so" =
     |}]
 ;;
 
-let%expect_test
-    "two turns: one process, one session/new, nothing replayed; where the time \
-     went"
-  =
-  with_acp ~slow_start:Time_float.Span.zero ~peer:(fun _ p ->
+let%expect_test "two turns: one process, one session/new, nothing replayed" =
+  with_acp ~peer:(fun _ p ->
     P.initialize
       ~caps:{|{"loadSession":true,"sessionCapabilities":{"resume":{}}}|}
       p;
@@ -1215,10 +1210,8 @@ let%expect_test
     agent got initialize
     agent got session/new session=- mcp=[]
     agent got session/prompt "first"
-    notice: OpenCode took _ s to start answering: mcp_refresh _ s, login _ s, process _ s (launch _ s, spawn _ s, handshake _ s (initialize _ s, session/new _ s)), handoff _ s, send _ s, first_output _ s
     assistant (acp:opencode/default, End_turn): "One."
     agent got session/prompt "second"
-    notice: OpenCode took _ s to start answering: mcp_refresh _ s, login _ s, handoff _ s, send _ s, first_output _ s
     assistant (acp:opencode/default, End_turn): "Two."
     |}]
 ;;
@@ -1261,14 +1254,12 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "start timings, as the notice says them" =
+let%expect_test "start timings, as the trace says them" =
   let phase ?(alongside = false) ?(children = []) name seconds =
     { Turn_timings.Phase.name; seconds; alongside; children }
   in
   print_endline
-    (Turn_timings.notice
-       ~harness:"Antigravity"
-       ~total:5.04
+    (Turn_timings.to_string_hum
        [ phase "login" 0.01
        ; phase
            "process"
@@ -1286,5 +1277,5 @@ let%expect_test "start timings, as the notice says them" =
        ; phase "checkpoint" 0.6 ~alongside:true
        ]);
   [%expect
-    {| Antigravity took 5.0 s to start answering: login 0.0 s, process 3.2 s (spawn 0.4 s, handshake 2.8 s (initialize 0.1 s, session/resume 2.7 s)), send 0.0 s, first_output 1.8 s, checkpoint 0.6 s (alongside) |}]
+    {| login 0.0 s, process 3.2 s (spawn 0.4 s, handshake 2.8 s (initialize 0.1 s, session/resume 2.7 s)), send 0.0 s, first_output 1.8 s, checkpoint 0.6 s (alongside) |}]
 ;;
