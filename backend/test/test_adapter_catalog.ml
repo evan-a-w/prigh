@@ -210,6 +210,17 @@ let fake_claude (p : Line_transport.Peer.t) =
   loop ()
 ;;
 
+(* How many sessions the fake Antigravities opened, for a test to wait on. *)
+let agy_sessions = ref 0
+let agy_session_opened = Eio.Condition.create ()
+
+let rec await_agy_sessions n =
+  if !agy_sessions < n
+  then (
+    Eio.Condition.await_no_mutex agy_session_opened;
+    await_agy_sessions n)
+;;
+
 (* Antigravity: its models through the session model API. *)
 let fake_agy ~logged_in (p : Line_transport.Peer.t) =
   let reply j result =
@@ -247,7 +258,9 @@ let fake_agy ~logged_in (p : Line_transport.Peer.t) =
            j
            {|{"sessionId":"s1","models":{"currentModelId":"flash","availableModels":[
                {"modelId":"gpt-oss","name":"GPT-OSS 120B (Medium)"},
-               {"modelId":"flash","name":"Gemini 3.8 Flash"}]}}|}
+               {"modelId":"flash","name":"Gemini 3.8 Flash"}]}}|};
+         incr agy_sessions;
+         Eio.Condition.broadcast agy_session_opened
        | _ -> ());
       loop ()
   in
@@ -658,11 +671,17 @@ let%expect_test
     event: models_changed
     harness: chip: deepseek/deepseek-flash (DeepSeek V4.1 Flash)
     |}];
+  let opened = !agy_sessions in
   switch "acp:antigravity";
+  (* Switched to, it is started at once (Runner.prewarm). *)
+  await_agy_sessions (opened + 1);
   [%expect
     {|
+    spawn agy on backend
     event: models_changed
     acp:antigravity: chip: acp:antigravity/gpt-oss (GPT-OSS 120B (Medium))
+    agy got initialize
+    agy got session/new
     |}]
 ;;
 

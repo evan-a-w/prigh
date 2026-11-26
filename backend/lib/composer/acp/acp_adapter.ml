@@ -172,6 +172,7 @@ let create
     ;;
 
     let native_questions = agent.quirks.xai_extensions
+    let starts_early = true
     let takes_login = String.equal agent.name "antigravity"
 
     let launch (start : Adapter.Start.t) : Adapter.Launch.t =

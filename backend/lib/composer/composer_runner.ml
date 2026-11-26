@@ -506,7 +506,12 @@ let prewarm t s input =
       L.alive a && Option.equal String.equal t.live_host (Some (t.host ()))
     | None -> false
   in
-  if (not up) && Option.is_none t.warming && Option.is_none t.services
+  let (module A) = t.adapter in
+  if
+    A.starts_early
+    && (not up)
+    && Option.is_none t.warming
+    && Option.is_none t.services
   then (
     let warming, warmed = Promise.create () in
     t.warming <- Some warming;

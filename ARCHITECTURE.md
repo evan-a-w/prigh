@@ -555,6 +555,13 @@ only; `Nix_store` runs one collection at a time through `Nix_store_ops`
 - `Trace_report` — the summary, an indented tree, and a Chrome/Perfetto
   trace export: `prigh trace SESSION [-perfetto FILE] [-tree] [-slowest N]`
   and the `trace` RPC method.
+- `Turn_timings` (`engine/`) — the phases of an external harness's start
+  in a run (`mcp_refresh`, `login`, `process`: `spawn`, `handshake`:
+  `initialize`, `session/new|resume|load`; `handoff`, `checkpoint`
+  alongside, `send`, `first_output`), each also a span; a run whose
+  harness took over 3 s to start answering gets a notice listing them.
+  ACP agents (`starts_early`) are started when a session opens on one
+  (`Runner.prewarm`), so the first message does not wait for them.
 
 Spans come from `Agent.start_run` (`prompt`), `Agent_loop` (`turn`,
 `model_request`, `retry_wait`, `tool`, `compaction`, `mask`), `Agent`

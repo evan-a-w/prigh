@@ -2023,7 +2023,8 @@ let attach t (client : Client.t) agent =
   else (
     Option.iter (preferred_host t client) ~f:(fun host ->
       Agent.prefer_host agent host.host_id);
-    Agent.chat_without_host agent)
+    Agent.chat_without_host agent);
+  Agent.prewarm agent
 ;;
 
 (* A brand-new session made or opened for [client] starts on a host chosen
@@ -2933,6 +2934,7 @@ let set_adapter t (client : Client.t) params =
       Agent.set_engine agent choice;
       Agent.set_unavailable agent None;
       Agent.set_runner agent (Some runner);
+      Agent.prewarm agent;
       models_changed t agent;
       attached_state t client)
 ;;

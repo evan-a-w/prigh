@@ -163,6 +163,12 @@ module type S = sig
       [ask_user] tool is offered to it). *)
   val native_questions : bool
 
+  (** Whether its process is started when a session opens on it, before the
+      first turn ({!Runner.prewarm}): for a harness slow to start whose
+      running process says all its catalog would (ACP agents; Codex and
+      Claude Code say their limits only when asked or after a turn). *)
+  val starts_early : bool
+
   val launch : Start.t -> Launch.t
 
   (** Talks to the process [transport] runs: the handshake, then the thread

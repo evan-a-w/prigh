@@ -34,6 +34,7 @@ let capabilities : Capabilities.t =
 
 let current_capabilities _ = capabilities
 let native_questions = true
+let starts_early = false
 
 let launch (start : Adapter.Start.t) : Adapter.Launch.t =
   { argv = [ "codex"; "app-server" ]
