@@ -39,6 +39,9 @@ module Turn = struct
       | Prompt (** answer the prompts *)
       | Compact of { instructions : string option }
       (** compact the context ([/compact]); there are no prompts *)
+      | Autonomous
+      (** an external harness resumed on its own (e.g. a background task
+          woke it between turns); there are no prompts to send *)
   end
 
   module Input = struct

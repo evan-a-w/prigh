@@ -482,6 +482,7 @@ let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 let limits t = Codex_codec.limits t.codec
 let on_change t f = t.on_change <- f
+let on_autonomous t f = Adapter.Driver.on_autonomous t.driver f
 
 let compact t settings ~instructions:_ =
   Adapter.Driver.await_idle t.driver;

@@ -323,6 +323,9 @@ type t =
   ; mutable noted : Leftover.t list
     (** uploads, and what an earlier run of a temporary session left, see
         {!leftovers} *)
+  ; mutable external_wakeup_pending : bool
+    (** the live external harness woke on its own while a run was finishing *)
+  ; mutable shutting_down : bool
   }
 
 let tracer_for ~clock ~(config : Config.t) session =
@@ -3730,7 +3733,9 @@ let composer_auto_compact
   =
   let over_threshold () =
     match kind, last_stop added, fst (Runner.context (runner t)) with
-    | Prompt, (Some (End_turn | Length | Tool_use) | None), Some tokens ->
+    | ( (Prompt | Autonomous)
+      , (Some (End_turn | Length | Tool_use) | None)
+      , Some tokens ) ->
       t.model.context_window > 0
       && Compaction_settings.should_compact
            (compaction_settings t)
@@ -3937,7 +3942,11 @@ and run_now ~kind ~tried ~then_ t prompts =
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };
-  let prompts = deliveries t @ mail t @ prompts in
+  let prompts =
+    match kind with
+    | Autonomous -> prompts
+    | Prompt | Compact _ -> deliveries t @ mail t @ prompts
+  in
   state_changed t;
   Guarded.fork
     ~sw:t.sw
@@ -3959,7 +3968,11 @@ and run_now ~kind ~tried ~then_ t prompts =
        (* [then_] may wait for the host (attachments): the run is already
        marked as started, so no other can start meanwhile. *)
        let prompts = prompts @ then_ ~cancel in
-       let prompts = prompts @ due_reminders t in
+       let prompts =
+         match kind with
+         | Autonomous -> prompts
+         | Prompt | Compact _ -> prompts @ due_reminders t
+       in
        let session = t.session in
        let finish ~idle =
          t.run <- None;
@@ -3967,7 +3980,12 @@ and run_now ~kind ~tried ~then_ t prompts =
          Promise.resolve resolve ();
          if idle then state_changed t
        in
-       if not t.chat_mode
+       let is_autonomous =
+         match kind with
+         | Autonomous -> true
+         | Prompt | Compact _ -> false
+       in
+       if (not t.chat_mode) && not is_autonomous
        then
          Turn_timings.phase "mcp_refresh" (fun () ->
            refresh_mcp_for_run t ~cancel);
@@ -4254,7 +4272,11 @@ and run_now ~kind ~tried ~then_ t prompts =
               queue_update t;
               Some (`Prompts [ user_message t queued ])
             | None ->
-              if
+              if t.external_wakeup_pending && not cancelled
+              then (
+                t.external_wakeup_pending <- false;
+                Some `Autonomous)
+              else if
                 (Background_tasks.has_undelivered t.background
                  && not (Cancellation.is_cancelled cancel))
                 || has_mail t
@@ -4311,7 +4333,8 @@ and run_now ~kind ~tried ~then_ t prompts =
        if summarised && Option.is_none next then prewarm t;
        Option.iter next ~f:(function
          | `Handover prompts -> start_run ~tried t prompts
-         | `Prompts prompts -> start_run t prompts);
+         | `Prompts prompts -> start_run t prompts
+         | `Autonomous -> start_run ~kind:Autonomous t []);
        auto_describe t)
 
 (* A usage limit with no fallback left: resume when it resets, if the
@@ -4772,6 +4795,8 @@ let create
     ; tracer = tracer_for ~clock:trace_clock ~config session
     ; noted = []
     ; on_noted = ignore
+    ; external_wakeup_pending = false
+    ; shutting_down = false
     }
   in
   (pinned := fun () -> pinned_account t);
@@ -5030,7 +5055,17 @@ let report_interrupted_subagents t =
   then start_run t []
 ;;
 
+let external_woke t =
+  if not t.shutting_down
+  then
+    if is_running t
+    then t.external_wakeup_pending <- true
+    else start_run ~kind:Autonomous t []
+;;
+
 let shutdown t =
+  t.shutting_down <- true;
+  t.external_wakeup_pending <- false;
   Subagent_log.detach t.subagent_log;
   Mcp_refresh.cancel t.mcp_refresh;
   cancel_background ~discard:true t;

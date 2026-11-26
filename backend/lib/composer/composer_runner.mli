@@ -76,6 +76,10 @@ val create
   -> ?checkpoint:(Json.t -> Tool.Result.t)
   -> ?catalog:(unit -> Adapter.Catalog.t option)
   -> ?on_change:(unit -> unit)
+  -> ?on_autonomous:(unit -> unit)
+       (** called when the live external harness begins a turn of its own
+           between prompts (e.g. a background task woke it), so the session
+           can drive and record it as an [Autonomous] run *)
   -> unit
   -> t
 

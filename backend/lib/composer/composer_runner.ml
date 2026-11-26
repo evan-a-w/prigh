@@ -51,6 +51,7 @@ type t =
   ; mutable known : Capabilities.t option (* the last process's *)
   ; catalog : unit -> Adapter.Catalog.t option
   ; on_change : unit -> unit
+  ; on_autonomous : (unit -> unit) option
   ; mutable warming : unit Promise.t option (* a [prewarm] starting *)
   ; mutable epoch : int (* [close]s: a start that outlived one stops *)
   }
@@ -75,6 +76,7 @@ let create
       ?checkpoint
       ?(catalog = fun () -> None)
       ?(on_change = ignore)
+      ?on_autonomous
       ()
   =
   { sw
@@ -119,6 +121,7 @@ let create
   ; known = None
   ; catalog
   ; on_change
+  ; on_autonomous
   ; warming = None
   ; epoch = 0
   }
@@ -405,119 +408,98 @@ let live_now
       (input : Engine_intf.Turn.Input.t)
       ~starting
   =
-  let host = t.host () in
-  (* The session moved to another tool host: its harness runs there now,
-     on a thread of its own there. *)
-  (match t.live with
-   | Some (Live ((module A), a))
-     when not (Option.equal String.equal t.live_host (Some host)) ->
-     A.stop a;
-     t.live <- None;
-     t.thread_id <- None
-   | Some _ | None -> ());
-  let base =
-    Turn_timings.phase "login" (fun () ->
-      let base = t.start ~cwd:s.cwd in
-      renew_login t s ~login:base.login;
-      base)
-  in
-  let base =
-    match base.login, t.login_dropped with
-    | Some login, Some dropped
-      when Account_ref.equal (Cli_credential.account login) dropped ->
-      { base with login = None }
-    | _ -> base
-  in
-  let login = Option.map base.login ~f:Cli_credential.account in
-  (* The user chose another login for the harness: a process on it, on the
-     same thread. *)
-  (match t.live with
-   | Some (Live ((module A), a))
-     when not (Option.equal Account_ref.equal t.live_login login) ->
-     A.stop a;
-     t.live <- None
-   | Some _ | None -> ());
-  match t.live with
-  | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
+  match input.kind, t.live with
+  | Autonomous, Some (Live ((module A), a) as live) when A.alive a -> Ok live
   | _ ->
-    starting ();
-    Turn_timings.phase "process"
-    @@ fun () ->
-    let epoch = t.epoch in
-    let (module A) = t.adapter in
-    let resume =
-      match Option.first_some t.thread_id base.resume with
-      | Some thread when compacted_since s.session ~thread ->
-        t.thread_id <- None;
-        t.fresh <- true;
-        None
-      | resume -> resume
+    let host = t.host () in
+    (* The session moved to another tool host: its harness runs there now,
+     on a thread of its own there. *)
+    (match t.live with
+     | Some (Live ((module A), a))
+       when not (Option.equal String.equal t.live_host (Some host)) ->
+       A.stop a;
+       t.live <- None;
+       t.thread_id <- None
+     | Some _ | None -> ());
+    let base =
+      Turn_timings.phase "login" (fun () ->
+        let base = t.start ~cwd:s.cwd in
+        renew_login t s ~login:base.login;
+        base)
     in
-    let fork = base.fork && Option.is_none t.thread_id in
-    let resume, at, revert =
-      if fork
-      then resume, base.at, None
-      else (
-        match rollback_plan t s.session ~resume with
-        | `Whole -> resume, None, None
-        | `At at -> resume, Some at, None
-        | `Revert before_turn_id -> resume, None, Some before_turn_id
-        | `Nothing ->
-          t.fresh <- true;
-          None, None, None)
+    let base =
+      match base.login, t.login_dropped with
+      | Some login, Some dropped
+        when Account_ref.equal (Cli_credential.account login) dropped ->
+        { base with login = None }
+      | _ -> base
     in
-    let start =
-      { base with
-        cost_total =
-          Option.first_some
-            (Option.bind resume ~f:(cost_total_of s.session))
-            base.cost_total
-      ; model = input.model
-      ; thinking = input.thinking
-      ; approval = input.approval
-      ; plan = input.plan
-      ; resume
-      ; fork = fork && Option.is_some resume
-      ; at
-      ; login_refused = t.login_refused
-      }
-    in
-    let started =
-      match start_process t s start, resume with
-      | Error (`Start e), Some thread ->
-        (* Its thread cannot be continued (gone, or in use elsewhere): a new
+    let login = Option.map base.login ~f:Cli_credential.account in
+    (* The user chose another login for the harness: a process on it, on the
+     same thread. *)
+    (match t.live with
+     | Some (Live ((module A), a))
+       when not (Option.equal Account_ref.equal t.live_login login) ->
+       A.stop a;
+       t.live <- None
+     | Some _ | None -> ());
+    (match t.live with
+     | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
+     | _ ->
+       starting ();
+       Turn_timings.phase "process"
+       @@ fun () ->
+       let epoch = t.epoch in
+       let (module A) = t.adapter in
+       let resume =
+         match Option.first_some t.thread_id base.resume with
+         | Some thread when compacted_since s.session ~thread ->
+           t.thread_id <- None;
+           t.fresh <- true;
+           None
+         | resume -> resume
+       in
+       let fork = base.fork && Option.is_none t.thread_id in
+       let resume, at, revert =
+         if fork
+         then resume, base.at, None
+         else (
+           match rollback_plan t s.session ~resume with
+           | `Whole -> resume, None, None
+           | `At at -> resume, Some at, None
+           | `Revert before_turn_id -> resume, None, Some before_turn_id
+           | `Nothing ->
+             t.fresh <- true;
+             None, None, None)
+       in
+       let start =
+         { base with
+           cost_total =
+             Option.first_some
+               (Option.bind resume ~f:(cost_total_of s.session))
+               base.cost_total
+         ; model = input.model
+         ; thinking = input.thinking
+         ; approval = input.approval
+         ; plan = input.plan
+         ; resume
+         ; fork = fork && Option.is_some resume
+         ; at
+         ; login_refused = t.login_refused
+         }
+       in
+       let started =
+         match start_process t s start, resume with
+         | Error (`Start e), Some thread ->
+           (* Its thread cannot be continued (gone, or in use elsewhere): a new
            one, handed the whole session. *)
-        s.notice
-          (sprintf
-             "%s could not continue its thread %s (%s): starting a new one, \
-              with the session handed over"
-             A.display_name
-             thread
-             (Error.to_string_hum e));
-        t.thread_id <- None;
-        t.fresh <- true;
-        start_process
-          t
-          s
-          { start with
-            resume = None
-          ; fork = false
-          ; at = None
-          ; cost_total = None
-          }
-      | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
-        (* The session was rewound: its thread drops the runs it lost. *)
-        (match L.revert a ~before_turn_id:(Option.value_exn revert) with
-         | Ok () -> Ok (Live ((module L), a))
-         | Error e ->
            s.notice
              (sprintf
-                "%s could not roll its thread %s back to the rewound session \
-                 (%s): starting a new one, with the session handed over"
+                "%s could not continue its thread %s (%s): starting a new one, \
+                 with the session handed over"
                 A.display_name
                 thread
                 (Error.to_string_hum e));
-           L.stop a;
            t.thread_id <- None;
            t.fresh <- true;
            start_process
@@ -528,26 +510,52 @@ let live_now
              ; fork = false
              ; at = None
              ; cost_total = None
-             })
-      | started, _ -> started
-    in
-    (match started with
-     | Ok (Live ((module L), a)) when t.epoch <> epoch ->
-       (* Closed while it started (the session was left): nobody runs it. *)
-       L.stop a;
-       Or_error.errorf "%s was stopped while it started" A.display_name
-     | Ok (Live ((module L), a) as live) ->
-       L.on_change a (fun () ->
-         (match L.models a with
-          | [] -> ()
-          | models -> t.models <- models);
-         t.on_change ());
-       t.live <- Some live;
-       t.on_change ();
-       t.live_host <- Some host;
-       t.live_login <- login;
-       Ok live
-     | Error (`Spawn e | `Start e) -> Error e)
+             }
+         | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
+           (* The session was rewound: its thread drops the runs it lost. *)
+           (match L.revert a ~before_turn_id:(Option.value_exn revert) with
+            | Ok () -> Ok (Live ((module L), a))
+            | Error e ->
+              s.notice
+                (sprintf
+                   "%s could not roll its thread %s back to the rewound \
+                    session (%s): starting a new one, with the session handed \
+                    over"
+                   A.display_name
+                   thread
+                   (Error.to_string_hum e));
+              L.stop a;
+              t.thread_id <- None;
+              t.fresh <- true;
+              start_process
+                t
+                s
+                { start with
+                  resume = None
+                ; fork = false
+                ; at = None
+                ; cost_total = None
+                })
+         | started, _ -> started
+       in
+       (match started with
+        | Ok (Live ((module L), a)) when t.epoch <> epoch ->
+          (* Closed while it started (the session was left): nobody runs it. *)
+          L.stop a;
+          Or_error.errorf "%s was stopped while it started" A.display_name
+        | Ok (Live ((module L), a) as live) ->
+          L.on_change a (fun () ->
+            (match L.models a with
+             | [] -> ()
+             | models -> t.models <- models);
+            t.on_change ());
+          Option.iter t.on_autonomous ~f:(L.on_autonomous a);
+          t.live <- Some live;
+          t.on_change ();
+          t.live_host <- Some host;
+          t.live_login <- login;
+          Ok live
+        | Error (`Spawn e | `Start e) -> Error e))
 ;;
 
 (* A process [prewarm] is starting for the session is this turn's. *)
@@ -864,7 +872,7 @@ and run_turn'
      nothing before they are. *)
   let before_checkpoint =
     match input.kind, t.checkpoint, t.not_git with
-    | Compact _, _, _ | Prompt, None, _ -> None
+    | (Compact _ | Autonomous), _, _ | Prompt, None, _ -> None
     | Prompt, Some _, Some (cwd, _) when String.equal cwd s.cwd -> None
     | Prompt, Some _, _ ->
       Some
@@ -916,11 +924,13 @@ and run_turn'
      let rec turn ~first messages =
        Composer_recorder.waiting recorder;
        let result =
-         Turn_timings.phase "send" (fun () ->
-           match input.kind with
-           | Compact { instructions } when first ->
-             L.compact a settings ~instructions
-           | Compact _ | Prompt ->
+         match input.kind with
+         | Autonomous when first -> Ok ()
+         | Compact { instructions } when first ->
+           Turn_timings.phase "send" (fun () ->
+             L.compact a settings ~instructions)
+         | Compact _ | Prompt | Autonomous ->
+           Turn_timings.phase "send" (fun () ->
              L.send a settings (with_handoff (input_of messages)))
        in
        match result with
@@ -1124,7 +1134,7 @@ and run_turn'
    let tokens =
      match input.kind with
      | Compact _ -> tokens
-     | Prompt ->
+     | Prompt | Autonomous ->
        Option.first_some
          tokens
          (let estimate = Message.estimate_tokens (Session.messages s.session) in

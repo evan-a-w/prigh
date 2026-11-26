@@ -555,6 +555,9 @@ type t =
   ; usage_http : Subscription_usage.Http.t
   ; temporaries : Temporary.t String.Table.t (** by session id *)
   ; temporary_grace : float
+  ; external_idle : unit ref String.Table.t
+    (** pending idle-eviction timers for sessions with a live external harness *)
+  ; external_idle_grace : float
   ; ledger_dir : string
   }
 
@@ -915,29 +918,63 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
            ])))
 ;;
 
+let cancel_external_idle t agent =
+  Hashtbl.remove t.external_idle (session_id agent)
+;;
+
+let can_evict t agent =
+  (* a stale agent of a session reopened since is not the live one *)
+  Option.exists (Hashtbl.find t.agents (session_id agent)) ~f:(phys_equal agent)
+  && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
+  && (not (Agent.is_running agent))
+  && (not (Agent.has_running_background agent))
+  && (not (Agent.resume_pending agent))
+  && List.is_empty (clients_of t agent)
+;;
+
+let evict_now t agent =
+  let id = session_id agent in
+  Hashtbl.remove t.external_idle id;
+  Hashtbl.remove t.agents id;
+  Hashtbl.remove t.listed id;
+  Agent.stop_engine agent;
+  let session = Agent.session agent in
+  if Session.persisted session && not (Session.gone session)
+  then (
+    File_cache.set t.loaded (Session.path session) session;
+    (* No longer live. *)
+    sessions_changed t ~changed:[ session ])
+;;
+
+(* An idle session whose external harness process is still alive (e.g. an ACP
+   agent with background tasks or subagents waiting to wake it) stays up for
+   [external_idle_grace] after its last client leaves or its last turn ends,
+   rather than being terminated at once. Any client attaching or autonomous
+   turn waking resets the timer. *)
+let await_external_idle t agent =
+  let id = session_id agent in
+  if not (Hashtbl.mem t.external_idle id)
+  then (
+    let token = ref () in
+    Hashtbl.set t.external_idle ~key:id ~data:token;
+    Fiber.fork_daemon ~sw:t.sw (fun () ->
+      t.sleep t.external_idle_grace;
+      (match Hashtbl.find t.external_idle id with
+       | Some token' when phys_equal token token' ->
+         Hashtbl.remove t.external_idle id;
+         if can_evict t agent then evict_now t agent
+       | Some _ | None -> ());
+      `Stop_daemon))
+;;
+
 let maybe_evict t agent =
   if Agent.temporary agent
   then (if List.is_empty (clients_of t agent) then await_return t agent)
-  else if
-    (* a stale agent of a session reopened since is not the live one *)
-    Option.exists
-      (Hashtbl.find t.agents (session_id agent))
-      ~f:(phys_equal agent)
-    && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
-    && (not (Agent.is_running agent))
-    && (not (Agent.has_running_background agent))
-    && (not (Agent.resume_pending agent))
-    && List.is_empty (clients_of t agent)
-  then (
-    Hashtbl.remove t.agents (session_id agent);
-    Hashtbl.remove t.listed (session_id agent);
-    Agent.stop_engine agent;
-    let session = Agent.session agent in
-    if Session.persisted session && not (Session.gone session)
-    then (
-      File_cache.set t.loaded (Session.path session) session;
-      (* No longer live. *)
-      sessions_changed t ~changed:[ session ]))
+  else if can_evict t agent
+  then
+    if Agent.external_live agent && Float.(t.external_idle_grace > 0.)
+    then await_external_idle t agent
+    else evict_now t agent
 ;;
 
 (* Only for changes: what is shown at [register] is the baseline. *)
@@ -1268,7 +1305,7 @@ let route t agent (event : Agent.Event.t) =
   match event with
   | State_changed { running; _ } ->
     note_catalog_key t agent;
-    if not running then maybe_evict t agent;
+    if running then cancel_external_idle t agent else maybe_evict t agent;
     (* A host's session name may have changed; [set_hosts] is a no-op when
        nothing did, so this does not loop. *)
     publish_hosts t
@@ -1776,6 +1813,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
          ?handoff_from
          ~catalog:(fun () -> find_catalog t agent adapter_id)
          ~on_change:(fun () -> models_changed t agent)
+         ~on_autonomous:(fun () -> Agent.external_woke agent)
          ())
 ;;
 
@@ -2001,6 +2039,7 @@ let create
       ?token
       ?(host_grace = 60.)
       ?(temporary_grace = 120.)
+      ?(external_idle_grace = 3600.)
       ?sleep
       ?(host_timeout = 30.)
       ?heartbeat_clock
@@ -2119,6 +2158,8 @@ let create
           Subscription_usage.Http.real ~env)
     ; temporaries = String.Table.create ()
     ; temporary_grace
+    ; external_idle = String.Table.create ()
+    ; external_idle_grace
     ; ledger_dir = Temporary_ledger.dir ~sessions_dir
     }
   in
@@ -2175,6 +2216,7 @@ let preferred_host t (client : Client.t) =
 
 let attach t (client : Client.t) agent =
   let previous = client.agent in
+  cancel_external_idle t agent;
   Option.iter
     (Hashtbl.find t.temporaries (session_id agent))
     ~f:(fun temp -> temp.away <- None);
@@ -3378,6 +3420,7 @@ let delete_saved ?leaving t client (summary : Session.Summary.t) =
       let bytes = Session.disk_usage summary.path in
       Session.delete_files summary.path;
       let agent = Hashtbl.find t.agents summary.id in
+      Hashtbl.remove t.external_idle summary.id;
       Hashtbl.remove t.agents summary.id;
       Hashtbl.remove t.listed summary.id;
       Hashtbl.remove t.catalog_keys summary.id;

@@ -286,6 +286,8 @@ module Turn = struct
   type t =
     { id : string
     ; mutable cancelled : bool
+    ; mutable autonomous : bool
+    ; mutable saw_text : bool
     ; mutable text : Open_item.t option
     ; mutable thought : Open_item.t option
     ; mutable items : int
@@ -458,8 +460,25 @@ let refuses_images t inputs =
 let prompt t inputs =
   match t.session_id, t.turn with
   | None, _ -> Or_error.error_string "no ACP session yet"
-  | Some _, Some turn ->
+  | Some _, Some ({ autonomous = false; _ } as turn) ->
     Or_error.error_s [%message "a turn is already running" ~turn:turn.id]
+  | Some session_id, Some ({ autonomous = true; _ } as turn) ->
+    if refuses_images t inputs
+    then Or_error.error_string "this agent does not take images"
+    else (
+      turn.autonomous <- false;
+      turn.prompts <- turn.prompts + 1;
+      let line =
+        request
+          t
+          Prompt
+          "session/prompt"
+          (`Object
+              [ "sessionId", `String session_id
+              ; "prompt", `Array (List.map inputs ~f:content_block)
+              ])
+      in
+      Ok [ Output.Send line ])
   | Some session_id, None ->
     if refuses_images t inputs
     then Or_error.error_string "this agent does not take images"
@@ -468,6 +487,8 @@ let prompt t inputs =
       let turn =
         { Turn.id = sprintf "turn-%d" t.turns
         ; cancelled = false
+        ; autonomous = false
+        ; saw_text = false
         ; text = None
         ; thought = None
         ; items = 0
@@ -499,6 +520,7 @@ let steer t inputs =
   | Some _, Some _, _ when refuses_images t inputs ->
     Or_error.error_string "this agent does not take images"
   | Some session_id, Some turn, Prompt ->
+    turn.autonomous <- false;
     turn.prompts <- turn.prompts + 1;
     Ok
       [ Output.Send
@@ -1172,12 +1194,37 @@ let close_items t =
   | Some turn -> close_text turn @ close_thought turn
 ;;
 
+(* When the agent resumes on its own between prompts (e.g. woken by a
+   background task), open an autonomous turn so its streaming updates, tool
+   calls and approvals are not dropped. *)
+let ensure_autonomous_turn t =
+  match t.turn, t.session_id with
+  | None, Some _ when not t.loading ->
+    t.turns <- t.turns + 1;
+    let turn =
+      { Turn.id = sprintf "turn-%d" t.turns
+      ; cancelled = false
+      ; autonomous = true
+      ; saw_text = false
+      ; text = None
+      ; thought = None
+      ; items = 0
+      ; prompts = 0
+      ; usage = None
+      }
+    in
+    t.turn <- Some turn;
+    [ Output.Event (Turn_started { turn_id = turn.id }) ]
+  | _ -> []
+;;
+
 (* Appends to the open item of the kind, opening one (and closing the other
    kind's) when there is none or the agent's message id changed. *)
 let chunk t ~thought ~message_id text =
   match t.turn with
   | None -> []
   | Some turn ->
+    if not thought then turn.saw_text <- true;
     let current = if thought then turn.thought else turn.text in
     let continues =
       match current, message_id with
@@ -1488,17 +1535,27 @@ let on_update t params =
   | Some "agent_message_chunk" ->
     (match block_text (obj (field "content" update)) with
      | Some text when not (String.is_empty text) ->
-       chunk t ~thought:false ~message_id:(str "messageId" update) text
+       ensure_autonomous_turn t
+       @ chunk t ~thought:false ~message_id:(str "messageId" update) text
      | _ -> [])
   | Some "agent_thought_chunk" ->
     (match block_text (obj (field "content" update)) with
      | Some text when not (String.is_empty text) ->
-       chunk t ~thought:true ~message_id:(str "messageId" update) text
+       ensure_autonomous_turn t
+       @ chunk t ~thought:true ~message_id:(str "messageId" update) text
      | _ -> [])
-  | Some ("tool_call" | "tool_call_update") when Option.is_none t.turn ->
-    (* After its prompt was answered: no turn to show it in. *)
-    []
-  | Some ("tool_call" | "tool_call_update") -> on_tool_update t update
+  | Some ("tool_call" | "tool_call_update") ->
+    let opened = ensure_autonomous_turn t in
+    (match t.turn with
+     | None -> []
+     | Some turn ->
+       let events = on_tool_update t update in
+       if
+         List.exists events ~f:(function
+           | Output.Event (Tool_start _) -> true
+           | _ -> false)
+       then turn.saw_text <- false;
+       opened @ events)
   | Some "plan" -> on_plan (items "entries" update)
   | Some "usage_update" -> on_usage t update
   | Some "notice" ->
@@ -1573,6 +1630,31 @@ let end_turn t (stop : Adapter_event.Stop.t) =
     @ withdrawn
     @ unasked
     @ [ Output.Event (Turn_end { turn_id = Some turn.id; stop }) ]
+;;
+
+let is_autonomous_turn t =
+  match t.turn with
+  | Some { autonomous = true; _ } -> true
+  | Some _ | None -> false
+;;
+
+let autonomous_has_text t =
+  match t.turn with
+  | Some { autonomous = true; saw_text; _ } -> saw_text
+  | Some _ | None -> false
+;;
+
+let has_open_work t =
+  Hashtbl.exists t.tools ~f:(fun (tool : Tool.t) -> not tool.ended)
+  || Hashtbl.length t.permissions > 0
+  || Hashtbl.length t.questions > 0
+;;
+
+let finish_autonomous t =
+  match t.turn with
+  | Some { autonomous = true; cancelled; _ } ->
+    end_turn t (if cancelled then Interrupted else Done)
+  | Some _ | None -> []
 ;;
 
 let known_stop_reasons =
@@ -1772,6 +1854,7 @@ let on_permission t ~id params =
        cancelled. *)
     [ Output.Send (result_line id cancelled_outcome) ]
   | _ ->
+    let opened = ensure_autonomous_turn t in
     Hashtbl.set
       t.permissions
       ~key:request_id
@@ -1782,7 +1865,8 @@ let on_permission t ~id params =
       | None -> [], Other "other", None
     in
     let title = Option.value (str "title" tool_call) ~default:"" in
-    started
+    opened
+    @ started
     @ [ Output.Event
           (Approval_request
              { request_id

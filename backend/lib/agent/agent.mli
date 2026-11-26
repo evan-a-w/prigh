@@ -344,6 +344,11 @@ val prewarm : t -> unit
     it again. *)
 val stop_engine : t -> unit
 
+(** Called when the session's live external harness begins a turn of its own
+    between prompts (e.g. woken by a background task): drives and records
+    that turn as a run. *)
+val external_woke : t -> unit
+
 (** prigh's own harness on the session's provider and model, whatever
     runner the session has (for the composer's [prigh] adapter). *)
 val harness_runner : t -> Runner.t

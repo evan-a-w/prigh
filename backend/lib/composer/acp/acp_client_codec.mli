@@ -286,6 +286,21 @@ val process_exited
 val session_id : t -> string option
 val turn_id : t -> string option
 val in_turn : t -> bool
+
+(** Whether the running turn was started by the agent itself between prompts
+    (e.g. a background task woke it), with no open [session/prompt] request. *)
+val is_autonomous_turn : t -> bool
+
+(** Whether an autonomous turn has emitted assistant text since its last
+    started tool call (so a short quiet spell means it finished speaking). *)
+val autonomous_has_text : t -> bool
+
+(** Whether any tool call is still open or any approval/question is waiting. *)
+val has_open_work : t -> bool
+
+(** Ends an autonomous turn cleanly ([Turn_end Done]); nothing otherwise. *)
+val finish_autonomous : t -> Output.t list
+
 val agent_capabilities : t -> Agent_capabilities.t option
 val session_config : t -> Session_config.t
 
