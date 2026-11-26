@@ -5978,19 +5978,30 @@ let leftovers t =
   List.dedup_and_sort (t.noted @ outputs @ worktrees) ~compare:Leftover.compare
 ;;
 
-let host_call_on t ~host ~cwd ~name arguments =
+let host_call_on
+      t
+      ?stdin
+      ?(cancel = Cancellation.never)
+      ?(on_output = ignore)
+      ~host
+      ~cwd
+      ~name
+      arguments
+  =
   match find_host t host with
   | None -> Tool.Result.error (sprintf "tool host %S is not connected" host)
   | Some h ->
-    host_exec_on
+    host_exec_with_stdin
       t
       h
-      ~cancel:Cancellation.never
-      ~on_output:ignore
+      ?stdin
+      ~cancel
+      ~on_output
       ~call_id:"leftover"
       ~cwd
       ~name
       ~arguments
+      ()
 ;;
 
 let remove_leftover t (leftover : Leftover.t) =

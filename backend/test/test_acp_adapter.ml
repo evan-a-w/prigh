@@ -535,8 +535,8 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
      (opencode
       (((name opencode) (display_name OpenCode) (command (opencode acp))
         (quirks
-         ((login ("opencode auth login")) (min_version ()) (prompt_usage Ignored)
-          (steer Between_turns) (xai_extensions false))))))
+         ((login ("opencode auth login")) (login_file ()) (min_version ())
+          (prompt_usage Ignored) (steer Between_turns) (xai_extensions false))))))
      (mine ()))
     |}];
   show "acp:mine=my-agent --acp --verbose,claude";
@@ -546,12 +546,12 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
      (opencode
       (((name opencode) (display_name OpenCode) (command (opencode acp))
         (quirks
-         ((login ("opencode auth login")) (min_version ()) (prompt_usage Ignored)
-          (steer Between_turns) (xai_extensions false))))))
+         ((login ("opencode auth login")) (login_file ()) (min_version ())
+          (prompt_usage Ignored) (steer Between_turns) (xai_extensions false))))))
      (mine
       (((name mine) (display_name mine) (command (my-agent --acp --verbose))
         (quirks
-         ((login ()) (min_version ()) (prompt_usage Ignored)
+         ((login ()) (login_file ()) (min_version ()) (prompt_usage Ignored)
           (steer Between_turns) (xai_extensions false)))))))
     |}];
   show "acp:unheard-of";
@@ -564,8 +564,8 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
      (opencode
       (((name opencode) (display_name OpenCode) (command (opencode acp))
         (quirks
-         ((login ("opencode auth login")) (min_version ()) (prompt_usage Ignored)
-          (steer Between_turns) (xai_extensions false))))))
+         ((login ("opencode auth login")) (login_file ()) (min_version ())
+          (prompt_usage Ignored) (steer Between_turns) (xai_extensions false))))))
      (mine ()))
     |}];
   List.iter [ Adapter_id.Prigh; Acp "opencode"; Acp "mine" ] ~f:(fun id ->
@@ -768,20 +768,22 @@ let%expect_test "versions and quirks of the known agents" =
     v1.10.0 < 1.5.0: false
     dev < 1.5.0: false
     (opencode
-     ((login ("opencode auth login")) (min_version ()) (prompt_usage Ignored)
-      (steer Between_turns) (xai_extensions false)))
+     ((login ("opencode auth login")) (login_file ()) (min_version ())
+      (prompt_usage Ignored) (steer Between_turns) (xai_extensions false)))
     (gemini
-     ((login (gemini)) (min_version ()) (prompt_usage Ignored)
+     ((login (gemini)) (login_file ()) (min_version ()) (prompt_usage Ignored)
       (steer Between_turns) (xai_extensions false)))
     (antigravity
-     ((login ("agy acp --login")) (min_version (1.5.0)) (prompt_usage Gemini)
-      (steer Prompt) (xai_extensions false)))
+     ((login ("agy acp --login"))
+      (login_file (~/.gemini/antigravity-cli/antigravity-oauth-token))
+      (min_version (1.5.0)) (prompt_usage Gemini) (steer Prompt)
+      (xai_extensions false)))
     (grok
-     ((login ("grok login")) (min_version ()) (prompt_usage Ignored)
-      (steer Xai_interject) (xai_extensions true)))
+     ((login ("grok login")) (login_file ()) (min_version ())
+      (prompt_usage Ignored) (steer Xai_interject) (xai_extensions true)))
     (goose
-     ((login ("goose configure")) (min_version ()) (prompt_usage Ignored)
-      (steer Between_turns) (xai_extensions false)))
+     ((login ("goose configure")) (login_file ()) (min_version ())
+      (prompt_usage Ignored) (steer Between_turns) (xai_extensions false)))
     |}]
 ;;
 

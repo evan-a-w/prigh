@@ -142,6 +142,12 @@ let not_logged_in (agent : Acp_agent.t) methods =
   sprintf "%s is not logged in on this host: %s" agent.display_name how
 ;;
 
+let is_not_logged_in e =
+  String.is_substring
+    (Error.to_string_hum e)
+    ~substring:" is not logged in on this host: "
+;;
+
 let create
       ?(load_quiet = Time_float.Span.of_sec 2.)
       ?(load_timeout = Time_float.Span.of_sec 90.)

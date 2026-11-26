@@ -11,22 +11,67 @@ let command_in problem =
   | _ -> None
 ;;
 
-let state (s : S.t) =
+(* [at] (Unix seconds) against the page's clock, else as the backend said. *)
+let confirmed ~now ~at ~ago =
+  match now with
+  | Some now ->
+    Some
+      (Rel_time.ago
+         ~now
+         (Time_ns.of_span_since_epoch (Time_ns.Span.of_sec at)))
+  | None -> ago
+;;
+
+let state ~now (s : S.t) =
   match s.installed, s.auth with
   | No, _ -> "bad", "Not installed"
   | Unknown _, _ -> "muted", "Unknown"
   | Yes, Logged_out -> "bad", "Not logged in"
   | Yes, Logged_in ->
     ( "good"
-    , Option.value_map
-        s.account
-        ~default:"Logged in"
-        ~f:(sprintf "Logged in · %s") )
+    , (match s.account, s.via with
+       | Some account, _ -> "Logged in · " ^ account
+       | None, Some (Prigh_login label) -> "Logged in · prigh login " ^ label
+       | None, Some (Session { at; ago }) ->
+         Option.value_map
+           (confirmed ~now ~at ~ago)
+           ~default:"Logged in"
+           ~f:(sprintf "Logged in · confirmed %s")
+       | None, Some (Login_file _) -> "Logged in · token file found"
+       | None, (Some Status_command | None) -> "Logged in") )
+  | Yes, Unknown when s.checking -> "muted", "Checking login…"
+  | Yes, Unknown when s.checkable -> "muted", "Login not checked yet"
   | Yes, (Not_needed | Unknown) -> "good", "Installed"
 ;;
 
-let adapter ~inject (s : S.t) =
-  let level, label = state s in
+let check_button ~inject (s : S.t) =
+  if s.checking
+  then
+    Some
+      (button
+         ~cls:"small adapter-check"
+         ~disabled:true
+         ~attrs:[ Attr.create "aria-busy" "true" ]
+         ~on_click:Effect.Ignore
+         [ Html.lamp (); Node.text "Checking…" ])
+  else if s.checkable
+  then
+    Some
+      (button
+         ~cls:"small adapter-check"
+         ~title:
+           (sprintf
+              "Start %s on %s briefly to see whether it is logged in \
+               (/adapters refresh)"
+              s.label
+              s.host_name)
+         ~on_click:(inject Action.Adapters_refresh)
+         [ Node.text "Check" ])
+  else None
+;;
+
+let adapter ~inject ~now (s : S.t) =
+  let level, label = state ~now s in
   let detail =
     match s.installed, s.version with
     | Yes, Some v -> sprintf "%s · %s" v (Option.value s.path ~default:"")
@@ -36,11 +81,12 @@ let adapter ~inject (s : S.t) =
     | Unknown why, _ -> String.capitalize why
   in
   let copy =
-    Option.map (Option.first_some s.problem s.hint) ~f:(fun problem ->
-      let text, what =
-        match command_in problem with
-        | Some command -> command, "the command"
-        | None -> problem, "what to do"
+    Option.bind (Option.first_some s.problem s.hint) ~f:(fun problem ->
+      let%map.Option text, what =
+        match command_in problem, s.problem with
+        | Some command, _ -> Some (command, "the command")
+        | None, Some _ -> Some (problem, "what to do")
+        | None, None -> None
       in
       button
         ~cls:"small"
@@ -63,7 +109,7 @@ let adapter ~inject (s : S.t) =
          match s.problem, s.hint with
          | None, Some h -> [ note ~cls:"adapter-hint select-text" ("muted", h) ]
          | _ -> [])
-    ; control (Option.to_list copy)
+    ; control (List.filter_opt [ check_button ~inject s; copy ])
     ]
 ;;
 
@@ -185,5 +231,5 @@ let groups (m : App.Model.t) ~inject =
     ]
   | Some (Ok statuses) ->
     List.map (Adapters_page.by_host statuses) ~f:(fun (host, here) ->
-      group ~title:host (List.map here ~f:(adapter ~inject)))
+      group ~title:host (List.map here ~f:(adapter ~inject ~now:m.now)))
 ;;

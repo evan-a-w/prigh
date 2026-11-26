@@ -20,10 +20,11 @@ val age : t -> host:string -> string -> float option
 
 (** Asks [fetch] for [adapter]'s catalog on [host] in a fiber of [sw],
     unless one younger than [max_age] seconds is kept, one is being asked,
-    or asking failed less than a minute ago; [on_done] once a new one is
-    kept, or asking failed. *)
+    or asking failed less than a minute ago (unless [force]); [on_done] once
+    a new one is kept, or asking failed. *)
 val refresh
-  :  t
+  :  ?force:bool
+  -> t
   -> sw:Switch.t
   -> host:string
   -> string
@@ -34,6 +35,9 @@ val refresh
 
 (** Why asking [adapter]'s catalog on [host] failed last, if it did. *)
 val failure : t -> host:string -> string -> Error.t option
+
+(** Whether {!refresh} is asking [adapter]'s catalog on [host]. *)
+val asking : t -> host:string -> string -> bool
 
 (** Waits for the asking {!refresh} started, if any. *)
 val await : t -> host:string -> string -> unit

@@ -5,8 +5,11 @@ open! Import
     (which version) and logged in, found out passively with
     [$probe_programs] ({!Host_probe}): the CLI's [--version] and its own
     login-status command ([codex login status], [claude auth status]),
-    never a login, a session, an MCP server or a turn. We never install
-    anything or log anyone in: a problem says what to run on that host. *)
+    never a login, a session, an MCP server or a turn. An ACP agent has no
+    login-status command: its login shows when it is started ({!Seen}: the
+    model-list check, a session), or when it runs on one of prigh's logins.
+    We never install anything or log anyone in: a problem says what to run
+    on that host. *)
 
 module Install : sig
   type t =
@@ -20,13 +23,56 @@ module Install : sig
   [@@deriving sexp_of, equal]
 end
 
+(** How we know it is logged in. *)
+module Via : sig
+  type t =
+    | Status_command (** its own login-status command said so *)
+    | Prigh_login of { label : string }
+    (** it runs on one of prigh's logins, chosen in Settings → Engines *)
+    | Session of { at : float }
+    (** it opened a session on its own login there at [at] (Unix seconds):
+        a model-list check or a session's start *)
+    | Login_file of { path : string }
+    (** its token file is there (Antigravity's, kept when the keyring is
+        out of reach); its contents are never read *)
+  [@@deriving sexp_of, equal]
+end
+
 module Auth : sig
   type t =
-    | Logged_in of { account : string option (** e.g. ["ChatGPT"], an email *) }
+    | Logged_in of
+        { account : string option (** e.g. ["ChatGPT"], an email *)
+        ; via : Via.t
+        }
     | Logged_out
     | Not_needed (** prigh's own harness *)
     | Unknown (** the CLI has no status command we know, or it said nothing *)
   [@@deriving sexp_of, equal]
+end
+
+(** What starting an ACP agent on its own login showed: [session/new]
+    succeeding means it is logged in, [-32000 Authentication required] that
+    it is not. *)
+module Seen : sig
+  type t =
+    | Opened of { at : float }
+    | Refused of { at : float }
+    | Check_failed of
+        { at : float
+        ; why : string
+        } (** it could not be started or did not answer: no evidence *)
+  [@@deriving sexp_of, equal]
+
+  (** The latest, by host and adapter. A [Check_failed] does not replace an
+      [Opened] or [Refused]. *)
+  module Table : sig
+    type seen := t
+    type t
+
+    val create : unit -> t
+    val record : t -> host:string -> Adapter_id.t -> seen -> unit
+    val find : t -> host:string -> Adapter_id.t -> seen option
+  end
 end
 
 module Status : sig
@@ -39,6 +85,9 @@ module Status : sig
     ; checked_at : float (** Unix seconds *)
     ; quirks : Acp_agent.Quirks.t
       (** an ACP agent's: its login command and minimum version *)
+    ; checking : bool (** its login is being checked (by starting it) *)
+    ; check_failed : string option
+      (** why the last check of its login could not tell *)
     }
   [@@deriving sexp_of, equal]
 
@@ -47,14 +96,31 @@ module Status : sig
       nothing we know of does. *)
   val problem : t -> string option
 
-  (** Advice short of a problem: how to log in to an agent that cannot say
-      whether it is logged in. *)
+  (** Advice short of a problem: that an agent's login was not checked yet
+      (or why checking failed), or how to log in to a CLI that cannot say. *)
   val hint : t -> string option
+
+  (** An ACP agent installed there whose login nothing has shown: checking
+      it (starting it briefly, {!Seen}) would tell. *)
+  val checkable : t -> bool
+
+  (** [t] with what is known beyond the probe: [prigh_login], the label of
+      the prigh login it runs on (its own login on the host is then beside
+      the point); [seen], what starting it showed (ACP agents only);
+      [checking], whether that is under way. *)
+  val with_evidence
+    :  t
+    -> prigh_login:string option
+    -> seen:Seen.t option
+    -> checking:bool
+    -> t
 
   (** [{adapter, label, host, host_name, installed, version?, path?,
       login_shell_path?, auth ("logged_in" | "logged_out" | "not_needed" |
-      "unknown"), account?, problem?, hint?, checked_at}] *)
-  val to_json : t -> Json.t
+      "unknown"), account?, via? ("status" | "prigh_login" | "session" |
+      "login_file"), prigh_login?, confirmed_at?, confirmed? (["5m ago"],
+      against [now]), checking?, checkable?, problem?, hint?, checked_at}] *)
+  val to_json : ?now:float -> t -> Json.t
 end
 
 (** The program an adapter runs ([codex], [claude], an ACP agent's

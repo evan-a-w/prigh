@@ -1070,6 +1070,9 @@ val host_call
     id), in [cwd] there; an error result when it is not connected. *)
 val host_call_on
   :  t
+  -> ?stdin:Stdin_feed.t
+  -> ?cancel:Cancellation.t
+  -> ?on_output:(string -> unit)
   -> host:string
   -> cwd:string
   -> name:string

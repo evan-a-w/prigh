@@ -30,3 +30,7 @@ val capabilities_of
   -> Acp_client_codec.Agent_capabilities.t option
   -> Acp_client_codec.Session_config.t
   -> Capabilities.t
+
+(** Whether starting an agent failed because it is not logged in on its host
+    ([-32000 Authentication required] to [session/new]). *)
+val is_not_logged_in : Error.t -> bool

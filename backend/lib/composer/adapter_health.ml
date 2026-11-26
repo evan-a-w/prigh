@@ -12,13 +12,62 @@ module Install = struct
   [@@deriving sexp_of, equal]
 end
 
+module Via = struct
+  type t =
+    | Status_command
+    | Prigh_login of { label : string }
+    | Session of { at : float }
+    | Login_file of { path : string }
+  [@@deriving sexp_of, equal]
+end
+
 module Auth = struct
   type t =
-    | Logged_in of { account : string option }
+    | Logged_in of
+        { account : string option
+        ; via : Via.t
+        }
     | Logged_out
     | Not_needed
     | Unknown
   [@@deriving sexp_of, equal]
+end
+
+module Key = struct
+  module T = struct
+    type t = string * string [@@deriving sexp, compare, hash]
+  end
+
+  include T
+  include Hashable.Make (T)
+
+  let of_ ~host adapter = host, Adapter_id.to_string adapter
+end
+
+module Seen = struct
+  type t =
+    | Opened of { at : float }
+    | Refused of { at : float }
+    | Check_failed of
+        { at : float
+        ; why : string
+        }
+  [@@deriving sexp_of, equal]
+
+  module Table = struct
+    type seen = t
+    type t = seen Key.Table.t
+
+    let create () = Key.Table.create ()
+    let find t ~host adapter = Hashtbl.find t (Key.of_ ~host adapter)
+
+    let record t ~host adapter (seen : seen) =
+      let key = Key.of_ ~host adapter in
+      match seen, Hashtbl.find t key with
+      | Check_failed _, Some (Opened _ | Refused _) -> ()
+      | _ -> Hashtbl.set t ~key ~data:seen
+    ;;
+  end
 end
 
 let acp_agent ?(acp = Acp_agent.find_known) name = acp name
@@ -59,6 +108,8 @@ module Status = struct
     ; auth : Auth.t
     ; checked_at : float
     ; quirks : Acp_agent.Quirks.t
+    ; checking : bool
+    ; check_failed : string option
     }
   [@@deriving sexp_of, equal]
 
@@ -69,8 +120,48 @@ module Status = struct
     | _ -> None
   ;;
 
+  let is_acp t =
+    match t.adapter with
+    | Acp _ -> true
+    | Codex | Claude | Prigh -> false
+  ;;
+
+  let checkable t =
+    match t.install, t.auth with
+    | Installed _, Unknown -> is_acp t && not t.checking
+    | _ -> false
+  ;;
+
   let hint t =
+    let label = Adapter_id.label t.adapter in
     match t.install, t.auth, login_command t.quirks t.adapter with
+    | Installed _, Unknown, _ when is_acp t && t.checking ->
+      Some
+        (sprintf
+           "Checking whether %s is logged in on %s: prigh starts it briefly to \
+            see"
+           label
+           t.host_name)
+    | Installed _, Unknown, command when is_acp t ->
+      Some
+        (match t.check_failed with
+         | Some why ->
+           sprintf
+             "Couldn't check whether %s is logged in on %s (%s): Check tries \
+              again%s"
+             label
+             t.host_name
+             why
+             (Option.value_map
+                command
+                ~default:""
+                ~f:(sprintf "; if it asks you to log in, run `%s` there"))
+         | None ->
+           sprintf
+             "Login not checked yet: Check (/adapters refresh) starts %s on %s \
+              briefly to see"
+             label
+             t.host_name)
     | Installed _, Unknown, Some command ->
       Some
         (sprintf
@@ -131,7 +222,56 @@ module Status = struct
           minimum)
   ;;
 
-  let to_json t =
+  let seconds at = `Number (Int.to_string (Float.iround_down_exn at))
+
+  (* ["5m ago"] *)
+  let ago ~now at =
+    let s = Float.iround_down_exn (now -. at) in
+    if s < 45
+    then "just now"
+    else if s < 3600
+    then sprintf "%dm ago" (Int.max 1 (s / 60))
+    else if s < 86_400
+    then sprintf "%dh ago" (s / 3600)
+    else sprintf "%dd ago" (s / 86_400)
+  ;;
+
+  let via_json ?now : Auth.t -> (string * Json.t) list = function
+    | Logged_in { via = Status_command; _ } -> [ "via", `String "status" ]
+    | Logged_in { via = Prigh_login { label }; _ } ->
+      [ "via", `String "prigh_login"; "prigh_login", `String label ]
+    | Logged_in { via = Session { at }; _ } ->
+      [ "via", `String "session"; "confirmed_at", seconds at ]
+      @ Option.value_map now ~default:[] ~f:(fun now ->
+        [ "confirmed", `String (ago ~now at) ])
+    | Logged_in { via = Login_file { path }; _ } ->
+      [ "via", `String "login_file"; "login_file", `String path ]
+    | Logged_out | Not_needed | Unknown -> []
+  ;;
+
+  let with_evidence t ~prigh_login ~(seen : Seen.t option) ~checking =
+    match t.install, prigh_login with
+    | Installed _, Some label ->
+      { t with
+        auth = Logged_in { account = None; via = Prigh_login { label } }
+      ; checking = false
+      ; check_failed = None
+      }
+    | Installed _, None when is_acp t ->
+      (match seen with
+       | Some (Opened { at }) ->
+         { t with
+           auth = Logged_in { account = None; via = Session { at } }
+         ; checking
+         }
+       | Some (Refused _) -> { t with auth = Logged_out; checking }
+       | Some (Check_failed { why; _ }) ->
+         { t with checking; check_failed = Some why }
+       | None -> { t with checking })
+    | _ -> t
+  ;;
+
+  let to_json ?now t =
     let str s = `String s in
     let opt name = Option.value_map ~default:[] ~f:(fun v -> [ name, str v ]) in
     let install =
@@ -144,7 +284,7 @@ module Status = struct
     in
     let auth, account =
       match t.auth with
-      | Logged_in { account } -> "logged_in", account
+      | Logged_in { account; _ } -> "logged_in", account
       | Logged_out -> "logged_out", None
       | Not_needed -> "not_needed", None
       | Unknown -> "unknown", None
@@ -158,11 +298,12 @@ module Status = struct
        @ install
        @ [ "auth", str auth ]
        @ opt "account" account
+       @ via_json ?now t.auth
+       @ (if t.checking then [ "checking", `True ] else [])
+       @ (if checkable t then [ "checkable", `True ] else [])
        @ opt "problem" (problem t)
        @ opt "hint" (hint t)
-       @ [ ( "checked_at"
-           , `Number (Int.to_string (Float.iround_down_exn t.checked_at)) )
-         ])
+       @ [ "checked_at", seconds t.checked_at ])
   ;;
 end
 
@@ -180,7 +321,10 @@ let request ?acp adapters : Host_probe.Request.t =
           ; version = [ "--version" ]
           ; status = status_args adapter
           }))
-  ; paths = []
+  ; paths =
+      List.filter_map adapters ~f:(fun adapter ->
+        (quirks ?acp adapter).login_file)
+      |> List.dedup_and_sort ~compare:String.compare
   ; env = []
   }
 ;;
@@ -218,7 +362,7 @@ let codex_auth (out : Host_probe.Command_output.t) : Auth.t =
       then Some "API key"
       else None
     in
-    Logged_in { account }
+    Logged_in { account; via = Status_command }
   | Some _ when String.is_substring lower ~substring:"not logged in" ->
     Logged_out
   | Some 1 -> Logged_out
@@ -231,22 +375,37 @@ let claude_auth (out : Host_probe.Command_output.t) : Auth.t =
   | Some exit_code ->
     (match Claude_health.parse_auth_status ~stdout:out.stdout ~exit_code with
      | Logged_in { method_; email } ->
-       Logged_in { account = Option.first_some email method_ }
+       Logged_in
+         { account = Option.first_some email method_; via = Status_command }
      | Logged_out -> Logged_out
      | Unknown _ -> Unknown)
 ;;
 
-let auth adapter (found : Host_probe.Found.t) : Auth.t =
+(* Whether [login_file] ([~/...]) is among the files the host found. *)
+let has_file (files : Host_probe.File.t list) login_file =
+  let tail = String.chop_prefix_if_exists login_file ~prefix:"~" in
+  List.find files ~f:(fun (f : Host_probe.File.t) ->
+    f.exists && String.is_suffix f.path ~suffix:tail)
+;;
+
+let auth ?acp ~files adapter (found : Host_probe.Found.t) : Auth.t =
+  let login_file () =
+    match Option.bind (quirks ?acp adapter).login_file ~f:(has_file files) with
+    | Some f ->
+      Auth.Logged_in { account = None; via = Login_file { path = f.path } }
+    | None -> Unknown
+  in
   match (adapter : Adapter_id.t), found.status with
   | Prigh, _ -> Not_needed
+  | Acp _, _ -> login_file ()
   | _, None -> Unknown
   | Codex, Some out -> codex_auth out
   | Claude, Some out -> claude_auth out
-  | Acp _, Some _ -> Unknown
 ;;
 
 let of_found
       ?acp
+      ?(files = [])
       adapter
       ~host
       ~host_name
@@ -263,6 +422,8 @@ let of_found
     ; auth = Unknown
     ; checked_at
     ; quirks = quirks ?acp adapter
+    ; checking = false
+    ; check_failed = None
     }
   | Some path ->
     let version =
@@ -273,9 +434,11 @@ let of_found
     ; host
     ; host_name
     ; install = Installed { version; path }
-    ; auth = auth adapter found
+    ; auth = auth ?acp ~files adapter found
     ; checked_at
     ; quirks = quirks ?acp adapter
+    ; checking = false
+    ; check_failed = None
     }
 ;;
 
@@ -287,6 +450,8 @@ let prigh_status ~host ~host_name ~checked_at : Status.t =
   ; auth = Not_needed
   ; checked_at
   ; quirks = Acp_agent.Quirks.none
+  ; checking = false
+  ; check_failed = None
   }
 ;;
 
@@ -302,6 +467,8 @@ let unknown ?acp adapters ~host ~host_name ~checked_at why =
       ; auth = Unknown
       ; checked_at
       ; quirks = quirks ?acp adapter
+      ; checking = false
+      ; check_failed = None
       })
 ;;
 
@@ -351,7 +518,14 @@ let of_result
                String.equal f.name name)
            with
            | Some found ->
-             of_found ?acp adapter ~host ~host_name ~checked_at found
+             of_found
+               ?acp
+               ~files:reply.paths
+               adapter
+               ~host
+               ~host_name
+               ~checked_at
+               found
            | None ->
              { Status.adapter
              ; host
@@ -360,6 +534,8 @@ let of_result
              ; auth = Unknown
              ; checked_at
              ; quirks = quirks ?acp adapter
+             ; checking = false
+             ; check_failed = None
              })))
 ;;
 
@@ -375,15 +551,6 @@ let probe ?acp ~exec adapters ~host ~host_name ~now =
   of_result ?acp adapters ~host ~host_name ~checked_at:now result
 ;;
 
-module Key = struct
-  module T = struct
-    type t = string * string [@@deriving sexp, compare, hash]
-  end
-
-  include T
-  include Hashable.Make (T)
-end
-
 module Cache = struct
   type t =
     { ttl : float
@@ -391,7 +558,7 @@ module Cache = struct
     }
 
   let create ~ttl = { ttl; statuses = Key.Table.create () }
-  let key ~host adapter = host, Adapter_id.to_string adapter
+  let key = Key.of_
   let find t ~host adapter = Hashtbl.find t.statuses (key ~host adapter)
 
   let fresh t ~now ~host adapter =

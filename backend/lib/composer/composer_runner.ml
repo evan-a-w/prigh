@@ -28,6 +28,7 @@ type t =
   ; mutable turns : int
   ; mutable thread_model : string option (* the model the CLI said it runs *)
   ; on_thread : string -> unit
+  ; on_start : Adapter.Start.t -> unit Or_error.t -> unit
   ; checkpoint : (Json.t -> Tool.Result.t) option (* runs [Checkpoint.op] *)
   ; mutable not_git : (string * string) option
     (* a cwd whose files have no checkpoints, and why *)
@@ -52,6 +53,7 @@ let create
       ?request_timeout
       ?(steer_poll = Time_float.Span.of_sec 0.2)
       ?(on_thread = ignore)
+      ?(on_start = fun _ _ -> ())
       ?(host = fun () -> "local")
       ?handoff_from
       ?checkpoint
@@ -80,6 +82,7 @@ let create
   ; turns = 0
   ; thread_model = None
   ; on_thread
+  ; on_start
   ; checkpoint
   ; not_git = None
   ; checkpoint_noted = false
@@ -238,6 +241,7 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        Line_transport.stop transport;
        raise exn
      | Ok a ->
+       t.on_start start (Ok ());
        t.resumed <- start.resume;
        t.forking <- Option.some_if start.fork start.resume |> Option.join;
        (* A new thread has seen nothing: whatever an older one saw. *)
@@ -246,6 +250,7 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        Ok (Live ((module A), a))
      | Error e ->
        Line_transport.stop transport;
+       t.on_start start (Error e);
        Error (`Start e))
 ;;
 

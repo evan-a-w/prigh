@@ -22,6 +22,20 @@ module Auth : sig
   [@@deriving sexp_of, equal]
 end
 
+(** How the backend knows it is logged in. *)
+module Via : sig
+  type t =
+    | Status_command (** its own login-status command said so *)
+    | Prigh_login of string (** it runs on this login of prigh's *)
+    | Session of
+        { at : float (** Unix seconds *)
+        ; ago : string option (** ["5m ago"], when the backend answered *)
+        }
+    (** an ACP agent opened a session on its own login then *)
+    | Login_file of string (** its token file is there (Antigravity) *)
+  [@@deriving sexp_of, equal]
+end
+
 type t =
   { adapter : string (** e.g. ["codex"], ["acp:gemini"] *)
   ; label : string (** e.g. ["Claude Code"] *)
@@ -34,6 +48,10 @@ type t =
     (** where a login shell finds it when the tool host's [PATH] does not *)
   ; auth : Auth.t
   ; account : string option
+  ; via : Via.t option
+  ; checking : bool (** its login is being checked, by starting it *)
+  ; checkable : bool
+    (** an ACP agent whose login nothing has shown yet: Refresh checks it *)
   ; problem : string option
     (** what stops it and what to run, e.g. ["Codex is not installed on
         laptop, please install it"] *)

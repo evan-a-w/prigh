@@ -460,7 +460,8 @@ let%expect_test "Antigravity: what the keyring said, logged in or not" =
     ();
   (* Found, then refused when read. *)
   find ~logged_in:true ~keyring:agy_file ~lookup_error:"secret-tool: locked" ();
-  [%expect {|
+  [%expect
+    {|
     (keyring true)
     (keyring true)
     Antigravity's login on desktop is in the keyring, but prigh needs secret-tool to read it and desktop has neither secret-tool nor nix: install libsecret there and Import again, or log prigh in with /login google-antigravity
@@ -555,7 +556,8 @@ let%expect_test "the keyring probe in bash: the bus, busctl, secret-tool" =
     {|secret-tool() { echo "Cannot autolaunch D-Bus" >&2; return 1; }|};
   case ~name:"no tools" "";
   ignore (Sys_unix.command ("rm -rf " ^ dir) : int);
-  [%expect {|
+  [%expect
+    {|
     no bus: keyring-error nobus
     bus=
     busctl finds it, secret-tool reads: keyring secret-tool

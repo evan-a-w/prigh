@@ -494,6 +494,8 @@ type t =
   ; engines : Engines.t (** what this backend deploys *)
   ; adapter_health : Adapter_health.Cache.t
     (** whether the composer's CLIs are installed and logged in, by host *)
+  ; login_seen : Adapter_health.Seen.Table.t
+    (** what starting the ACP agents showed of their own logins, by host *)
   ; catalogs : Adapter_catalog.t
     (** the composer's CLIs' models and usage limits, by host *)
   ; spawn_external :
@@ -1167,15 +1169,29 @@ let engine_unavailable t agent =
          (Error.to_string_hum e))
 ;;
 
+(* A probed status with what else is known of its login: the prigh login it
+   runs on, what starting it showed, a check under way. *)
+let with_evidence t (s : Adapter_health.Status.t) =
+  let adapter = Adapter_id.to_string s.adapter in
+  Adapter_health.Status.with_evidence
+    s
+    ~prigh_login:
+      (Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
+         login_label t provider ref_))
+    ~seen:(Adapter_health.Seen.Table.find t.login_seen ~host:s.host s.adapter)
+    ~checking:(Adapter_catalog.asking t.catalogs ~host:s.host adapter)
+;;
+
 (* The statuses of the deployed adapters on [hosts], in that order. *)
 let adapter_statuses t hosts =
   List.concat_map hosts ~f:(fun (host : Agent.Host.t) ->
     List.filter_map t.engines.adapters ~f:(fun adapter ->
-      Adapter_health.Cache.find t.adapter_health ~host:host.id adapter))
+      Adapter_health.Cache.find t.adapter_health ~host:host.id adapter
+      |> Option.map ~f:(with_evidence t)))
 ;;
 
-let adapters_json statuses =
-  `Array (List.map statuses ~f:Adapter_health.Status.to_json)
+let adapters_json t statuses =
+  `Array (List.map statuses ~f:(Adapter_health.Status.to_json ~now:(t.now ())))
 ;;
 
 let adapters_changed t ~hosts =
@@ -1183,10 +1199,36 @@ let adapters_changed t ~hosts =
     `Object
       [ "type", `String "event"
       ; "event", `String "adapters_changed"
-      ; "adapters", adapters_json (adapter_statuses t hosts)
+      ; "adapters", adapters_json t (adapter_statuses t hosts)
       ]
   in
   broadcast t json
+;;
+
+(* Notes what starting an ACP agent on its own login on [host] showed of
+   that login: whether that changed what is known. *)
+let note_seen t ~host (adapter : Adapter_id.t) (result : _ Or_error.t) =
+  match adapter with
+  | Codex | Claude | Prigh -> false
+  | Acp _ ->
+    let at = t.now () in
+    let seen : Adapter_health.Seen.t =
+      match result with
+      | Ok _ -> Opened { at }
+      | Error e when Acp_adapter.is_not_logged_in e -> Refused { at }
+      | Error e -> Check_failed { at; why = Error.to_string_hum e }
+    in
+    let table = t.login_seen in
+    let before = Adapter_health.Seen.Table.find table ~host adapter in
+    Adapter_health.Seen.Table.record table ~host adapter seen;
+    let after = Adapter_health.Seen.Table.find table ~host adapter in
+    let kind : Adapter_health.Seen.t option -> int = function
+      | Some (Opened _) -> 1
+      | Some (Refused _) -> 2
+      | Some (Check_failed _) -> 3
+      | None -> 0
+    in
+    kind before <> kind after
 ;;
 
 (* The session's active tool host by name, for messages. *)
@@ -1256,25 +1298,53 @@ let catalog_changed t ~host adapter =
     | _ -> ())
 ;;
 
-(* Runs [adapter]'s harness on the session's tool host only to ask its
-   catalog ({!Adapter.S.catalog}). *)
-let fetch_catalog t agent (module A : Adapter.S) () =
-  let start = Adapter.Start.default ~cwd:(Session.cwd (Agent.session agent)) in
+(* Runs [adapter]'s harness on the tool host [host] (named [host_name]), in
+   [cwd], only to ask its catalog ({!Adapter.S.catalog}), on its own login:
+   what that shows of the login is noted. *)
+let fetch_catalog
+      t
+      agent
+      ~host
+      ~host_name
+      ~cwd
+      adapter_id
+      (module A : Adapter.S)
+      ()
+  =
+  let start = Adapter.Start.default ~cwd in
   let launch = A.launch start in
-  let%bind.Or_error transport =
-    match t.spawn_external with
-    | Some spawn -> spawn agent launch
-    | None -> host_spawn t agent launch
+  let result =
+    let%bind.Or_error transport =
+      match t.spawn_external with
+      | Some spawn -> spawn agent launch
+      | None ->
+        Host_transport.spawn
+          ~sw:t.sw
+          ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
+            Agent.host_call_on
+              agent
+              ~stdin
+              ~cancel
+              ~on_output
+              ~host
+              ~cwd
+              ~name
+              args)
+          ~host:host_name
+          launch
+    in
+    Switch.run (fun sw ->
+      Exn.protect
+        ~finally:(fun () -> Line_transport.stop transport)
+        ~f:(fun () ->
+          A.catalog
+            ~sw
+            ~request_timeout:(Time_float.Span.of_sec 30.)
+            transport
+            start))
   in
-  Switch.run (fun sw ->
-    Exn.protect
-      ~finally:(fun () -> Line_transport.stop transport)
-      ~f:(fun () ->
-        A.catalog
-          ~sw
-          ~request_timeout:(Time_float.Span.of_sec 30.)
-          transport
-          start))
+  ignore (note_seen t ~host adapter_id result : bool);
+  result
 ;;
 
 (* Asks, in the background, the catalog of a Codex, Claude Code or ACP
@@ -1296,8 +1366,20 @@ let ensure_catalog ?(max_age = 1800.) t agent =
          ~host
          name
          ~max_age
-         ~fetch:(fetch_catalog t agent adapter)
-         ~on_done:(fun () -> catalog_changed t ~host name))
+         ~fetch:
+           (fetch_catalog
+              t
+              agent
+              ~host
+              ~host_name:(active_host_label agent)
+              ~cwd:(Session.cwd (Agent.session agent))
+              adapter_id
+              adapter)
+         ~on_done:(fun () ->
+           catalog_changed t ~host name;
+           match adapter_id with
+           | Acp _ -> adapters_changed t ~hosts:(hosts t)
+           | Codex | Claude | Prigh -> ()))
   | _ -> ()
 ;;
 
@@ -1445,6 +1527,12 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
            spawned)
          ~start
          ~on_thread
+         ~on_start:(fun (start : Adapter.Start.t) result ->
+           (* On one of prigh's logins, it shows nothing of its own. *)
+           if
+             Option.is_none start.login
+             && note_seen t ~host:(Agent.active_host agent) adapter_id result
+           then adapters_changed t ~hosts:(hosts t))
          ~checkpoint:(fun args ->
            Agent.host_call agent ~name:Checkpoint.op args)
          ~host:(fun () -> Agent.active_host agent)
@@ -1688,6 +1776,7 @@ let create
     ; default_agent
     ; engines
     ; adapter_health = Adapter_health.Cache.create ~ttl:60.
+    ; login_seen = Adapter_health.Seen.Table.create ()
     ; catalogs =
         Adapter_catalog.create
           ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
@@ -3843,6 +3932,50 @@ let set_adapter_login t params =
   `Object [ "adapter_logins", adapter_logins_json t ]
 ;;
 
+(* Checks, in the background, the logins of the ACP agents on [host] that
+   nothing has shown ({!Adapter_health.Status.checkable}) by asking their
+   model lists, which starts them briefly on their own logins ([force], on
+   Refresh: even when asking failed lately, and those found logged out, which
+   may have logged in since). The adapters checked, with the host's id. *)
+let check_logins t agent ~force (host : Agent.Host.t) =
+  List.filter_map t.engines.adapters ~f:(fun adapter_id ->
+    let checkable =
+      Option.exists
+        (Adapter_health.Cache.find t.adapter_health ~host:host.id adapter_id)
+        ~f:(fun s ->
+          let s = with_evidence t s in
+          Adapter_health.Status.checkable s
+          ||
+          match force, s.adapter, s.install, s.auth with
+          | true, Acp _, Installed _, Logged_out -> true
+          | _ -> false)
+    in
+    match checkable, Composer_adapters.find t.engines adapter_id with
+    | true, Ok adapter ->
+      let name = Adapter_id.to_string adapter_id in
+      Adapter_catalog.refresh
+        ~force
+        t.catalogs
+        ~sw:t.sw
+        ~host:host.id
+        name
+        ~max_age:0.
+        ~fetch:
+          (fetch_catalog
+             t
+             agent
+             ~host:host.id
+             ~host_name:host.name
+             ~cwd:host.cwd
+             adapter_id
+             adapter)
+        ~on_done:(fun () ->
+          catalog_changed t ~host:host.id name;
+          adapters_changed t ~hosts:(hosts t));
+      Some (host.id, name)
+    | _ -> None)
+;;
+
 let list_adapters t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let%bind () =
@@ -3907,8 +4040,15 @@ let list_adapters t (client : Client.t) params =
     |> List.exists ~f:Fn.id
   in
   if changed then adapters_changed t ~hosts:state.hosts;
+  let checks =
+    List.concat_map hosts ~f:(check_logins t client.agent ~force:refresh)
+  in
+  if refresh
+  then
+    List.iter checks ~f:(fun (host, name) ->
+      Adapter_catalog.await t.catalogs ~host name);
   `Object
-    [ "adapters", adapters_json (adapter_statuses t hosts)
+    [ "adapters", adapters_json t (adapter_statuses t hosts)
     ; "adapter_logins", adapter_logins_json t
     ]
 ;;
@@ -3967,7 +4107,19 @@ let import_adapter_login t (client : Client.t) agent params =
     Agent.host_call_on agent ~host:host.id ~cwd:host.cwd ~name arguments
   in
   let host_name = if String.is_empty host.name then host.id else host.name in
-  let%bind found = Cli_import.find ~exec ~adapter ~host:host_name () in
+  let logged_in =
+    match Adapter_id.of_string adapter with
+    | Ok adapter_id ->
+      (match
+         Adapter_health.Seen.Table.find t.login_seen ~host:host.id adapter_id
+       with
+       | Some (Opened _) -> true
+       | Some (Refused _ | Check_failed _) | None -> false)
+    | Error _ -> false
+  in
+  let%bind found =
+    Cli_import.find ~logged_in ~exec ~adapter ~host:host_name ()
+  in
   let found_json =
     [ "adapter", `String adapter
     ; "provider", `String (Provider_id.to_string found.provider)

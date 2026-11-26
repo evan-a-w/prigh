@@ -38,8 +38,9 @@ let age t ~host adapter =
 ;;
 
 let retry_after = 60.
+let asking t ~host adapter = Hashtbl.mem t.asking (host, adapter)
 
-let refresh t ~sw ~host adapter ~max_age ~fetch ~on_done =
+let refresh ?(force = false) t ~sw ~host adapter ~max_age ~fetch ~on_done =
   let key = host, adapter in
   let fresh =
     Option.exists (age t ~host adapter) ~f:(fun age -> Float.( < ) age max_age)
@@ -48,7 +49,7 @@ let refresh t ~sw ~host adapter ~max_age ~fetch ~on_done =
     Option.exists (Hashtbl.find t.failed key) ~f:(fun (at, _) ->
       Float.( < ) (t.now () -. at) retry_after)
   in
-  if not (fresh || failed_lately || Hashtbl.mem t.asking key)
+  if not (((fresh || failed_lately) && not force) || Hashtbl.mem t.asking key)
   then (
     let done_, resolve = Promise.create () in
     Hashtbl.set t.asking ~key ~data:done_;

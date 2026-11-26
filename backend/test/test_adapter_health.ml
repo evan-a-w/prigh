@@ -73,13 +73,13 @@ let%expect_test "installed and logged in" =
   [%expect
     {|
     codex: ((Installed (version (0.166.0)) (path /usr/bin/codex))
-     (Logged_in (account (ChatGPT))))
+     (Logged_in (account (ChatGPT)) (via Status_command)))
       (ready)
     claude: ((Installed (version (2.1.330)) (path /home/u/.local/bin/claude))
-     (Logged_in (account (lloyd@example.com))))
+     (Logged_in (account (lloyd@example.com)) (via Status_command)))
       (ready)
     acp:gemini: ((Installed (version (0.9.1)) (path /usr/bin/gemini)) Unknown)
-      (ready) prigh can't tell whether Gemini CLI is logged in on laptop: if it asks, run `gemini` there
+      (ready) Login not checked yet: Check (/adapters refresh) starts Gemini CLI on laptop briefly to see
     prigh: ((Installed (version (<version>)) (path prigh)) Not_needed)
       (ready)
     |}]
@@ -166,13 +166,13 @@ let%expect_test
     acp:antigravity: ((Installed (version (1.4.12)) (path /usr/bin/agy)) Unknown)
       Antigravity 1.4.12 on laptop is too old to drive: update it to 1.5.0 or later there
     acp:grok: ((Installed (version (1.0.41)) (path /usr/bin/grok)) Unknown)
-      (ready) prigh can't tell whether Grok Build is logged in on laptop: if it asks, run `grok login` there
+      (ready) Login not checked yet: Check (/adapters refresh) starts Grok Build on laptop briefly to see
     acp:opencode: ((Not_installed (login_shell_path ())) Unknown)
       OpenCode is not installed on laptop, please install it
     acp:antigravity: ((Installed (version (1.5.13)) (path /usr/bin/agy)) Unknown)
-      (ready) prigh can't tell whether Antigravity is logged in on laptop: if it asks, run `agy acp --login` there
+      (ready) Login not checked yet: Check (/adapters refresh) starts Antigravity on laptop briefly to see
     acp:grok: ((Installed (version (1.0.41)) (path /usr/bin/grok)) Unknown)
-      (ready) prigh can't tell whether Grok Build is logged in on laptop: if it asks, run `grok login` there
+      (ready) Login not checked yet: Check (/adapters refresh) starts Grok Build on laptop briefly to see
     acp:opencode: ((Not_installed (login_shell_path ())) Unknown)
       OpenCode is not installed on laptop, please install it
     |}]
@@ -226,7 +226,7 @@ let%expect_test "JSON" =
         (mask_version (Json.to_string (Adapter_health.Status.to_json s))));
   [%expect
     {|
-    {"adapter":"codex","label":"Codex","host":"h1","host_name":"laptop","installed":true,"version":"0.166.0","path":"/usr/bin/codex","auth":"logged_in","account":"API key","checked_at":0}
+    {"adapter":"codex","label":"Codex","host":"h1","host_name":"laptop","installed":true,"version":"0.166.0","path":"/usr/bin/codex","auth":"logged_in","account":"API key","via":"status","checked_at":0}
     {"adapter":"claude","label":"Claude Code","host":"h1","host_name":"laptop","installed":false,"auth":"unknown","problem":"Claude Code is not installed on laptop, please install it","checked_at":0}
     {"adapter":"acp:gemini","label":"Gemini CLI","host":"h1","host_name":"laptop","installed":null,"unknown":"the host did not report it","auth":"unknown","problem":"can't tell whether Gemini CLI is installed on laptop: the host did not report it","checked_at":0}
     {"adapter":"prigh","label":"prigh","host":"h1","host_name":"laptop","installed":true,"version":"<version>","path":"prigh","auth":"not_needed","checked_at":0}
@@ -243,6 +243,8 @@ let%expect_test "the cache" =
     ; auth = Unknown
     ; checked_at
     ; quirks = Acp_agent.Quirks.none
+    ; checking = false
+    ; check_failed = None
     }
   in
   Adapter_health.Cache.set
@@ -273,8 +275,210 @@ let%expect_test "the cache" =
     |}]
 ;;
 
+(* An ACP agent has no login-status command: its login shows when it is
+   started (the model-list check, a session) or when it runs on one of
+   prigh's logins. *)
+let acp_status ?(files = "[]") name =
+  let agent = Option.value_exn (Acp_agent.find_known name) in
+  let program = List.hd_exn agent.command in
+  List.hd_exn
+    (Adapter_health.of_result
+       [ Acp name ]
+       ~host:"h1"
+       ~host_name:"desktop"
+       ~checked_at:0.
+       { Tool.Result.text =
+           sprintf
+             {|{"programs":[{"name":%S,"path":"/bin/%s","login_shell_path":null,"version":%s,"status":null}],"paths":%s,"env":{}}|}
+             program
+             program
+             (out 0 "1.5.13")
+             files
+       ; is_error = false
+       ; images = []
+       })
+;;
+
+let show_evidence ?(prigh_login = None) ?seen ?(checking = false) s =
+  let s = Adapter_health.Status.with_evidence s ~prigh_login ~seen ~checking in
+  match Adapter_health.Status.to_json ~now:600. s with
+  | `Object fields ->
+    List.iter fields ~f:(fun (k, v) ->
+      match k with
+      | "auth"
+      | "account"
+      | "via"
+      | "prigh_login"
+      | "confirmed_at"
+      | "confirmed"
+      | "login_file"
+      | "checking"
+      | "checkable"
+      | "problem"
+      | "hint" -> printf "  %s: %s\n" k (Json.to_string v)
+      | _ -> ())
+  | _ -> assert false
+;;
+
+let%expect_test "ACP agents' logins: unknown, checking, seen, prigh's" =
+  let s = acp_status "antigravity" in
+  print_endline "nothing known:";
+  show_evidence s;
+  print_endline "checking:";
+  show_evidence s ~checking:true;
+  print_endline "opened a session (the model list) at 300:";
+  show_evidence s ~seen:(Opened { at = 300. });
+  print_endline "refused (-32000 Authentication required):";
+  show_evidence s ~seen:(Refused { at = 300. });
+  print_endline "the check failed:";
+  show_evidence s ~seen:(Check_failed { at = 300.; why = "it timed out" });
+  print_endline "on one of prigh's logins (refused on its own):";
+  show_evidence
+    s
+    ~prigh_login:(Some "Work Google")
+    ~seen:(Refused { at = 300. });
+  print_endline "its token file is there:";
+  show_evidence
+    (acp_status
+       "antigravity"
+       ~files:
+         {|[{"path":"/home/l/.gemini/antigravity-cli/antigravity-oauth-token","exists":true}]|});
+  print_endline "...but a session was refused since:";
+  show_evidence
+    (acp_status
+       "antigravity"
+       ~files:
+         {|[{"path":"/home/l/.gemini/antigravity-cli/antigravity-oauth-token","exists":true}]|})
+    ~seen:(Refused { at = 300. });
+  [%expect
+    {|
+    nothing known:
+      auth: "unknown"
+      checkable: true
+      hint: "Login not checked yet: Check (/adapters refresh) starts Antigravity on desktop briefly to see"
+    checking:
+      auth: "unknown"
+      checking: true
+      hint: "Checking whether Antigravity is logged in on desktop: prigh starts it briefly to see"
+    opened a session (the model list) at 300:
+      auth: "logged_in"
+      via: "session"
+      confirmed_at: 300
+      confirmed: "5m ago"
+    refused (-32000 Authentication required):
+      auth: "logged_out"
+      problem: "Antigravity on desktop is not logged in: run `agy acp --login` there"
+    the check failed:
+      auth: "unknown"
+      checkable: true
+      hint: "Couldn't check whether Antigravity is logged in on desktop (it timed out): Check tries again; if it asks you to log in, run `agy acp --login` there"
+    on one of prigh's logins (refused on its own):
+      auth: "logged_in"
+      via: "prigh_login"
+      prigh_login: "Work Google"
+    its token file is there:
+      auth: "logged_in"
+      via: "login_file"
+      login_file: "/home/l/.gemini/antigravity-cli/antigravity-oauth-token"
+    ...but a session was refused since:
+      auth: "logged_out"
+      problem: "Antigravity on desktop is not logged in: run `agy acp --login` there"
+    |}]
+;;
+
+let%expect_test "every ACP agent: unknown, logged in, logged out" =
+  List.iter
+    [ "opencode"; "gemini"; "antigravity"; "grok"; "goose" ]
+    ~f:(fun name ->
+      let s = acp_status name in
+      printf "%s:\n" name;
+      show_evidence s;
+      show_evidence s ~seen:(Opened { at = 0. });
+      show_evidence s ~seen:(Refused { at = 0. }));
+  [%expect
+    {|
+    opencode:
+      auth: "unknown"
+      checkable: true
+      hint: "Login not checked yet: Check (/adapters refresh) starts OpenCode on desktop briefly to see"
+      auth: "logged_in"
+      via: "session"
+      confirmed_at: 0
+      confirmed: "10m ago"
+      auth: "logged_out"
+      problem: "OpenCode on desktop is not logged in: run `opencode auth login` there"
+    gemini:
+      auth: "unknown"
+      checkable: true
+      hint: "Login not checked yet: Check (/adapters refresh) starts Gemini CLI on desktop briefly to see"
+      auth: "logged_in"
+      via: "session"
+      confirmed_at: 0
+      confirmed: "10m ago"
+      auth: "logged_out"
+      problem: "Gemini CLI on desktop is not logged in: run `gemini` there"
+    antigravity:
+      auth: "unknown"
+      checkable: true
+      hint: "Login not checked yet: Check (/adapters refresh) starts Antigravity on desktop briefly to see"
+      auth: "logged_in"
+      via: "session"
+      confirmed_at: 0
+      confirmed: "10m ago"
+      auth: "logged_out"
+      problem: "Antigravity on desktop is not logged in: run `agy acp --login` there"
+    grok:
+      auth: "unknown"
+      checkable: true
+      hint: "Login not checked yet: Check (/adapters refresh) starts Grok Build on desktop briefly to see"
+      auth: "logged_in"
+      via: "session"
+      confirmed_at: 0
+      confirmed: "10m ago"
+      auth: "logged_out"
+      problem: "Grok Build on desktop is not logged in: run `grok login` there"
+    goose:
+      auth: "unknown"
+      checkable: true
+      hint: "Login not checked yet: Check (/adapters refresh) starts Goose on desktop briefly to see"
+      auth: "logged_in"
+      via: "session"
+      confirmed_at: 0
+      confirmed: "10m ago"
+      auth: "logged_out"
+      problem: "Goose on desktop is not logged in: run `goose configure` there"
+    |}]
+;;
+
+let%expect_test "what is seen: a failed check does not hide a result" =
+  let table = Adapter_health.Seen.Table.create () in
+  let record seen =
+    Adapter_health.Seen.Table.record table ~host:"h1" (Acp "grok") seen;
+    print_s
+      [%sexp
+        (Adapter_health.Seen.Table.find table ~host:"h1" (Acp "grok")
+         : Adapter_health.Seen.t option)]
+  in
+  record (Check_failed { at = 1.; why = "timed out" });
+  record (Opened { at = 2. });
+  record (Check_failed { at = 3.; why = "timed out" });
+  record (Refused { at = 4. });
+  print_s
+    [%sexp
+      (Adapter_health.Seen.Table.find table ~host:"h2" (Acp "grok")
+       : Adapter_health.Seen.t option)];
+  [%expect
+    {|
+    ((Check_failed (at 1) (why "timed out")))
+    ((Opened (at 2)))
+    ((Opened (at 2)))
+    ((Refused (at 4)))
+    ()
+    |}]
+;;
+
 (* Over the RPC, on the backend's own host, with fake CLIs on its PATH. *)
-let with_server ?(engines = Engines.default) ?(home = false) f =
+let with_server ?(engines = Engines.default) ?(home = false) ?spawn_external f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -308,6 +512,7 @@ let with_server ?(engines = Engines.default) ?(home = false) f =
       ~sessions_dir
       ~cwd:t.dir
       ~engines
+      ?spawn_external:(Option.map spawn_external ~f:(fun f -> f ~sw))
       ~new_agent
       ?home:(Option.some_if home t.dir)
       ()
@@ -600,4 +805,106 @@ let%expect_test "Codex on one of prigh's ChatGPT logins: chosen, listed, shown" 
     (adapter_login ())
     {}
     |}]
+;;
+
+(* An ACP agent that is logged in answers [session/new]; one that is not,
+   [-32000 Authentication required]. *)
+let fake_acp ~logged_in (p : Line_transport.Peer.t) =
+  let module C = Test_adapter_catalog in
+  let answer j field value =
+    C.write
+      p
+      (`Object
+          [ "jsonrpc", `String "2.0"
+          ; "id", Option.value_exn (Json.member "id" j)
+          ; field, Json.of_string value
+          ])
+  in
+  let rec loop () =
+    match C.read p with
+    | None -> ()
+    | Some j ->
+      (match C.string_at [ "method" ] j with
+       | Some "initialize" ->
+         answer j "result" {|{"protocolVersion":1,"agentCapabilities":{}}|}
+       | Some "session/new" when logged_in ->
+         answer j "result" {|{"sessionId":"s1"}|}
+       | Some "session/new" ->
+         answer
+           j
+           "error"
+           {|{"code":-32000,"message":"Authentication required"}|}
+       | _ -> ());
+      loop ()
+  in
+  loop ()
+;;
+
+let print_logins json =
+  let adapters =
+    Option.bind (Json.member "result" json) ~f:(Json.member "adapters")
+    |> Option.first_some (Json.member "adapters" json)
+  in
+  match adapters with
+  | Some (`Array items) ->
+    List.iter items ~f:(fun item ->
+      let get k =
+        Option.value_map (Json.member k item) ~default:"-" ~f:Json.to_string
+      in
+      printf
+        "%s auth=%s via=%s checkable=%s\n  %s\n"
+        (get "adapter")
+        (get "auth")
+        (get "via")
+        (get "checkable")
+        (match Json.member "problem" item, Json.member "hint" item with
+         | Some p, _ -> "problem=" ^ Json.to_string p
+         | None, Some h -> "hint=" ^ Json.to_string h
+         | None, None -> "-"))
+  | _ -> print_endline (Json.to_string json)
+;;
+
+let%expect_test "ACP agents' logins: checked by starting them, on Refresh" =
+  let engines =
+    Or_error.ok_exn
+      (Engines.create
+         ~engines:[ Harness; Composer ]
+         ~adapters:[ Acp "antigravity"; Acp "grok" ]
+         ())
+  in
+  let spawned = ref [] in
+  let spawn_external ~sw _agent (launch : Adapter.Launch.t) =
+    let program = List.hd_exn launch.argv in
+    spawned := program :: !spawned;
+    Ok
+      (Line_transport.Peer.spawn
+         ~sw
+         (fake_acp ~logged_in:(String.equal program "agy")))
+  in
+  with_server ~engines ~spawn_external
+  @@ fun t ~call ~events:_ ->
+  script t "agy" {|echo "agy 1.5.13"|};
+  script t "grok" {|echo "grok 1.0.41"|};
+  with_path t (fun () ->
+    ignore (call "hello" : Json.t);
+    print_logins (call ~params:{|{"refresh": true}|} "list_adapters");
+    [%expect
+      {|
+      "acp:antigravity" auth="logged_in" via="session" checkable=-
+        -
+      "acp:grok" auth="logged_out" via=- checkable=-
+        problem="Grok Build on <host> is not logged in: run `grok login` there"
+      |}];
+    (* Known now: neither is started again. *)
+    spawned := [];
+    print_logins (call "list_adapters");
+    print_s [%sexp (!spawned : string list)];
+    [%expect
+      {|
+      "acp:antigravity" auth="logged_in" via="session" checkable=-
+        -
+      "acp:grok" auth="logged_out" via=- checkable=-
+        problem="Grok Build on <host> is not logged in: run `grok login` there"
+      ()
+      |}])
 ;;

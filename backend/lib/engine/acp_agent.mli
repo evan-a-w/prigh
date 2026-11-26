@@ -30,6 +30,10 @@ module Quirks : sig
   type t =
     { login : string option
       (** the command that logs it in, run on the tool host *)
+    ; login_file : string option
+      (** a file whose presence (never its contents) suggests it is logged
+          in, [~] the host's home: Antigravity's token file, which it
+          keeps only when the keyring is out of reach *)
     ; min_version : string option
       (** the oldest version in which [command] speaks ACP *)
     ; prompt_usage : Prompt_usage.t

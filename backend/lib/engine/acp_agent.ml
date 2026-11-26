@@ -19,6 +19,7 @@ module Quirks = struct
 
   type t =
     { login : string option
+    ; login_file : string option
     ; min_version : string option
     ; prompt_usage : Prompt_usage.t
     ; steer : Steer.t
@@ -28,6 +29,7 @@ module Quirks = struct
 
   let none =
     { login = None
+    ; login_file = None
     ; min_version = None
     ; prompt_usage = Ignored
     ; steer = Between_turns
@@ -61,6 +63,7 @@ let known =
     ; quirks =
         { Quirks.none with
           login = Some "agy acp --login"
+        ; login_file = Some "~/.gemini/antigravity-cli/antigravity-oauth-token"
         ; min_version = Some "1.5.0"
         ; prompt_usage = Gemini
         ; steer = Prompt
