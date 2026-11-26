@@ -35,6 +35,15 @@ val create
 
 val feed : t -> Adapter_event.t -> unit
 
+(** The harness was handed a turn: emits [Agent_waiting], and again
+    whenever it goes silent within the turn (its calls ended, a steer was
+    passed on, before a message starts), until the turn ends. *)
+val waiting : t -> unit
+
+(** The harness's process is starting (or resuming its thread): emits
+    [Agent_waiting] with [starting]. *)
+val starting : t -> unit
+
 (** A message the user sent while the harness worked (a steer the runner
     passed on): recorded and emitted at once when no call is open, else
     after the open calls end (by the end of the turn at the latest), so

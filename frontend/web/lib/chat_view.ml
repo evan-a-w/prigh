@@ -589,37 +589,7 @@ and assistant
     | Some runs, _ -> Activity_runs.continues runs n
   in
   let pending =
-    if streaming && count = 0 && not in_box
-    then (
-      let label, detail =
-        match Chat.activity chat with
-        | Retrying { attempt; max_attempts; error; delay_ms } ->
-          ( sprintf
-              "Retrying in %s (attempt %d of %d)…"
-              (Prigh_ui.Activity.seconds delay_ms)
-              attempt
-              max_attempts
-          , Some error )
-        | Waiting (Some { attempt; max_attempts; error; delay_ms = _ }) ->
-          ( sprintf
-              "Waiting for the model (attempt %d of %d)…"
-              attempt
-              max_attempts
-          , Some error )
-        | _ -> "Waiting for the model…", None
-      in
-      div
-        "pending"
-        [ Html.lamp ()
-        ; span "label" label
-        ; Node.span
-            ~attrs:[ Attr.class_ "stop-hint" ]
-            [ Loon.Kbd.view [ Node.text "Esc" ]; Node.text " to stop" ]
-        ; (match detail with
-           | Some error -> div "detail" [ Node.text ("after: " ^ error) ]
-           | None -> Node.none)
-        ])
-    else Node.none
+    if streaming && count = 0 && not in_box then pending chat else Node.none
   in
   let stopped = if Fold.shows fold Notes then stopped message else Node.none in
   if
@@ -640,6 +610,36 @@ and assistant
             then Node.none
             else footer times message)
          ])
+
+(* The lamp of a reply nothing of is shown yet: what it waits for. *)
+and pending chat =
+  let label, detail =
+    match Chat.activity chat with
+    | Retrying { attempt; max_attempts; error; delay_ms } ->
+      ( sprintf
+          "Retrying in %s (attempt %d of %d)…"
+          (Prigh_ui.Activity.seconds delay_ms)
+          attempt
+          max_attempts
+      , Some error )
+    | Waiting (Some { attempt; max_attempts; error; delay_ms = _ }) ->
+      ( sprintf "Waiting for the model (attempt %d of %d)…" attempt max_attempts
+      , Some error )
+    | Starting agent -> sprintf "Starting %s…" agent, None
+    | Waiting_for agent -> sprintf "Waiting for %s…" agent, None
+    | _ -> "Waiting for the model…", None
+  in
+  div
+    "pending"
+    [ Html.lamp ()
+    ; span "label" label
+    ; Node.span
+        ~attrs:[ Attr.class_ "stop-hint" ]
+        [ Loon.Kbd.view [ Node.text "Esc" ]; Node.text " to stop" ]
+    ; (match detail with
+       | Some error -> div "detail" [ Node.text ("after: " ^ error) ]
+       | None -> Node.none)
+    ]
 
 (* Quiet: a run of steps as one line saying what it is doing, or what it
    did and how long it took; the line opens the steps, each a line that
@@ -1175,6 +1175,15 @@ and entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat =
                  (Int.to_string i)
                  (entry ?menu ?index ?quiet ~ui ~fold times chat ~n:i e)
                :: rev_nodes) )))
+  in
+  (* An agent CLI asked for a reply has said nothing yet: no message of it
+     streams, as the model's does from its asking. *)
+  let rev_nodes =
+    match Chat.activity chat, Chat.streaming chat with
+    | (Starting _ | Waiting_for _), None when Chat.running chat ->
+      keyed "waiting" (div "msg assistant streaming" [ pending chat ])
+      :: rev_nodes
+    | _ -> rev_nodes
   in
   div "entries" (List.rev rev_nodes)
 ;;

@@ -82,8 +82,12 @@ let rec summarise (e : Event.t) : string option =
   match e with
   | Message_update { delta = Text_delta t; _ } ->
     Some (sprintf "text_delta %S" t)
-  | Message_update _ | Agent_start | Agent_end _ | Turn_start | Turn_end _ ->
-    None
+  | Message_update _
+  | Agent_start
+  | Agent_end _
+  | Turn_start
+  | Turn_end _
+  | Agent_waiting _ -> None
   | Message_start (User { text = t; _ }) -> Some (sprintf "user %S" t)
   | Message_start _ -> Some "message_start"
   | Message_end (Assistant a) ->

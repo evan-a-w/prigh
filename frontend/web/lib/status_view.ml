@@ -57,7 +57,7 @@ let doing (m : App.Model.t) =
     then Working "Sending…"
     else if state.running
     then (
-      let doing = Chat.activity m.chat in
+      let doing = App.Model.activity m in
       let text =
         String.capitalize
           (Option.value (Prigh_ui.Activity.label doing) ~default:"working")

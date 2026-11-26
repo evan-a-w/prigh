@@ -1163,6 +1163,13 @@ module Model = struct
 
   let waiting t = not (List.is_empty t.confirms && List.is_empty t.questions)
 
+  let activity t =
+    Prigh_ui.Activity.asking
+      (Chat.activity t.chat)
+      ~confirms:(not (List.is_empty t.confirms))
+      ~questions:(not (List.is_empty t.questions))
+  ;;
+
   let active t =
     match t.state with
     | Some s ->

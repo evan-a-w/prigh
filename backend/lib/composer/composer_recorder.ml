@@ -60,6 +60,7 @@ type t =
   ; mutable plans : int
   ; mutable finished : bool
   ; mutable steered : Message.t list (* reversed: waiting for open calls *)
+  ; mutable in_turn : bool (* the harness was asked and has not ended *)
   }
 
 let model_name = External_model.name
@@ -88,6 +89,7 @@ let create ~adapter ~model ~emit ~notice ~prompts =
   ; plans = 0
   ; finished = false
   ; steered = []
+  ; in_turn = false
   }
 ;;
 
@@ -156,8 +158,34 @@ let delta t (o : Open_message.t) event =
        })
 ;;
 
+(* The harness, for people: [Codex], [Claude Code]. *)
+let label t =
+  match Adapter_id.of_string t.adapter with
+  | Ok adapter -> Adapter_id.label adapter
+  | Error _ -> t.adapter
+;;
+
+let emit_waiting t =
+  t.emit (Agent_waiting { agent = label t; starting = false })
+;;
+
+let starting t = t.emit (Agent_waiting { agent = label t; starting = true })
+
+let waiting t =
+  t.in_turn <- true;
+  emit_waiting t
+;;
+
+(* Between steps of a turn: the harness works on, silent until it says
+   more. *)
+let waiting_again t =
+  if t.in_turn && Option.is_none t.open_ && List.is_empty t.steps
+  then emit_waiting t
+;;
+
 let open_new t =
   t.emit Turn_start;
+  emit_waiting t;
   let o =
     { Open_message.builder = Assistant_builder.create ~model:t.model
     ; stream = Agent_loop.next_stream ()
@@ -390,7 +418,8 @@ let rec end_call t (c : Call.t) ~ok ~output ~changes ~images =
           (Turn_end
              { assistant = step.assistant
              ; tool_results = List.rev step.results
-             }))))
+             }));
+      if not (List.is_empty done_) then waiting_again t))
 
 (* Ends, as cancelled (or denied), the calls still running: those under the
    subagent call [under], or all; the latest first, so a subagent's calls
@@ -456,11 +485,15 @@ let user_message t m =
   | Some o when not (List.is_empty o.calls) -> ()
   | Some _ ->
     close t ~stop_reason:End_turn;
-    flush_steered t
-  | None -> flush_steered t
+    flush_steered t;
+    waiting_again t
+  | None ->
+    flush_steered t;
+    waiting_again t
 ;;
 
 let turn_end t (stop : Adapter_event.Stop.t) =
+  t.in_turn <- false;
   t.stop <- Some stop;
   let stop_reason : Stop_reason.t =
     match stop with
@@ -483,20 +516,15 @@ let turn_end t (stop : Adapter_event.Stop.t) =
   flush_steered t
 ;;
 
-(* The harness, for people: [Codex], [Claude Code]. *)
-let label t =
-  match Adapter_id.of_string t.adapter with
-  | Ok adapter -> Adapter_id.label adapter
-  | Error _ -> t.adapter
-;;
-
 let feed t (event : Adapter_event.t) =
   match event with
   | Thread_started { thread_id; model } ->
     t.thread_id <- Some thread_id;
     Option.iter model ~f:(fun model ->
       t.model <- model_name ~adapter:t.adapter (Some model))
-  | Turn_started _ -> t.stop <- None
+  | Turn_started _ ->
+    t.stop <- None;
+    t.in_turn <- true
   | Text_delta { item; text } -> text_delta t ~thinking:false ~item text
   | Text_done { item; text } -> text_done t ~thinking:false ~item text
   | Thinking_delta { item; text } -> text_delta t ~thinking:true ~item text

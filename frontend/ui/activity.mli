@@ -14,6 +14,12 @@ type t =
   | Thinking
   | Writing
   | Running_tools
+  | Starting of string
+  (** the agent CLI a composer session runs on ("Codex") is starting *)
+  | Waiting_for of string
+  (** the agent CLI was asked, and has said nothing since *)
+  | Approving (** waits for the user to approve a call *)
+  | Answering (** waits for the user to answer its questions *)
 [@@deriving sexp_of, equal]
 
 (** For an agent the backend says is running or not. *)
@@ -21,6 +27,10 @@ val of_running : bool -> t
 
 (** The top level events of one agent (not those of its subagents). *)
 val apply : t -> P.Event.t -> t
+
+(** [t] while the user is asked to approve calls ([confirms]) or answer
+    questions ([questions]): what the agent waits for then. *)
+val asking : t -> confirms:bool -> questions:bool -> t
 
 (** [t] as the backend's state has it: [Idle] when not running, at least
     [Working] when it is. *)

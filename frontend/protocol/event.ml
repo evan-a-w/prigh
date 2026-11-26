@@ -45,6 +45,10 @@ type t =
   | Message_update of Stream_update.t
   | Message_end of Message.t
   | Retry of Retry.t
+  | Agent_waiting of
+      { agent : string
+      ; starting : bool
+      }
   | Tool_start of Tool_call.t
   | Tool_output of
       { call_id : string
@@ -196,6 +200,10 @@ let rec of_json j =
   | "message_end" ->
     Json.object_field j "message" >>= Message.of_json >>| fun m -> Message_end m
   | "retry" -> Retry.of_json j >>| fun r -> Retry r
+  | "agent_waiting" ->
+    let%bind agent = Json.string_field j "agent" in
+    let%map starting = Json.bool_default_field j "starting" ~default:false in
+    Agent_waiting { agent; starting }
   | "tool_start" ->
     Json.object_field j "call" >>= Tool_call.of_json >>| fun c -> Tool_start c
   | "tool_output" ->

@@ -9,7 +9,8 @@ open! Import
 val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** What the current session's agent is doing, for its row: ["thinking…"]
-    (or waiting for the model), ["retrying…"] or ["working…"] (also while
+    (or waiting for the model or its agent CLI), ["starting…"] (its agent
+    CLI), ["waiting for you…"], ["retrying…"] or ["working…"] (also while
     only its subagents run); [None] when nothing runs. *)
 val current_activity : App.Model.t -> string option
 

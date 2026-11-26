@@ -315,7 +315,9 @@ The composer (`composer/`), from the bottom up:
   it (`Canonical_tool`: `Bash` and `commandExecution` are `bash`,
   `fileChange` is `apply_patch`, `TodoWrite` is `update_plan`, `Task` a
   nested subagent), so cards, diffs, approval rules, search and plans work
-  unchanged.
+  unchanged. Where the harness's model would be waited for, it emits
+  `agent_waiting` (the CLI starting, asked, or silent between steps), which
+  the frontends show as "Starting Codex…" or "Waiting for Codex…".
 - **`Injected_tools`** serves prigh's tools the agents lack (`render_ui`,
   `memory`, `custom_instructions`, `sessions`, `ask_session`, the forge
   tools, `worktree`; `ask_user` for agents without questions of their own)
