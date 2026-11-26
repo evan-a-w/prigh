@@ -205,7 +205,7 @@ let%expect_test
     <div class="flex gap-0.5 items-center panel-toggles">
     <Vdom.Node.none-widget class="">
     Branch feature/a-rather-long-branch-for-the-sidebar-card
-    <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center link loon max-w-[24ch] mode narrow:h-11 narrow:text-sm overflow-hidden plan px-2 py-0.5 rounded-4xl shrink-0 status-item text-muted-foreground text-xs transition-all w-fit whitespace-nowrap">
+    <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-start link loon max-w-[36ch] mode narrow:h-11 narrow:max-w-full narrow:text-sm overflow-hidden plan px-2 py-0.5 rounded-4xl shrink-0 status-item text-muted-foreground text-xs transition-all w-fit whitespace-nowrap">
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nc7\
@@ -259,7 +259,7 @@ let%expect_test
                             \n/work") (purpose (Sidebar 5)))))
     (Sessions (Ctrl+B))
     New session
-    (plan 1/2: Final nix GC)
+    (Plan: Final nix GC)
     (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     (Run /todos)

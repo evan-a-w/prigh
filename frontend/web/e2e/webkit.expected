@@ -425,7 +425,7 @@ Test it
 === webkit: plan mode off ===
 Context 0% full, $<COST>: details
 mode: Auto: never asks
-plan 0/2: Write the schema
+Plan: Write the schema
 <HOSTNAME>
 V4.1 Flash
 === webkit: implementing ===
