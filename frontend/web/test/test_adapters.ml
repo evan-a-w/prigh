@@ -398,3 +398,24 @@ let%expect_test "Engines: importing the host's Codex login asks first" =
     Codex runs on "imported from laptop" from its next turn: laptop's file is now /home/u/.codex/auth.json.moved-to-prigh
     |}]
 ;;
+
+let%expect_test "Engines: Antigravity's login, on a shared Google login" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (hello ~features:[ "engines" ]));
+  H.quiet h (fun () -> H.act h (Settings_section Engines));
+  H.reply
+    h
+    "list_adapters"
+    {|{"adapters":[],"adapter_logins":[{"adapter":"acp:antigravity","provider":"google-antigravity","login":"~alice/g","label":"Alice's Google","choices":[{"ref":"~alice/g","label":"Alice's Google"}]}]}|};
+  H.text h ~selector:".adapter-login";
+  H.click h ~selector:".adapter-login-acp-antigravity .adapter-login-import";
+  [%expect
+    {|
+    Antigravity login
+    Your Antigravity sessions run on Antigravity's own login on their tool host, or on one of your Antigravity (Google) logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login. Import moves the tool host's own login into prigh.
+    (Alice's Google) (Import)
+    (Run "/adapters import acp:antigravity")
+    (Rpc (method_ import_adapter_login) (params ((adapter acp:antigravity)))
+     (tag Adapter_import_found))
+    |}]
+;;

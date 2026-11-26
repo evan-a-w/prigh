@@ -396,6 +396,17 @@ access token on a private descriptor (`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`)
 not in its environment, so the commands it runs never see it; a tool host
 whose prigh predates that gets it in `CLAUDE_CODE_OAUTH_TOKEN`, with a notice
 to update prigh there. An API key goes in `ANTHROPIC_API_KEY`.
+Antigravity (`acp:antigravity`) can run on an Antigravity (Google) login
+(`google-antigravity`): `/adapters import antigravity` moves agy's Google login
+from a tool host (its `~/.gemini/antigravity-cli/antigravity-oauth-token`, or
+the Linux keyring, which it then clears: Google does not retire copies), and
+`/login google-antigravity` signs in with Google's Antigravity client, which
+prigh finds in an installed `agy` (or `PRIGH_ANTIGRAVITY_CLIENT_ID`/`_SECRET`).
+Each agy process gets an access token alone, in a private `--gemini-dir` that
+links the rest of `~/.gemini` and is deleted at exit, with the keyring cut
+off; prigh restarts it on the session before the token expires. Settings →
+Usage shows its plan and 5-hour/weekly limits per model group, from Google's
+Code Assist quota summary.
 
 With `prigh serve -tokens`, a user can share one of their built-in
 providers' logins with other users: `/accounts share LOGIN [with USER]`

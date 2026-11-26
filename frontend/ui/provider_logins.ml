@@ -771,7 +771,7 @@ let no_choice auth (state : P.State.t) =
            who
            label
            adapter
-       | None, ("codex" | "claude") ->
+       | None, ("codex" | "claude" | "acp:antigravity") ->
          sprintf
            "%s uses its own login: /adapters login %s runs it on one of \
             prigh's, or sign in through its CLI"
@@ -818,6 +818,10 @@ let share_note (l : Login.t) =
     Some
       "Their Claude Code sessions can run on it too: their tool host gets \
        short-lived access tokens (against Anthropic's terms for Pro/Max)"
+  | "google-antigravity" ->
+    Some
+      "Their Antigravity sessions can run on it too: their tool host gets \
+       short-lived access tokens"
   | _ -> None
 ;;
 

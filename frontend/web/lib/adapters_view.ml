@@ -113,7 +113,11 @@ let login_row ~inject (l : Adapter_login.t) =
     | Some c -> c.label
   in
   row
-    ~cls:("adapter-login adapter-login-" ^ l.adapter)
+    ~cls:
+      ("adapter-login adapter-login-"
+       ^ String.map l.adapter ~f:(function
+         | ':' -> '-'
+         | c -> c))
     ~name:(who ^ " login")
     ?note:(Option.map (Adapter_login.warning l) ~f:(fun w -> "warm", w))
     ~about:

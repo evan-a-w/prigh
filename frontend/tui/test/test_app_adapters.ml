@@ -426,8 +426,56 @@ let%expect_test "/adapters import claude laptop: asks first, then moves it" =
 
     ▌ earlier question
       earlier answer
-    ─── which CLI? /adapters import codex|claude [HOST] moves that host's login into prigh ───
+    ───── which CLI? /adapters import codex|claude|antigravity [HOST] moves its login here ───
     > /adapters import▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/adapters import antigravity: from the keyring, then cleared" =
+  let reply ~confirmed =
+    sprintf
+      {|{"confirmed":%b,"adapter":"acp:antigravity","provider":"google-antigravity","host":"laptop","path":"keyring","label":"imported from laptop","warning":"Antigravity on laptop will stop being logged in.","note":null,"adapter_logins":[]}|}
+      confirmed
+  in
+  let h = connected () in
+  run h "/adapters import antigravity";
+  H.reply h Adapter_import_found (reply ~confirmed:false);
+  H.enter h;
+  H.reply h Adapter_imported (reply ~confirmed:true);
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ import_adapter_login)
+      (params ((adapter acp:antigravity)))
+      (tag Adapter_import_found))
+    (Rpc
+      (method_ import_adapter_login)
+      (params (
+        (adapter acp:antigravity)
+        (host    laptop)
+        (confirm true)))
+      (tag Adapter_imported))
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Notice ───────────────────────────────────────────────────────────────────────────────┐
+    │ Antigravity runs on "imported from laptop" from its next turn: its login is cleared    │
+    │ from laptop's keyring                                                                  │
+    └──────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;

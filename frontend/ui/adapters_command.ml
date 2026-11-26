@@ -20,6 +20,13 @@ module Action = struct
   [@@deriving sexp_of, equal]
 end
 
+(* What the user may type for an adapter whose id is longer. *)
+let canonical adapter =
+  match String.lowercase adapter with
+  | "antigravity" | "agy" -> "acp:antigravity"
+  | _ -> adapter
+;;
+
 let parse rest =
   match
     String.split (String.strip rest) ~on:' '
@@ -28,18 +35,26 @@ let parse rest =
   | [] -> Ok (Action.List { refresh = false })
   | [ "refresh" ] -> Ok (List { refresh = true })
   | [ "login" ] -> Ok (Login { adapter = None; login = None })
-  | [ "login"; adapter ] -> Ok (Login { adapter = Some adapter; login = None })
+  | [ "login"; adapter ] ->
+    Ok (Login { adapter = Some (canonical adapter); login = None })
   | [ "import" ] ->
     Or_error.error_string
-      "which CLI? /adapters import codex|claude [HOST] moves that host's login \
-       into prigh"
-  | [ "import"; adapter ] -> Ok (Import { adapter; host = None })
+      "which CLI? /adapters import codex|claude|antigravity [HOST] moves its \
+       login here"
+  | [ "import"; adapter ] ->
+    Ok (Import { adapter = canonical adapter; host = None })
   | "import" :: adapter :: host ->
-    Ok (Import { adapter; host = Some (String.concat ~sep:" " host) })
+    Ok
+      (Import
+         { adapter = canonical adapter
+         ; host = Some (String.concat ~sep:" " host)
+         })
   | "login" :: adapter :: login ->
     Ok
       (Login
-         { adapter = Some adapter; login = Some (String.concat ~sep:" " login) })
+         { adapter = Some (canonical adapter)
+         ; login = Some (String.concat ~sep:" " login)
+         })
   | _ -> Or_error.errorf "unknown argument %S: %s" (String.strip rest) usage
 ;;
 
