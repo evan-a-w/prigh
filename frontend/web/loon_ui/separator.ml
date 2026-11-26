@@ -12,7 +12,12 @@ module Orientation = struct
   ;;
 end
 
-let view ?(attrs = []) ?class_ ?(orientation = Orientation.Horizontal) ?(decorative = true) ()
+let view
+      ?(attrs = [])
+      ?class_
+      ?(orientation = Orientation.Horizontal)
+      ?(decorative = true)
+      ()
   =
   let role =
     if decorative

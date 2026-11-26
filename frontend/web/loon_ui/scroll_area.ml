@@ -482,11 +482,12 @@ let scroll_bar ?(attrs = []) ?class_ ?(orientation = Orientation.Vertical) () =
        ; data "slot" "scroll-area-scrollbar"
        ; Cn.with_class
            ?class_
-           [ "data-horizontal:h-2.5 data-horizontal:flex-col data-horizontal:border-t \
-              data-horizontal:border-t-transparent data-vertical:h-full \
-              data-vertical:w-2.5 data-vertical:border-l \
-              data-vertical:border-l-transparent flex touch-none p-px transition-colors \
-              select-none" ]
+           [ "data-horizontal:h-2.5 data-horizontal:flex-col \
+              data-horizontal:border-t data-horizontal:border-t-transparent \
+              data-vertical:h-full data-vertical:w-2.5 data-vertical:border-l \
+              data-vertical:border-l-transparent flex touch-none p-px \
+              transition-colors select-none"
+           ]
        ; Attr.create
            "style"
            (match orientation with
@@ -539,9 +540,9 @@ let root
           [ Attr.create "data-radix-scroll-area-viewport" ""
           ; data "slot" "scroll-area-viewport"
           ; Attr.class_
-              "size-full rounded-[inherit] transition-[color,box-shadow] outline-none \
-               focus-visible:ring-[3px] focus-visible:ring-ring/50 \
-               focus-visible:outline-1"
+              "size-full rounded-[inherit] transition-[color,box-shadow] \
+               outline-none focus-visible:ring-[3px] \
+               focus-visible:ring-ring/50 focus-visible:outline-1"
           ; Attr.create "style" "overflow: hidden;"
           ]
         [ Node.div

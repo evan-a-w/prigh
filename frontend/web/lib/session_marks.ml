@@ -51,5 +51,6 @@ let prune t ~paths =
 ;;
 
 let marked t sessions =
-  List.filter sessions ~f:(fun (s : Session_summary.t) -> Set.mem t.marked s.path)
+  List.filter sessions ~f:(fun (s : Session_summary.t) ->
+    Set.mem t.marked s.path)
 ;;

@@ -18,8 +18,9 @@ let list ?(attrs = []) ?class_ children =
       ([ data "slot" "breadcrumb-list"
        ; Cn.with_class
            ?class_
-           [ "text-muted-foreground gap-1.5 text-sm flex flex-wrap items-center \
-              wrap-break-word" ]
+           [ "text-muted-foreground gap-1.5 text-sm flex flex-wrap \
+              items-center wrap-break-word"
+           ]
        ]
        @ attrs)
     children

@@ -424,7 +424,7 @@ val layout : Model.t -> Layout.t
 val transcript_rows : Model.t -> int
 
 val init : Model.t
-val format_tokens : int -> string
+val format_tokens : float -> string
 
 (** [path] with the active tool host's home directory (from the state's
     [hosts]; this frontend's own when that host is ours and did not say, or

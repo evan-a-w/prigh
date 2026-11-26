@@ -3,7 +3,10 @@
 open! Core
 open Bonsai_web
 
-val component : tip:Tip.t Bonsai.t -> local_ Bonsai.graph -> Vdom.Node.t Bonsai.t
+val component
+  :  tip:Tip.t Bonsai.t
+  -> local_ Bonsai.graph
+  -> Vdom.Node.t Bonsai.t
 
 (** [#question]: an ask_user-style question above the composer. *)
 val question : tip:Tip.t Bonsai.t -> local_ Bonsai.graph -> Vdom.Node.t Bonsai.t

@@ -22,7 +22,6 @@
     ]} *)
 
 open! Import
-
 module Curve = Chart_path.Curve
 
 (** A data value: a row's fields are numbers or text. *)
@@ -93,7 +92,13 @@ module Margin : sig
 end
 
 (** Recharts' [margin]; sides not given are 5. *)
-val margin : ?top:float -> ?right:float -> ?bottom:float -> ?left:float -> unit -> Margin.t
+val margin
+  :  ?top:float
+  -> ?right:float
+  -> ?bottom:float
+  -> ?left:float
+  -> unit
+  -> Margin.t
 
 module Layout : sig
   (** [Vertical] is Recharts' [layout="vertical"]: categories down the Y
@@ -318,7 +323,8 @@ module Rectangle_props : sig
     ; y : float
     ; width : float
     ; height : float
-    ; radius : [ `All of float | `Corners of float * float * float * float ] option
+    ; radius :
+        [ `All of float | `Corners of float * float * float * float ] option
     ; fill : string
     ; index : int
     ; row : row
@@ -326,7 +332,11 @@ module Rectangle_props : sig
 end
 
 (** Recharts' [<Rectangle>] (a bar). *)
-val rectangle : ?attrs:Attr.t list -> ?class_:string -> Rectangle_props.t -> Node.t
+val rectangle
+  :  ?attrs:Attr.t list
+  -> ?class_:string
+  -> Rectangle_props.t
+  -> Node.t
 
 module Sector_props : sig
   type t =
@@ -617,7 +627,12 @@ val bar_chart
   -> element list
   -> Spec.t
 
-val line_chart : ?margin:Margin.t -> ?layout:Layout.t -> data:row list -> element list -> Spec.t
+val line_chart
+  :  ?margin:Margin.t
+  -> ?layout:Layout.t
+  -> data:row list
+  -> element list
+  -> Spec.t
 
 (** A pie chart's data is its [pie]s'. *)
 val pie_chart : ?margin:Margin.t -> element list -> Spec.t

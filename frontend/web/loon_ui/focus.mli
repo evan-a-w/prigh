@@ -21,7 +21,9 @@ val guard : id:string -> [ `Start | `End ] -> Node.t
     where it is (Radix's prevented [onOpenAutoFocus]). When it leaves the page
     with the focus, the focus goes back to the element that had it before
     (Radix's FocusScope). *)
-val on_mount : [ `First_tabbable | `Keep | `Self | `Selector of string ] -> Attr.t
+val on_mount
+  :  [ `First_tabbable | `Keep | `Self | `Selector of string ]
+  -> Attr.t
 
 (** For the overlays closing in this render: no focus back where it was
     when they leave the page (Radix's onCloseAutoFocus prevented, as a
@@ -40,4 +42,6 @@ val when_ : bool -> Attr.t
 (** For a container's [keydown]: Tab on its last tabbable element goes to
     its first, Shift+Tab on its first to its last (Radix's FocusScope with
     [loop], as a non-modal popover's content). *)
-val loop_tab : Js_of_ocaml.Dom_html.keyboardEvent Js_of_ocaml.Js.t -> unit Effect.t
+val loop_tab
+  :  Js_of_ocaml.Dom_html.keyboardEvent Js_of_ocaml.Js.t
+  -> unit Effect.t

@@ -589,13 +589,15 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "/login with git-host arguments: completed, then sent as \
-                 forge_login; GitHub's device code"
+let%expect_test
+    "/login with git-host arguments: completed, then sent as forge_login; \
+     GitHub's device code"
   =
   let h = connected () in
   H.keys h "/login g";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -690,7 +692,8 @@ let%expect_test "/login with git-host arguments: completed, then sent as \
                 { message = "Or paste a token instead"; allow_empty = false }
           }));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ forge_login)
       (params (

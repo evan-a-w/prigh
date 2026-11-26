@@ -67,7 +67,8 @@ let of_event (event : P.Event.t) ~where =
   | Message_start (User user) ->
     (match P.Message.User.source user with
      | Some { kind = Delivery; title } ->
-       Some { title = "prigh: background work finished in " ^ where; body = title }
+       Some
+         { title = "prigh: background work finished in " ^ where; body = title }
      | Some _ | None -> None)
   | _ -> None
 ;;

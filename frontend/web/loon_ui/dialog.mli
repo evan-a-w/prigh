@@ -74,4 +74,9 @@ val footer
 val title : ?attrs:Attr.t list -> ?class_:string -> t -> Node.t list -> Node.t
 
 (** Its accessible description. *)
-val description : ?attrs:Attr.t list -> ?class_:string -> t -> Node.t list -> Node.t
+val description
+  :  ?attrs:Attr.t list
+  -> ?class_:string
+  -> t
+  -> Node.t list
+  -> Node.t

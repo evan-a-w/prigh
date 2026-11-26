@@ -4221,7 +4221,7 @@ let%expect_test
     (Subagent_end
        { call_id = "c1"
        ; agent_id = "a1"
-       ; usage = { input = 10; output = 5; cache_read = 0 }
+       ; usage = { input = 10.; output = 5.; cache_read = 0. }
        ; turns = 1
        ; cost_usd = 0.
        ; result = { text = report; is_error = true }
@@ -4521,7 +4521,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     (Subagent_end
        { call_id = "c2"
        ; agent_id = "c2"
-       ; usage = { input = 10; output = 5; cache_read = 0 }
+       ; usage = { input = 10.; output = 5.; cache_read = 0. }
        ; turns = 1
        ; cost_usd = 0.02
        ; result = { text = "all tests pass"; is_error = false }
@@ -4783,7 +4783,7 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
     (Subagent_end
        { call_id = "c2"
        ; agent_id = "c2"
-       ; usage = { input = 1; output = 2; cache_read = 0 }
+       ; usage = { input = 1.; output = 2.; cache_read = 0. }
        ; turns = 3
        ; cost_usd = 0.02
        ; result = { text = "green"; is_error = false }
@@ -4850,7 +4850,7 @@ let%expect_test "new user prompt clears finished agents" =
     (Subagent_end
        { call_id = "c1"
        ; agent_id = "c1"
-       ; usage = { input = 1; output = 2; cache_read = 0 }
+       ; usage = { input = 1.; output = 2.; cache_read = 0. }
        ; turns = 1
        ; cost_usd = 0.01
        ; result = { text = "done"; is_error = false }
@@ -4916,7 +4916,7 @@ let%expect_test "session reload drops subagent transcripts and focus" =
     (Subagent_end
        { call_id = "c1"
        ; agent_id = "c1"
-       ; usage = { input = 1; output = 1; cache_read = 0 }
+       ; usage = { input = 1.; output = 1.; cache_read = 0. }
        ; turns = 1
        ; cost_usd = 0.0
        ; result = { text = "report"; is_error = false }
@@ -5043,7 +5043,7 @@ let%expect_test "nested subagent events recurse into the parent's children" =
            Subagent_end
              { call_id = "c1"
              ; agent_id = "p/c1"
-             ; usage = { input = 1; output = 1; cache_read = 0 }
+             ; usage = { input = 1.; output = 1.; cache_read = 0. }
              ; turns = 1
              ; cost_usd = 0.0
              ; result = { text = "inner done"; is_error = false }
@@ -5891,7 +5891,7 @@ let%expect_test
     (Subagent_end
        { call_id = "c2"
        ; agent_id = "c2"
-       ; usage = { input = 1; output = 0; cache_read = 0 }
+       ; usage = { input = 1.; output = 0.; cache_read = 0. }
        ; turns = 1
        ; cost_usd = 0.02
        ; result = { text = "ok"; is_error = false }
@@ -7432,7 +7432,7 @@ let with_agents ~width ~height =
     (Subagent_end
        { call_id = "c2"
        ; agent_id = "c2"
-       ; usage = { input = 10; output = 5; cache_read = 0 }
+       ; usage = { input = 10.; output = 5.; cache_read = 0. }
        ; turns = 1
        ; cost_usd = 0.02
        ; result = { text = "all tests pass"; is_error = false }

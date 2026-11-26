@@ -35,7 +35,12 @@ end
 
 (** shadcn's [buttonVariants]: the classes of a button of this variant and
     size, then [class_], for other elements that should look like one. *)
-val classes : ?variant:Variant.t -> ?size:Size.t -> ?class_:string -> unit -> string
+val classes
+  :  ?variant:Variant.t
+  -> ?size:Size.t
+  -> ?class_:string
+  -> unit
+  -> string
 
 (** A [<button>] ([type="button"] unless [type_] says otherwise). *)
 val view

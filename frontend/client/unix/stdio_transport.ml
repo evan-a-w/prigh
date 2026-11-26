@@ -20,8 +20,9 @@ let spawn ?env ~prog ~args () =
             upon
               (Clock.after (Time_float.Span.of_sec 2.))
               (fun () ->
-                if not (Deferred.is_determined closed)
-                then Signal_unix.send_i Signal.kill (`Pid (Process.pid process))))
+                 if not (Deferred.is_determined closed)
+                 then
+                   Signal_unix.send_i Signal.kill (`Pid (Process.pid process))))
       ; closed
       }
 ;;

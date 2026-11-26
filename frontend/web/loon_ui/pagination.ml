@@ -80,7 +80,9 @@ let link
        ; data "variant" (Button.Variant.name variant)
        ; data "size" (Button.Size.name size)
        ]
-       @ (if is_active then [ aria "current" "page"; data "active" "true" ] else [])
+       @ (if is_active
+          then [ aria "current" "page"; data "active" "true" ]
+          else [])
        @ [ Attr.class_
              (Button.classes
                 ~variant
@@ -104,13 +106,8 @@ let previous ?(attrs = []) ?class_ ?(text = "Previous") ?href ?on_click () =
     ~class_:(Cn.cn ([ "pl-1.5!" ] @ Option.to_list class_))
     ?href
     ?on_click
-    [ Icon.view
-        ~attrs:[ data "icon" "inline-start" ]
-        ~class_:""
-        Chevron_left
-    ; Node.span
-        ~attrs:[ Attr.class_ "hidden sm:block" ]
-        [ Node.text text ]
+    [ Icon.view ~attrs:[ data "icon" "inline-start" ] ~class_:"" Chevron_left
+    ; Node.span ~attrs:[ Attr.class_ "hidden sm:block" ] [ Node.text text ]
     ]
 ;;
 
@@ -121,9 +118,7 @@ let next ?(attrs = []) ?class_ ?(text = "Next") ?href ?on_click () =
     ~class_:(Cn.cn ([ "pr-1.5!" ] @ Option.to_list class_))
     ?href
     ?on_click
-    [ Node.span
-        ~attrs:[ Attr.class_ "hidden sm:block" ]
-        [ Node.text text ]
+    [ Node.span ~attrs:[ Attr.class_ "hidden sm:block" ] [ Node.text text ]
     ; Icon.view ~attrs:[ data "icon" "inline-end" ] ~class_:"" Chevron_right
     ]
 ;;
@@ -136,7 +131,8 @@ let ellipsis ?(attrs = []) ?class_ () =
        ; Cn.with_class
            ?class_
            [ "size-8 [&_svg:not([class*='size-'])]:size-4 flex items-center \
-              justify-center" ]
+              justify-center"
+           ]
        ]
        @ attrs)
     [ Icon.view Ellipsis

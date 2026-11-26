@@ -31,7 +31,12 @@ module Size : sig
 end
 
 (** shadcn's [toggleVariants]: the classes of a toggle, then [class_]. *)
-val classes : ?variant:Variant.t -> ?size:Size.t -> ?class_:string -> unit -> string
+val classes
+  :  ?variant:Variant.t
+  -> ?size:Size.t
+  -> ?class_:string
+  -> unit
+  -> string
 
 (** Controlled. Give an icon-only toggle an [aria-label] in [attrs]. *)
 val view

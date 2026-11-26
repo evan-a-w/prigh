@@ -47,7 +47,8 @@ let set ?(attrs = []) ?class_ children =
        ; Cn.with_class
            ?class_
            [ "gap-4 has-[>[data-slot=checkbox-group]]:gap-3 \
-              has-[>[data-slot=radio-group]]:gap-3 flex flex-col" ]
+              has-[>[data-slot=radio-group]]:gap-3 flex flex-col"
+           ]
        ]
        @ attrs)
     children
@@ -61,7 +62,8 @@ let legend ?(attrs = []) ?class_ ?(variant = Legend_variant.Legend) children =
        ; Cn.with_class
            ?class_
            [ "mb-1.5 font-medium data-[variant=label]:text-sm \
-              data-[variant=legend]:text-base" ]
+              data-[variant=legend]:text-base"
+           ]
        ]
        @ attrs)
     children
@@ -73,8 +75,9 @@ let group ?(attrs = []) ?class_ children =
       ([ data "slot" "field-group"
        ; Cn.with_class
            ?class_
-           [ "gap-5 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4 \
-              group/field-group @container/field-group flex w-full flex-col"
+           [ "gap-5 data-[slot=checkbox-group]:gap-3 \
+              *:data-[slot=field-group]:gap-4 group/field-group \
+              @container/field-group flex w-full flex-col"
            ]
        ]
        @ attrs)
@@ -82,12 +85,12 @@ let group ?(attrs = []) ?class_ children =
 ;;
 
 let root
-  ?(attrs = [])
-  ?class_
-  ?(orientation = Orientation.Vertical)
-  ?(invalid = false)
-  ?(disabled = false)
-  children
+      ?(attrs = [])
+      ?class_
+      ?(orientation = Orientation.Vertical)
+      ?(invalid = false)
+      ?(disabled = false)
+      children
   =
   Node.div
     ~attrs:
@@ -96,7 +99,8 @@ let root
        ; data "orientation" (Orientation.name orientation)
        ; Cn.with_class
            ?class_
-           [ "data-[invalid=true]:text-destructive gap-2 group/field flex w-full"
+           [ "data-[invalid=true]:text-destructive gap-2 group/field flex \
+              w-full"
            ; Orientation.classes orientation
            ]
        ]
@@ -127,12 +131,14 @@ let label ?(attrs = []) ?class_ ?for_ children =
              dark:has-data-checked:border-primary/20 \
              dark:has-data-checked:bg-primary/10 gap-2 leading-snug \
              group-data-[disabled=true]/field:opacity-50 \
-             has-[>[data-slot=field]]:rounded-lg has-[>[data-slot=field]]:border \
+             has-[>[data-slot=field]]:rounded-lg \
+             has-[>[data-slot=field]]:border \
              has-[>[data-slot=field]]:not-has-[:disabled,[data-disabled]]:hover:bg-muted/50 \
              has-[>[data-slot=field]]:has-[:focus-visible]:border-ring \
              has-[>[data-slot=field]]:has-[:focus-visible]:ring-ring/50 \
              has-[>[data-slot=field]]:has-[:focus-visible]:ring-3 \
-             *:data-[slot=field]:p-2.5 group/field-label peer/field-label flex w-fit"
+             *:data-[slot=field]:p-2.5 group/field-label peer/field-label flex \
+             w-fit"
           ; "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col"
           ]
           @ Option.to_list class_))
@@ -147,7 +153,8 @@ let title ?(attrs = []) ?class_ children =
        ; Cn.with_class
            ?class_
            [ "gap-2 leading-snug text-sm font-medium \
-              group-data-[disabled=true]/field:opacity-50 flex w-fit items-center"
+              group-data-[disabled=true]/field:opacity-50 flex w-fit \
+              items-center"
            ]
        ]
        @ attrs)
@@ -160,8 +167,9 @@ let description ?(attrs = []) ?class_ children =
       ([ data "slot" "field-description"
        ; Cn.with_class
            ?class_
-           [ "text-muted-foreground text-left text-sm [[data-variant=legend]+&]:-mt-1.5 \
-              leading-normal font-normal group-has-data-horizontal/field:text-balance"
+           [ "text-muted-foreground text-left text-sm \
+              [[data-variant=legend]+&]:-mt-1.5 leading-normal font-normal \
+              group-has-data-horizontal/field:text-balance"
            ; "last:mt-0 nth-last-2:-mt-1"
            ; "[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary"
            ]
@@ -177,9 +185,11 @@ let separator ?(attrs = []) ?class_ children =
     ~attrs:
       ([ data "slot" "field-separator"
        ; data "content" (Bool.to_string has_content)
-       ; Cn.with_class ?class_ [ "-my-2 h-5 text-sm \
-                                  group-data-[variant=outline]/field-group:-mb-2 \
-                                  relative" ]
+       ; Cn.with_class
+           ?class_
+           [ "-my-2 h-5 text-sm group-data-[variant=outline]/field-group:-mb-2 \
+              relative"
+           ]
        ]
        @ attrs)
     (Node.div
@@ -218,7 +228,9 @@ let error ?(attrs = []) ?class_ ?(errors = []) children =
        | [] -> None
        | [ e ] -> Some [ Node.text e ]
        | errors ->
-         let errors = List.filter errors ~f:(fun e -> not (String.is_empty e)) in
+         let errors =
+           List.filter errors ~f:(fun e -> not (String.is_empty e))
+         in
          Some
            [ Node.ul
                ~attrs:[ Attr.class_ "ml-4 flex list-disc flex-col gap-1" ]

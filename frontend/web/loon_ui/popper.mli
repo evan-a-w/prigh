@@ -73,4 +73,9 @@ val arrow : ?class_:string -> unit -> Node.t
     trigger [anchor] so that its selected item (the element with
     [data-state="checked"], or the first item) lies over the trigger's
     value, and kept within the viewport. *)
-val item_aligned_wrapper : ?attrs:Attr.t list -> name:string -> anchor:string -> Node.t -> Node.t
+val item_aligned_wrapper
+  :  ?attrs:Attr.t list
+  -> name:string
+  -> anchor:string
+  -> Node.t
+  -> Node.t

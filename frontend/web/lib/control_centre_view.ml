@@ -158,13 +158,13 @@ let view (m : App.Model.t) ~(root : Control_centre.t) ~options ~inject =
     [ Node.div
         ~attrs:
           [ Attr.class_
-              "loon control-centre flex max-h-[72vh] w-[min(640px,100%)] flex-col \
-               overflow-hidden rounded-xl bg-popover text-popover-foreground \
-               shadow-lg ring-1 ring-foreground/10 outline-none animate-in \
-               fade-in-0 zoom-in-95 narrow:h-(--vvh,100dvh) narrow:max-h-none \
-               narrow:w-full narrow:rounded-none narrow:pt-(--safe-t) \
-               narrow:pb-(--safe-b) narrow:ring-0 narrow:zoom-in-100 \
-               narrow:slide-in-from-bottom-4"
+              "loon control-centre flex max-h-[72vh] w-[min(640px,100%)] \
+               flex-col overflow-hidden rounded-xl bg-popover \
+               text-popover-foreground shadow-lg ring-1 ring-foreground/10 \
+               outline-none animate-in fade-in-0 zoom-in-95 \
+               narrow:h-(--vvh,100dvh) narrow:max-h-none narrow:w-full \
+               narrow:rounded-none narrow:pt-(--safe-t) narrow:pb-(--safe-b) \
+               narrow:ring-0 narrow:zoom-in-100 narrow:slide-in-from-bottom-4"
           ; Attr.create "data-slot" "command"
           ; Attr.id "control-centre"
           ; Attr.role "dialog"

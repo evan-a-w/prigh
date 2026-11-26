@@ -20,11 +20,14 @@ module Compound = struct
 
   let matches t (e : Element.t) =
     Option.for_all t.tag ~f:(String.equal e.tag)
-    && List.for_all t.ids ~f:(fun id -> Option.equal String.equal e.id (Some id))
+    && List.for_all t.ids ~f:(fun id ->
+      Option.equal String.equal e.id (Some id))
     && List.for_all t.classes ~f:(List.mem e.classes ~equal:String.equal)
   ;;
 
-  let is_name_char c = Char.is_alphanum c || Char.equal c '-' || Char.equal c '_'
+  let is_name_char c =
+    Char.is_alphanum c || Char.equal c '-' || Char.equal c '_'
+  ;;
 
   (* [tag], [.class] and [#id]s only; anything else is for lambdasoup. *)
   let parse s =
@@ -42,11 +45,13 @@ module Compound = struct
       else (
         match s.[i] with
         | '.' ->
-          Option.bind (name (i + 1)) ~f:(fun (c, j) ->
-            parts j { t with classes = c :: t.classes })
+          Option.bind
+            (name (i + 1))
+            ~f:(fun (c, j) -> parts j { t with classes = c :: t.classes })
         | '#' ->
-          Option.bind (name (i + 1)) ~f:(fun (id, j) ->
-            parts j { t with ids = id :: t.ids })
+          Option.bind
+            (name (i + 1))
+            ~f:(fun (id, j) -> parts j { t with ids = id :: t.ids })
         | _ -> None)
     in
     let empty = { tag = None; ids = []; classes = [] } in
@@ -70,7 +75,9 @@ let index root =
   let rec go parent : Node_helpers.t -> unit = function
     | Text _ | Widget -> ()
     | Element { tag_name; attributes; children; _ } as node ->
-      let attribute name = List.Assoc.find attributes ~equal:String.equal name in
+      let attribute name =
+        List.Assoc.find attributes ~equal:String.equal name
+      in
       let i = Queue.length elements in
       Queue.enqueue
         elements
@@ -117,7 +124,8 @@ let convert root =
         |> Map.to_alist
       in
       let element = Soup.create_element tag_name ~attributes in
-      List.iter children ~f:(fun child -> Soup.append_child element (convert child));
+      List.iter children ~f:(fun child ->
+        Soup.append_child element (convert child));
       Soup.coerce element
   in
   let soup = Soup.create_soup () in

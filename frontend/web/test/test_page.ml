@@ -28,10 +28,19 @@ let%expect_test
    with
    | Ok n -> printf "unexpected int: %d\n" n
    | Error e -> printf "out of range: %s\n" (Error.to_string_hum e));
+  (* A long session's token totals pass 2^31, beyond a JS [int]. *)
+  print_s
+    [%sexp
+      (Prigh_protocol.Usage.of_json
+         (Or_error.ok_exn
+            (Prigh_protocol.Json.parse
+               {|{"input":2169597936,"output":5,"cache_read":2100000000}|}))
+       : Prigh_protocol.Usage.t Or_error.t)];
   [%expect
     {|
     (1789820702579)
     out of range: field "n": integer "1789820702579" out of range
+    (Ok ((input 2169597936) (output 5) (cache_read 2100000000)))
     |}]
 ;;
 

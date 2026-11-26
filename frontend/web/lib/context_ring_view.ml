@@ -23,8 +23,8 @@ let level ~compacts_at percent =
 ;;
 
 let usd_of (model : Llm.t) (usage : Usage.t) =
-  let per_m tokens price = Float.of_int tokens *. price /. 1e6 in
-  per_m (usage.input - usage.cache_read) model.cost.input
+  let per_m tokens price = tokens *. price /. 1e6 in
+  per_m (usage.input -. usage.cache_read) model.cost.input
   +. per_m usage.cache_read model.cost.cache_read
   +. per_m usage.output model.cost.output
 ;;
@@ -62,19 +62,15 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   in
   let thinking = Option.value m.pending.thinking ~default:state.thinking in
   let cache_rate =
-    if state.usage.input > 0
-    then
-      Some
-        (100.
-         *. Float.of_int state.usage.cache_read
-         /. Float.of_int state.usage.input)
+    if Float.(state.usage.input > 0.)
+    then Some (100. *. state.usage.cache_read /. state.usage.input)
     else None
   in
   Node.div
     ~attrs:
       [ Attr.class_
-          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 rounded-lg \
-           border-0 bg-popover p-3 text-xs whitespace-normal \
+          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 \
+           rounded-lg border-0 bg-popover p-3 text-xs whitespace-normal \
            text-popover-foreground shadow-md ring-1 ring-foreground/10 \
            grid-cols-[1fr_auto] narrow:fixed narrow:inset-x-0 narrow:top-auto \
            narrow:bottom-0 narrow:w-auto narrow:max-w-none narrow:gap-x-4 \
@@ -97,8 +93,8 @@ let card (m : App.Model.t) (state : State.t) ~inject =
             ~cls:"context-card-of font-mono text-xs"
             (sprintf
                "%s / %s"
-               (tokens state.context_tokens)
-               (tokens state.model.context_window))
+               (tokens (Float.of_int state.context_tokens))
+               (tokens (Float.of_int state.model.context_window)))
         ]
     ; (match percent with
        | Some p ->
@@ -145,7 +141,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
                  "%.0f%% used · compacts at %s (%.0f%%)"
                  p
                  (tokens
-                    (Float.iround_nearest_exn
+                    (Float.round_nearest
                        (at /. 100. *. Float.of_int state.model.context_window)))
                  at
              | None -> sprintf "Compacts at %.0f%%" at)

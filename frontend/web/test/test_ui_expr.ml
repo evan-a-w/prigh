@@ -207,7 +207,8 @@ let%expect_test "expression semantics: the backend's table" =
           (match E.eval e ~env with
            | Ok f -> Float.to_string_hum ~decimals:6 ~strip_zero:true f
            | Error _ -> "(none)"));
-  [%expect {|
+  [%expect
+    {|
     1 + 2 * 3            7
     (1 + 2) * 3          9
     10 - 4 - 3           3

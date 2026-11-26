@@ -8,7 +8,7 @@ type t =
   ; mutable quiet : bool
   ; mutable clipboard : bool
   ; mutable rendered : (App.Model.t * Page_soup.t) option
-      (* The page for the model it was rendered from: queries between two
+    (* The page for the model it was rendered from: queries between two
          actions share one rendering. *)
   }
 
@@ -339,7 +339,14 @@ let key
 let type_ t text = act t (Edit { text; cursor = String.length text })
 
 let connecting () =
-  let t = { model = App.init; pending = []; quiet = true; clipboard = true; rendered = None } in
+  let t =
+    { model = App.init
+    ; pending = []
+    ; quiet = true
+    ; clipboard = true
+    ; rendered = None
+    }
+  in
   act t Start;
   t.quiet <- false;
   t

@@ -163,7 +163,7 @@
    test_units
    test_update_notice
    test_worktree_switch
-    test_worktrees
+   test_worktrees
    test_zoom))
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))

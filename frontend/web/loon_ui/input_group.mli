@@ -37,7 +37,12 @@ end
 
 (** The group ([role="group"]). [disabled] sets [data-disabled="true"],
     which fades the addons. *)
-val root : ?attrs:Attr.t list -> ?class_:string -> ?disabled:bool -> Node.t list -> Node.t
+val root
+  :  ?attrs:Attr.t list
+  -> ?class_:string
+  -> ?disabled:bool
+  -> Node.t list
+  -> Node.t
 
 (** Icons, text or buttons beside the control; a click on it (not on a
     button) focuses the group's input. *)

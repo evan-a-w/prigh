@@ -13,7 +13,8 @@ module Kind : sig
 end
 
 type t =
-  { entry : string (** the entry that made it, to undo it ({!Request.Restore}) *)
+  { entry : string
+    (** the entry that made it, to undo it ({!Request.Restore}) *)
   ; kind : Kind.t
   ; message : string (** the entry id of the message it is about *)
   ; messages : int (** the messages it keeps out of the context *)

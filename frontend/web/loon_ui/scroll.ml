@@ -82,10 +82,16 @@ let add_lock () =
     let top = px_of (Js.to_string cs##.marginTop) in
     let right = px_of (Js.to_string cs##.marginRight) in
     let window_width = Dom_html.window##.innerWidth in
-    let gap = Int.max 0 (window_width - doc##.documentElement##.clientWidth + right - left) in
+    let gap =
+      Int.max
+        0
+        (window_width - doc##.documentElement##.clientWidth + right - left)
+    in
     set_lock_css doc (lock_css ~left ~top ~right ~gap));
   incr locks;
-  body##setAttribute (Js.string "data-scroll-locked") (Js.string (Int.to_string !locks))
+  body##setAttribute
+    (Js.string "data-scroll-locked")
+    (Js.string (Int.to_string !locks))
 ;;
 
 let remove_lock () =

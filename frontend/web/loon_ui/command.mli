@@ -98,7 +98,12 @@ val group
 
 (** A rule between groups, hidden while searching (unless
     [always_render]). *)
-val separator : ?attrs:Attr.t list -> ?class_:string -> ?always_render:bool -> unit -> part
+val separator
+  :  ?attrs:Attr.t list
+  -> ?class_:string
+  -> ?always_render:bool
+  -> unit
+  -> part
 
 (** An item. [value] is what the search matches (with [keywords]) and what
     the state's [value] names; it defaults to the children's text, but only

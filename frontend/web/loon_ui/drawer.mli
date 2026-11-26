@@ -75,5 +75,10 @@ module Drag_rules : sig
   (** Letting go, the panel [swipe] down, the pointer [dragged_up] from the
       press [ms] ago: closes it a quarter of its height down or flicked down
       (faster than 0.4px/ms over the drag). *)
-  val release : height:float -> swipe:float -> dragged_up:float -> ms:float -> release
+  val release
+    :  height:float
+    -> swipe:float
+    -> dragged_up:float
+    -> ms:float
+    -> release
 end

@@ -2,10 +2,11 @@ open! Import
 open Js_of_ocaml
 
 let key (ev : Dom_html.keyboardEvent Js.t) = Dom_html.Keyboard_code.of_event ev
-;;
 
 let focus_now selector =
-  match Js.Opt.to_option (Dom_html.document##querySelector (Js.string selector)) with
+  match
+    Js.Opt.to_option (Dom_html.document##querySelector (Js.string selector))
+  with
   | None -> ()
   | Some el -> el##focus
 ;;
@@ -15,12 +16,12 @@ let in_browser () = Js.Optdef.test (Js.Unsafe.global##.document : _ Js.Optdef.t)
 let focus_selector selector =
   Effect.of_sync_fun
     (fun () ->
-      if in_browser ()
-      then
-        ignore
-          (Dom_html.window##requestAnimationFrame
-             (Js.wrap_callback (fun (_ : Js.number_t) -> focus_now selector))
-           : Dom_html.animation_frame_request_id))
+       if in_browser ()
+       then
+         ignore
+           (Dom_html.window##requestAnimationFrame
+              (Js.wrap_callback (fun (_ : Js.number_t) -> focus_now selector))
+            : Dom_html.animation_frame_request_id))
     ()
 ;;
 

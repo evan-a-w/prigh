@@ -590,11 +590,11 @@ let nix_gc_confirm generations ~inject =
 ;;
 
 let tokens n =
-  if n >= 1_000_000
-  then sprintf "%.1fM" (Float.of_int n /. 1e6)
-  else if n >= 1000
-  then sprintf "%.1fk" (Float.of_int n /. 1000.)
-  else Int.to_string n
+  if Float.(n >= 1e6)
+  then sprintf "%.1fM" (n /. 1e6)
+  else if Float.(n >= 1000.)
+  then sprintf "%.1fk" (n /. 1000.)
+  else sprintf "%.0f" n
 ;;
 
 let duration seconds =

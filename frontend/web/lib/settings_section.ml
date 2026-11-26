@@ -65,8 +65,8 @@ let about = function
      work, and when long conversations are summarised. Kept on the backend."
   | Usage ->
     "How much of your Claude and ChatGPT subscriptions' usage limits you have \
-     used, as the providers report it (read when you open this page), and whether a \
-     run stopped by one carries on when it resets."
+     used, as the providers report it (read when you open this page), and \
+     whether a run stopped by one carries on when it resets."
   | Memory ->
     "What you asked the model to remember, for later sessions. Kept on the \
      backend, for your account."

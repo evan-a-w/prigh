@@ -9,7 +9,13 @@ let view ?(attrs = []) ?class_ ?(ratio = 1.) children =
              ; Css_gen.create ~field:"width" ~value:"100%"
              ; Css_gen.create
                  ~field:"padding-bottom"
-                 ~value:(sprintf "%s%%" (Float.to_string_hum ~strip_zero:true ~decimals:4 (100. /. ratio)))
+                 ~value:
+                   (sprintf
+                      "%s%%"
+                      (Float.to_string_hum
+                         ~strip_zero:true
+                         ~decimals:4
+                         (100. /. ratio)))
              ])
       ; data "radix-aspect-ratio-wrapper" ""
       ]

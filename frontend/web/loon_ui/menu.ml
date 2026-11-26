@@ -112,23 +112,25 @@ module Sub_content = struct
 end
 
 let common ?text_value ~disabled children =
-  { text = Option.value text_value ~default:(List_nav.text_of_nodes children); disabled }
+  { text = Option.value text_value ~default:(List_nav.text_of_nodes children)
+  ; disabled
+  }
 ;;
 
 let inset_attr inset = if inset then [ data "inset" "" ] else []
 let slot (c : Classes.t) part = data "slot" (c.slot ^ "-" ^ part)
 
 let item
-  ?(attrs = [])
-  ?class_
-  ?(inset = false)
-  ?(variant = Variant.Default)
-  ?(disabled = false)
-  ?text_value
-  ?(close_on_select = true)
-  ?(on_select = Effect.Ignore)
-  ?href
-  children
+      ?(attrs = [])
+      ?class_
+      ?(inset = false)
+      ?(variant = Variant.Default)
+      ?(disabled = false)
+      ?text_value
+      ?(close_on_select = true)
+      ?(on_select = Effect.Ignore)
+      ?href
+      children
   : Item.t
   =
   Action
@@ -165,20 +167,24 @@ let indicator (c : Classes.t) ~kind ~checked icon =
               | "radio" -> c.radio_indicator
               | _ -> c.checkbox_indicator)
          ])
-    (if checked then [ Node.span ~attrs:[ data "state" "checked" ] [ icon ] ] else [])
+    (if checked
+     then [ Node.span ~attrs:[ data "state" "checked" ] [ icon ] ]
+     else [])
 ;;
 
-let checked_state checked = data "state" (if checked then "checked" else "unchecked")
+let checked_state checked =
+  data "state" (if checked then "checked" else "unchecked")
+;;
 
 let checkbox_item
-  ?(attrs = [])
-  ?class_
-  ?(disabled = false)
-  ?text_value
-  ?(close_on_select = true)
-  ~checked
-  ~on_checked_change
-  children
+      ?(attrs = [])
+      ?class_
+      ?(disabled = false)
+      ?text_value
+      ?(close_on_select = true)
+      ~checked
+      ~on_checked_change
+      children
   : Item.t
   =
   Action
@@ -202,14 +208,14 @@ let checkbox_item
 ;;
 
 let radio_item
-  ?(attrs = [])
-  ?class_
-  ?indicator:indicator_icon
-  ?(disabled = false)
-  ?text_value
-  ?(close_on_select = true)
-  ~value
-  children
+      ?(attrs = [])
+      ?class_
+      ?indicator:indicator_icon
+      ?(disabled = false)
+      ?text_value
+      ?(close_on_select = true)
+      ~value
+      children
   : Item.t
   =
   Radio
@@ -240,7 +246,9 @@ let radio_item
 ;;
 
 let radio_action ?value ?(on_value_change = fun _ -> Effect.Ignore) (r : radio) =
-  let checked = Option.value_map value ~default:false ~f:(String.equal r.value) in
+  let checked =
+    Option.value_map value ~default:false ~f:(String.equal r.value)
+  in
   { common = r.r_common
   ; select = on_value_change r.value
   ; close_on_select = r.r_close_on_select
@@ -248,7 +256,9 @@ let radio_action ?value ?(on_value_change = fun _ -> Effect.Ignore) (r : radio) 
   }
 ;;
 
-let radio_group ?(attrs = []) ~value ~on_value_change (items : Item.t list) : Item.t =
+let radio_group ?(attrs = []) ~value ~on_value_change (items : Item.t list)
+  : Item.t
+  =
   let rec resolve (items : Item.t list) =
     List.map items ~f:(fun (item : Item.t) : Item.t ->
       match item with
@@ -256,7 +266,11 @@ let radio_group ?(attrs = []) ~value ~on_value_change (items : Item.t list) : It
       | Group g -> Group { g with items = resolve g.items }
       | Action _ | Sub _ | Static _ -> item)
   in
-  Group { attrs = Attr.role "group" :: attrs; slot = "radio-group"; items = resolve items }
+  Group
+    { attrs = Attr.role "group" :: attrs
+    ; slot = "radio-group"
+    ; items = resolve items
+    }
 ;;
 
 let label ?(attrs = []) ?class_ ?(inset = false) children : Item.t =
@@ -292,18 +306,28 @@ let group ?(attrs = []) items : Item.t =
 let sub trigger content : Item.t = Sub (trigger, content)
 
 let sub_trigger
-  ?(attrs = [])
-  ?class_
-  ?(inset = false)
-  ?(disabled = false)
-  ?text_value
-  children
+      ?(attrs = [])
+      ?class_
+      ?(inset = false)
+      ?(disabled = false)
+      ?text_value
+      children
   : Sub_trigger.t
   =
-  { common = common ?text_value ~disabled children; attrs; class_; inset; children }
+  { common = common ?text_value ~disabled children
+  ; attrs
+  ; class_
+  ; inset
+  ; children
+  }
 ;;
 
-let sub_content ?(attrs = []) ?class_ ?(side_offset = 0.) ?(align_offset = 0.) items
+let sub_content
+      ?(attrs = [])
+      ?class_
+      ?(side_offset = 0.)
+      ?(align_offset = 0.)
+      items
   : Sub_content.t
   =
   { attrs; class_; side_offset; align_offset; items }
@@ -351,7 +375,8 @@ let first_highlighted items =
 
 let last_highlighted items =
   { State.initial with
-    highlighted = Option.map (List.last (enabled items)) ~f:(fun (i, _) -> [ i ])
+    highlighted =
+      Option.map (List.last (enabled items)) ~f:(fun (i, _) -> [ i ])
   }
 ;;
 
@@ -386,17 +411,21 @@ let level_keydown t ~prefix items ev =
   let entries = Array.of_list (entries items) in
   let current =
     match state.highlighted with
-    | Some h when List.equal Int.equal (parent h) prefix && not (List.is_empty h) ->
+    | Some h
+      when List.equal Int.equal (parent h) prefix && not (List.is_empty h) ->
       List.last h
     | _ -> None
   in
   let highlight i =
     let path = prefix @ [ i ] in
-    t.set_state { highlighted = Some path; open_sub = trim state.open_sub ~path }
+    t.set_state
+      { highlighted = Some path; open_sub = trim state.open_sub ~path }
   in
   let open_sub i (sub : Item.sub_content) =
     let path = prefix @ [ i ] in
-    let first = Option.map (List.hd (enabled sub.items)) ~f:(fun (j, _) -> path @ [ j ]) in
+    let first =
+      Option.map (List.hd (enabled sub.items)) ~f:(fun (j, _) -> path @ [ j ])
+    in
     t.set_state { highlighted = first; open_sub = Some path }
   in
   let handled e = Some (Effect.Many [ Dom_util.stop ev; e ]) in
@@ -407,21 +436,32 @@ let level_keydown t ~prefix items ev =
     | Tab, _ -> Some (Dom_util.prevent_default ev)
     | (Enter | Space), Some (_, E_action a) when not a.common.disabled ->
       handled
-        (Effect.Many [ a.select; (if a.close_on_select then t.close else Effect.Ignore) ])
-    | (Enter | Space | ArrowRight), Some (i, E_sub (trig, sub)) when not trig.common.disabled
-      -> handled (open_sub i sub)
+        (Effect.Many
+           [ a.select; (if a.close_on_select then t.close else Effect.Ignore) ])
+    | (Enter | Space | ArrowRight), Some (i, E_sub (trig, sub))
+      when not trig.common.disabled -> handled (open_sub i sub)
     | ArrowLeft, _ when not (List.is_empty prefix) ->
       handled
         (t.set_state
-           { highlighted = Some prefix; open_sub = trim state.open_sub ~path:prefix })
-    | ArrowLeft, _ -> Option.map t.on_edge ~f:(fun f -> Effect.Many [ Dom_util.stop ev; f `Left ])
+           { highlighted = Some prefix
+           ; open_sub = trim state.open_sub ~path:prefix
+           })
+    | ArrowLeft, _ ->
+      Option.map t.on_edge ~f:(fun f ->
+        Effect.Many [ Dom_util.stop ev; f `Left ])
     (* In a sub-menu too, as Radix's menubar: on an item that opens nothing,
        ArrowRight goes to the next menu. *)
     | ArrowRight, _ ->
-      Option.map t.on_edge ~f:(fun f -> Effect.Many [ Dom_util.stop ev; f `Right ])
+      Option.map t.on_edge ~f:(fun f ->
+        Effect.Many [ Dom_util.stop ev; f `Right ])
     | _ ->
       (match
-         List_nav.move ~loop:false ~equal:Int.equal ~items:(enabled items) ~current key
+         List_nav.move
+           ~loop:false
+           ~equal:Int.equal
+           ~items:(enabled items)
+           ~current
+           key
        with
        | Some i -> handled (highlight i)
        | None -> None)
@@ -459,10 +499,13 @@ module Grace = struct
   let now () = Js.to_float (new%js Js.date_now)##getTime
 
   let xy (ev : Dom_html.mouseEvent Js.t) =
-    Js.to_float (Js.Unsafe.coerce ev)##.clientX, Js.to_float (Js.Unsafe.coerce ev)##.clientY
+    ( Js.to_float (Js.Unsafe.coerce ev)##.clientX
+    , Js.to_float (Js.Unsafe.coerce ev)##.clientY )
   ;;
 
-  let in_browser () = Js.Optdef.test (Js.Unsafe.global##.document : _ Js.Optdef.t)
+  let in_browser () =
+    Js.Optdef.test (Js.Unsafe.global##.document : _ Js.Optdef.t)
+  ;;
 
   (* The pointer's horizontal direction, from the moves over the items. *)
   let track ev =
@@ -496,7 +539,13 @@ module Grace = struct
         current
         := Some
              { level
-             ; area = [ x +. bleed, y; near, top; far, top; far, bottom; near, bottom ]
+             ; area =
+                 [ x +. bleed, y
+                 ; near, top
+                 ; far, top
+                 ; far, bottom
+                 ; near, bottom
+                 ]
              ; right
              ; until = now () +. 300.
              })
@@ -510,8 +559,9 @@ module Grace = struct
     for i = 0 to n - 1 do
       let xi, yi = a.(i)
       and xj, yj = a.(!j) in
-      if Bool.( <> ) Float.(yi > py) Float.(yj > py)
-         && Float.(px < ((xj -. xi) *. (py -. yi) /. (yj -. yi)) +. xi)
+      if
+        Bool.( <> ) Float.(yi > py) Float.(yj > py)
+        && Float.(px < ((xj -. xi) *. (py -. yi) /. (yj -. yi)) +. xi)
       then inside := not !inside;
       j := i
     done;
@@ -524,7 +574,8 @@ module Grace = struct
     match !current with
     | Some g when not (String.equal g.level level) -> false
     | Some g when Float.(now () < g.until) ->
-      Option.equal Bool.equal !moving_right (Some g.right) && inside (xy ev) g.area
+      Option.equal Bool.equal !moving_right (Some g.right)
+      && inside (xy ev) g.area
     | Some _ ->
       current := None;
       false
@@ -537,7 +588,10 @@ let rec render_level t ~prefix ~level_id ~subs (items : Item.t list) =
   let counter = ref (-1) in
   let nav_attrs ~(common : common) ~path ~on_click ~sub_open =
     let highlighted =
-      Option.value_map state.highlighted ~default:false ~f:(List.equal Int.equal path)
+      Option.value_map
+        state.highlighted
+        ~default:false
+        ~f:(List.equal Int.equal path)
     in
     let on_move =
       if common.disabled
@@ -545,7 +599,9 @@ let rec render_level t ~prefix ~level_id ~subs (items : Item.t list) =
         if highlighted
         then
           Effect.Many
-            [ t.set_state { state with highlighted = None }; focus_content level_id ]
+            [ t.set_state { state with highlighted = None }
+            ; focus_content level_id
+            ]
         else Effect.Ignore
       else (
         let open_sub =
@@ -565,7 +621,9 @@ let rec render_level t ~prefix ~level_id ~subs (items : Item.t list) =
         if to_sub then Effect.Ignore else on_move)
     ; Attr.on_mouseleave (fun ev ->
         match sub_open with
-        | `Sub when Option.exists state.open_sub ~f:(fun o -> is_prefix ~prefix:path o) ->
+        | `Sub
+          when Option.exists state.open_sub ~f:(fun o ->
+                 is_prefix ~prefix:path o) ->
           (* The sub-menu stays, its trigger highlighted, while the pointer
              heads for it. *)
           Grace.start ev ~level:level_id ~sub_id:(path_id t.id path);
@@ -574,22 +632,28 @@ let rec render_level t ~prefix ~level_id ~subs (items : Item.t list) =
           if highlighted && not (Grace.moving_to_sub ev ~level:level_id)
           then
             Effect.Many
-              [ t.set_state { state with highlighted = None }; focus_content level_id ]
+              [ t.set_state { state with highlighted = None }
+              ; focus_content level_id
+              ]
           else Effect.Ignore)
     ; Focus.when_ highlighted
     ]
     @ (if highlighted then [ data "highlighted" "" ] else [])
-    @ (if common.disabled
-       then [ aria "disabled" "true"; data "disabled" "" ]
-       else [ Attr.on_click (fun _ -> on_click) ])
+    @
+    if common.disabled
+    then [ aria "disabled" "true"; data "disabled" "" ]
+    else [ Attr.on_click (fun _ -> on_click) ]
   in
   let go_action a =
     incr counter;
     let path = prefix @ [ !counter ] in
     let on_click =
-      Effect.Many [ a.select; (if a.close_on_select then t.close else Effect.Ignore) ]
+      Effect.Many
+        [ a.select; (if a.close_on_select then t.close else Effect.Ignore) ]
     in
-    a.render t.classes (nav_attrs ~common:a.common ~path ~on_click ~sub_open:`No)
+    a.render
+      t.classes
+      (nav_attrs ~common:a.common ~path ~on_click ~sub_open:`No)
   in
   let rec go (items : Item.t list) =
     List.map items ~f:(fun (item : Item.t) ->
@@ -624,7 +688,9 @@ let rec render_level t ~prefix ~level_id ~subs (items : Item.t list) =
               (Node.div
                  ~attrs:
                    ([ slot t.classes "sub-content"
-                    ; Cn.with_class ?class_:content.class_ [ t.classes.sub_content ]
+                    ; Cn.with_class
+                        ?class_:content.class_
+                        [ t.classes.sub_content ]
                     ; Attr.id sub_id
                     ; Attr.role "menu"
                     ; aria "orientation" "vertical"
@@ -633,11 +699,17 @@ let rec render_level t ~prefix ~level_id ~subs (items : Item.t list) =
                     ; data "orientation" "vertical"
                     ; Attr.tabindex (-1)
                     ; Attr.style (Css_gen.create ~field:"outline" ~value:"none")
-                    ; Attr.on_keydown (level_keydown t ~prefix:path content.items)
+                    ; Attr.on_keydown
+                        (level_keydown t ~prefix:path content.items)
                     ]
                     @ Popper.content_attrs ~side:Right ~align:Start ()
                     @ content.attrs)
-                 (render_level t ~prefix:path ~level_id:sub_id ~subs content.items))
+                 (render_level
+                    t
+                    ~prefix:path
+                    ~level_id:sub_id
+                    ~subs
+                    content.items))
           in
           subs := sub_node :: !subs);
         Node.div
@@ -661,21 +733,21 @@ let rec render_level t ~prefix ~level_id ~subs (items : Item.t list) =
 ;;
 
 let content
-  ?(attrs = [])
-  ?class_
-  ?(side = Popper.Side.Bottom)
-  ?(side_offset = 0.)
-  ?(align = Popper.Align.Center)
-  ?(align_offset = 0.)
-  ?avoid_collisions
-  ?(modal = true)
-  ?(inside = [])
-  ?(labelled_by = true)
-  ?on_dismiss
-  ~base_class
-  ~anchor
-  t
-  items
+      ?(attrs = [])
+      ?class_
+      ?(side = Popper.Side.Bottom)
+      ?(side_offset = 0.)
+      ?(align = Popper.Align.Center)
+      ?(align_offset = 0.)
+      ?avoid_collisions
+      ?(modal = true)
+      ?(inside = [])
+      ?(labelled_by = true)
+      ?on_dismiss
+      ~base_class
+      ~anchor
+      t
+      items
   =
   let subs = ref [] in
   let id = content_id t.id in
@@ -697,7 +769,9 @@ let content
             ; Attr.role "menu"
             ; aria "orientation" "vertical"
             ]
-            @ (if labelled_by then [ aria "labelledby" (trigger_id t.id) ] else [])
+            @ (if labelled_by
+               then [ aria "labelledby" (trigger_id t.id) ]
+               else [])
             @ [ data "state" "open"
               ; Attr.tabindex (-1)
               ; Attr.style (Css_gen.create ~field:"outline" ~value:"none")
@@ -716,10 +790,11 @@ let content
            ~inside
            ~modal
            ~on_dismiss:
-             (Option.value on_dismiss ~default:(fun (_ : Dismiss.Reason.t) -> t.close))
+             (Option.value on_dismiss ~default:(fun (_ : Dismiss.Reason.t) ->
+                t.close))
            ()
        ]
-     (* Radix's modal menus lock the page's scroll (RemoveScroll). *)
-     @ if modal then [ Scroll.lock ] else [])
+       (* Radix's modal menus lock the page's scroll (RemoveScroll). *)
+       @ if modal then [ Scroll.lock ] else [])
     (top :: !subs)
 ;;

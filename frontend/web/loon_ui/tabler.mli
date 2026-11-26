@@ -53,4 +53,9 @@ val of_name : string -> t option
 
 (** The icon. [class_] goes after [tabler-icon tabler-icon-NAME];
     [stroke_width] (["2"]) is for the outline icons. *)
-val view : ?attrs:Attr.t list -> ?class_:string -> ?stroke_width:string -> t -> Node.t
+val view
+  :  ?attrs:Attr.t list
+  -> ?class_:string
+  -> ?stroke_width:string
+  -> t
+  -> Node.t

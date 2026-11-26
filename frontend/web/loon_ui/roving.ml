@@ -32,7 +32,10 @@ let move ~enabled ~current (key : Js_of_ocaml.Dom_html.Keyboard_code.t) =
     | _ -> None)
 ;;
 
-let in_browser () = Js_of_ocaml.Js.Optdef.test (Js_of_ocaml.Js.Unsafe.global##.document : _ Js_of_ocaml.Js.Optdef.t)
+let in_browser () =
+  Js_of_ocaml.Js.Optdef.test
+    (Js_of_ocaml.Js.Unsafe.global##.document : _ Js_of_ocaml.Js.Optdef.t)
+;;
 
 let next ev ~group ~item ~fallback ~current =
   let open Js_of_ocaml in
@@ -41,12 +44,17 @@ let next ev ~group ~item ~fallback ~current =
   then (
     let target : Dom_html.element Js.t = Js.Unsafe.get ev "currentTarget" in
     let root : Dom_html.element Js.t Js.Opt.t =
-      Js.Unsafe.meth_call target "closest" [| Js.Unsafe.inject (Js.string group) |]
+      Js.Unsafe.meth_call
+        target
+        "closest"
+        [| Js.Unsafe.inject (Js.string group) |]
     in
     match Js.Opt.to_option root with
     | None -> None
     | Some root ->
-      let els = Dom.list_of_nodeList (root##querySelectorAll (Js.string item)) in
+      let els =
+        Dom.list_of_nodeList (root##querySelectorAll (Js.string item))
+      in
       let enabled =
         List.map els ~f:(fun el ->
           not (Js.to_bool (el##hasAttribute (Js.string "disabled"))))
@@ -58,7 +66,10 @@ let next ev ~group ~item ~fallback ~current =
       Option.map (move ~enabled ~current key) ~f:(fun i ->
         let el = List.nth_exn els i in
         let value =
-          Js.Opt.case (el##getAttribute (Js.string "value")) (fun () -> "") Js.to_string
+          Js.Opt.case
+            (el##getAttribute (Js.string "value"))
+            (fun () -> "")
+            Js.to_string
         in
         value, Effect.of_thunk (fun () -> el##focus)))
   else (
@@ -83,7 +94,10 @@ module Tab_stop = struct
       not (Js.to_bool (el##hasAttribute (Js.string "disabled"))))
   ;;
 
-  let current_target ev : Dom_html.element Js.t = Js.Unsafe.get ev "currentTarget"
+  let current_target ev : Dom_html.element Js.t =
+    Js.Unsafe.get ev "currentTarget"
+  ;;
+
   let target ev : Dom_html.element Js.t = Js.Unsafe.get ev "target"
 
   let group_attrs ~item ~active ~focusable =
@@ -117,7 +131,8 @@ module Tab_stop = struct
         else
           Effect.of_thunk (fun () ->
             let group = current_target ev in
-            if focusable then group##setAttribute (Js.string "tabindex") (Js.string "0")))
+            if focusable
+            then group##setAttribute (Js.string "tabindex") (Js.string "0")))
     ]
   ;;
 
@@ -130,7 +145,10 @@ module Tab_stop = struct
           Effect.of_thunk (fun () ->
             let el = current_target ev in
             let root : Dom_html.element Js.t Js.Opt.t =
-              Js.Unsafe.meth_call el "closest" [| Js.Unsafe.inject (Js.string group) |]
+              Js.Unsafe.meth_call
+                el
+                "closest"
+                [| Js.Unsafe.inject (Js.string group) |]
             in
             Js.Opt.iter root (fun root ->
               List.iter
@@ -141,11 +159,13 @@ module Tab_stop = struct
                     (Js.string (if phys_equal other el then "0" else "-1"))))))
     ; Attr.on_keydown (fun ev ->
         (* Shift+Tab out of the group: past the group, not into it. *)
-        if in_browser ()
-           && Js.to_bool ev##.shiftKey
-           && (match Dom_util.key ev with
-               | Tab -> true
-               | _ -> false)
+        if
+          in_browser ()
+          && Js.to_bool ev##.shiftKey
+          &&
+          match Dom_util.key ev with
+          | Tab -> true
+          | _ -> false
         then
           Effect.of_thunk (fun () ->
             let root : Dom_html.element Js.t Js.Opt.t =

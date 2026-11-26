@@ -29,7 +29,9 @@ let remove_ghosts (parent : Dom.node Js.t) =
 ;;
 
 let ghost (el : Dom_html.element Js.t) (parent : Dom.node Js.t) =
-  let copy : Dom_html.element Js.t = Js.Unsafe.coerce (el##cloneNode Js._true) in
+  let copy : Dom_html.element Js.t =
+    Js.Unsafe.coerce (el##cloneNode Js._true)
+  in
   let selector =
     "[data-state=open], [data-state=delayed-open], [data-state=instant-open]"
   in
@@ -43,7 +45,8 @@ let ghost (el : Dom_html.element Js.t) (parent : Dom.node Js.t) =
              ~equal:String.equal -> copy :: opened
     | _ -> opened
   in
-  List.iter (copy :: elements copy "[id]") ~f:(fun e -> e##removeAttribute (Js.string "id"));
+  List.iter (copy :: elements copy "[id]") ~f:(fun e ->
+    e##removeAttribute (Js.string "id"));
   List.iter opened ~f:close_state;
   copy##setAttribute (Js.string "data-presence-ghost") (Js.string "");
   copy##setAttribute (Js.string "aria-hidden") (Js.string "true");
@@ -53,7 +56,11 @@ let ghost (el : Dom_html.element Js.t) (parent : Dom.node Js.t) =
   Portal.show copy;
   let animating e =
     let style = Dom_html.window##getComputedStyle e in
-    let name = Js.to_string ((Js.Unsafe.coerce style)##getPropertyValue (Js.string "animation-name")) in
+    let name =
+      Js.to_string
+        ((Js.Unsafe.coerce style)##getPropertyValue
+           (Js.string "animation-name"))
+    in
     not (String.is_empty name || String.equal name "none")
   in
   let animated = List.filter opened ~f:animating in
@@ -71,7 +78,12 @@ let ghost (el : Dom_html.element Js.t) (parent : Dom.node Js.t) =
           e
           (Dom_html.Event.make "animationend")
           (Dom_html.handler (fun (ev : Dom_html.event Js.t) ->
-             if Js.Opt.case ev##.target (fun () -> false) (fun t -> phys_equal t e) then finish ();
+             if
+               Js.Opt.case
+                 ev##.target
+                 (fun () -> false)
+                 (fun t -> phys_equal t e)
+             then finish ();
              Js._true))
           Js._false
       in
@@ -103,7 +115,12 @@ module Hook = Vdom.Attr.Hooks.Make (struct
           Option.iter state.parent ~f:remove_ghosts)
     ;;
 
-    let update ~old_input:() ~new_input:() (state : State.t) (el : Dom_html.element Js.t) =
+    let update
+          ~old_input:()
+          ~new_input:()
+          (state : State.t)
+          (el : Dom_html.element Js.t)
+      =
       Js.Opt.iter el##.parentNode (fun p -> state.parent <- Some p)
     ;;
 

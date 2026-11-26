@@ -59,5 +59,7 @@ let trims_after =
 ;;
 
 let deleted_label t =
-  if t.messages <= 1 then "Message deleted" else sprintf "%d messages deleted" t.messages
+  if t.messages <= 1
+  then "Message deleted"
+  else sprintf "%d messages deleted" t.messages
 ;;

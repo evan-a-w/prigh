@@ -45,7 +45,12 @@ end
 
 (** shadcn's [itemVariants], for other elements that should look like an
     item. *)
-val classes : ?variant:Variant.t -> ?size:Size.t -> ?class_:string -> unit -> string
+val classes
+  :  ?variant:Variant.t
+  -> ?size:Size.t
+  -> ?class_:string
+  -> unit
+  -> string
 
 (** A [<div>]. *)
 val view

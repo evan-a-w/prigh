@@ -43,6 +43,11 @@ val next
     Shift+Tab from an item leaves the group. [group] and [item] are
     selectors; [focusable]: whether any item is enabled. *)
 module Tab_stop : sig
-  val group_attrs : item:string -> active:string -> focusable:bool -> Attr.t list
+  val group_attrs
+    :  item:string
+    -> active:string
+    -> focusable:bool
+    -> Attr.t list
+
   val item_attrs : group:string -> item:string -> Attr.t list
 end

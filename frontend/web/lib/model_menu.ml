@@ -32,7 +32,8 @@ let offered (models : Llm.t list) ~(auth : Auth_status.t list) ~current =
 (* The first run of digits and dots: "GPT-6.2 Sol" is [6; 2]. *)
 let version name =
   let start =
-    String.lfindi name ~f:(fun _ c -> Char.is_digit c) |> Option.value ~default:(-1)
+    String.lfindi name ~f:(fun _ c -> Char.is_digit c)
+    |> Option.value ~default:(-1)
   in
   if start < 0
   then None

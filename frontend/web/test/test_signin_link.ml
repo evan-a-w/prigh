@@ -25,7 +25,8 @@ let%expect_test "prigh web's sign-in link: the code, and what it is traded for" 
         [%sexp
           (Signin_link.Credentials.of_json reply
            : Signin_link.Credentials.t option)]);
-  [%expect {|
+  [%expect
+    {|
     (#signin=0123abcd (code (0123abcd)))
     (signin=x (code (x)))
     (#a=1&signin=y (code (y)))

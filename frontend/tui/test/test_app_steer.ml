@@ -276,7 +276,7 @@ let%expect_test
     (Subagent_end
        { call_id = "c1"
        ; agent_id = "a1"
-       ; usage = { input = 1; output = 1; cache_read = 0 }
+       ; usage = { input = 1.; output = 1.; cache_read = 0. }
        ; turns = 2
        ; cost_usd = 0.
        ; result = { text = "indexed"; is_error = false }

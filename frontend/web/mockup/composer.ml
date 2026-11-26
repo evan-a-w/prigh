@@ -13,7 +13,8 @@ let ring fraction =
   let pie_c = 2. *. Float.pi *. 3.5 in
   Node.create_svg
     "svg"
-    ~attrs:[ Attr.create "viewBox" "0 0 18 18"; Attr.class_ "size-4 -rotate-90" ]
+    ~attrs:
+      [ Attr.create "viewBox" "0 0 18 18"; Attr.class_ "size-4 -rotate-90" ]
     [ svg
         "circle"
         [ Attr.create "cx" "9"
@@ -31,7 +32,9 @@ let ring fraction =
         ; Attr.create "fill" "none"
         ; Attr.create "stroke" "currentColor"
         ; Attr.create "stroke-width" "7"
-        ; Attr.create "stroke-dasharray" (sprintf "%.2f %.2f" (pie_c *. fraction) pie_c)
+        ; Attr.create
+            "stroke-dasharray"
+            (sprintf "%.2f %.2f" (pie_c *. fraction) pie_c)
         ]
     ]
 ;;
@@ -115,7 +118,12 @@ let view ?(queued = []) ?wrap_chip ?draft ?above ~tip () =
                    ~attrs:[ Attr.create "aria-label" "Context and cost" ]
                    [ ring 0.42 ])
             ; div "ml-auto" []
-            ; chip ~tip ~id:"model" "Model, reasoning and mode" (Icon.view Sparkles) Fake.User.model
+            ; chip
+                ~tip
+                ~id:"model"
+                "Model, reasoning and mode"
+                (Icon.view Sparkles)
+                Fake.User.model
             ; chip ~tip ~id:"host" "Tool host" (Icon.view Server) Fake.User.host
             ; Tip.wrap
                 ~side:Top

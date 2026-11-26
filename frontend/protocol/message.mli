@@ -5,7 +5,7 @@ module User : sig
     { text : string
     ; images : Image.t list [@sexp.list]
     ; origin : Origin.t option [@sexp.option]
-    (** how [text] is made up, when the harness added to it *)
+      (** how [text] is made up, when the harness added to it *)
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
@@ -41,7 +41,7 @@ module Tool_result : sig
     ; images : Image.t list [@sexp.list]
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     ; elided : Elided.t option [@sexp.option]
-    (** [text] is cut short ([get_messages_page]) *)
+      (** [text] is cut short ([get_messages_page]) *)
     }
   [@@deriving sexp_of, equal]
 

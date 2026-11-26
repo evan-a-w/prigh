@@ -24,7 +24,6 @@ type t =
 [@@deriving sexp_of, equal]
 
 val empty : t
-
 val loading : t -> t
 val status : t -> (Nix_store_status.t, string) Result.t -> t
 

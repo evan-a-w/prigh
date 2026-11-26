@@ -76,7 +76,8 @@ let parse diff =
     let flush acc =
       match current with
       | None -> acc
-      | Some (header, rev_lines) -> file_of_lines header (List.rev rev_lines) :: acc
+      | Some (header, rev_lines) ->
+        file_of_lines header (List.rev rev_lines) :: acc
     in
     match lines with
     | [] -> List.rev (flush acc)
@@ -85,7 +86,8 @@ let parse diff =
     | line :: rest ->
       (match current with
        | None -> go acc None rest
-       | Some (header, rev_lines) -> go acc (Some (header, line :: rev_lines)) rest)
+       | Some (header, rev_lines) ->
+         go acc (Some (header, line :: rev_lines)) rest)
   in
   go [] None (String.split_lines diff)
 ;;
@@ -162,8 +164,7 @@ let render (d : P.Git_diff.t) : Content.t =
     :: List.map f.hunks ~f:(fun line ->
       Content.Line.of_string ~style:(line_style line) ("  " ^ line))
   in
-  head
-  :: List.concat_map files ~f:file
+  (head :: List.concat_map files ~f:file)
   @
   if d.truncated
   then
