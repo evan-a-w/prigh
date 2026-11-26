@@ -328,10 +328,9 @@ the TUI, show whether each CLI is installed and logged in on each tool host,
 and what to run there when not ("Claude Code on laptop is not logged in:
 run `claude auth login` there"); prigh never installs one or logs in for
 you. The Home Manager module installs Codex, Claude Code, Antigravity
-(`agy` 1.5.0 or later, the flake's own when your nixpkgs' is older; it and
-Claude Code are unfree) and OpenCode by default, and Goose with
-`agents.goose`; Grok Build is not in nixpkgs. The Docker image has the
-same four (DOCKER.md, "Engines").
+(`agy` >= 1.5.0, the flake's if your nixpkgs' is older; it and Claude Code
+are unfree) and OpenCode by default (the Docker image has them too), and
+Goose with `agents.goose`; Grok Build is not in nixpkgs.
 
 ### Computer use
 
