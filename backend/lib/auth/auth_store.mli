@@ -42,6 +42,14 @@ val modify_entry
 
 val read_entry : t -> string -> Json.t option Or_error.t
 
+(** Rewrites the whole file under the lock, for changes to several entries
+    at once (an account and its metadata); unchanged entries keep their
+    order. *)
+val modify_all
+  :  t
+  -> f:((string * Json.t) list -> (string * Json.t) list Or_error.t)
+  -> unit Or_error.t
+
 (** The entries whose keys start with [prefix], in file order. *)
 val entries : t -> prefix:string -> (string * Json.t) list Or_error.t
 

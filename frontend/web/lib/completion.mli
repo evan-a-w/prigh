@@ -21,6 +21,11 @@ val items : t -> Picker.Item.t list
 val selected : t -> int
 val selected_item : t -> Picker.Item.t option
 
+(** Whether [provider]'s models can be used: logged in to it, or a provider
+    prigh has no login for (a CLI's, such as Codex's, which lists only what its
+    own login offers). *)
+val logged_in : Auth_status.t list -> string -> bool
+
 (** What the editor's [text] with the caret at byte [cursor] completes, if
     anything. Paths and directories start without items: see [request]. *)
 val compute
@@ -31,10 +36,12 @@ val compute
   -> ?snippets:Snippet.t list
   -> ?reminders:Reminder.t list (** the session's, for [/remind rm] *)
   -> ?forges:Forge_account.t list (** for [/login] and [/logout] *)
+  -> ?engines:Deployed_engines.t (** for [/engine] *)
   -> ?worktrees:Worktree.t list
        (** the repository's, for [/worktree] and [/review] *)
   -> ?refs:Git_diff.Refs.t
        (** the reviewed repository's branches and tags, for [/review] *)
+  -> ?composer:bool (** the backend deploys it: [/settings engines] *)
   -> superuser:bool (** offers the commands only superusers have *)
   -> text:string
   -> cursor:int

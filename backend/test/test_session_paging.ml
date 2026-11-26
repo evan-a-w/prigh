@@ -148,7 +148,9 @@ let numbered n =
     (List.map (List.range 1 (n + 1)) ~f:(sprintf "test %04d ... ok\n"))
 ;;
 
-let call id = Content.Tool_call { id; name = "bash"; arguments = "{}" }
+let call id =
+  Content.Tool_call { id; name = "bash"; arguments = "{}"; extra = None }
+;;
 
 let assistant ?(calls = []) text =
   Message.Assistant
@@ -156,6 +158,7 @@ let assistant ?(calls = []) text =
     ; stop_reason = (if List.is_empty calls then End_turn else Tool_use)
     ; usage = Usage.zero
     ; model = "m"
+    ; account = None
     }
 ;;
 
@@ -418,6 +421,7 @@ let%expect_test "get_outline: the user's messages, compactions and errors" =
        ; stop_reason = Error "overloaded"
        ; usage = Usage.zero
        ; model = "m"
+       ; account = None
        });
   (* Notes alone, nothing of the user's: not a landmark. *)
   append

@@ -532,12 +532,13 @@ let%expect_test "auth: stored key, environment, keyless; status" =
     (Error
      "auth.json's \"aiproxy\" entry is an OAuth login, not an API key (another tool may use that name): /logout aiproxy, then /login aiproxy")
     (() ())
-    {"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null}
-    {"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null}
-    {"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null}
-    {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null}
-    {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"custom":{"base_url":"http://localhost:3000/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
-    {"provider":"ollama","name":"ollama","methods":[{"method":"api_key","label":"ollama API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"custom":{"base_url":"http://localhost:11434/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
+    {"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"openai","name":"OpenAI API","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"openai-codex","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"google-antigravity","name":"Antigravity (Google)","methods":[{"method":"oauth","label":"Antigravity (Google account)"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"accounts":[{"ref":"aiproxy/main","id":"main","label":"aiproxy API key","method":"api_key","source":"stored api key","default":true,"fallback":false}],"custom":{"base_url":"http://localhost:3000/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
+    {"provider":"ollama","name":"ollama","methods":[{"method":"api_key","label":"ollama API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"accounts":[],"custom":{"base_url":"http://localhost:11434/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     |}]
 ;;
 
@@ -590,13 +591,15 @@ let follow t login =
     | Progress m -> printf "%s\n" (mask t m)
     | Prompt_cancelled _ -> ()
     | Auth_url _ -> print_endline "auth url?!"
-    | Done { provider; method_ } ->
+    | Done { provider; method_; account = _ } ->
       print_s
         [%message
           "done" (provider : Provider_id.t) (method_ : Provider_auth.Method.t)]
     | Failed { provider; error } ->
       print_s [%message "failed" provider (mask t error)]
-    | Logged_out p -> print_s [%message "logged out" (p : Provider_id.t)]
+    | Logged_out { provider = p; account = _ } ->
+      print_s [%message "logged out" (p : Provider_id.t)]
+    | Accounts_changed -> ()
     | Forge_done _ | Forge_logged_out _ -> print_endline "forge?!")
 ;;
 
@@ -1031,13 +1034,22 @@ let conversation =
           [ Content.thinking "Two files to read."
           ; Text "Reading."
           ; Tool_call
-              { id = "call_1"; name = "read"; arguments = {|{"path":"a.png"}|} }
+              { id = "call_1"
+              ; name = "read"
+              ; arguments = {|{"path":"a.png"}|}
+              ; extra = None
+              }
           ; Tool_call
-              { id = "call_2"; name = "read"; arguments = {|{"path":"b.txt"}|} }
+              { id = "call_2"
+              ; name = "read"
+              ; arguments = {|{"path":"b.txt"}|}
+              ; extra = None
+              }
           ]
       ; stop_reason = Tool_use
       ; usage = Usage.zero
       ; model = "aiproxy/m"
+      ; account = None
       }
   ; Tool_result
       { tool_call_id = "call_1"
@@ -1065,6 +1077,7 @@ let request ?(thinking = Thinking.On (Some High)) model =
   ; thinking
   ; max_tokens = None
   ; cache_key = None
+  ; account = None
   }
 ;;
 
@@ -1257,6 +1270,163 @@ let%expect_test
     |}]
 ;;
 
+(* Gemini's OpenAI-compatible endpoint signs a step's first tool call in
+   [extra_content], on whichever delta of the call it likes, and rejects the
+   next request unless the signature comes back with the call. *)
+let gemini_chunks =
+  [ {|{"choices":[{"index":0,"delta":{"role":"assistant","content":"Fetching both."}}]}|}
+  ; {|{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"f1","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":"}}]}}]}|}
+  ; {|{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"a\"}"},"extra_content":{"google":{"thought_signature":"SIG_A"}}}]}}]}|}
+  ; {|{"choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"id":"f2","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"b\"}"}}]}}]}|}
+  ; {|{"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}|}
+  ]
+;;
+
+let gemini_model () =
+  Custom_provider.model
+    { name = "gemini"
+    ; base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+    ; api = Chat
+    ; headers = []
+    ; models = []
+    }
+    "gemini-3-pro-preview"
+;;
+
+let print_assistant_messages ~quirks (r : Provider.Request.t) =
+  match
+    Json.member "messages" (Openai_chat.For_testing.request_body ~quirks r)
+  with
+  | Some (`Array messages) ->
+    List.iter messages ~f:(fun m ->
+      match Json.member "role" m with
+      | Some (`String "assistant") -> print_endline (Json.to_string m)
+      | _ -> ())
+  | _ -> ()
+;;
+
+let%expect_test "chat completions: Gemini thought signatures" =
+  let model = gemini_model () in
+  let reply =
+    { (Openai_chat.For_testing.parse_reply
+         (List.map gemini_chunks ~f:Json.of_string))
+      with
+      model = Model.key model
+    }
+  in
+  print_s [%sexp (reply.content : Content.t list)];
+  [%expect
+    {|
+    ((Text "Fetching both.")
+     (Tool_call
+      ((id f1) (name web_fetch) (arguments "{\"url\":\"a\"}")
+       (extra "{\"google\":{\"thought_signature\":\"SIG_A\"}}")))
+     (Tool_call ((id f2) (name web_fetch) (arguments "{\"url\":\"b\"}"))))
+    |}];
+  (* The session keeps the signature across a reload. *)
+  let dir = Filename_unix.temp_dir "prigh-gemini" "" in
+  let session = Session.create ~dir ~cwd:"/proj" () in
+  let (_ : Session.Entry.t) =
+    Session.append_message session (Assistant reply)
+  in
+  let loaded = Or_error.ok_exn (Session.load (Session.path session)) in
+  let reloaded =
+    List.find_map_exn (Session.messages loaded) ~f:(function
+      | Message.Assistant a -> Some a
+      | User _ | Tool_result _ -> None)
+  in
+  print_s
+    [%sexp ([%equal: Content.t list] reloaded.content reply.content : bool)];
+  [%expect {| true |}];
+  let result id =
+    Message.Tool_result
+      { tool_call_id = id
+      ; tool_name = "web_fetch"
+      ; text = "ok"
+      ; is_error = false
+      ; images = []
+      }
+  in
+  let foreign =
+    { Message.Assistant.content =
+        [ Text "Reading."
+        ; Tool_call
+            { id = "toolu_1"; name = "read"; arguments = "{}"; extra = None }
+        ; Tool_call
+            { id = "toolu_2"; name = "read"; arguments = "{}"; extra = None }
+        ]
+    ; stop_reason = Tool_use
+    ; usage = Usage.zero
+    ; model = "anthropic/claude-sonnet-4-5"
+    ; account = None
+    }
+  in
+  let request ?(model = model) () =
+    { Provider.Request.model
+    ; system = None
+    ; messages =
+        [ Message.user "fetch a and b"
+        ; Assistant foreign
+        ; result "toolu_1"
+        ; result "toolu_2"
+        ; Assistant reloaded
+        ; result "f1"
+        ; result "f2"
+        ]
+    ; tools = []
+    ; thinking = Off
+    ; max_tokens = None
+    ; cache_key = None
+    ; account = None
+    }
+  in
+  (* Gemini's own step goes back verbatim (only its first call is signed);
+     another model's step gets the dummy signature on its first call. *)
+  print_assistant_messages ~quirks:Openai_chat.Quirks.gemini (request ());
+  [%expect
+    {|
+    {"role":"assistant","content":"Reading.","tool_calls":[{"id":"toolu_1","type":"function","function":{"name":"read","arguments":"{}"},"extra_content":{"google":{"thought_signature":"skip_thought_signature_validator"}}},{"id":"toolu_2","type":"function","function":{"name":"read","arguments":"{}"}}]}
+    {"role":"assistant","content":"Fetching both.","tool_calls":[{"id":"f1","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"a\"}"},"extra_content":{"google":{"thought_signature":"SIG_A"}}},{"id":"f2","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"b\"}"}}]}
+    |}];
+  (* Another Gemini model's signature would not validate: the dummy instead. *)
+  print_assistant_messages
+    ~quirks:Openai_chat.Quirks.gemini
+    (request ~model:{ model with id = "gemini-3-flash-preview" } ());
+  [%expect
+    {|
+    {"role":"assistant","content":"Reading.","tool_calls":[{"id":"toolu_1","type":"function","function":{"name":"read","arguments":"{}"},"extra_content":{"google":{"thought_signature":"skip_thought_signature_validator"}}},{"id":"toolu_2","type":"function","function":{"name":"read","arguments":"{}"}}]}
+    {"role":"assistant","content":"Fetching both.","tool_calls":[{"id":"f1","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"a\"}"},"extra_content":{"google":{"thought_signature":"skip_thought_signature_validator"}}},{"id":"f2","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"b\"}"}}]}
+    |}];
+  (* Any OpenAI-compatible server gets its own [extra_content] back, and no
+     dummies. *)
+  print_assistant_messages ~quirks:Openai_chat.Quirks.generic (request ());
+  [%expect
+    {|
+    {"role":"assistant","content":"Reading.","tool_calls":[{"id":"toolu_1","type":"function","function":{"name":"read","arguments":"{}"}},{"id":"toolu_2","type":"function","function":{"name":"read","arguments":"{}"}}]}
+    {"role":"assistant","content":"Fetching both.","tool_calls":[{"id":"f1","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"a\"}"},"extra_content":{"google":{"thought_signature":"SIG_A"}}},{"id":"f2","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"b\"}"}}]}
+    |}];
+  List.iter
+    [ "https://generativelanguage.googleapis.com/v1beta/openai"
+    ; "https://aiplatform.googleapis.com/v1/projects/p/locations/global/endpoints/openapi"
+    ; "http://localhost:4000/v1"
+    ]
+    ~f:(fun url ->
+      let quirks = Openai_chat.Quirks.of_url url in
+      print_s [%sexp (quirks.gemini : bool)]);
+  [%expect
+    {|
+    true
+    true
+    false
+    |}];
+  print_endline
+    (Sse_request.error_message_of_body
+       ~status:400
+       {|[{"error":{"code":400,"message":"Function call is missing a thought_signature in functionCall parts. This is required for tools to work correctly, and missing thought_signature may lead to degraded model performance. Additional data, function call `default_api:web_fetch` , position 4. Please refer to https://ai.google.dev/gemini-api/docs/thought-signatures for more details.","status":"INVALID_ARGUMENT"}}]|});
+  [%expect
+    {| HTTP 400: Gemini refused the history: a tool call in it lacks its thought signature. /compact (which summarises the old tool calls) or /new gets past it; please report it with the session, as prigh should have sent one. |}]
+;;
+
 (* ---- end to end ------------------------------------------------------------- *)
 
 let tool_call_reply =
@@ -1409,6 +1579,7 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
           ; thinking = Off
           ; max_tokens = None
           ; cache_key = None
+          ; account = None
           }
           ~cancel:Cancellation.never
           ~on_event:ignore
@@ -1435,6 +1606,7 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
           ; thinking = Off
           ; max_tokens = None
           ; cache_key = None
+          ; account = None
           }
           ~cancel:Cancellation.never
           ~on_event:ignore)
@@ -1456,6 +1628,49 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
     POST /v2/chat/completions HTTP/1.1 authorization=- x-api-key=-
     (Error
      "custom provider ghost is not configured: add it with /login custom (or check providers.ghost in config.json)")
+    |}];
+  let other =
+    ok_exn
+      (Provider_accounts.save_login
+         ~label:"Other"
+         (store t)
+         (Custom "gw")
+         (Api_key "sk-other"))
+  in
+  let gw ?account () =
+    let message =
+      provider.stream
+        { model = Option.value_exn (Model_registry.find models "gw/claude-x")
+        ; system = None
+        ; messages = [ Message.user "hi" ]
+        ; tools = []
+        ; thinking = Off
+        ; max_tokens = None
+        ; cache_key = None
+        ; account
+        }
+        ~cancel:Cancellation.never
+        ~on_event:ignore
+    in
+    let key =
+      Option.bind
+        (List.last (Server.requests server))
+        ~f:(fun r -> Server.Request.header r "x-api-key")
+    in
+    print_s
+      [%sexp
+        (message.account : string option)
+      , (key : string option)
+      , (message.stop_reason : Stop_reason.t)]
+  in
+  gw ();
+  gw ~account:(Own other) ();
+  gw ~account:Account_ref.main ();
+  [%expect
+    {|
+    (() (sk-gw) (Error "HTTP 418: just checking"))
+    ((other) (sk-other) (Error "HTTP 418: just checking"))
+    (() (sk-gw) (Error "HTTP 418: just checking"))
     |}]
 ;;
 
@@ -1541,7 +1756,7 @@ let%expect_test
     {"type":"event","event":"auth","kind":"progress","message":"Checking http://127.0.0.1:PORT/v1/models ..."}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"event","event":"auth","kind":"progress","message":"Found 2 models: gpt-4o, openai/gpt-4o-mini"}
-    {"type":"event","event":"auth","kind":"done","provider":"aiproxy","method":"api_key"}
+    {"type":"event","event":"auth","kind":"done","provider":"aiproxy","method":"api_key","account":"main"}
     |}];
   custom_keys ();
   let call_quiet ?(params = "{}") meth =
@@ -1590,7 +1805,7 @@ let%expect_test
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"unknown model \"aiproxy/gpt-5\"; did you mean: aiproxy/gpt-4o (gpt-4o)"}
     ("\"aiproxy/openai/gpt-4o-mini\"")
-    {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"custom":{"base_url":"http://127.0.0.1:PORT/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
+    {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"accounts":[],"custom":{"base_url":"http://127.0.0.1:PORT/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     |}];
   (* Logging out asks the caller which to remove. *)
   call ~params:{|{"provider": "aiproxy"}|} "logout";
@@ -1606,7 +1821,7 @@ let%expect_test
     {"type":"event","event":"auth","kind":"logged_out","provider":"aiproxy"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     ()
-    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"aiproxy\" (one of: anthropic, openai, openai-codex, deepseek; or custom to add an OpenAI-compatible endpoint)"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"aiproxy\" (one of: anthropic, openai, openai-codex, deepseek, google-antigravity; or custom to add an OpenAI-compatible endpoint)"}
     |}]
 ;;
 

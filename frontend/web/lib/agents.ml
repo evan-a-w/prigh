@@ -33,6 +33,9 @@ module Agent = struct
     ; name : string option
     ; model : string
     ; host : string option
+    ; thinking : string option
+    ; cwd : string option
+    ; worktree : Agent_worktree.t option
     ; status : Status.t
     ; started_at : Time_ns.t
     ; ended_at : Time_ns.t option
@@ -57,6 +60,13 @@ module Agent = struct
     let%bind name = Json.string_opt_field json "name" in
     let%bind model = Json.string_field json "model" in
     let%bind host = Json.string_opt_field json "host" in
+    let%bind thinking = Json.string_opt_field json "thinking" in
+    let%bind cwd = Json.string_opt_field json "cwd" in
+    let%bind worktree =
+      match Json.field json "worktree" with
+      | None | Some `Null -> Ok None
+      | Some w -> Agent_worktree.of_json w >>| Option.some
+    in
     let%bind started_at = Json.float_field json "started_at_ms" >>| of_ms in
     let%bind ended_at = ms_opt "ended_at_ms" in
     let%bind turns = Json.int_field json "turns" in
@@ -76,6 +86,9 @@ module Agent = struct
       ; name
       ; model
       ; host
+      ; thinking
+      ; cwd
+      ; worktree
       ; status = Status.of_result result
       ; started_at
       ; ended_at
@@ -181,8 +194,8 @@ let update_agent t id ~f =
 
 let rec record_in t ~now ~parent (event : Event.t) =
   match event with
-  | Subagent_start { call_id; agent_id; task; name; model; host; continued; _ }
-    ->
+  | Subagent_start
+      { call_id; agent_id; task; name; model; host; worktree; continued; _ } ->
     if Option.is_some (find_agent t agent_id)
     then
       if continued
@@ -207,6 +220,9 @@ let rec record_in t ~now ~parent (event : Event.t) =
               ; name
               ; model
               ; host
+              ; thinking = None
+              ; cwd = Option.map worktree ~f:(fun w -> w.path)
+              ; worktree
               ; status = Running
               ; started_at = now
               ; ended_at = None

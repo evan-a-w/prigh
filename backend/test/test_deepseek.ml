@@ -15,6 +15,7 @@ let request ?(thinking = Thinking.Off) ?(tools = []) ?system messages =
   ; thinking
   ; max_tokens = None
   ; cache_key = None
+  ; account = None
   }
 ;;
 
@@ -29,11 +30,16 @@ let%expect_test
             [ Content.thinking "I should list."
             ; Text "Listing."
             ; Tool_call
-                { id = "call_1"; name = "bash"; arguments = "{\"cmd\":\"ls\"}" }
+                { id = "call_1"
+                ; name = "bash"
+                ; arguments = "{\"cmd\":\"ls\"}"
+                ; extra = None
+                }
             ]
         ; stop_reason = Tool_use
         ; usage = Usage.zero
         ; model = model.id
+        ; account = None
         }
     ; Tool_result
         { tool_call_id = "call_1"

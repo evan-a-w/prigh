@@ -39,6 +39,7 @@ let request
       ?(tools = tools)
       ?system
       ?max_tokens
+      ?account
       messages
   =
   { Provider.Request.model
@@ -48,6 +49,7 @@ let request
   ; thinking
   ; max_tokens
   ; cache_key = None
+  ; account
   }
 ;;
 
@@ -59,12 +61,22 @@ let conversation =
           ; Text ""
           ; Text "Listing."
           ; Tool_call
-              { id = "toolu_1"; name = "bash"; arguments = {|{"cmd":"ls"}|} }
-          ; Tool_call { id = "toolu_2"; name = "subagent"; arguments = "" }
+              { id = "toolu_1"
+              ; name = "bash"
+              ; arguments = {|{"cmd":"ls"}|}
+              ; extra = None
+              }
+          ; Tool_call
+              { id = "toolu_2"
+              ; name = "subagent"
+              ; arguments = ""
+              ; extra = None
+              }
           ]
       ; stop_reason = Tool_use
       ; usage = Usage.zero
       ; model = Model.key model
+      ; account = None
       }
   ; Tool_result
       { tool_call_id = "toolu_1"
@@ -88,6 +100,7 @@ let conversation =
       ; stop_reason = End_turn
       ; usage = Usage.zero
       ; model = "deepseek/deepseek-flash"
+      ; account = None
       }
   ; Message.user "thanks"
   ; Message.user "and again"
@@ -836,6 +849,7 @@ let%expect_test "an unresolved server_tool_use in history is dropped, not text" 
       ; stop_reason = Aborted
       ; usage = Usage.zero
       ; model = Model.key model
+      ; account = None
       }
   in
   let body =
@@ -847,4 +861,31 @@ let%expect_test "an unresolved server_tool_use in history is dropped, not text" 
     (Json.to_string (Option.value_exn (Json.member "messages" body)));
   [%expect
     {| [{"role":"user","content":[{"type":"text","text":"eio?","cache_control":{"type":"ephemeral"}}]},{"role":"assistant","content":[{"type":"text","text":"Searching."}]},{"role":"user","content":[{"type":"text","text":"go on","cache_control":{"type":"ephemeral"}}]}] |}]
+;;
+
+let%expect_test "thinking is replayed only to the account that wrote it" =
+  let id s = Or_error.ok_exn (Account_ref.of_string s) in
+  let replayed ~written ~to_ =
+    let conversation =
+      List.map conversation ~f:(function
+        | Message.Assistant a when String.equal a.model (Model.key model) ->
+          Message.Assistant { a with account = written }
+        | m -> m)
+    in
+    let body =
+      T.request_body
+        ~oauth:true
+        (request ~thinking:(On (Some High)) ?account:to_ conversation)
+    in
+    String.is_substring (Json.to_string body) ~substring:"sig-1"
+  in
+  print_s
+    [%sexp
+      ([ replayed ~written:None ~to_:None
+       ; replayed ~written:(Some "work") ~to_:(Some (id "work"))
+       ; replayed ~written:(Some "work") ~to_:None
+       ; replayed ~written:None ~to_:(Some (id "work"))
+       ]
+       : bool list)];
+  [%expect {| (true true false false) |}]
 ;;

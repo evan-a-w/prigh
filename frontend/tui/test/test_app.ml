@@ -575,7 +575,9 @@ let%expect_test
   H.mode h;
   [%expect {| editing |}];
   H.event h (Auth (Progress "exchanging code"));
-  H.event h (Auth (Done { provider = "anthropic"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "anthropic"; method_ = "api_key"; account = None }));
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
@@ -780,7 +782,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -797,7 +799,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -814,7 +816,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -1324,7 +1326,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.keys h "y";
   [%expect
     {| (Rpc (method_ logout) (params ((provider deepseek))) (tag Show_error)) |}];
-  H.event h (Auth (Logged_out "deepseek"));
+  H.event h (Auth (Logged_out { provider = "deepseek"; account = None }));
   [%expect {| (Rpc (method_ auth_status) (params ()) (tag Auth_refresh)) |}]
 ;;
 
@@ -3084,17 +3086,17 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     {|
     ┌─ Help ───────────────────────────────────────────────────┐
     │ Commands                                                 │
-    │ /help                              show commands and     │
-    │ keys                                                     │
-    │ /hotkeys                           show keyboard         │
-    │ shortcuts                                                │
-    │ /model [name|id|provider/id]       pick or switch the    │
-    │ model                                                    │
-    │ /scoped-models                     pick the models       │
-    │ Ctrl+P cycles through                                    │
-    │ /change_default                    save the current      │
-    │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 367 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    │ /help                                                    │
+    │    show commands and keys                                │
+    │ /hotkeys                                                 │
+    │    show keyboard shortcuts                               │
+    │ /model [name|id|provider/id]                             │
+    │    pick or switch the model                              │
+    │ /scoped-models                                           │
+    │    pick the models Ctrl+P cycles through                 │
+    │ /change_default                                          │
+    │    save the current model and thinking level as the      │
+    └───────── 1–11 of 422 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -6980,7 +6982,9 @@ let%expect_test "login end to end includes a prompt_cancelled" =
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.event h (Auth (Progress "exchanging code"));
-  H.event h (Auth (Done { provider = "anthropic"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "anthropic"; method_ = "api_key"; account = None }));
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
@@ -8052,6 +8056,7 @@ let%expect_test "~ in the cwd shown is the active tool host's home, not ours" =
        ; user = None
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   show_where ~active:"client-2" ~cwd:"/home/me/d";
   [%expect
@@ -8097,6 +8102,7 @@ let%expect_test
        ; user = None
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.keys h "/host laptop";
   H.enter h;
@@ -8408,6 +8414,7 @@ let%expect_test "the host picker shows which session other frontends are in" =
        ; user = None
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.keys h "/host";
   H.enter h;
@@ -8736,7 +8743,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8753,7 +8760,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 87
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -9038,7 +9045,7 @@ let%expect_test
                                 │   /fallback [off|model...]      show or set the models that take over, in order, when a model's usa…
                                 │   /default-dir [off|path]       show or set the directory new sessions start in (on the default hos…
                                 │   /default-host [off|name]      show or set the tool host prigh-web's new sessions start on (a term…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 82
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 87
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
@@ -9207,6 +9214,7 @@ let%expect_test
        ; user = Some "lloyd"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.show h;
   [%expect
@@ -9482,6 +9490,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
        ; user = Some "s"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.keys h "/setusr";
   H.enter h;
@@ -9740,7 +9749,9 @@ let%expect_test
       (tag Show_error))
     |}];
   H.event h (Auth (Progress "Found 1 models: gpt-4o"));
-  H.event h (Auth (Done { provider = "aiproxy"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "aiproxy"; method_ = "api_key"; account = None }));
   H.reply
     ~quiet:true
     h
@@ -9825,7 +9836,7 @@ let%expect_test
                 }
           }));
   H.enter h;
-  H.event h (Auth (Logged_out "ollama"));
+  H.event h (Auth (Logged_out { provider = "ollama"; account = None }));
   [%expect
     {|
     (Rpc
@@ -10538,5 +10549,61 @@ let%expect_test
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    |}]
+;;
+
+let%expect_test
+    "what an agent CLI is doing: starting, waited for, writing, tools, waited \
+     for again, never the model"
+  =
+  let h = connected ~width:100 ~height:8 () in
+  let status () =
+    print_endline
+      (Option.value
+         (Prigh_ui.Activity.brief (App.Model.activity h.H.model))
+         ~default:"(idle)")
+  in
+  H.event h (State (state ~running:true ()));
+  H.event h Agent_start;
+  H.event h (Message_start (user "go"));
+  H.event h (Agent_waiting { agent = "Claude Code"; starting = true });
+  H.show h;
+  H.event h (Agent_waiting { agent = "Claude Code"; starting = false });
+  status ();
+  H.event h Turn_start;
+  H.event h (Agent_waiting { agent = "Claude Code"; starting = false });
+  H.event h (Message_start (Assistant partial));
+  status ();
+  H.event h (Message_update (unnumbered (Text_delta "Looking.")));
+  status ();
+  H.event h (Tool_start (tool_call "c1"));
+  status ();
+  H.event h (Agent_waiting { agent = "Claude Code"; starting = false });
+  H.show h;
+  H.event h (Agent_end []);
+  H.event h (State (state ()));
+  status ();
+  [%expect
+    {|
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ⠋ starting Claude Code · Esc aborts · Enter steers
+    waiting for Claude Code
+    waiting for Claude Code
+    writing
+    running tools
+      earlier answer
+
+    ▌ go
+      Looking.
+    … bash
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ waiting for Claude Code · Esc aborts · Enter steers
+    (idle)
     |}]
 ;;

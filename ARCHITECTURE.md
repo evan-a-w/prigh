@@ -2,7 +2,8 @@
 
 How prigh fits together, and where each piece lives. For using prigh see
 `README.md`; for the container, `DOCKER.md`; for builds, tests and
-conventions, `AGENTS.md` (and `backend/AGENTS.md`). The `.mli` files are the
+conventions (`./test`; `./test --full` only when the user asks),
+`AGENTS.md` (and `backend/AGENTS.md`). The `.mli` files are the
 detailed reference: this file says which one to open.
 
 prigh is an OCaml backend (`backend/`, all the logic) and OCaml frontends
@@ -40,25 +41,9 @@ outside is skills (`SKILL.md` files) and the tools of MCP servers.
 | `nix/` | flake pins, patches, desktop packaging, Home Manager module (`nix/README.md`) |
 
 `backend/lib` is one library with `(include_subdirs unqualified)`: a
-module's name does not carry its directory.
-
-| Group | Contents |
-|---|---|
-| `agent/` | `Agent`, `Agent_loop`, compaction, approvals, plans, goals, reminders, review, subagent bookkeeping, system prompt, skills, memory |
-| `session/` | the JSONL `Session` and what it records: `Message`, `Content`, `Image`, `Usage`, pages, outlines, search |
-| `providers/` | `Provider`, `Provider_router`, the providers, `Model`, `Model_registry`, `Sse`, `Http_client` |
-| `auth/` | `Credential`, `Auth_store`, `Provider_auth`, OAuth flows, `Login_manager` |
-| `tools/` | `Tool`, `Tools`, the built-in `Tool_*` and helpers (`Process`, `Apply_patch`, `Truncate`, ...) |
-| `host/` | `Tool_host`, `Host_ops`, the host's files, git, worktrees |
-| `forge/` | git hosting: sign-ins, REST APIs, pull requests (`Forges`) |
-| `mcp/` | MCP client, config, hub, tools |
-| `computer/` | computer use: `Computer_action`, `Computer_helper`, `Tool_computer` |
-| `rpc/` | `Rpc_server`, `Rpc_router`, `Rpc_json`, users, `Web_server`, `Websocket`, file HTTP, `prigh web`/`desktop` |
-| `acp/` | `prigh acp`: the Agent Client Protocol for editors |
-| `nix/` | Nix store status and garbage collection for superusers |
-| `terminal/` | the browser's terminals (tmux control mode) |
-| `trace/` | tracing (see "Tracing") |
-| `util/` | `Import`, `Config`, `Cancellation`, `Guarded`, `Utf8`, small shared pieces |
+module's name does not carry its directory. `backend/AGENTS.md` lists its
+groups (`agent/`, `engine/`, `composer/`, `session/`, `providers/`,
+`tools/`, `host/`, `rpc/`, ...) and what each holds.
 
 ## Processes
 
@@ -151,6 +136,30 @@ switches the cwd, and `~` means the host's home.
   `$list_paths`, `$list_dirs`, `$instructions` (AGENTS.md/CLAUDE.md and
   skills from the host), `$skill`, `$mcp_*`, `$git_diff`, `$git_forge`,
   `$git_actions`, `$fs_*`. Older hosts answer "unknown host tool".
+- Long-lived programs: `$process` (`Host_process`) runs a line-oriented
+  program (an agent CLI on stdio) for as long as its exec lasts, over the
+  same `tool_exec` channel, so it needs nothing new in the protocol. Its
+  chunks are JSON frames, one per line: up `started`, `out` (numbered
+  stdout lines), rate-capped `err`/`err_dropped`; down `in`, `ack`,
+  `close`, `signal`. Stdout is read only while fewer than the window's lines
+  are unacknowledged, so a slow backend blocks the program on its pipe.
+  Cancelling closes its stdin, sends SIGTERM and kills the tree after
+  `term_grace`; the result says how it ended, with its stderr's end. With
+  `mcp`, the host relays as `mcp`/`mcp_in` frames (outside the window) each
+  connection to a Unix socket in a private directory that first presents
+  the token reported in `started`: a `prigh mcp-bridge` the program runs as
+  an MCP server, given socket and token only in its MCP config (`{{prigh}}`
+  and `{{mcp_socket}}` in the arguments name them). With `secret`, the program
+  gets it as one line on a socket at fd 3 (named by a variable the caller
+  chose), never in its environment; `started` says so. An older host
+  ignores it: `Host_transport` restarts the program with it in the
+  environment and a notice. `Host_stream` is the
+  backend's end: lines in and out (at most 12 MiB each), `stop`,
+  `interrupt` and an `ended` saying why (exited, not installed or only on a
+  login shell's `PATH`, an older host, the host gone). `$probe_programs`
+  (`Host_probe`) checks without side effects which programs a host has,
+  their `--version` and status command, and whether given files exist and
+  variables are set, never their contents.
 - Choice: a new session starts on a host chosen from the client's context
   (`Rpc_server.start_location`): the client itself if it is a tool host
   (or its `hello`'s `prefer_host`), else where its current session runs.
@@ -206,6 +215,163 @@ and budgets, delivery of background work's reports, and eviction.
 | Worktrees | `Worktree` (`host/`), `Tool_worktree`, `Agent_worktree`, `Worktree_home`, `Worktree_watch` |
 | Temporary sessions | `Leftover`, `Temporary_ledger` (`rpc/`): what they made, deleted when they end |
 
+### Engines
+
+A session runs on an engine (`engine/`): the **harness** (prigh's own
+`Agent_loop`, providers and tools; `Harness_runner` in `agent/`) or the
+**composer**, which drives an external coding agent (Codex, Claude Code,
+ACP agents, prigh itself) on the session's tool host through an adapter.
+`Agent` stays the session object either way (log, clients, queues,
+approvals, hosts, worktrees, naming); only its runs go through `Runner`
+(`Engine_intf`), whose `Capabilities` say what the engine supports.
+
+`Engines` is what a backend deploys (`-engines harness,composer -adapters
+codex,claude`, or `$PRIGH_ENGINES`/`$PRIGH_ADAPTERS`; the harness alone by
+default), shared by all its namespaces, so users, settings and logins are
+the same on either engine. A session's engine is its last `Engine` entry
+(`Engine_choice`; none: the harness), set by `new_session`'s `engine` and
+`adapter`; one the backend does not deploy, or this build cannot run, can
+be read but not run (`state`'s `unavailable`). `hello` lists `engines` and
+`adapters` (and the `engines` feature) when there is more than the harness;
+`state` carries `engine`, `adapter` and `capabilities` off the harness.
+
+`Adapter_health` (`composer/`) says whether each adapter's CLI can run on a
+host: one `$probe_programs` call per host runs its `--version` and its
+login-status command (`codex login status`, `claude auth status`), never a
+login or a turn. `Rpc_server` caches the statuses per host and adapter for
+a minute, forgets a host's when it (re)connects (`adapters_changed`), and
+answers `list_adapters {refresh?}` (every connected host, the session's
+first), each with the `problem` to show ("Claude Code on laptop is not
+logged in: run `claude auth login` there"); prigh never installs a CLI or
+logs in. ACP agents have no login-status command: their login is what
+starting them showed (`session/new` in the model-list check or a session:
+opened, or `-32000 Authentication required`), the prigh login they run on,
+or Antigravity's token file; with none of that the row says "Login not
+checked yet", and opening the page or Refresh/Check runs the model-list
+check. prigh-web shows them in Settings → Engines (composer deployed
+only), the TUI with `/adapters`.
+
+Codex can run on one of prigh's ChatGPT logins (`Cli_login`: the user's
+choice per adapter in their config's `adapters`; `Cli_credential`: an
+`Account_ref`, own or shared through `Account_shares`, resolved and
+refreshed on the owner's store, its usage in that login's ledger).
+`Codex_login` sends `account/login/start {type: chatgptAuthTokens}` after
+`initialize`, answers `account/chatgptAuthTokens/refresh` with freshly
+refreshed tokens, and pushes new ones before a turn when they near expiry;
+a Codex refusing the mode keeps its own login and the session gets a
+notice. `set_adapter_login` changes the choice; a live process on another
+login is restarted on the same thread at the next turn.
+`Antigravity_login` (`acp/`) runs agy through a bash wrapper that writes the
+access token (from the process's secret descriptor) into a private
+`--gemini-dir` linking the rest of `~/.gemini`, removed at exit, with D-Bus
+pointed nowhere so agy reads the file; `Acp_adapter` asks for a renewal
+(`Login_renewal`) when the token nears expiry or a turn is refused.
+`Oauth_antigravity` (`auth/`) holds Google's client (found in agy's binary
+by hash, never shipped) and refreshes; `Subscription_usage` reads Code
+Assist's `loadCodeAssist` and `retrieveUserQuotaSummary`.
+
+`Engine_gate` (`rpc/`) refuses, before dispatch, the methods the attached
+session's engine lacks (`Capabilities.method_feature`: fork, rewind, trim
+and delete, compact, `downsize_images`, `btw`, steering subagents, plan
+mode), with what to do instead, named after the adapter ("Codex sessions
+can't rewind in place: fork from that message instead (/fork)"); the
+`Agent` vals behind them check too, and the frontends mirror the check
+(`Session_engine`) to hide or disable the controls.
+
+Compaction of composer sessions: Codex and Claude Code compact natively
+(`Native`); an ACP agent listing a `compact` (or `compress`) command is
+sent it as a prompt (`Command`, Antigravity's `/compact`); any other
+(`Summary`) is compacted by prigh: `Agent.summarise_for_agent` summarises
+the session with the compaction (else prigh's) model, records the
+`Compaction`, and `Runner.compacted` stops the process so the next turn
+starts a new thread handed the compacted session (`Handoff`). Both on
+request and, between turns, when the agent's context passes the threshold.
+Its context is what the agent reports (`usage_update`), else the session's
+estimate capped by the turn's reported input; its window the agent's, else
+its model family's (`External_model.known_window`), else unknown (0: no
+percentage, no automatic compaction).
+
+The composer (`composer/`), from the bottom up:
+
+- **Codecs** (`codex/`, `claude/`, `acp/`): pure, no I/O. Each turns its
+  CLI's lines into `Adapter_event`s (`engine/`: text and thinking deltas,
+  tool start/update/end with a `Tool_kind` and diffs, approval requests,
+  questions, plans, usage and cost, turn end with its `Stop`, errors
+  classified as usage limits, auth, overload...) and builds the lines to
+  send: `Codex_codec` for `codex app-server` (JSON-RPC: threads, turns,
+  `turn/steer`, approvals, `item/tool/requestUserInput`), `Claude_codec`
+  for `claude` stream-json and its control protocol (`can_use_tool`,
+  `AskUserQuestion`, `ExitPlanMode`, in-band `mcp_message`; argv from
+  `Claude_launch`), `Acp_client_codec` for the client side of ACP v1. Their
+  tests replay transcripts recorded by T3 Code (`test/fixtures/`, `NOTICE`).
+- **Adapters** (`Adapter_intf.S`, found by `Composer_adapters`):
+  `Codex_adapter`, `Claude_adapter` and `Acp_adapter` wrap a codec around a
+  `Line_transport` (launch argv and environment, start or resume a thread,
+  send, steer, interrupt, answer, `Capabilities`); `Prigh_adapter` runs the
+  harness in the backend. `Acp_adapter` is strictly the spec: capabilities
+  from what the agent advertises (plan mode with a `plan` mode, images when
+  it takes them), prigh's tools as a stdio MCP server in `session/new`'s
+  `mcpServers`, a thread continued with `session/resume`, else
+  `session/load` (loaded once the replay goes quiet, as some agents never
+  answer it), else anew. Commands come from `Acp_agent` (`known`, or
+  `-adapters acp:name=command`); one without fails at startup.
+- **`Host_transport`** spawns the CLI on the session's active tool host
+  through `$process` (`Host_stream`, see Tool hosts), with the MCP side
+  channel on; a CLI not installed there fails with `Host_stream.Ended`'s
+  message and makes `Adapter_health` check that host again.
+- **`Composer_runner`** is the composer's `Runner`: it starts the CLI on
+  the first turn and keeps it between turns, restarting it and resuming the
+  recorded thread (a `Thread` entry per adapter and host) when it exited or
+  its host went; routes approval requests through `Services.approve`,
+  questions and the plan a CLI proposes on leaving plan mode (Claude Code's
+  `ExitPlanMode`, Grok's `x.ai/exit_plan_mode`) through `ask_user`; steers mid-turn where the CLI can (Codex;
+  Antigravity with another `session/prompt`, Grok with `_x.ai/interject`,
+  per `Acp_agent.Quirks`), between turns otherwise; and records the cost the CLI reports as spend
+  (`External_model` names its replies `codex/MODEL`, priced at zero).
+  A session always names a model the CLI listed (its default first, under
+  its real id); only until the CLI or its catalog lists them does it run on
+  a placeholder (`ADAPTER/default`, shown "loading models…"), which then
+  takes the default, as a session recorded on it before does.
+- **`Adapter_catalog`** holds, per host and adapter, the models and usage
+  limits the CLI's own login offers (Codex's `model/list` and
+  `account/rateLimits/read`, Claude Code's `initialize` and `get_usage`),
+  read by running the CLI briefly (the adapter's `catalog`) when
+  `list_models` or `usage_limits` is asked before a session's first turn;
+  the live process's `account/rateLimits/updated` or `rate_limit_event`
+  then keep them current. Never prigh's own provider logins: a change goes
+  to the session's clients as `models_changed`, and they ask again.
+- **`Composer_recorder`** turns the events into the `Agent_event`s and
+  messages a harness run makes, each external tool under prigh's name for
+  it (`Canonical_tool`: `Bash` and `commandExecution` are `bash`,
+  `fileChange` is `apply_patch`, `TodoWrite` is `update_plan`, `Task` a
+  nested subagent), so cards, diffs, approval rules, search and plans work
+  unchanged. Where the harness's model would be waited for, it emits
+  `agent_waiting` (the CLI starting, asked, or silent between steps), which
+  the frontends show as "Starting Codex…" or "Waiting for Codex…".
+- **`Injected_tools`** serves prigh's tools the agents lack (`render_ui`,
+  `memory`, `custom_instructions`, `sessions`, `ask_session`, the forge
+  tools, `worktree`; `ask_user` for agents without questions of their own)
+  as the MCP server `prigh`: in band for Claude Code, through `prigh
+  mcp-bridge` on the tool host (`Mcp_bridge`, relaying stdio to
+  `$PRIGH_MCP_SOCKET`) for Codex and ACP agents. Custom instructions and
+  user info go as developer instructions (Codex) or `initialize`'s
+  `appendSystemPrompt` (Claude Code), never on the command line. The CLIs
+  always ask before acting (Codex `untrusted`, Claude Code `default` with
+  `--setting-sources=user --strict-mcp-config`, so a repository's `.claude`
+  settings and hooks do not apply): prigh's approval mode, rules and Smart
+  judge decide, the mode only picking Codex's sandbox (Codex still runs
+  commands it knows to be read-only without asking).
+- **`Handoff`** quotes the session for an adapter taking over (another
+  adapter or host, a thread it cannot resume; `set_adapter` switches):
+  within a token budget, the latest messages verbatim under a header saying
+  where the session came from and how to read what was left out
+  (`sessions`), or only what that adapter has not seen when switching back.
+- **`Checkpoint`** (`$checkpoint`) keeps each run's files under hidden refs:
+  rewind restores them and rolls the agent's thread back; forks fork it.
+- **`Fake_cli`** (`prigh fake-cli codex|claude --script FILE`, hidden)
+  stands in for a CLI in the e2e tests: it answers `--version` and the
+  login-status commands, and replays a transcript against the backend's.
+
 ### Subagents and background work
 
 - `Tool_subagent` (`tools/`): `subagent {task, tools?, model?, thinking?,
@@ -253,6 +419,21 @@ and budgets, delivery of background work's reports, and eviction.
 - `Auth_store` (`auth/`): `~/.config/prigh/auth.json` (pi's format), atomic
   0600 writes under an in-process mutex and a cross-process lock.
   `Credential` is an API key or OAuth tokens.
+- `Provider_accounts`: several logins per provider in the same file (the
+  provider's own key is account `main`, others `account:PROVIDER:ID`;
+  `Account_meta` holds labels, order, default and fallback under
+  `"prigh:accounts"`). Requests name an account (`Provider.Request.account`,
+  pinned per session by the agent); replies record it so encrypted
+  reasoning is only replayed to the account that wrote it. The agent tries
+  the provider's other fallback accounts before `fallback_models`.
+- `Account_shares` (`-tokens`): the logins users share with each other.
+  Grants live in the owner's `Account_meta`; a recipient's request names
+  `Account_ref.Shared` (`~OWNER/ID`), and the router resolves (and
+  refreshes) it on the owner's store in-process, so no client sees the
+  secret. `Account_ledger` keeps each login's usage per user and day (the
+  owner's own and recipients'; `auth_status`, `account_usage`);
+  `Login_choice` lists a user's own and shared logins for pinning and
+  fallback. Revoking pushes `accounts_changed` and unpins recipients.
 - `Provider_auth`: which methods each provider supports, environment
   fallbacks, `resolve` (refreshing OAuth under the lock).
 - `Login_manager`: runs one login flow at a time and turns its prompts into
@@ -304,7 +485,7 @@ to `head`. Rewinding moves `head`; forking copies the active path to a new
 file. Besides messages, entries record model and thinking changes,
 compaction summaries, masking, names, descriptions, cwds with their host, the
 system prompt, goal, reminders, approval mode and rules, archiving, pinning,
-spend, review changes and what the model was told. `Session.mli` lists them.
+spend, review changes and what the model was told, and for engines the session's engine (`Engine`), its external agent's threads (`Thread`) and turns (`External_turn`), and handoffs between adapters (`Handoff`). `Session.mli` lists them.
 
 Related: `Message_page`/`Outline`/`Trim_point` (paged transcripts and
 landmarks), `Session_search` (word index over saved sessions),
@@ -391,6 +572,13 @@ only; `Nix_store` runs one collection at a time through `Nix_store_ops`
 - `Trace_report` — the summary, an indented tree, and a Chrome/Perfetto
   trace export: `prigh trace SESSION [-perfetto FILE] [-tree] [-slowest N]`
   and the `trace` RPC method.
+- `Turn_timings` (`engine/`) — the phases of an external harness's start
+  in a run (`mcp_refresh`, `login`, `process`: `spawn`, `handshake`:
+  `initialize`, `session/new|resume|load`; `handoff`, `checkpoint`
+  alongside, `send`, `first_output`), each also a span; the run's
+  trace records them (`start_phases`; `prigh trace`).
+  ACP agents (`starts_early`) are started when a session opens on one
+  (`Runner.prewarm`), so the first message does not wait for them.
 
 Spans come from `Agent.start_run` (`prompt`), `Agent_loop` (`turn`,
 `model_request`, `retry_wait`, `tool`, `compaction`, `mask`), `Agent`
@@ -473,11 +661,13 @@ builds installers for Linux, macOS and Windows.
 
 | Command | What |
 |---|---|
-| `serve` | the backend: stdio, `-listen`, `-web` (`-open`, `-web-root`), `-token`/`-tokens`, `-no-backend-host`, `-session` (the default session) |
+| `serve` | the backend: stdio, `-listen`, `-web` (`-open`, `-web-root`), `-token`/`-tokens`, `-no-backend-host`, `-session` (the default session), `-engines`/`-adapters` |
 | `tool-host` | the local tool worker; `-connect`/`-remote` for a standalone host; `-computer` |
 | `web` | prigh-web locally for a remote backend (`-connect`, else `$PRIGH_CONNECT` or the saved connection) |
 | `desktop` | the desktop app's sidecar |
 | `acp` | the Agent Client Protocol on stdio |
+| `mcp-bridge` | prigh's tools for a CLI the composer runs (started by the CLI, relaying to `$PRIGH_MCP_SOCKET`) |
+| `fake-cli codex\|claude --script FILE` | hidden: a stand-in for a CLI in the e2e tests |
 | `run <prompt>` | headless run streaming to stdout (confirmations denied) |
 | `sessions`, `login`, `logout`, `auth` | sessions and credentials without a backend |
 | `trace SESSION` | `Trace_report` over a session's trace |
@@ -486,8 +676,3 @@ builds installers for Linux, macOS and Windows.
 `run` and `serve` share `-model`, `-thinking`, `-session`, `-cwd`,
 `-no-tools`, `-faux`. With no model given, a new session uses the config's
 `default_model`, else the first logged-in provider's.
-
-## Tests
-
-`./test` is the suite to run; `./test --full` only when the user explicitly
-asks. See `AGENTS.md`.

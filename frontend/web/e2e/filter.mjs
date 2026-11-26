@@ -11,6 +11,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
@@ -126,7 +127,7 @@ let shot = 0;
 const screenshot = async label => {
   if (!process.env.SHOTS) return;
   shot++;
-  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running"));
+  await animationsOver(page);
   await page.screenshot({
     path: join(process.env.SHOTS, `${engineName}-filter-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`),
   });
@@ -164,11 +165,13 @@ const menu = () => page.evaluate(() =>
       : el.getAttribute("aria-checked") === "false" ? "[ ]" : "   "} ${el.querySelector(".menu-label").innerText}`)
     .join("\n"));
 // The menu under its button and inside the window.
-const placement = () => page.evaluate(async () => {
-  const el = document.querySelector(".filter-menu");
+const placement = async () => {
   // Where it settles: a phone's sheet slides up.
-  await Promise.all(el.getAnimations().map(a => a.finished));
-  const m = el.getBoundingClientRect();
+  await animationsOver(page, ".filter-menu");
+  return page.evaluate(place);
+};
+const place = () => {
+  const m = document.querySelector(".filter-menu").getBoundingClientRect();
   const inside0 = m.left >= 0 && m.right <= innerWidth && m.top >= 0 && m.bottom <= innerHeight;
   // A phone's: a sheet across the bottom (its row in the ⋯ sheet is gone).
   if (document.querySelector(".app.narrow"))
@@ -176,7 +179,7 @@ const placement = () => page.evaluate(async () => {
   const b = document.querySelector(".panel-toggles").getBoundingClientRect();
   const inside = m.left >= 0 && m.right <= innerWidth && m.top >= 0 && m.bottom <= innerHeight;
   return `below the toggles: ${m.top >= b.bottom - 1}; inside the window: ${inside}; focused: ${document.activeElement?.classList.contains("filter-menu")}`;
-});
+};
 const openMenu = async () => {
   await page.locator(".composer textarea").fill("/filter");
   await page.locator(".composer textarea").press("Control+Enter");

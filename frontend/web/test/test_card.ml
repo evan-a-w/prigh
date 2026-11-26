@@ -168,6 +168,7 @@ let%expect_test
   [%expect
     {|
     Toggle_context_card
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     <div class="context-ring-anchor flex open relative shrink-0 z-(--z-menu-anchor)">
     Toggle_context_card
     (Run /session)
@@ -204,7 +205,7 @@ let%expect_test
     <div class="flex gap-0.5 items-center panel-toggles">
     <Vdom.Node.none-widget class="">
     Branch feature/a-rather-long-branch-for-the-sidebar-card
-    <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center link loon max-w-[24ch] mode narrow:h-11 narrow:text-sm overflow-hidden plan px-2 py-0.5 rounded-4xl shrink-0 status-item text-muted-foreground text-xs transition-all w-fit whitespace-nowrap">
+    <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-start link loon max-w-[36ch] mode narrow:h-11 narrow:max-w-full narrow:text-sm overflow-hidden plan px-2 py-0.5 rounded-4xl shrink-0 status-item text-muted-foreground text-xs transition-all w-fit whitespace-nowrap">
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nc7\
@@ -258,7 +259,7 @@ let%expect_test
                             \n/work") (purpose (Sidebar 5)))))
     (Sessions (Ctrl+B))
     New session
-    (plan 1/2: Final nix GC)
+    (Plan: Final nix GC)
     (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     (Run /todos)
@@ -314,5 +315,26 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
     Toggle_status_tray
     Toggle_status_tray
     Toggle_status_tray
+    |}]
+;;
+
+let%expect_test "an agent's model of unknown window: its tokens, no percentage" =
+  let fields =
+    List.Assoc.add
+      (fields ())
+      ~equal:String.equal
+      "model"
+      (Jsonaf.of_string
+         {|{"id":"neon","provider":"acp:antigravity","key":"acp:antigravity/neon","name":"Neon","context_window":0,"max_output":0,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}}|})
+  in
+  let h = H.create ~state:(H.state_json ~fields ()) () in
+  H.names h ~selector:".context-ring";
+  H.text h ~selector:".context-card .context-card-head";
+  H.text h ~selector:".context-card .context-card-sub";
+  [%expect
+    {|
+    button "Context and cost ($1.30): details"
+    Context 10k
+    Window unknown: no automatic compaction
     |}]
 ;;

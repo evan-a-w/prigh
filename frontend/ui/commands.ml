@@ -40,6 +40,8 @@ module Argument = struct
     | Generate_model
     | Approval_model
     | Naming
+    | Engine
+    | Adapter
   [@@deriving sexp_of, equal]
 end
 
@@ -94,14 +96,29 @@ let every =
   ; c
       ~argument:Argument.Login
       "login"
-      "[provider] [api_key|oauth]"
-      "log in to a provider, or a git host: github [HOST] [token], forgejo \
-       HOST [token], HOST [token]"
+      "[provider] [method] [as LABEL]"
+      "log in to a provider (as LABEL: another login, or that one again), or a \
+       git host: github [HOST] [token], forgejo HOST [token], HOST [token]"
   ; c
       ~argument:Argument.Logout
       "logout"
-      "[provider|HOST]"
-      "remove a provider's or a git host's stored credential"
+      "[provider[@LOGIN]|HOST]"
+      "remove a provider's or a login's or a git host's stored credential"
+  ; c
+      "accounts"
+      "[QUERY|SUBCOMMAND LOGIN]"
+      "the providers' logins: pick one to manage it; default, up, down, remove \
+       LOGIN; rename LOGIN to LABEL; fallback LOGIN on|off"
+  ; c
+      "usage"
+      ""
+      "each login's usage: its subscription's limits, and the requests and \
+       tokens (an API key's cost) of today and the last 7 and 30 days"
+  ; c
+      "account"
+      "[LOGIN|default]"
+      "pick the login of the model's provider this session uses (or /model \
+       MODEL@LOGIN)"
   ; c
       ~argument:Argument.Thinking
       "thinking"
@@ -292,7 +309,18 @@ let every =
        [instructions] (HEAD: the uncommitted changes) has the model review the \
        changes for prioritised findings"
   ; c "init" "" "write or improve the project's AGENTS.md"
-  ; c "new" "" "start a new session"
+  ; c
+      ~argument:Argument.Engine
+      "new"
+      "[engine]"
+      "start a new session (on another engine or adapter, e.g. codex or \
+       claude, when the backend runs several: without one it asks)"
+  ; c
+      ~argument:Argument.Adapter
+      "engine"
+      "[adapter]"
+      "switch this session to another of the composer's adapters (codex, \
+       claude, ...): it carries on from a summary of the session so far"
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"
   ; c
@@ -436,6 +464,14 @@ let every =
       "setusr"
       "[user]"
       "act as another user (superusers only); without a user, list them"
+  ; c
+      "adapters"
+      "[refresh | retry | login [ADAPTER] [LOGIN|own]]"
+      "whether the composer's agent CLIs (Codex, Claude Code, ACP agents) are \
+       installed and logged in on each tool host, and what to run there when \
+       not; refresh checks again; retry asks the session's CLI for its models \
+       again; login runs Codex on one of prigh's ChatGPT \
+       logins or its own"
   ; c
       "nix-gc"
       "[run [DAYS|all]]"

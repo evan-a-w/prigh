@@ -425,7 +425,7 @@ Test it
 === firefox: plan mode off ===
 Context 0% full, $<COST>: details
 mode: Auto: never asks
-plan 0/2: Write the schema
+Plan: Write the schema
 <HOSTNAME>
 V4.1 Flash
 === firefox: implementing ===
@@ -1039,6 +1039,57 @@ A
 alice
 === firefox: accounts: errors ===
 none
+=== firefox: sharing: bob's logins before ===
+0
+=== firefox: sharing: 390x844: alice's logins ===
+ok
+API key
+API key, default.
+Share…
+Manage
+TODAY
+5 req 22k tok $0.67
+7 DAYS
+5 req 22k tok $0.67
+30 DAYS
+5 req 22k tok $0.67
+=== firefox: sharing: 390x844: share with ===
+ok
+bob
+pick to share: they never see its key
+=== firefox: sharing: bob's logins after ===
+API key (from alice)
+API key, default, shared by alice.
+Hide
+Manage
+TODAY
+2 req 8.6k tok $0.25
+7 DAYS
+2 req 8.6k tok $0.25
+30 DAYS
+2 req 8.6k tok $0.25
+=== firefox: sharing: 320x640: alice's logins ===
+ok
+API key
+API key, default, shared with bob.
+Share…
+Manage
+TODAY
+5 req 22k tok $0.67
+7 DAYS
+5 req 22k tok $0.67
+30 DAYS
+5 req 22k tok $0.67
+You
+today 3 req 13k tok $0.42 · 30 days 3 req 13k tok $0.42
+bob
+today 2 req 8.6k tok $0.25 · 30 days 2 req 8.6k tok $0.25
+=== firefox: sharing: 320x640: share with ===
+ok
+bob
+shared with them: pick to stop sharing
+=== firefox: sharing: bob's logins once revoked ===
+0
 === firefox: reconnect: a long session, halfway up ===
 scrolled: true
 draft: half-written thought
@@ -2996,7 +3047,7 @@ focus in the filter: control-input
   Release notes | <age> · <CWD>
   Deploy checklist | <age> · <CWD>
 -- Commands --
-  /new | start a new session
+  /new | start a new session (/new ENGINE: on another engine or adapter, e.g. codex or claude, when the backend runs several; the new-session screen picks one too)
   /settings | appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
   /review | the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
   /files | browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
@@ -4076,14 +4127,17 @@ back: Memory | What you asked the model to remember, for later sessions. Kept on
 (none)
 === firefox: usage: opened ===
 Usage
-How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 At a limit
 Resume after a usage limit
 A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-Claude
+Anthropic
+Claude Pro/Max
+Subscription, default, takes over at usage limits.
+Manage
 5-hour session
 Resets in 2h 15m · TIME
 33% used
@@ -4094,7 +4148,9 @@ Weekly · Opus
 Reset time not reported
 4% used
 ChatGPT
-Plus
+Plus/Pro
+Subscription, default, takes over at usage limits. Plus plan.
+Manage
 5-hour session
 Resets in 43m · TIME
 72% used
@@ -4107,18 +4163,22 @@ asked: Claude 1, ChatGPT 1
 asked: Claude 2, ChatGPT 2; ChatGPT's session: 75% used
 === firefox: usage: Claude rate limited ===
 Usage
-How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 At a limit
 Resume after a usage limit
 A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-Claude
-Could not read the limits
-Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
+Anthropic
+Claude Pro/Max
+Subscription, default, takes over at usage limits.
+Manage
+Limits unknown: Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
 ChatGPT
-Plus
+Plus/Pro
+Subscription, default, takes over at usage limits. Plus plan.
+Manage
 5-hour session
 Resets in 43m · TIME
 75% used
@@ -4130,10 +4190,10 @@ bars: 5-hour session used=75, Weekly used=12
 asked again: 2
 === firefox: usage: phone 390x844 ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+back: Usage | Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 === firefox: usage: phone 320x640 ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+back: Usage | Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 === firefox: usage: errors ===
 (none)
 === firefox: user info: moved from user_info.md ===
@@ -5038,6 +5098,54 @@ prigh: Cleaned up. (time)
 === firefox: quiet small: errors ===
 (none)
 found: src/compact.ml
+=== firefox: overscroll desktop: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== firefox: overscroll desktop: a turn up (the wheel) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== firefox: overscroll desktop: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== firefox: overscroll desktop: errors ===
+none
+=== firefox: overscroll phone: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== firefox: overscroll phone: a turn up (a swipe) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== firefox: overscroll phone: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== firefox: overscroll phone: errors ===
+none
+=== firefox: overscroll small: scrolled on past the end while replies streamed ===
+subagent's rows: 1
+at the end: true
+frames with the jump button at the end: 0
+frames with rows overlapping: 0
+frames with a message twice: 0
+scrollTop set at the end: 0 times
+=== firefox: overscroll small: a turn up (a swipe) the chat does not take ===
+following (at the end): true
+frames with the jump button: 0
+=== firefox: overscroll small: a real turn up ===
+at the end: false
+jump button: true
+back at the end: true
+=== firefox: overscroll small: errors ===
+none
 === firefox: editor desktop: a file open ===
 ok
 strip: src/ compact.ml
@@ -5164,6 +5272,118 @@ drawer gone: true
 strip: src/ turn.mli
 swiped: src/ compact.ml
 left: the chat
+=== firefox: engines (desktop): the new-session engine chip ===
+chip: Harness (Engine: Harness. Change it)
+=== firefox: engines (desktop): the engine picker ===
+prigh harness prigh's own agent, calling the model directly
+Codex OpenAI's Codex CLI on the session's tool host
+Claude Code Anthropic's Claude Code CLI on the session's tool host
+=== firefox: engines (desktop): chosen ===
+chip: Codex
+=== firefox: engines (desktop): the first turn ===
+Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
+model chip: Codex · gpt-5.2-codex
+sidebar: 1 session, "Hello"
+=== firefox: engines (desktop): the model menu's engine ===
+button: Engine: Codex
+Codex 0.166.0 · logged in (ChatGPT)
+prigh harness prigh's own agent, calling the model directly
+Claude Code Claude Code is not installed on server-laptop, please install it
+=== firefox: engines (desktop): Codex asks to run a command ===
+Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
+=== firefox: engines (desktop): the command ran ===
+card: bash ls
+Two entries: README.md and src. <TIME>
+=== firefox: engines (desktop): a control Codex sessions do not have ===
+Codex sessions have no side questions (/btw): ask in the session instead
+=== firefox: engines (desktop): Settings → Engines ===
+Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
+Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
+Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
+copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
+=== firefox: engines (desktop): the model menu on another engine ===
+held: true
+held, back on Codex: true
+=== firefox: engines (desktop): errors ===
+none
+=== firefox: engines (phone): the new-session engine chip ===
+chip: Harness (Engine: Harness. Change it)
+=== firefox: engines (phone): the engine picker ===
+prigh harness prigh's own agent, calling the model directly
+Codex OpenAI's Codex CLI on the session's tool host
+Claude Code Anthropic's Claude Code CLI on the session's tool host
+phone: ok
+=== firefox: engines (phone): chosen ===
+chip: Codex
+=== firefox: engines (phone): the first turn ===
+Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
+model chip: Codex · gpt-5.2-codex
+sidebar: 1 session, "Hello"
+phone: ok
+=== firefox: engines (phone): the model menu's engine ===
+button: Engine: Codex
+Codex 0.166.0 · logged in (ChatGPT)
+prigh harness prigh's own agent, calling the model directly
+Claude Code Claude Code is not installed on server-laptop, please install it
+phone: 0 targets under 44px
+=== firefox: engines (phone): Codex asks to run a command ===
+Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
+phone: ok
+=== firefox: engines (phone): the command ran ===
+card: bash ls
+Two entries: README.md and src. <TIME>
+=== firefox: engines (phone): a control Codex sessions do not have ===
+Codex sessions have no side questions (/btw): ask in the session instead
+=== firefox: engines (phone): Settings → Engines ===
+Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
+Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
+Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
+copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
+phone: ok
+=== firefox: engines (phone): the model menu on another engine ===
+held: true
+held, back on Codex: true
+=== firefox: engines (phone): errors ===
+none
+=== firefox: engines (small): the new-session engine chip ===
+chip: Harness (Engine: Harness. Change it)
+=== firefox: engines (small): the engine picker ===
+prigh harness prigh's own agent, calling the model directly
+Codex OpenAI's Codex CLI on the session's tool host
+Claude Code Anthropic's Claude Code CLI on the session's tool host
+phone: ok
+=== firefox: engines (small): chosen ===
+chip: Codex
+=== firefox: engines (small): the first turn ===
+Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
+model chip: gpt-5.2-codex
+sidebar: 1 session, "Hello"
+phone: ok
+=== firefox: engines (small): the model menu's engine ===
+button: Engine: Codex
+Codex 0.166.0 · logged in (ChatGPT)
+prigh harness prigh's own agent, calling the model directly
+Claude Code Claude Code is not installed on server-laptop, please install it
+phone: 0 targets under 44px
+=== firefox: engines (small): Codex asks to run a command ===
+Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
+phone: ok
+=== firefox: engines (small): the command ran ===
+card: bash ls
+Two entries: README.md and src. <TIME>
+=== firefox: engines (small): a control Codex sessions do not have ===
+Codex sessions have no side questions (/btw): ask in the session instead
+=== firefox: engines (small): Settings → Engines ===
+Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
+Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
+Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
+copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
+phone: ok
+=== firefox: engines (small): the model menu on another engine ===
+held: true
+held, back on Codex: true
+=== firefox: engines (small): errors ===
+none
 === firefox: smoke: sign in ===
 prigh
 web

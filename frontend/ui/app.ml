@@ -12,6 +12,9 @@ module Reply_tag = struct
     | Auth_show
     | Auth_login_picker
     | Auth_logout_picker
+    | Share_targets of string (** the login's ref *)
+    | Usage_limits of { show : bool }
+    (** [usage_limits]: kept for [/accounts]; [show]: [/usage] shows them *)
     | Forge_refresh
     | Prs_picker of string option (** the state asked for *)
     | Pr_shown
@@ -134,6 +137,11 @@ module Reply_tag = struct
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Adapters_shown (** [/adapters] *)
+    | Adapter_login_picker of string option (** the adapter named *)
+    | Adapter_login_set of string (** the adapter *)
+    | Adapter_import_found (** [/adapters import]: for the user to consent *)
+    | Adapter_imported
     | Nix_store_shown (** [/nix-gc] *)
     | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
@@ -299,6 +307,8 @@ module Model = struct
     { state : P.State.t option
     ; models : P.Model.t list
     ; auth : P.Auth_status.t list
+    ; usage_limits : P.Subscription_usage.t option
+      (** the last [usage_limits] answer: the logins' limits *)
     ; forge : P.Forge_account.t list
     ; transcript : Transcript.t
     ; agents : Agent_view.t list
@@ -331,6 +341,7 @@ module Model = struct
     ; user : string option
     ; superuser : bool
     ; pasted_text : bool
+    ; deployed : P.Deployed_engines.t
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -356,7 +367,22 @@ module Model = struct
     Option.value_map t.state ~default:false ~f:(fun s -> s.running)
   ;;
 
-  let activity t = Activity.set_running t.activity (running t)
+  let activity t =
+    Activity.asking
+      (Activity.set_running t.activity (running t))
+      ~confirms:
+        ((not (List.is_empty t.pending_confirms))
+         ||
+         match t.mode with
+         | Confirm { action = Tool_confirm _; _ } -> true
+         | _ -> false)
+      ~questions:
+        ((not (List.is_empty t.pending_questions))
+         ||
+         match t.mode with
+         | Question _ -> true
+         | _ -> false)
+  ;;
 
   let agents_running t =
     List.exists t.agents ~f:(fun (a : Agent_view.t) ->
@@ -383,6 +409,7 @@ module Model = struct
       ; user = t.user
       ; superuser = t.superuser
       ; features = []
+      ; deployed = Prigh_protocol.Deployed_engines.harness_only
       }
   ;;
 end
@@ -686,6 +713,7 @@ let init =
   { state = None
   ; models = []
   ; auth = []
+  ; usage_limits = None
   ; forge = []
   ; transcript = Transcript.empty
   ; agents = []
@@ -717,6 +745,7 @@ let init =
   ; user = None
   ; superuser = false
   ; pasted_text = false
+  ; deployed = P.Deployed_engines.harness_only
   ; stderr_tail = []
   ; pending_confirms = []
   ; pending_questions = []
@@ -880,9 +909,15 @@ let restore_pasted editor (text, pasted) =
          ~f:(Fn.non String.is_empty)) )
 ;;
 
+(* A provider prigh has no login for is a CLI's (Codex, Claude Code), which
+   lists only what its own login offers. *)
 let logged_in m provider =
-  List.exists m.auth ~f:(fun a ->
-    String.equal a.provider provider && Option.is_some a.configured)
+  match
+    List.find m.auth ~f:(fun (a : P.Auth_status.t) ->
+      String.equal a.provider provider)
+  with
+  | None -> not (List.is_empty m.auth)
+  | Some a -> Option.is_some a.configured
 ;;
 
 (** Models Ctrl+P / Ctrl+T / [/scoped-models] operate on, in catalog order. *)
@@ -934,7 +969,7 @@ let format_tokens n =
   else sprintf "%.0fM" (Float.round (n /. 1e6))
 ;;
 
-let model_picker_value m ~logged_in_only ~query =
+let model_items m ~logged_in_only =
   let current = Option.map m.state ~f:(fun s -> s.model.key) in
   let scoped = scoped_keys m in
   let models =
@@ -942,28 +977,55 @@ let model_picker_value m ~logged_in_only ~query =
     then List.filter m.models ~f:(fun model -> logged_in m model.provider)
     else m.models
   in
-  let items =
-    List.map models ~f:(fun (model : P.Model.t) ->
-      let logged = logged_in m model.provider in
-      let scoped_mark = if Set.mem scoped model.key then " ◆" else "" in
+  List.map models ~f:(fun (model : P.Model.t) ->
+    let logged = logged_in m model.provider in
+    let scoped_mark = if Set.mem scoped model.key then " ◆" else "" in
+    Picker.Item.create
+      ~id:model.key
+      ~detail:
+        (String.concat
+           ~sep:"  "
+           ([ model.key ^ scoped_mark ]
+            @ (if model.context_window > 0
+               then [ "ctx " ^ format_tokens (Float.of_int model.context_window) ]
+               else [])
+            @ [ format_price model.cost ]
+            @ if logged then [] else [ "not logged in" ]))
+      ~search:(model.name ^ " " ^ model.key)
+      ~marked:
+        (Option.value_map current ~default:false ~f:(String.equal model.key))
+      ~dimmed:(not logged)
+      model.name)
+;;
+
+(* The session's agent CLI could not list its models: what to do about it,
+   as commands, above the models. *)
+let harness_fixes m =
+  match m.state with
+  | Some { engine = { models = Some (Failed { message; fixes; _ }); _ }; _ } ->
+    List.map fixes ~f:(fun fix ->
       Picker.Item.create
-        ~id:model.key
-        ~detail:
-          (String.concat
-             ~sep:"  "
-             ([ model.key ^ scoped_mark
-              ; "ctx " ^ format_tokens (Float.of_int model.context_window)
-              ; format_price model.cost
-              ]
-              @ if logged then [] else [ "not logged in" ]))
-        ~search:(model.name ^ " " ^ model.key)
-        ~marked:
-          (Option.value_map current ~default:false ~f:(String.equal model.key))
-        ~dimmed:(not logged)
-        model.name)
-  in
+        ~id:(P.Harness_models.Fix.command fix)
+        ~detail:(P.Harness_models.Fix.command fix ^ "  " ^ message)
+        (P.Harness_models.Fix.label fix))
+  | _ -> []
+;;
+
+let model_picker_value m ~logged_in_only ~query =
   let title = if logged_in_only then "Model (logged in)" else "Model" in
-  Picker.create ~query ~title items
+  let title =
+    match m.state with
+    | Some ({ engine = { models = Some (Failed _); _ }; _ } as s) ->
+      sprintf
+        "%s: %s"
+        title
+        (P.Session_engine.model_label s.engine ~model:s.model.name)
+    | _ -> title
+  in
+  Picker.create
+    ~query
+    ~title
+    (harness_fixes m @ model_items m ~logged_in_only)
 ;;
 
 let model_picker ?(logged_in_only = false) m ~query =
@@ -1012,6 +1074,103 @@ let thinking_picker m =
         (P.Thinking.label level))
   in
   open_picker m Thinking (Picker.create ~title items)
+;;
+
+(* ---- engines ------------------------------------------------------------ *)
+
+let current_choice m =
+  Option.map m.state ~f:(fun (s : P.State.t) ->
+    P.Deployed_engines.Choice.of_session s.engine)
+;;
+
+(* [/new]'s choices, or [/engine]'s (the composer's adapters): this session's
+   first. *)
+let engine_choices m ~switch =
+  let choices =
+    if switch
+    then P.Deployed_engines.switch_targets m.deployed
+    else P.Deployed_engines.choices m.deployed
+  in
+  match current_choice m with
+  | Some c when List.mem choices c ~equal:P.Deployed_engines.Choice.equal ->
+    c :: List.filter choices ~f:(Fn.non (P.Deployed_engines.Choice.equal c))
+  | _ -> choices
+;;
+
+let engine_picker m ~switch =
+  let current = current_choice m in
+  let items =
+    List.map (engine_choices m ~switch) ~f:(fun c ->
+      Picker.Item.create
+        ~id:(P.Deployed_engines.Choice.key c)
+        ~detail:(P.Deployed_engines.Choice.describe c)
+        ~marked:(Option.equal P.Deployed_engines.Choice.equal current (Some c))
+        (P.Deployed_engines.Choice.label c))
+  in
+  let title = if switch then "Switch this session to" else "New session on" in
+  open_picker m (Engines { switch }) (Picker.create ~title items)
+;;
+
+let new_session_on m (c : P.Deployed_engines.Choice.t) =
+  ( m
+  , [ rpc
+        "new_session"
+        ~params:(P.Deployed_engines.Choice.params c)
+        ~tag:
+          (Reload_messages_notice
+             (sprintf "new %s session" (P.Deployed_engines.Choice.label c)))
+    ] )
+;;
+
+let switch_adapter m (c : P.Deployed_engines.Choice.t) =
+  let target = Option.value c.adapter ~default:c.engine in
+  match c.adapter with
+  | _
+    when Option.equal
+           P.Deployed_engines.Choice.equal
+           (current_choice m)
+           (Some c) ->
+    notice m (sprintf "already on %s" (P.Deployed_engines.Choice.label c)), []
+  | Some _ | None ->
+    ( notice m (sprintf "switching to %s…" (P.Deployed_engines.Choice.label c))
+    , [ call (Set_adapter { adapter = target }) ] )
+;;
+
+let engine_chosen m ~switch arg =
+  let choices =
+    if switch
+    then P.Deployed_engines.switch_targets m.deployed
+    else P.Deployed_engines.choices m.deployed
+  in
+  match P.Deployed_engines.find_in choices arg with
+  | Error e -> error m (Error.to_string_hum e), []
+  | Ok c -> if switch then switch_adapter m c else new_session_on m c
+;;
+
+let new_command m args =
+  match args with
+  | [] when P.Deployed_engines.has_choice m.deployed ->
+    engine_picker m ~switch:false, []
+  | [] -> m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
+  | [ arg ] when P.Deployed_engines.has_choice m.deployed ->
+    engine_chosen m ~switch:false arg
+  | [ _ ] ->
+    ( error m "this backend runs only the harness: /new starts a session on it"
+    , [] )
+  | _ -> error m "usage: /new [engine]  (e.g. /new codex)", []
+;;
+
+let engine_command m args =
+  match args, P.Deployed_engines.switch_targets m.deployed with
+  | _, [] ->
+    ( error
+        m
+        "this backend runs no composer adapters: start it with -engines \
+         harness,composer -adapters codex,claude to switch between them"
+    , [] )
+  | [], _ -> engine_picker m ~switch:true, []
+  | [ arg ], _ -> engine_chosen m ~switch:true arg
+  | _ -> error m "usage: /engine [adapter]  (e.g. /engine claude)", []
 ;;
 
 let verbosity_picker m =
@@ -1065,7 +1224,11 @@ let login_items m =
       | None ->
         Picker.Item.create
           ~id:(s.provider ^ " " ^ meth.method_)
-          ~detail:(String.strip (meth.label ^ "  " ^ configured))
+          ~detail:
+            (String.strip
+               (Provider_logins.own_label ~provider:s.name meth.label
+                ^ "  "
+                ^ configured))
           ~marked:(not (String.is_empty configured))
           (s.name ^ " (" ^ meth.method_ ^ ")")))
   @ [ Picker.Item.create
@@ -1140,6 +1303,202 @@ let restore_command m command =
   if Editor.is_empty m.editor
   then { m with editor = Editor.set_text m.editor command }
   else m
+;;
+
+(* ---- provider logins -------------------------------------------------- *)
+
+let logins_picker ?(query = "") ?section m ~title rows =
+  let items =
+    List.map rows ~f:(fun (r : Provider_logins.Row.t) ->
+      Picker.Item.create
+        ?section
+        ~id:r.id
+        ~detail:r.detail
+        ~marked:r.marked
+        r.label)
+  in
+  open_picker m Commands (Picker.create ~query ~title items)
+;;
+
+let logins_request m command (r : Provider_logins.Request.t) =
+  ( m
+  , [ rpc
+        r.method_
+        ~params:r.params
+        ~tag:
+          (Retry_in_editor
+             { command; hint = ""; then_ = Notice_on_success r.done_ })
+    ] )
+;;
+
+let confirm_logout m (l : Provider_logins.Login.t) =
+  { m with
+    mode =
+      Confirm
+        { question =
+            sprintf
+              "Log out of %s and delete its credential? (y/n)"
+              (Provider_logins.title l)
+        ; action =
+            Logout_login
+              { provider = l.provider.provider; account = l.account.id }
+        }
+  }
+;;
+
+let share_picker m ~ref_ users =
+  match Provider_logins.find m.auth ref_, users with
+  | Error e, _ -> error m e
+  | Ok _, [] -> notice m "no other users on this server to share with"
+  | Ok l, users ->
+    logins_picker
+      m
+      ?section:(Provider_logins.share_note l)
+      ~title:(Provider_logins.share_title l)
+      (Provider_logins.share_rows_for l users)
+;;
+
+let logins_picker_title = "Logins"
+
+(* An open [/accounts] picker shows the logins' latest usage. *)
+let logins_refreshed m =
+  match m.mode with
+  | Picker { kind = Commands; picker }
+    when String.equal (Picker.title picker) logins_picker_title ->
+    { m with
+      mode =
+        Picker
+          { kind = Commands
+          ; picker =
+              Picker.set_items
+                picker
+                (List.map
+                   (Provider_logins.rows
+                      ?usage:m.usage_limits
+                      m.auth
+                      ~session:m.state)
+                   ~f:(fun (r : Provider_logins.Row.t) ->
+                     Picker.Item.create
+                       ~id:r.id
+                       ~detail:r.detail
+                       ~marked:r.marked
+                       r.label))
+          }
+    }
+  | _ -> m
+;;
+
+(* [/usage]: each login's limits and what ran on it. *)
+let format_usage m (usage : P.Subscription_usage.t) : Content.t =
+  let now = usage.fetched_at in
+  let dim text = { Content.Span.text; style = Style.dim Style.plain } in
+  let logins = Provider_logins.all m.auth in
+  if List.is_empty logins
+  then [ [ dim "no logins yet: /login signs in to a provider" ] ]
+  else
+    List.concat_map logins ~f:(fun l ->
+      let windows =
+        match Login_usage_text.limits_of (Some usage) ~ref_:l.account.ref_ with
+        | Some (Limits { windows; _ }) ->
+          List.map windows ~f:(fun (w : P.Subscription_usage.Window.t) ->
+            let style =
+              if Float.( >= ) w.used_percent 90.
+              then Style.fg Red
+              else if Float.( >= ) w.used_percent 70.
+              then Style.fg Yellow
+              else Style.plain
+            in
+            [ { Content.Span.text = "  " ^ Login_usage_text.window ~now w
+              ; style
+              }
+            ])
+        | Some (Failed e) -> [ [ dim ("  limits unknown: " ^ e) ] ]
+        | Some (Not_signed_in | Api_key) | None -> []
+      in
+      ([ { Content.Span.text = Provider_logins.title l
+         ; style = Style.bold Style.plain
+         }
+       ; dim ("  " ^ l.account.ref_)
+       ]
+       :: windows)
+      @ List.map
+          (Login_usage_text.period_lines
+             ~cost:(Login_usage_text.billed l.account)
+             l.account.usage)
+          ~f:(fun line -> [ dim ("  " ^ line) ]))
+    @ [ []
+      ; [ dim
+            "Limits as the providers report them; requests and tokens per \
+             login (UTC days), with the cost of API keys. /accounts manages \
+             the logins."
+        ]
+      ]
+;;
+
+let accounts_command m (cmd : Commands.Parsed.t) =
+  let command = "/accounts " ^ cmd.rest in
+  match Provider_logins.Command.parse cmd.rest with
+  | Share { account; user = "" } ->
+    (match Provider_logins.shareable m.auth account with
+     | Ok l ->
+       m, [ rpc "account_share_targets" ~tag:(Share_targets l.account.ref_) ]
+     | Error e -> error (restore_command m command) e, [])
+  | Pick query ->
+    if List.is_empty (Provider_logins.all m.auth)
+    then notice m "no logins yet: /login signs in to a provider", []
+    else
+      ( logins_picker
+          m
+          ~query
+          ~title:logins_picker_title
+          (Provider_logins.rows ?usage:m.usage_limits m.auth ~session:m.state)
+      , [ rpc "auth_status" ~tag:Auth_refresh
+        ; rpc "usage_limits" ~tag:(Usage_limits { show = false })
+        ] )
+  | Menu arg ->
+    (match Provider_logins.find m.auth arg with
+     | Ok l ->
+       ( logins_picker
+           m
+           ~title:(Provider_logins.title l)
+           (Provider_logins.menu l ~session:m.state)
+       , [] )
+     | Error e -> error (restore_command m command) e, [])
+  | Remove arg ->
+    (match Provider_logins.find m.auth arg with
+     | Ok l when Option.is_none l.account.shared_by -> confirm_logout m l, []
+     | Ok _ ->
+       (match Provider_logins.request m.auth (Remove arg) with
+        | Ok r -> logins_request m command r
+        | Error e -> error (restore_command m command) e, [])
+     | Error e -> error (restore_command m command) e, [])
+  | c ->
+    (match Provider_logins.request m.auth c with
+     | Ok r -> logins_request m command r
+     | Error e -> error (restore_command m command) e, [])
+;;
+
+let account_command m (cmd : Commands.Parsed.t) =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some state
+    when String.is_empty cmd.rest
+         && Option.is_some (Provider_logins.no_choice m.auth state) ->
+    notice m (Option.value_exn (Provider_logins.no_choice m.auth state)), []
+  | Some state when String.is_empty cmd.rest ->
+    ( logins_picker
+        m
+        ~title:
+          (sprintf
+             "%s login for this session"
+             (Provider_logins.provider_name m.auth state.model.provider))
+        (Provider_logins.session_rows m.auth state)
+    , [] )
+  | Some state ->
+    let command = "/account " ^ cmd.rest in
+    (match Provider_logins.session_request m.auth state cmd.rest with
+     | Ok r -> logins_request m command r
+     | Error e -> error (restore_command m command) e, [])
 ;;
 
 (* ---- git hosting ------------------------------------------------------ *)
@@ -2339,7 +2698,7 @@ let format_auth m : Content.t =
     List.fold statuses ~init:0 ~f:(fun acc s ->
       Int.max acc (String.length s.provider))
   in
-  List.map statuses ~f:(fun (s : P.Auth_status.t) ->
+  List.concat_map statuses ~f:(fun (s : P.Auth_status.t) ->
     let methods =
       String.concat
         ~sep:", "
@@ -2365,15 +2724,42 @@ let format_auth m : Content.t =
         ]
       | None, None -> [ { text = "not configured"; style = Style.fg Gray } ]
     in
-    [ { Content.Span.text = Text_width.pad_right s.provider ~width ^ "  "
-      ; style = Style.bold Style.plain
-      }
-    ]
-    @ state
-    @
-    if Option.is_some s.custom
-    then []
-    else [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ])
+    let line : Content.Line.t =
+      [ { Content.Span.text = Text_width.pad_right s.provider ~width ^ "  "
+        ; style = Style.bold Style.plain
+        }
+      ]
+      @ state
+      @
+      if Option.is_some s.custom
+      then []
+      else [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ]
+    in
+    line
+    ::
+    (if Option.is_some s.custom || List.length s.accounts < 2
+     then []
+     else
+       List.map s.accounts ~f:(fun account ->
+         let l = { Provider_logins.Login.provider = s; account } in
+         [ { Content.Span.text =
+               String.make (width + 2) ' '
+               ^ "@ "
+               ^ Provider_logins.label account
+           ; style = Style.plain
+           }
+         ; { text = sprintf "  %s  %s" (Provider_logins.detail l) account.ref_
+           ; style = Style.dim Style.plain
+           }
+         ])))
+  @ (if List.is_empty (Provider_logins.all statuses)
+     then []
+     else
+       [ [ { Content.Span.text = "/accounts manages a provider's logins"
+           ; style = Style.dim Style.plain
+           }
+         ]
+       ])
   @ [ [ { Content.Span.text = "/login custom adds an OpenAI-compatible endpoint"
         ; style = Style.dim Style.plain
         }
@@ -2521,6 +2907,7 @@ let reset_connection m =
     state = None
   ; models = []
   ; auth = []
+  ; usage_limits = None
   ; forge = []
   ; sessions = None
   ; known_sessions = Session_link.Known.empty
@@ -2530,6 +2917,7 @@ let reset_connection m =
   ; user = None
   ; superuser = false
   ; pasted_text = false
+  ; deployed = P.Deployed_engines.harness_only
   ; stderr_tail = []
   ; known_paths = String.Set.empty
   ; login_lines = []
@@ -2783,14 +3171,21 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
        let m = reset_connection m in
        let m =
          match P.Hello_reply.of_json json with
-         | Ok ({ client_id; namespace; user; superuser; features = _ } as hello)
-           ->
+         | Ok
+             ({ client_id
+              ; namespace
+              ; user
+              ; superuser
+              ; features = _
+              ; deployed = _
+              } as hello) ->
            { m with
              client_id = Some client_id
            ; namespace
            ; user
            ; superuser
            ; pasted_text = P.Hello_reply.pasted_text hello
+           ; deployed = hello.deployed
            }
          | Error _ -> m
        in
@@ -2859,17 +3254,29 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id, namespace, user, superuser, pasted_text =
+       let client_id, namespace, user, superuser, pasted_text, deployed =
          match P.Hello_reply.of_json json with
-         | Ok ({ client_id; namespace; user; superuser; features = _ } as hello)
-           ->
+         | Ok
+             ({ client_id
+              ; namespace
+              ; user
+              ; superuser
+              ; features = _
+              ; deployed = _
+              } as hello) ->
            ( Some client_id
            , namespace
            , user
            , superuser
-           , P.Hello_reply.pasted_text hello )
+           , P.Hello_reply.pasted_text hello
+           , hello.deployed )
          | Error _ ->
-           m.client_id, m.namespace, m.user, m.superuser, m.pasted_text
+           ( m.client_id
+           , m.namespace
+           , m.user
+           , m.superuser
+           , m.pasted_text
+           , m.deployed )
        in
        let m, session_commands =
          reset_session
@@ -2880,6 +3287,7 @@ let reconnect_reply m ~generation result =
            ; user
            ; superuser
            ; pasted_text
+           ; deployed
            }
        in
        let m =
@@ -2906,8 +3314,24 @@ let reconnect_reply m ~generation result =
 
 (* ---- slash commands --------------------------------------------------- *)
 
-let set_model_command key =
-  rpc "set_model" ~params:[ "model", str key ] ~tag:(Set_model_done key)
+(* A login pinned for the session carries over to a model of its provider. *)
+let set_model_command ?(account = []) key =
+  rpc
+    "set_model"
+    ~params:(("model", str key) :: account)
+    ~tag:(Set_model_done key)
+;;
+
+let set_model_keeping m key =
+  let account =
+    match
+      List.find m.models ~f:(fun (model : P.Model.t) ->
+        String.equal model.key key)
+    with
+    | Some model -> Provider_logins.keep_pin m.state ~provider:model.provider
+    | None -> []
+  in
+  set_model_command ~account key
 ;;
 
 let export_command path =
@@ -2921,8 +3345,21 @@ let export_command path =
 ;;
 
 let switch_model m arg =
+  let arg, login = Model_match.split_account m.models arg in
   match Model_match.resolve m.models arg with
-  | Found model -> m, [ set_model_command model.key ]
+  | Found model ->
+    (match login with
+     | None -> m, [ set_model_keeping m model.key ]
+     | Some login ->
+       (match Provider_logins.find ~provider:model.provider m.auth login with
+        | Ok l ->
+          ( m
+          , [ set_model_command
+                ~account:[ "account", str l.account.id ]
+                model.key
+            ] )
+        | Error e ->
+          error (restore_command m ("/model " ^ arg ^ "@" ^ login)) e, []))
   | Ambiguous _ ->
     ( model_picker (notice m (sprintf "several models match %S" arg)) ~query:arg
     , [] )
@@ -2957,12 +3394,13 @@ let cycle_model m ~step =
           ~f:fst
     in
     let next = List.nth_exn models ((index + step + n) mod n) in
+    let set = set_model_keeping m next.key in
     let m =
       match m.state with
       | Some s -> { m with state = Some { s with model = next } }
       | None -> m
     in
-    m, [ set_model_command next.key ]
+    m, [ set ]
 ;;
 
 let cycle_thinking m =
@@ -3097,7 +3535,12 @@ let set_chat m (s : P.State.t) ~on =
 let cycle_mode m =
   match m.state with
   | None -> notice m "not connected", []
-  | Some s -> set_mode m (Session_mode.cycle (Session_mode.of_state s))
+  | Some s ->
+    set_mode
+      m
+      (Session_mode.cycle
+         ~plan:(P.Session_engine.supports s.engine Plan_mode)
+         (Session_mode.of_state s))
 ;;
 
 let mode_picker m =
@@ -3106,12 +3549,17 @@ let mode_picker m =
   | Some s ->
     let current = Session_mode.of_state s in
     let items =
-      List.map (Session_mode.choices ~current) ~f:(fun mode ->
-        Picker.Item.create
-          ~id:(Session_mode.label mode)
-          ~detail:(Session_mode.describe mode)
-          ~marked:(Session_mode.equal mode current)
-          (Session_mode.label mode))
+      List.map
+        (Session_mode.choices
+           ~plan:(P.Session_engine.supports s.engine Plan_mode)
+           ~current
+           ())
+        ~f:(fun mode ->
+          Picker.Item.create
+            ~id:(Session_mode.label mode)
+            ~detail:(Session_mode.describe mode)
+            ~marked:(Session_mode.equal mode current)
+            (Session_mode.label mode))
     in
     open_picker m Modes (Picker.create ~title:"Mode (Alt+M cycles)" items), []
 ;;
@@ -3884,6 +4332,48 @@ let start_nix_gc m generations =
       ] )
 ;;
 
+let adapters_command m rest =
+  match Adapters_command.parse rest with
+  | Error e ->
+    ( error
+        (restore_command m (String.strip ("/adapters " ^ rest)))
+        (Error.to_string_hum e)
+    , [] )
+  | Ok (List { refresh }) ->
+    ( notice m "checking the agent CLIs on the tool hosts…"
+    , [ call (List_adapters { refresh }) ~tag:Adapters_shown ] )
+  | Ok Retry ->
+    notice m "asking the agent CLI for its models again…", [ call Retry_models ]
+  | Ok (Login { adapter; login = None }) ->
+    ( notice m "reading the logins…"
+    , [ call
+          (List_adapters { refresh = false })
+          ~tag:(Adapter_login_picker adapter)
+      ] )
+  | Ok (Login { adapter; login = Some login }) ->
+    let adapter = Option.value adapter ~default:"codex" in
+    ( notice m "changing the login…"
+    , [ call
+          (Set_adapter_login
+             { adapter
+             ; login =
+                 (if String.Caseless.equal login "own" then None else Some login)
+             })
+          ~tag:(Adapter_login_set adapter)
+      ] )
+  | Ok (Import { adapter; host }) ->
+    ( notice
+        m
+        (sprintf
+           "looking for %s's login on %s…"
+           (P.Session_engine.adapter_label adapter)
+           (Option.value host ~default:"the session's tool host"))
+    , [ call
+          (Import_adapter_login { adapter; host; confirm = false })
+          ~tag:Adapter_import_found
+      ] )
+;;
+
 let nix_gc_command m rest =
   match Nix_gc_command.parse rest with
   | Status ->
@@ -4388,7 +4878,7 @@ let add_context_messages m messages =
   { m with transcript }
 ;;
 
-let run_command m (cmd : Commands.Parsed.t) =
+let run_command_unchecked m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
   | "help", [] ->
@@ -4620,6 +5110,24 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [ rpc "auth_status" ~tag:Auth_login_picker
       ; call Forge_status ~tag:Forge_refresh
       ] )
+  | "login", _ :: _ when List.mem cmd.args "as" ~equal:String.equal ->
+    (match Provider_logins.split_as cmd.args with
+     | provider :: rest, Some label ->
+       ( m
+       , [ rpc
+             "login"
+             ~params:
+               (Provider_logins.login_params
+                  m.auth
+                  ~provider
+                  ~method_:(List.hd rest)
+                  ~label:(Some label))
+         ] )
+     | _ ->
+       ( error
+           (restore_command m ("/login " ^ cmd.rest))
+           "/login PROVIDER [METHOD] as LABEL: type the login's label after as"
+       , [] ))
   | "login", provider :: rest ->
     (match Forge_accounts.Login.parse m.forge cmd.args with
      | Some (Ok login) -> forge_login m login
@@ -4636,6 +5144,20 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [ rpc "auth_status" ~tag:Auth_logout_picker
       ; call Forge_status ~tag:Forge_refresh
       ] )
+  | "logout", _ :: _ when Provider_logins.names_login cmd.rest ->
+    (match Provider_logins.find m.auth cmd.rest with
+     | Ok l when Option.is_some l.account.shared_by ->
+       logins_request m ("/logout " ^ cmd.rest) (Provider_logins.logout l)
+     | Ok l -> confirm_logout m l, []
+     | Error e -> error (restore_command m ("/logout " ^ cmd.rest)) e, [])
+  | "accounts", _ -> accounts_command m cmd
+  | "usage", [] ->
+    ( notice m "reading the logins' usage…"
+    , [ rpc "auth_status" ~tag:Auth_refresh
+      ; rpc "usage_limits" ~tag:(Usage_limits { show = true })
+      ] )
+  | "usage", _ -> error m "usage: /usage", []
+  | "account", _ -> account_command m cmd
   | "logout", provider :: _ ->
     (match Forge_accounts.logout_host m.forge provider with
      | Some host -> forge_logout m host
@@ -4665,8 +5187,8 @@ let run_command m (cmd : Commands.Parsed.t) =
       ] )
   | "review", _ -> review_command m cmd.rest
   | "init", _ -> m, [ rpc "init" ~tag:Review_started ]
-  | "new", _ ->
-    m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
+  | "new", args -> new_command m args
+  | "engine", args -> engine_command m args
   | "name", [] ->
     ( { m with
         mode = Text_prompt { question = "Session name"; action = Name }
@@ -4830,6 +5352,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "connect", _ -> connect m cmd.rest
   | "signin", args -> sign_in m args
   | "signout", _ -> sign_out m
+  | "adapters", _ -> adapters_command m cmd.rest
   | "nix-gc", _ when m.superuser -> nix_gc_command m cmd.rest
   | "setusr", [] -> m, [ rpc "list_users" ~tag:Users_list ]
   | "setusr", [ user ] ->
@@ -4840,6 +5363,36 @@ let run_command m (cmd : Commands.Parsed.t) =
     ( unknown_command m name ~retry:(fun name ->
         String.strip (sprintf "/%s %s" name cmd.rest))
     , [] )
+;;
+
+(* The feature a slash command needs of the session's engine: checked before
+   any picker opens, so a refusal comes first. *)
+let command_feature (cmd : Commands.Parsed.t)
+  : P.Session_engine.Feature.t option
+  =
+  match cmd.name, cmd.args with
+  | ("fork" | "clone"), _ -> Some Fork
+  | "rewind", _ -> Some Rewind
+  | ("trim" | "untrim"), _ | "delete", ([] | [ "undo" ]) -> Some Context_edit
+  | "compact", _ -> Some Compact
+  | "downsize-images", _ -> Some Downsize_images
+  | "btw", _ :: _ -> Some Btw
+  | "plan", ([] | "on" :: _) -> Some Plan_mode
+  | _ -> None
+;;
+
+let engine_refuses m (cmd : Commands.Parsed.t) =
+  match m.state, command_feature cmd with
+  | Some (s : P.State.t), Some feature
+    when not (P.Session_engine.supports s.engine feature) ->
+    Some (P.Session_engine.refusal s.engine feature)
+  | _ -> None
+;;
+
+let run_command m (cmd : Commands.Parsed.t) =
+  match engine_refuses m cmd with
+  | Some why -> error m why, []
+  | None -> run_command_unchecked m cmd
 ;;
 
 (* ---- editing mode ----------------------------------------------------- *)
@@ -5145,6 +5698,7 @@ let refresh_command_autocomplete m =
       ~logged_in:(logged_in m)
       ~default_dir_host:(default_dir_host m)
       ~server:m.server
+      ~engines:m.deployed
       ~model:(Option.map m.state ~f:(fun s -> s.model))
   with
   | None -> { m with autocomplete = None }, []
@@ -5209,9 +5763,10 @@ let accept_autocomplete m ~submit_now =
          | Autocomplete.Source.Snippet, _ -> m, []
          | Autocomplete.Source.Command, true ->
            (match Commands.find ~superuser:m.superuser item.id with
-            (* [/review] and [/agents] alone are the common case: they run
-               at once. *)
-            | Some { argument = Some (Review | Agents); _ } -> submit m
+            (* [/review] and [/agents] alone are the common case, and [/new]
+               and [/engine] alone open their picker: they run at once. *)
+            | Some { argument = Some (Review | Agents | Engine | Adapter); _ }
+              -> submit m
             | Some spec when Option.is_some spec.argument ->
               refresh_autocomplete m
             | _ -> submit m)
@@ -5583,7 +6138,12 @@ let rec editing m (intent : Intent.t) =
 let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   let m = { m with mode = Editing } in
   match kind with
-  | Models _ -> m, [ set_model_command item.id ]
+  | Models _ when String.is_prefix item.id ~prefix:"/" ->
+    (* One of [harness_fixes]. *)
+    (match Commands.parse item.id with
+     | Some cmd -> run_command m cmd
+     | None -> m, [])
+  | Models _ -> m, [ set_model_keeping m item.id ]
   | Scoped_models | Transcript_filter -> m, []
   | Thinking -> m, [ rpc "set_thinking" ~params:[ "thinking", str item.id ] ]
   | Modes -> mode_by_name m item.id
@@ -5611,6 +6171,13 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
      | Some host -> forge_logout m host
      | None -> logout m item.id)
   | Pull_requests -> pr_command m item.id
+  | Commands ->
+    if Provider_logins.asks item.id
+    then { m with editor = Editor.set_text m.editor item.id }, []
+    else (
+      match Commands.parse item.id with
+      | Some cmd -> run_command m cmd
+      | None -> m, [])
   | Sessions _ ->
     ( m
     , [ rpc
@@ -5774,8 +6341,19 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
        , [] )
      | None -> error m "that one is gone; /instructions lists the others", [])
   | Mcp list -> mcp_selected m list item.id
+  | Engines { switch } -> engine_chosen m ~switch item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
+  | Adapter_login adapter ->
+    ( notice m "changing the login…"
+    , [ call
+          (Set_adapter_login
+             { adapter
+             ; login =
+                 (if String.equal item.id "own" then None else Some item.id)
+             })
+          ~tag:(Adapter_login_set adapter)
+      ] )
 ;;
 
 let save_scoped_models m picker =
@@ -6429,6 +7007,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     match action with
     | Logout provider ->
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
+    | Logout_login { provider; account } ->
+      ( m
+      , [ rpc
+            "logout"
+            ~params:[ "provider", str provider; "account", str account ]
+        ] )
     | Forge_logout host -> m, [ call (Forge_logout host) ]
     | Cd_to_checkout path ->
       m, [ call (Enter_worktree path) ~tag:(Dir_changed Cwd) ]
@@ -6444,6 +7028,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       , [ call (Delete_sessions { paths; switch_to }) ~tag:Sessions_deleted ] )
     | Tool_confirm c -> answer_confirm m c Allow
     | Nix_gc generations -> start_nix_gc m (Some generations)
+    | Import_adapter_login { adapter; host } ->
+      ( notice m "moving the login into prigh…"
+      , [ call
+            (Import_adapter_login { adapter; host = Some host; confirm = true })
+            ~tag:Adapter_imported
+        ] )
     | Browser_signin ->
       relink
         m
@@ -6513,13 +7103,15 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
            and /terminal from the proxy (see DOCKER.md)"
       , [] )
     | Logout _
+    | Logout_login _
     | Forge_logout _
     | Rewind _
     | Trim _
     | Trim_after _
     | Delete_sessions _
     | Remove_worktree _
-    | Nix_gc _ -> notice m "cancelled", []
+    | Nix_gc _
+    | Import_adapter_login _ -> notice m "cancelled", []
   in
   match intent, action with
   | (Insert ("y" | "Y") | Submit), _ -> yes { m with mode = Editing }
@@ -6769,7 +7361,7 @@ let auth_event m (e : P.Auth_event.t) =
        { m with mode = Editing; login_lines = [] }, []
      | _ -> m, [])
   | Progress message -> { m with login_lines = m.login_lines @ [ message ] }, []
-  | Done { provider; method_ } ->
+  | Done { provider; method_; account = _ } ->
     let m =
       match m.mode with
       | Login_prompt _ -> { m with mode = Editing }
@@ -6795,7 +7387,7 @@ let auth_event m (e : P.Auth_event.t) =
     in
     let m = { m with login_lines = [] } in
     error m (sprintf "login to %s failed: %s" provider e), []
-  | Logged_out provider ->
+  | Logged_out { provider; account = _ } ->
     ( notice m (sprintf "logged out of %s" provider)
     , [ rpc "auth_status" ~tag:Auth_refresh ] )
   | Forge_done { host; user; method_ } ->
@@ -6913,6 +7505,7 @@ let apply_event m (e : P.Event.t) =
   | Message_update _
   | Message_end _
   | Retry _
+  | Agent_waiting _
   | Tool_start _
   | Tool_output _
   | Tool_end _
@@ -6932,7 +7525,8 @@ let apply_event m (e : P.Event.t) =
   | Terminal_kill _ -> m, []
   | Memory_changed memory -> memory_changed m memory, []
   | Custom_instructions_changed ci -> instructions_changed m ci, []
-  | User_info_changed _ | Mcp_settings_changed _ -> m, []
+  | User_info_changed _ | Mcp_settings_changed _ | Adapters_changed _ -> m, []
+  | Models_changed -> m, [ rpc "list_models" ~tag:Models_catalog ]
   | Mcp_auth_changed ->
     m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_auth_refreshed ]
   | Prefs_changed changes ->
@@ -6955,6 +7549,7 @@ let apply_event m (e : P.Event.t) =
     (match m.nix_gc with
      | Some _ -> { m with nix_gc = Some progress }, []
      | None -> m, [])
+  | Accounts_changed -> m, [ rpc "auth_status" ~tag:Auth_refresh ]
   | Temporary_ended _ -> m, []
   | Sessions_changed change ->
     (match change, Option.first_some m.sessions (picker_sessions m) with
@@ -7263,6 +7858,73 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                  lists them"
                 note.id)
          , [] ))
+     | Adapters_shown ->
+       decode json ~f:P.Adapter_status.list_of_json (fun statuses ->
+         decode json ~f:P.Adapter_login.list_of_json (fun logins ->
+           ( output
+               { m with notice = None }
+               ~title:"Agent CLIs"
+               (Content.lines
+                  (String.concat
+                     ~sep:"\n"
+                     (Adapters_command.lines statuses logins)))
+           , [] )))
+     | Adapter_login_picker adapter ->
+       decode json ~f:P.Adapter_login.list_of_json (fun logins ->
+         match Adapters_command.find_login logins ~adapter with
+         | Error e -> error { m with notice = None } (Error.to_string_hum e), []
+         | Ok l ->
+           let current ref_ =
+             Option.equal
+               String.equal
+               (Option.map l.login ~f:(fun c -> c.ref_))
+               ref_
+           in
+           let items =
+             Picker.Item.create
+               ~id:"own"
+               ~detail:"on the session's tool host (log in there)"
+               ~marked:(current None)
+               (P.Session_engine.adapter_label l.adapter ^ "'s own login")
+             :: List.map l.choices ~f:(fun (c : P.Adapter_login.Choice.t) ->
+               Picker.Item.create
+                 ?section:(P.Adapter_login.warning l)
+                 ~id:c.ref_
+                 ~detail:(c.ref_ ^ ", prigh hands it short-lived tokens")
+                 ~marked:(current (Some c.ref_))
+                 c.label)
+           in
+           ( open_picker
+               { m with notice = None }
+               (Adapter_login l.adapter)
+               (Picker.create
+                  ~title:(P.Session_engine.adapter_label l.adapter ^ " runs on")
+                  items)
+           , [] ))
+     | Adapter_login_set adapter ->
+       decode json ~f:P.Adapter_login.list_of_json (fun logins ->
+         match
+           List.find logins ~f:(fun (l : P.Adapter_login.t) ->
+             String.equal l.adapter adapter)
+         with
+         | None -> notice m "changed", []
+         | Some l -> notice m (Adapters_command.changed l), [])
+     | Adapter_import_found ->
+       decode json ~f:P.Adapter_login.Import.of_json (fun i ->
+         ( { m with
+             notice = None
+           ; mode =
+               Confirm
+                 { question = P.Adapter_login.Import.question i
+                 ; action =
+                     Import_adapter_login { adapter = i.adapter; host = i.host }
+                 }
+           ; autocomplete = None
+           }
+         , [] ))
+     | Adapter_imported ->
+       decode json ~f:P.Adapter_login.Import.of_json (fun i ->
+         notice m (P.Adapter_login.Import.done_ i), [])
      | Nix_store_shown ->
        decode json ~f:P.Nix_store_status.of_json (fun status ->
          ( output
@@ -7590,8 +8252,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:P.Hello_reply.of_json
          (fun
-             ({ client_id; namespace; user; superuser = _; features = _ } as
-              hello)
+             ({ client_id
+              ; namespace
+              ; user
+              ; superuser = _
+              ; features = _
+              ; deployed = _
+              } as hello)
             ->
             let m, session_commands =
               reset_session
@@ -7602,6 +8269,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 ; sessions = None
                 ; known_sessions = Session_link.Known.empty
                 ; pasted_text = P.Hello_reply.pasted_text hello
+                ; deployed = hello.deployed
                 }
             in
             let m =
@@ -7733,7 +8401,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          (sessions_refreshed m)
      | Auth_refresh ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
-         { m with auth }, [])
+         logins_refreshed { m with auth }, [])
+     | Usage_limits { show } ->
+       decode json ~f:P.Subscription_usage.of_json (fun usage ->
+         let m = logins_refreshed { m with usage_limits = Some usage } in
+         if show
+         then output m ~title:"Usage" (format_usage m usage), []
+         else m, [])
      | Auth_show ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          let m = { m with auth } in
@@ -7744,6 +8418,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Auth_logout_picker ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          logout_picker { m with auth }, [])
+     | Share_targets ref_ ->
+       decode json ~f:strings (fun users -> share_picker m ~ref_ users, [])
      | Forge_refresh ->
        decode json ~f:P.Forge_account.list_of_json (fun forge ->
          forge_refreshed m forge, [])
@@ -7869,7 +8545,16 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          , [] ))
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
-         { m with models }, [])
+         let m = { m with models } in
+         match m.mode with
+         | Picker { kind = Models { logged_in_only } as kind; picker } ->
+           let picker =
+             Picker.set_items
+               picker
+               (harness_fixes m @ model_items m ~logged_in_only)
+           in
+           { m with mode = Picker { kind; picker } }, []
+         | _ -> m, [])
      | Models_for_scoped ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          scoped_models_picker { m with models }, [])
@@ -8048,6 +8733,22 @@ let block_backend_rpc m cmds =
   else m, cmds
 ;;
 
+(* What the session's engine cannot do is refused here, in the backend's
+   words, rather than sent. *)
+let block_engine_refused m cmds =
+  match m.state with
+  | None -> m, cmds
+  | Some (s : P.State.t) ->
+    List.fold cmds ~init:(m, []) ~f:(fun (m, kept) cmd ->
+      match cmd with
+      | Command.Rpc { method_; params; _ } ->
+        (match P.Session_engine.refuse s.engine ~method_ ~params with
+         | Some why -> error m why, kept
+         | None -> m, cmd :: kept)
+      | _ -> m, cmd :: kept)
+    |> fun (m, kept) -> m, List.rev kept
+;;
+
 (* The last [list_sessions] sent was after this many changes. *)
 let note_sessions_asked m cmds =
   if
@@ -8122,14 +8823,16 @@ let update m (action : Action.t) =
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Focus focused ->
         { m with terminal_focus = (if focused then Focused else Unfocused) }, []
-      | Hello ({ client_id; namespace; user; superuser; features = _ } as hello)
-        ->
+      | Hello
+          ({ client_id; namespace; user; superuser; features = _; deployed = _ }
+           as hello) ->
         ( { m with
             client_id = Some client_id
           ; namespace
           ; user
           ; superuser
           ; pasted_text = P.Hello_reply.pasted_text hello
+          ; deployed = hello.deployed
           }
         , [] )
       | Server_link link -> { m with server = Some link }, []
@@ -8140,6 +8843,7 @@ let update m (action : Action.t) =
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in
+    let m, cmds = block_engine_refused m cmds in
     let m, cmds = note_sessions_asked m cmds in
     maybe_open_pending m, cmds)
 ;;

@@ -48,6 +48,7 @@ module Argument : sig
     | Review (** [/review]: a worktree or [--base], then a base branch *)
     | Trim (** [after], [undo] *)
     | Delete (** [undo], or sessions *)
+    | Adapter (** [/engine]: the composer's adapters *)
   [@@deriving sexp_of, equal]
 end
 

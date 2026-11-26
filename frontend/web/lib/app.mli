@@ -195,6 +195,12 @@ module Reply_tag : sig
         { command : string (** back into the editor if refused *)
         ; notice : string (** shown on success *)
         }
+    | Share_targets
+    | Login_users of string (** [account_usage] of the login with this ref *)
+    | Logins_changed of
+        { command : string (** back into the editor if refused *)
+        ; notice : string (** shown on success *)
+        } (** a change to a provider's logins ([/accounts], [/account]) *)
     | Mcp_settings_loaded (** [get_mcp_settings] *)
     | Mcp_host_listed
     (** [list_mcp], [mcp_approve] or [mcp_signout], for the settings *)
@@ -329,6 +335,12 @@ module Reply_tag : sig
     | Nix_collected (** [nix_store_gc] *)
     | Memory_loaded (** [get_memory] *)
     | Usage_loaded (** [usage_limits] *)
+    | Adapters_loaded (** [list_adapters] *)
+    | Adapter_logins_loaded of string option
+    (** [list_adapters] for [/adapters login]: the adapter whose picker opens *)
+    | Adapter_login_saved of string (** [set_adapter_login]: the adapter *)
+    | Adapter_import_found (** [import_adapter_login] without [confirm] *)
+    | Adapter_imported
     | Instructions_loaded (** [get_custom_instructions] *)
     | Instruction_saved
     (** [save_custom_instruction]: the draft closes, or says why not *)
@@ -559,6 +571,7 @@ module Action : sig
     | Set_temporary of bool
     (** the new-session screen's Temporary chip: a new session of that
         kind, unless the empty one shown is already *)
+    | Pick_engine (** the new-session screen's engine chip: [/new]'s choices *)
     | New_temporary
     (** Ctrl+Shift+O: a new temporary session; on the new-session screen,
         the Temporary chip *)
@@ -628,6 +641,13 @@ module Action : sig
     | Model_menu_step of int (** the next provider along the rail (← →) *)
     | Model_menu_more (** "Show more": the provider's older models *)
     | Model_menu_access (** opens or closes the access menu in its foot *)
+    | Model_menu_engine
+    (** opens or closes the engine menu in its foot (asking the adapters'
+        health the first time) *)
+    | Model_menu_engine_pick of string
+    (** a choice of the engine menu, by key: switches this session (a fresh
+        one gives way to a new session on it, as the engine chip) *)
+    | Model_menu_engine_picker (** Alt+E: the engine picker, by keyboard *)
     | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
     | Toggle_favourite of string option
     (** stars or unstars the model ([None]: the highlighted one) *)
@@ -637,6 +657,11 @@ module Action : sig
     | Open_help
     | Open_settings (** the gear, Ctrl+, *)
     | Usage_refresh (** Settings → Usage's Refresh *)
+    | Adapters_refresh (** Settings → Engines' Refresh: checks the hosts again *)
+    | Copy_text of
+        { text : string
+        ; copied : string (** the toast once it is there *)
+        } (** to the clipboard *)
     | Settings_section of Settings_section.t
     | Settings_home
     (** a section of the settings page, from its list; opens the page there
@@ -778,6 +803,8 @@ module Action : sig
         transcript, live, and the composer writes to it *)
     | Close_subagent_chat (** back to the session's own chat *)
     | Subagent_back
+    | Subagent_fixed of Subagent_state.Fixed.t
+    (** a subagent's chip or folder: says why it cannot change *)
     (** from a subagent's chat to its parent's (the session's for a
         top-level one) *)
     | Answer_confirm of
@@ -967,6 +994,10 @@ module Model : sig
           to it is stale if a change came after *)
     ; models : Llm.t list
     ; auth : Auth_status.t list
+    ; share_targets : string list
+      (** the other users the user's logins can be shared with *)
+    ; login_users : Login_usage.User.t list String.Map.t
+      (** by login ref: who used the logins the user shares ([account_usage]) *)
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t (** local time minus UTC *)
     ; browser_time_zone : string option (** IANA, once the page said *)
@@ -1080,6 +1111,7 @@ module Model : sig
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; usage : Usage_page.t (** the settings page's Usage *)
+    ; adapters : Adapters_page.t (** the settings page's Engines *)
     ; memory : Memory_notes.t (** the settings page's Memory *)
     ; instructions : Instruction_notes.t
     (** the settings page's Custom instructions *)
@@ -1144,6 +1176,15 @@ module Model : sig
   (** A tool confirmation or an [ask_user] question is showing: it owns the
       keyboard, above any dialog. *)
   val waiting : t -> bool
+
+  (** What the session's agent is doing ({!Chat.activity}), or that it
+      waits for the user to approve a call or answer. *)
+  val activity : t -> Prigh_ui.Activity.t
+
+  (** {!activity} in the chat on show ({!shown_chat}): a subagent's in its
+      chat. *)
+  val shown_activity : t -> Prigh_ui.Activity.t
+
   (** The turn or background subagents or jobs run: the session is busy. *)
   val active : t -> bool
 
@@ -1155,6 +1196,22 @@ module Model : sig
   (** Who the composer writes to: the subagent whose chat is on show, else
       the main agent. *)
   val recipient : t -> Recipient.t
+
+  (** The names of the agent CLIs' models (the session's, the shown subagent's and
+      those offered), by key: their replies name them by key. *)
+  val model_names : t -> string String.Map.t
+
+  (** The subagent whose chat is on show. *)
+  val shown_subagent : t -> Agents.Agent.t option
+
+  (** The state of the chat on show: the session's, or in a subagent's chat
+      the subagent's ({!Subagent_state}), which the chrome around the chat
+      shows. *)
+  val shown_state : t -> State.t option
+
+  (** The transcript on show: the session's, or the subagent's (empty until
+      it is fetched). *)
+  val shown_chat : t -> Chat.t
 
   (** How messages' times read: in [utc_offset], relative to [now]'s day. *)
   val message_time : t -> Message_time.t
@@ -1225,11 +1282,41 @@ val offered_models : Model.t -> Llm.t list
 (** Whether the user signed in as a superuser. *)
 val superuser : Model.t -> bool
 
+(** The backend deploys the composer engine ([hello]'s [engines] feature):
+    Settings shows Engines. *)
+val composer_engine : Model.t -> bool
+
 (** Whether the session is temporary ([State.temporary]). *)
 val temporary : Model.t -> bool
 
 (** A session with nothing in it yet: the new-session screen. *)
 val fresh : Model.t -> bool
+
+(** What new sessions can run on ([hello]'s engines and adapters). *)
+val deployed : Model.t -> Deployed_engines.t
+
+(** The session's engine and adapter, as a choice of [/new]. *)
+val current_choice : Model.t -> Deployed_engines.Choice.t option
+
+(** A choice of the model menu's engine menu: [hint] is its health on the
+    session's host (from Settings → Engines' [list_adapters]) or what it is;
+    [trouble] when that says it cannot run. *)
+module Engine_option : sig
+  type t =
+    { choice : Deployed_engines.Choice.t
+    ; hint : string
+    ; trouble : bool
+    ; current : bool
+    }
+end
+
+(** The model menu's engine menu: what this session can switch to (a fresh
+    one: what a new session can run on), this one's first; none when there
+    is nothing else. *)
+val engine_options : Model.t -> Engine_option.t list
+
+(** Why the engine cannot change while a run goes on. *)
+val engine_busy : string
 
 (** What the Temporary chip shows: the session's kind, or the one asked
     for. *)

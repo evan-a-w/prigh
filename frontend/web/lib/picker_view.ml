@@ -49,7 +49,10 @@ let view
       ~attrs:
         [ classes
             [ "picker-item" ]
-            [ "selected", selected; "marked", item.marked; "dimmed", item.dimmed ]
+            [ "selected", selected
+            ; "marked", item.marked
+            ; "dimmed", item.dimmed
+            ]
         ; slot "command-item"
         ; Attr.role "option"
         ; Attr.id (sprintf "picker-option-%d" i)
@@ -62,11 +65,15 @@ let view
          ; (if String.is_empty item.detail
             then Node.none
             else span ~cls:"picker-detail" item.detail)
-         ; (if item.marked then Html.mark ~cls:"picker-check" Check else Node.none)
+         ; (if item.marked
+            then Html.mark ~cls:"picker-check" Check
+            else Node.none)
          ]
        @ trailing item)
   in
-  [ input
+  [ Option.value_map (Picker.note p) ~default:Node.none ~f:(fun note ->
+      Node.div ~attrs:[ Attr.class_ "picker-note" ] [ Node.text note ])
+  ; input
   ; (match visible with
      | [] ->
        Node.div

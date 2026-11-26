@@ -15,11 +15,12 @@ let assistant content : Message.t =
          then Tool_use
          else End_turn)
     ; model = "anthropic/claude-opus-4-5"
+    ; account = None
     }
 ;;
 
 let call id name arguments =
-  assistant [ Text "working"; Tool_call { id; name; arguments } ]
+  assistant [ Text "working"; Tool_call { id; name; arguments; extra = None } ]
 ;;
 
 let result ?(is_error = false) id name text : Message.t =

@@ -110,6 +110,11 @@ the diffs from `dune build @runtest` and `dune promote` if right.
 
 - Backend: drive the agent with `Faux_provider` and print event streams; no
   network. Helpers in `backend/test/tool_test_helpers.ml`.
+- Composer (Codex, Claude Code, ACP): never a real CLI or a login. Codecs
+  replay transcripts (`backend/test/fixtures/`); the runner and RPC tests
+  use in-memory peers; end to end, `prigh fake-cli codex|claude --script
+  FILE` stands in for the binary on the `PATH` (`frontend/web/e2e/engines.mjs`,
+  `frontend/tui/tmux-test/engines.t`).
 - TUI: drive `App.update` with keys and events and print the screen (the
   `H` harness in `frontend/tui/test/test_app.ml`).
 - prigh-web: drive `App.update` through `Harness` (`frontend/web/test`) and

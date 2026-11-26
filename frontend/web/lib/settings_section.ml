@@ -5,6 +5,7 @@ type t =
   | Sessions
   | New_sessions
   | Models
+  | Engines
   | Usage
   | Memory
   | About_you
@@ -15,9 +16,10 @@ type t =
   | Account
 [@@deriving sexp_of, equal, enumerate]
 
-let available ~superuser =
+let available ?(composer = false) ~superuser () =
   List.filter all ~f:(function
     | Nix_store -> superuser
+    | Engines -> composer
     | Appearance
     | Sessions
     | New_sessions
@@ -31,8 +33,10 @@ let available ~superuser =
     | Account -> true)
 ;;
 
-let visible t ~superuser =
-  if List.mem (available ~superuser) t ~equal then t else Appearance
+let visible ?composer t ~superuser =
+  if List.mem (available ?composer ~superuser ()) t ~equal
+  then t
+  else Appearance
 ;;
 
 let name = function
@@ -40,6 +44,7 @@ let name = function
   | Sessions -> "Sessions"
   | New_sessions -> "New sessions"
   | Models -> "Models"
+  | Engines -> "Engines"
   | Usage -> "Usage"
   | Memory -> "Memory"
   | About_you -> "About you"
@@ -63,10 +68,14 @@ let about = function
   | Models ->
     "The providers whose models you use, the models prigh uses for its own \
      work, and when long conversations are summarised. Kept on the backend."
+  | Engines ->
+    "The agent CLIs the composer engine drives (Codex, Claude Code, ACP \
+     agents) on each tool host: whether they are installed and logged in. \
+     prigh only checks: install them and log in on the host itself."
   | Usage ->
-    "How much of your Claude and ChatGPT subscriptions' usage limits you have \
-     used, as the providers report it (read when you open this page), and whether a \
-     run stopped by one carries on when it resets."
+    "Each login's usage: how much of its subscription's limits it has used, as \
+     the provider reports it (read when you open this page), and what ran on \
+     it. And whether a run stopped by a limit carries on when it resets."
   | Memory ->
     "What you asked the model to remember, for later sessions. Kept on the \
      backend, for your account."
@@ -93,6 +102,7 @@ let arg = function
   | Sessions -> "sessions"
   | New_sessions -> "new-sessions"
   | Models -> "models"
+  | Engines -> "engines"
   | Usage -> "usage"
   | Memory -> "memory"
   | About_you -> "user-info"
@@ -131,8 +141,8 @@ module Move = struct
   [@@deriving sexp_of, equal]
 end
 
-let move t (move : Move.t) ~superuser =
-  let sections = available ~superuser in
+let move ?composer t (move : Move.t) ~superuser =
+  let sections = available ?composer ~superuser () in
   let n = List.length sections in
   let i =
     Option.value_map

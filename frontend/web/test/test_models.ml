@@ -237,6 +237,7 @@ let%expect_test
        ; user = Some "ann"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.event h (sprintf {|{"event":"state","state":%s}|} busy_state);
   H.event

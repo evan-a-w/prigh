@@ -116,10 +116,12 @@ let%expect_test "which messages a compaction keeps" =
   let big = String.make 40_000 'x' in
   let a id =
     Message.Assistant
-      { content = [ Tool_call { id; name = "filler"; arguments = "{}" } ]
+      { content =
+          [ Tool_call { id; name = "filler"; arguments = "{}"; extra = None } ]
       ; usage = Usage.zero
       ; stop_reason = Tool_use
       ; model = "m"
+      ; account = None
       }
   in
   let r id text =
@@ -395,10 +397,11 @@ let assistant_calls calls =
   Message.Assistant
     { content =
         List.map calls ~f:(fun (id, name, arguments) ->
-          Content.Tool_call { id; name; arguments })
+          Content.Tool_call { id; name; arguments; extra = None })
     ; usage = Usage.zero
     ; stop_reason = Tool_use
     ; model = "m"
+    ; account = None
     }
 ;;
 

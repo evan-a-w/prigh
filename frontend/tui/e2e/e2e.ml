@@ -82,8 +82,12 @@ let rec summarise (e : Event.t) : string option =
   match e with
   | Message_update { delta = Text_delta t; _ } ->
     Some (sprintf "text_delta %S" t)
-  | Message_update _ | Agent_start | Agent_end _ | Turn_start | Turn_end _ ->
-    None
+  | Message_update _
+  | Agent_start
+  | Agent_end _
+  | Turn_start
+  | Turn_end _
+  | Agent_waiting _ -> None
   | Message_start (User { text = t; _ }) -> Some (sprintf "user %S" t)
   | Message_start _ -> Some "message_start"
   | Message_end (Assistant a) ->
@@ -147,7 +151,7 @@ let rec summarise (e : Event.t) : string option =
   | Terminal_kill key -> Some (sprintf "terminal_kill %s" key)
   | Btw_delta { btw_id; delta } -> Some (sprintf "btw_delta %s %S" btw_id delta)
   (* A hint to refresh session lists: how many arrive depends on timing. *)
-  | Sessions_changed _ -> None
+  | Sessions_changed _ | Accounts_changed -> None
   | Temporary_ended { session; _ } ->
     Some (sprintf "temporary_ended %s" session)
   | Nix_gc_progress p -> Some (sprintf "nix_gc_progress %d" p.paths_deleted)
@@ -155,7 +159,10 @@ let rec summarise (e : Event.t) : string option =
   | Memory_changed _
   | Custom_instructions_changed _
   | User_info_changed _
-  | Mcp_settings_changed _ | Mcp_auth_changed -> None
+  | Mcp_settings_changed _
+  | Mcp_auth_changed
+  | Adapters_changed _
+  | Models_changed -> None
   | Generate_delta { gen_id; delta } ->
     Some (sprintf "generate_delta %s %S" gen_id delta)
   | Agent_queues _ -> None

@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -377,10 +378,7 @@ const controlsShown = () => page.evaluate(() => {
 
 // A chip's menu at rest: it is opaque from its first frame, but rises into
 // place (and where it stands is measured).
-const risen = () => page.waitForFunction(() => {
-  const e = document.querySelector("#chip-popover");
-  return e && e.getAnimations().every(a => a.playState !== "running");
-});
+const risen = () => animationsOver(page, "#chip-popover");
 
 // Where a chip's menu stands: below its chip, above the composer's box or
 // over it, at the chip's left edge (exactly: one shifted by a few pixels is
@@ -1178,7 +1176,7 @@ try {
   await page.locator(".composer-plus .plus").click();
   await page.locator("#chip-popover").waitFor();
   // Its rise from the bottom over.
-  await page.locator("#chip-popover").evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+  await animationsOver(page, "#chip-popover");
   section("phone: a chip's menu");
   console.log(await popoverPlace());
   await screenshot("phone: a chip's menu");
@@ -1222,7 +1220,7 @@ try {
       await page.locator(".chat-chrome .toggle-sidebar").click();
       await page.waitForFunction(() => document.querySelector(".app.narrow.sidebar-open"));
     }
-    await page.locator(".sidebar").evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+    await animationsOver(page, ".sidebar");
     await screenshot(`phone ${width}: pinned`);
   }
   await page.keyboard.press("Escape");

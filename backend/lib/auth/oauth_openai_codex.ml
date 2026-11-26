@@ -97,7 +97,7 @@ let exchange ~env ~cancel (config : Config.t) ~code ~verifier =
          ; "code_verifier", verifier
          ; "redirect_uri", Config.redirect_uri config
          ]
-       ~what:"OpenAI Codex token exchange")
+       ~what:"ChatGPT token exchange")
     ~f:credential_of_body
 ;;
 
@@ -118,7 +118,7 @@ let refresh
          ; "refresh_token", refresh_token
          ; "client_id", config.client_id
          ]
-       ~what:"OpenAI Codex token refresh")
+       ~what:"ChatGPT token refresh")
     ~f:credential_of_body
 ;;
 
@@ -179,3 +179,12 @@ module For_testing = struct
   let account_id_of_token = account_id_of_token
   let credential_of_body = credential_of_body
 end
+
+let plan_of_token token =
+  let open Option.Let_syntax in
+  let%bind payload = decode_jwt_payload token in
+  let%bind auth = Json.member jwt_claim_path payload in
+  match Json.member "chatgpt_plan_type" auth with
+  | Some (`String plan) when not (String.is_empty plan) -> Some plan
+  | _ -> None
+;;

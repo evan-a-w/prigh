@@ -487,6 +487,7 @@ let rec apply t (event : Event.t) =
   | Generate_delta _
   | Review _
   | Sessions_changed _
+  | Accounts_changed
   | Temporary_ended _
   | Agent_queues _
   | Nix_gc_progress _
@@ -496,6 +497,9 @@ let rec apply t (event : Event.t) =
   | Custom_instructions_changed _
   | User_info_changed _
   | Mcp_settings_changed _
+  | Agent_waiting _
+  | Adapters_changed _
+  | Models_changed
   | Mcp_auth_changed -> t
 ;;
 

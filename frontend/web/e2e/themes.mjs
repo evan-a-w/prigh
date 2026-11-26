@@ -13,6 +13,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -116,8 +117,11 @@ const look = p => p.evaluate(() => {
 // The components' variables (bin/loon_bridge.css), the corners and fonts,
 // and a component's computed colours and corners: the settings' Corners
 // toggle group, its pressed item.
-const bridged = p => p.evaluate(async () => {
-  await Promise.all(document.getAnimations().map(a => a.finished.catch(() => {})));
+const bridged = async p => {
+  await animationsOver(p);
+  return p.evaluate(variables);
+};
+const variables = () => {
   const css = getComputedStyle(document.documentElement);
   const v = n => css.getPropertyValue(n).trim();
   const on = document.querySelector(".settings-panel .corners [aria-checked=true]");
@@ -130,7 +134,7 @@ const bridged = p => p.evaluate(async () => {
     `fonts: ${first(getComputedStyle(document.body).fontFamily)}, ${first(getComputedStyle(document.querySelector(".composer textarea") ?? document.body).fontFamily)}`,
     on ? `pressed ${on.innerText}: ${item.backgroundColor} ${item.color}, corners ${item.borderTopLeftRadius}, ${item.height}` : "no pressed item",
   ].join("\n");
-});
+};
 const lookIs = (p, theme, accent) => p.waitForFunction(([t, a]) =>
   document.documentElement.dataset.theme === t && document.documentElement.dataset.accent === a, [theme, accent]);
 const composer = p => p.locator(".composer textarea");

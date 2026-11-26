@@ -156,6 +156,7 @@ let scope_badge scope =
 let row
       ?(cls = "")
       ?note:n
+      ?below
       ?scope
       ?(wide = false)
       ?keys
@@ -209,6 +210,7 @@ let row
         ; Option.value_map n ~default:Node.none ~f:(fun n -> note n)
         ]
     ; control ~wide controls
+    ; Option.value below ~default:Node.none
     ]
 ;;
 

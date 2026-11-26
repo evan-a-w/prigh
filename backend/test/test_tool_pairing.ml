@@ -3,7 +3,9 @@ open! Prigh
 open Tool_test_helpers
 module Reply = Faux_provider.Reply
 
-let call id = { Content.Tool_call.id; name = "bash"; arguments = "{}" }
+let call id =
+  { Content.Tool_call.id; name = "bash"; arguments = "{}"; extra = None }
+;;
 
 let assistant ids =
   Message.Assistant
@@ -11,6 +13,7 @@ let assistant ids =
     ; stop_reason = Tool_use
     ; usage = Usage.zero
     ; model = "m"
+    ; account = None
     }
 ;;
 
@@ -108,6 +111,7 @@ let%expect_test "the Anthropic request is repaired" =
       ; thinking = Off
       ; max_tokens = Some 100
       ; cache_key = None
+      ; account = None
       }
   in
   print_endline
@@ -175,6 +179,7 @@ let%expect_test
         ; thinking = Off
         ; max_tokens = Some 100
         ; cache_key = None
+        ; account = None
         }
     in
     List.iter

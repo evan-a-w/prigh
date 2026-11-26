@@ -8,6 +8,7 @@ module Picker_kind = struct
     | Login
     | Logout
     | Verbosity
+    | Engines of { switch : bool }
     | Confirm_tools
     | Modes
     | Fork of Entry.t list
@@ -16,6 +17,7 @@ module Picker_kind = struct
     | Hosts
     | Users
     | Accounts
+    | Logins of { noun : string } (** what its rows are, for its filter *)
     | Skills
     | Snippets
     | Reminders
@@ -31,6 +33,7 @@ module Picker_kind = struct
     | Generate_models
     | Approval_models
     | Naming_models
+    | Adapter_logins of string
     | Defaults of New_default.Picker.t
     | Attach
     | Menu of Context_menu.t
@@ -126,6 +129,12 @@ type t =
       { input : string
       ; error : string option
       }
+  | Login_label of
+      { title : string
+      ; command : string
+      ; input : string
+      ; error : string option
+      }
   | New_worktree of New_worktree.t
   | Remove_worktree of
       { worktree : Worktree.t
@@ -136,6 +145,11 @@ type t =
       ; error : string option
       }
   | Nix_gc_confirm of Nix_generations.t
+  | Import_login_confirm of
+      { import : Adapter_login.Import.t
+      ; busy : bool
+      ; error : string option
+      }
   | Annotate of Annotate.t
   | Temporary_menu
   | Leave_temporary
@@ -193,15 +207,18 @@ let per_session = function
           | Login
           | Logout
           | Verbosity
+          | Engines _
           | Confirm_tools
           | Users
           | Accounts
+          | Logins _
           | Themes
           | Accents
           | Compaction_models
           | Generate_models
           | Approval_models
           | Naming_models
+          | Adapter_logins _
           | Defaults _
           | Attach )
       ; _
@@ -214,5 +231,7 @@ let per_session = function
   | Login _
   | Auth _
   | Forge_host _
+  | Login_label _
   | Nix_gc_confirm _ -> false
+  | Import_login_confirm _ -> false
 ;;

@@ -55,6 +55,9 @@ let help =
        Enter switches, Esc closes" )
   ; "Alt+1…9 (in the model menu)", "switch to the list's Nth model"
   ; "Alt+F (in the model menu)", "star or unstar the highlighted model"
+  ; ( "Alt+E (in the model menu)"
+    , "pick the session's engine (Codex, Claude Code, …), as its foot's engine \
+       menu does" )
   ; ( "↑ ↓ / Enter / Esc (a chip's menu)"
     , "move / choose / close it; type to filter the models or hosts" )
   ; ( "Tab (a chip's menu; ← → in the host's)"
@@ -393,6 +396,8 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
       ~f:(fun n -> App.Action.Model_menu_nth n)
   | _, Popover { chip = Model; _ } when alt_letter t "f" ->
     Some (Toggle_favourite None)
+  | _, Popover { chip = Model; _ } when alt_letter t "e" ->
+    Some Model_menu_engine_picker
   (* In the model's filter ← → move the caret once something is typed. *)
   | ("ArrowLeft" | "ArrowRight"), Popover { picker; _ }
     when plain t && String.is_empty (Picker.query picker) ->

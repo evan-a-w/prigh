@@ -47,6 +47,7 @@ let view (m : App.Model.t) ~inject =
               ]
           ; Chat_view.view
               ~fold:(App.Model.fold m)
+              ~names:(App.Model.model_names m)
               (App.Model.message_time m)
               chat
           ]

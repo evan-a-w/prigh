@@ -231,17 +231,25 @@ let place_popover () =
           (Js.string (if down then "below" else "above"));
         set "--popover-room" (if down then below else above);
         set "--popover-shift" 0.;
-        let menu = el##getBoundingClientRect in
         let right =
           Float.min
             (Js.to_float box##.right)
             (Float.of_int Dom_html.window##.innerWidth -. margin)
         in
-        let over = Js.to_float menu##.right -. right in
-        if Float.(over > 0.)
+        if Js.to_bool (el##.classList##contains (Js.string "model-menu"))
         then (
-          let room = Js.to_float menu##.left -. Js.to_float box##.left in
-          set "--popover-shift" (-.Float.min over room));
+          (* Its right edge on what holds it, measured from the chip's
+             right, which stays put when the chip's label changes. *)
+          let width = Float.of_int el##.offsetWidth in
+          let left = Float.max margin (right -. width) in
+          set "--popover-right" (Js.to_float chip##.right -. (left +. width)))
+        else (
+          let menu = el##getBoundingClientRect in
+          let over = Js.to_float menu##.right -. right in
+          if Float.(over > 0.)
+          then (
+            let room = Js.to_float menu##.left -. Js.to_float box##.left in
+            set "--popover-shift" (-.Float.min over room)));
         (* The current choice in the middle of a long list. *)
         Js.Opt.iter
           (el##querySelector
@@ -331,15 +339,20 @@ let reported = ref true
    from ours. *)
 let last_set = ref None
 
-let at_end (el : Dom_html.element Js.t) =
-  Float.(
-    of_int el##.scrollHeight -. Js.to_float el##.scrollTop -. of_int el##.clientHeight
-    < 40.)
+let position (el : Dom_html.element Js.t) : Chat_follow.Position.t =
+  { top = Js.to_float el##.scrollTop
+  ; height = Float.of_int el##.scrollHeight
+  ; client = Float.of_int el##.clientHeight
+  }
 ;;
 
+let at_end el = Chat_follow.at_end (position el)
+
 let follow_to_end (el : Dom_html.element Js.t) =
-  el##.scrollTop := Js.float (Float.of_int el##.scrollHeight);
-  last_set := Some (Js.to_float el##.scrollTop)
+  if Chat_follow.off_end (position el)
+  then (
+    el##.scrollTop := Js.float (Float.of_int el##.scrollHeight);
+    last_set := Some (Js.to_float el##.scrollTop))
 ;;
 
 let scroll_to_bottom () =
@@ -1246,24 +1259,67 @@ let install_listeners ~schedule ~current =
       listen event (fun ev ->
         if in_chat ev then user_scrolled := true;
         Js._true));
-  (* Intent first: a wheel or swipe up stops following at once, before the
-     scroll it causes lands, so output arriving meanwhile cannot undo it. *)
+  (* Intent first ([Chat_follow.Turn_up]): a wheel or swipe up stops
+     following at once; the scroll listener shows the jump button once the
+     chat moves, and a turn it does not take follows again. *)
+  let turn_up = ref None in
+  let touching = ref false in
+  let rec settle () =
+    ignore
+      (Dom_html.window##requestAnimationFrame
+         (Js.wrap_callback (fun (_ : Js.number_t) ->
+            match !turn_up, chat_element () with
+            | None, _ -> ()
+            | Some _, None -> turn_up := None
+            | Some turn, Some el ->
+              (match
+                 Chat_follow.Turn_up.frame
+                   turn
+                   ~top:(Js.to_float el##.scrollTop)
+                   ~held:!touching
+               with
+               | Taken -> turn_up := None
+               | Waiting turn ->
+                 turn_up := Some turn;
+                 settle ()
+               | Not_taken ->
+                 turn_up := None;
+                 if not !following
+                 then (
+                   set_following true;
+                   follow_to_end el))))
+       : Dom_html.animation_frame_request_id)
+  in
+  let turned_up () =
+    match !turn_up, chat_element () with
+    | Some turn, _ -> turn_up := Some (Chat_follow.Turn_up.again turn)
+    | None, Some el when !following ->
+      following := false;
+      turn_up := Some (Chat_follow.Turn_up.start ~top:(Js.to_float el##.scrollTop));
+      settle ()
+    | None, _ -> ()
+  in
   listen
     (Dom_html.Event.make "wheel")
     (fun (ev : Dom_html.mouseScrollEvent Js.t) ->
        if in_chat ev && Float.(Js.to_float (Js.Unsafe.coerce ev)##.deltaY < 0.)
-       then set_following false;
+       then turned_up ();
        Js._true);
   let touch_y = ref None in
   listen Dom_html.Event.touchstart (fun (ev : Dom_html.touchEvent Js.t) ->
+    touching := true;
     touch_y
     := Js.Optdef.to_option (ev##.touches##item 0)
        |> Option.map ~f:(fun t -> Js.to_float t##.clientY);
     Js._true);
+  List.iter [ Dom_html.Event.touchend; Dom_html.Event.touchcancel ] ~f:(fun event ->
+    listen event (fun (ev : Dom_html.touchEvent Js.t) ->
+      touching := ev##.touches##.length > 0;
+      Js._true));
   listen Dom_html.Event.touchmove (fun (ev : Dom_html.touchEvent Js.t) ->
     (match !touch_y, Js.Optdef.to_option (ev##.touches##item 0) with
      | Some y0, Some t when in_chat ev && Float.(Js.to_float t##.clientY > y0 +. 4.)
-       -> set_following false
+       -> turned_up ()
      | _ -> ());
     Js._true);
   (* Scroll events do not bubble: only capturing sees the chat's. Scrolling
@@ -1279,9 +1335,13 @@ let install_listeners ~schedule ~current =
            Float.(abs (top -. s) < 2.))
        in
        if at_end el
-       then set_following true
+       then (
+         turn_up := None;
+         set_following true)
        else if not ours
-       then set_following false
+       then (
+         turn_up := None;
+         set_following false)
      | _ -> ());
     Js._true);
   let observer =

@@ -498,6 +498,44 @@ let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject =
     ]
 ;;
 
+let import_login_confirm (i : Adapter_login.Import.t) ~busy ~error ~inject =
+  let cli = Session_engine.adapter_label i.adapter in
+  Modal.view
+    ~cls:"import-login-confirm"
+    ~title:(sprintf "Move %s's login from %s into prigh?" cli i.host)
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:
+      [ keys_only "Enter moves it, Esc cancels"
+      ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
+      ; button
+          ~cls:"danger"
+          ~disabled:busy
+          ~on_click:(inject Action.Dialog_accept)
+          [ Node.text (if busy then "Moving…" else "Move it") ]
+      ]
+    ([ Node.p [ Node.text i.warning ]
+     ; Node.p
+         ~attrs:[ Attr.class_ "dialog-note" ]
+         [ Node.textf
+             "prigh keeps it as %S, refreshing it for every tool host that \
+              runs %s on it."
+             i.label
+             cli
+         ]
+     ]
+     @ (match i.adapter with
+        | "claude" ->
+          [ Node.p
+              ~attrs:[ Attr.class_ "dialog-note" ]
+              [ Node.text
+                  "Anthropic's terms keep Claude Pro/Max logins to Claude's \
+                   own apps: running it through prigh may breach them."
+              ]
+          ]
+        | _ -> [])
+     @ [ dialog_error error ])
+;;
+
 let trim_after_confirm
       (m : App.Model.t)
       (point : Message_point.t)
@@ -927,6 +965,8 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Trim_after_confirm { point; busy; error } ->
     Some (trim_after_confirm m point ~busy ~error ~inject)
   | Nix_gc_confirm generations -> Some (nix_gc_confirm generations ~inject)
+  | Import_login_confirm { import; busy; error } ->
+    Some (import_login_confirm import ~busy ~error ~inject)
   | Annotate _ -> None
   | Temporary_menu -> Some (Temporary_view.menu ~inject)
   | Leave_temporary -> Some (Temporary_view.leave m ~inject)
@@ -952,6 +992,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Login _
   | Auth _
   | Forge_host _
+  | Login_label _
   | Pulls _
   | Pull _
   | Pr_create _

@@ -44,6 +44,7 @@ module Argument = struct
     | Review
     | Trim
     | Delete
+    | Adapter
   [@@deriving sexp_of, equal]
 end
 
@@ -74,7 +75,17 @@ let every =
       "settings"
       "appearance, sessions, new sessions' defaults, models, git hosting and \
        your account; a section opens at it (Ctrl+,)"
-  ; c "new" "start a new session"
+  ; c
+      "new"
+      "start a new session (/new ENGINE: on another engine or adapter, e.g. \
+       codex or claude, when the backend runs several; the new-session screen \
+       picks one too)"
+  ; c
+      ~argument:Adapter
+      ~args:"[adapter]"
+      "engine"
+      "switch this session to another of the composer's adapters (codex, \
+       claude, ...): it carries on from a summary of the session so far"
   ; c
       "temporary"
       "a temporary session: not saved or listed, deleted when you leave it \
@@ -422,16 +433,27 @@ let every =
       "background jobs: the session card, or kill one"
   ; c
       ~argument:Login
-      ~args:"[provider|github [HOST]|forgejo HOST|HOST] [token]"
+      ~args:"[provider [as LABEL]|github [HOST]|forgejo HOST|HOST] [token]"
       "login"
-      "log in to a model provider (or /login custom), or sign in to GitHub or \
-       a Forgejo or Gitea host (token: paste one instead of OAuth)"
+      "log in to a model provider (or /login custom; as LABEL: another login \
+       of it), or sign in to GitHub or a Forgejo or Gitea host (token: paste \
+       one instead of OAuth)"
   ; c
       ~argument:Logout
-      ~args:"[provider|HOST]"
+      ~args:"[provider[@LOGIN]|HOST]"
       "logout"
-      "remove a provider's login, or sign out of a git host (github: \
-       github.com)"
+      "remove a provider's login (@LOGIN: one of several), or sign out of a \
+       git host (github: github.com)"
+  ; c
+      ~args:"[QUERY|default|rename|fallback|up|down|remove LOGIN]"
+      "accounts"
+      "a provider's logins: pick one to use, rename, make the default or log \
+       out of"
+  ; c
+      ~args:"[LOGIN|default]"
+      "account"
+      "the login of the model's provider this session uses (or /model \
+       MODEL@LOGIN)"
   ; c "auth" "show which providers and git hosts are logged in"
   ; c
       ~argument:Pr

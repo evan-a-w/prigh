@@ -286,10 +286,13 @@ let%expect_test
       [ Message.user "earlier"
       ; Assistant
           { content =
-              [ Tool_call { id = "c0"; name = "filler"; arguments = "{}" } ]
+              [ Tool_call
+                  { id = "c0"; name = "filler"; arguments = "{}"; extra = None }
+              ]
           ; usage = Usage.zero
           ; stop_reason = Tool_use
           ; model = Model.key flash
+          ; account = None
           }
       ; Tool_result
           { tool_call_id = "c0"

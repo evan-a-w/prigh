@@ -243,13 +243,14 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
   (* The plan's chip is a note at the chrome's right (in the ⋯ menu on a
      phone). *)
   H.elements h ~selector:".status-notes .plan";
-  [%expect {| <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center link loon max-w-[24ch] mode narrow:h-11 narrow:text-sm overflow-hidden plan px-2 py-0.5 rounded-4xl shrink-0 status-item text-muted-foreground text-xs transition-all w-fit whitespace-nowrap"> |}];
+  [%expect
+    {| <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-start link loon max-w-[36ch] mode narrow:h-11 narrow:max-w-full narrow:text-sm overflow-hidden plan px-2 py-0.5 rounded-4xl shrink-0 status-item text-muted-foreground text-xs transition-all w-fit whitespace-nowrap"> |}];
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   status h;
   [%expect
     {|
     Mode Auto: never asks
-    (plan 1/3: change it)
+    (Plan: change it)
     |}];
   H.click h ~selector:".status-notes .plan";
   modal h;
@@ -290,6 +291,42 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
     ✓ read the code
     ✓ test
     (Done)
+    |}]
+;;
+
+(* A long step: [Plan:], then the step from its start (cut at its end by
+   [truncate], with an ellipsis), then the count; the whole plan in its
+   title. *)
+let%expect_test "the plan's chip: Plan:, the step's start, the count" =
+  let h = H.create () in
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (state
+          ~plan:
+            {|{"steps":[{"step":"Move the store behind the interface, no behaviour change","status":"in_progress"},{"step":"test","status":"in_progress"},{"step":"ship","status":"pending"}]}|}
+          ()));
+  H.show h ~selector:".status-notes .plan";
+  H.names h ~selector:".status-notes .plan";
+  [%expect
+    {|
+    <button type="button"
+            title="Plan 0/3 (/todos)
+    ▸ Move the store behind the interface, no behaviour change
+    ▸ test
+    ○ ship"
+            class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-start link loon max-w-[36ch] mode narrow:h-11 narrow:max-w-full narrow:text-sm overflow-hidden plan px-2 py-0.5 rounded-4xl shrink-0 status-item text-muted-foreground text-xs transition-all w-fit whitespace-nowrap"
+            @on_click>
+      <span class="min-w-0 plan-text truncate">
+        <span class="font-semibold plan-label"> Plan: </span>
+         Move the store behind the interface, no behaviour change (+1 running)
+      </span>
+    </button>
+    button "Plan: Move the store behind the interface, no behaviour change (+1 running)" -- Plan 0/3 (/todos)
+    ▸ Move the store behind the interface, no behaviour change
+    ▸ test
+    ○ ship
     |}]
 ;;
 

@@ -7,11 +7,13 @@ let assistant text =
   Message.Assistant
     { content =
         [ Text text
-        ; Content.Tool_call { id = "c"; name = "bash"; arguments = "{}" }
+        ; Content.Tool_call
+            { id = "c"; name = "bash"; arguments = "{}"; extra = None }
         ]
     ; stop_reason = End_turn
     ; usage = Usage.zero
     ; model = "m"
+    ; account = None
     }
 ;;
 

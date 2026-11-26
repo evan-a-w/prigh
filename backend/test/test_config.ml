@@ -203,7 +203,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, default_chat_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, default_host, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model, mask_observations, computer_screenshots, computer_screenshots_max, computer_native, compact_at_tokens, compaction_model, naming_model, approval_model, trace)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, adapters, confirm_tools, scoped_models, approval_mode, default_chat_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, default_host, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model, mask_observations, computer_screenshots, computer_screenshots_max, computer_native, compact_at_tokens, compaction_model, naming_model, approval_model, trace)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};

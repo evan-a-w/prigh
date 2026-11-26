@@ -35,7 +35,7 @@ let last_turn_usd (m : App.Model.t) (state : State.t) =
     | Assistant { message; _ } :: rest -> since_user (message.usage :: acc) rest
     | (Shell _ | Compaction _) :: rest -> since_user acc rest
   in
-  match since_user [] (Chat.rev_entries m.chat) with
+  match since_user [] (Chat.rev_entries (App.Model.shown_chat m)) with
   | [] -> None
   | usages -> Some (List.sum (module Float) usages ~f:(usd_of state.model))
 ;;
@@ -44,6 +44,8 @@ let card_id = "context-card"
 let tokens = Status_view.tokens
 
 let card (m : App.Model.t) (state : State.t) ~inject =
+  let sub = Option.is_some (App.Model.shown_subagent m) in
+  let whose = if sub then "This subagent" else "This session" in
   let line ?(cls = "") k v =
     div
       ~cls:(String.strip ("status-detail " ^ cls))
@@ -58,9 +60,15 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   let at = compacts_at m state in
   let percent = Status_view.context_percent state in
   let mode =
-    Option.value m.pending.mode ~default:(Session_mode.of_state state)
+    if sub
+    then Session_mode.of_state state
+    else Option.value m.pending.mode ~default:(Session_mode.of_state state)
   in
-  let thinking = Option.value m.pending.thinking ~default:state.thinking in
+  let thinking =
+    if sub
+    then state.thinking
+    else Option.value m.pending.thinking ~default:state.thinking
+  in
   let cache_rate =
     if Float.(state.usage.input > 0.)
     then
@@ -73,8 +81,8 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   Node.div
     ~attrs:
       [ Attr.class_
-          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 rounded-lg \
-           border-0 bg-popover p-3 text-xs whitespace-normal \
+          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 \
+           rounded-lg border-0 bg-popover p-3 text-xs whitespace-normal \
            text-popover-foreground shadow-md ring-1 ring-foreground/10 \
            grid-cols-[1fr_auto] narrow:fixed narrow:inset-x-0 narrow:top-auto \
            narrow:bottom-0 narrow:w-auto narrow:max-w-none narrow:gap-x-4 \
@@ -95,10 +103,13 @@ let card (m : App.Model.t) (state : State.t) ~inject =
         [ span ~cls:"context-card-title text-[12.5px] font-semibold" "Context"
         ; span
             ~cls:"context-card-of font-mono text-xs"
-            (sprintf
-               "%s / %s"
-               (tokens (Float.of_int state.context_tokens))
-               (tokens (Float.of_int state.model.context_window)))
+            (if state.model.context_window > 0
+             then
+               sprintf
+                 "%s / %s"
+                 (tokens (Float.of_int state.context_tokens))
+                 (tokens (Float.of_int state.model.context_window))
+             else tokens (Float.of_int state.context_tokens))
         ]
     ; (match percent with
        | Some p ->
@@ -148,15 +159,15 @@ let card (m : App.Model.t) (state : State.t) ~inject =
                     (Float.round_nearest
                        (at /. 100. *. Float.of_int state.model.context_window)))
                  at
-             | None -> sprintf "Compacts at %.0f%%" at)
+             | None -> "Window unknown: no automatic compaction")
         ]
     ; div ~cls:"context-card-rule col-span-full border-t border-border" []
     ; (match Prigh_ui.Loop_status.budget_part state with
-       | None -> line "This session" (sprintf "$%.2f" state.cost_usd)
+       | None -> line whose (Prigh_ui.Loop_status.cost state)
        | Some (text, lvl) ->
          line
            ~cls:("cost " ^ Status_view.level_class lvl)
-           "This session"
+           whose
            (sprintf "$%.2f · %s" state.cost_usd text))
     ; (match last_turn_usd m state with
        | Some usd -> line "Last turn" (sprintf "$%.3f" usd)
@@ -180,6 +191,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
            ~default:"none")
     ; line ~cls:"mode-line" "Mode" (Session_mode.title mode)
     ; line "Model" state.model.name
+    ; Node.fragment (Login_usage_view.card_lines m state ~line)
     ; (match state.git_branch with
        | Some branch -> line ~cls:"branch-line" "Branch" branch
        | None -> Node.none)
@@ -187,7 +199,9 @@ let card (m : App.Model.t) (state : State.t) ~inject =
         ~cls:
           "context-card-foot col-span-full flex items-center justify-between \
            gap-2 border-t border-border pt-1.5"
-        [ (if Option.exists percent ~f:(fun p -> Float.(p >= 70.))
+        [ (if sub
+           then Node.none
+           else if Option.exists percent ~f:(fun p -> Float.(p >= 70.))
            then
              button
                ~variant:Outline
@@ -262,16 +276,17 @@ let ring_svg percent =
 ;;
 
 let view (m : App.Model.t) ~inject =
-  match m.state with
+  match App.Model.shown_state m with
   | None -> Node.none
   | Some state ->
     let at = compacts_at m state in
     let percent = Status_view.context_percent state in
     let p = Option.value percent ~default:0. in
+    let cost = Prigh_ui.Loop_status.cost state in
     let label =
       match percent with
-      | Some p -> sprintf "Context %.0f%% full, $%.2f: details" p state.cost_usd
-      | None -> sprintf "Context and cost ($%.2f): details" state.cost_usd
+      | Some p -> sprintf "Context %.0f%% full, %s: details" p cost
+      | None -> sprintf "Context and cost (%s): details" cost
     in
     Node.div
       ~attrs:

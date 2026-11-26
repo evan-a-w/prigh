@@ -280,6 +280,7 @@ let%expect_test "a judge that does not answer in time asks the user" =
       ; stop_reason = Aborted
       ; usage = Usage.zero
       ; model = ""
+      ; account = None
       })
     ~judge:[]
     [ bash ~id:"c1" "make"; Reply.text "ok" ]

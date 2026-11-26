@@ -15,6 +15,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -96,13 +97,10 @@ page.on("pageerror", error => errors.push(`page: ${error.message}`));
 
 const section = label => console.log(`=== ${engineName}: field_menu: ${label} ===`);
 let shot = 0;
-// The menu's appearing (a slide and a fade), over.
-const settled = () => page.waitForFunction(() => document.getAnimations().every(a =>
-  a.playState !== "running" || a.effect?.getTiming().iterations === Infinity));
 const screenshot = async label => {
   if (!process.env.SHOTS) return;
   shot++;
-  await settled();
+  await animationsOver(page);
   await page.screenshot({
     path: join(process.env.SHOTS, `${engineName}-field_menu-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`),
   });
@@ -136,7 +134,7 @@ const gone = () => page.waitForFunction(() => !document.querySelector(".field-me
 // Where the menu is: its corner at the pointer (to a few pixels: the
 // pointer is at [position] in the field).
 const placed = async (locator, position = { x: 30, y: 10 }) => {
-  await settled();
+  await animationsOver(page);
   const box = await menu().boundingBox();
   const at = await locator.boundingBox();
   const near = (a, b) => Math.abs(a - b) <= 4;
@@ -304,7 +302,7 @@ try {
   await page.evaluate(() => navigator.clipboard.writeText("old"));
   const [x, y] = await at("copy-me-please");
   await rightClickAt(x, y);
-  await settled();
+  await animationsOver(page);
   const box = await menu().boundingBox();
   console.log(`terminal: ${await lastMenu()}; ${Math.abs(box.x - x) <= 4 && Math.abs(box.y - y) <= 4 ? "menu at the pointer" : `menu at ${box.x},${box.y}, the pointer at ${x},${y}`}`);
   console.log(await items());
@@ -322,7 +320,7 @@ try {
   // From the keyboard: Shift+F10, at the shell's cursor.
   await page.keyboard.press("Shift+F10");
   await menu().waitFor();
-  await settled();
+  await animationsOver(page);
   const cursor = await page.locator(".terminal-panel .xterm-helper-textarea").boundingBox();
   const kbox = await menu().boundingBox();
   console.log(`Shift+F10: ${Math.abs(kbox.x - cursor.x) <= 4 && Math.abs(kbox.y - cursor.y - 24) <= 4 ? "menu under the cursor" : `menu at ${kbox.x},${kbox.y}, the cursor at ${cursor.x},${cursor.y}`}`);

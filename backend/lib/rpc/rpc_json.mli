@@ -65,7 +65,17 @@ val trace_report : Trace_report.Report.t -> perfetto:bool -> Json.t
 val entry : Session.Entry.t -> Json.t
 val thinking : Thinking.t -> Json.t
 val thinking_of_string : string -> Thinking.t Or_error.t
-val auth_status : Provider_auth.Status.t -> Json.t
+(** [shared]: the logins other users share with the client's user (each
+    provider gets its own); [shareable]: the user may share their logins
+    (each built-in provider's says so). *)
+val auth_status
+  :  ?shared:Account_shares.Shared.t list
+  -> ?shareable:bool
+  -> ?usage:(Provider_id.t -> Account_ref.t -> Account_ledger.Periods.t)
+       (** what ran on a login (for a shared one, the user's own use), as
+           each account's [usage] when anything did in the last 30 days *)
+  -> Provider_auth.Status.t
+  -> Json.t
 
 (** [("type", "event"); ("event", name); ...fields]. With [now] (seconds),
     the messages of [message_start] and [message_end] events, also nested in

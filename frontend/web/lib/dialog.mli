@@ -11,6 +11,9 @@ module Picker_kind : sig
     | Login (** item ids are [provider method] *)
     | Logout
     | Verbosity
+    | Engines of { switch : bool }
+    (** [/new] (a new session's engine) or [/engine] (this session's
+        adapter); item ids are [Deployed_engines.Choice.key]s *)
     | Confirm_tools
     | Modes (** item ids are [Session_mode.label]s *)
     | Fork of Entry.t list (** item ids are entry ids *)
@@ -19,6 +22,9 @@ module Picker_kind : sig
     | Hosts (** item ids are host ids *)
     | Users (** act as one ([/setusr]) *)
     | Accounts (** the account menu: see [App] for the item ids *)
+    | Logins of { noun : string } (** what its rows are, for its filter *)
+    (** a provider's logins ([/accounts]): item ids are slash commands, run
+        when picked; one ending in a space asks for a label ([Login_label]) *)
     | Skills (** item ids are skill names *)
     | Snippets (** item ids are snippet names *)
     | Reminders (** the session's ([/remind]); item ids are their names *)
@@ -44,6 +50,8 @@ module Picker_kind : sig
     (** [/approval-model]: model keys, or [off] (the session's) *)
     | Naming_models
     (** [/naming model]: model keys, or [off] (the drafting model's) *)
+    | Adapter_logins of string
+    (** [/adapters login ADAPTER]: item ids are login refs, or [own] *)
     | Defaults of New_default.Picker.t
     (** the settings' New sessions: model keys, or host ids; the first item
         ([builtin]) goes back to the built-in *)
@@ -153,6 +161,12 @@ type t =
       { input : string
       ; error : string option
       } (** [/login forgejo]: which host? *)
+  | Login_label of
+      { title : string
+      ; command : string (** the label typed is appended and it is run *)
+      ; input : string
+      ; error : string option
+      } (** a login's label: adding one, or renaming it *)
   | New_worktree of New_worktree.t
   | Remove_worktree of
       { worktree : Worktree.t
@@ -164,6 +178,11 @@ type t =
       } (** asked before removing it *)
   | Nix_gc_confirm of Nix_generations.t
   (** [/nix-gc run DAYS|all]: delete profile generations, then collect? *)
+  | Import_login_confirm of
+      { import : Adapter_login.Import.t
+      ; busy : bool (** moving it: waiting for the backend *)
+      ; error : string option
+      } (** [/adapters import]: move the host's own CLI login into prigh? *)
   | Annotate of Annotate.t (** drawing on an image *)
   | Temporary_menu (** a temporary session's: keep it, or delete it *)
   | Leave_temporary

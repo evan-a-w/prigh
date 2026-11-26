@@ -63,6 +63,15 @@ val create
   -> ?heartbeat_clock:float Eio.Time.clock_ty Eio.Resource.t
        (** what [host_timeout] is measured by (default: [env]'s clock) *)
   -> ?namespace:string
+  -> ?member:Account_shares.Member.t
+       (** the user, and the logins users share ([-tokens]): [auth_status]
+           lists those shared with them, [account_share] shares theirs, and
+           every client hears [accounts_changed] when one shared with them
+           changes; a session pinned to one no longer shared goes back to
+           the default login, with a notice *)
+  -> ?ledger:Account_ledger.t
+       (** what ran on the user's logins: [auth_status] gives each login's
+           usage, [account_usage] the users' (default: none recorded) *)
   -> ?backend_host:bool
        (** whether [new_agent] makes the backend a tool host (default: true) *)
   -> ?home:string
@@ -107,6 +116,19 @@ val create
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string
+  -> ?engines:Engines.t
+       (** the engines (and the composer's adapters) this backend deploys
+           (default: the harness alone). [hello] lists them when there is
+           more than the harness; [new_session] takes [engine] and
+           [adapter]; a session on one not deployed can be read but not run
+           ([state]'s [unavailable]). *)
+  -> ?spawn_external:
+       (Agent.t
+        -> host:string
+        -> Adapter.Launch.t
+        -> Line_transport.t Or_error.t)
+       (** starts a composer session's harness on the tool host [host]
+           (default: there, with [$process]) *)
   -> new_agent:(?session:Session.t -> cwd:string -> unit -> Agent.t)
   -> ?default_agent:Agent.t
   -> unit

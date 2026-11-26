@@ -41,13 +41,13 @@ let job_output_note ~has =
 
 let no_detached_or_loops ~has =
   sprintf
-    "- Never start processes with &, nohup, setsid or disown inside a \
-     command: nothing tracks them or tells you when they exit%s. Never wait \
-     in a shell loop (while ...; do sleep ...; done, or pgrep -f, which \
-     matches its own shell): bash refuses such loops unless they are under a \
-     timeout of at most %s (e.g. timeout 60 bash -c 'until curl -sf URL; do \
-     sleep 1; done' for a server). Wait %son a pid with timeout N tail \
-     --pid=PID -f /dev/null."
+    "- Never start processes with &, nohup, setsid or disown inside a command: \
+     nothing tracks them or tells you when they exit%s. Never wait in a shell \
+     loop (while ...; do sleep ...; done, or pgrep -f, which matches its own \
+     shell): bash refuses such loops unless they are under a timeout of at \
+     most %s (e.g. timeout 60 bash -c 'until curl -sf URL; do sleep 1; done' \
+     for a server). Wait %son a pid with timeout N tail --pid=PID -f \
+     /dev/null."
     (if has "job_output" then " (use bash with background: true)" else "")
     (Background_tasks.seconds_text Polling_wait.max_bounded_seconds)
     (if has "job_output" then "for a job's exit report instead, or " else "")
@@ -395,6 +395,17 @@ let build
      @ instructions
      @ Option.to_list (Option.map user_info ~f:user_info_section)
      @ Option.to_list (Custom_instruction.section custom_instructions))
+;;
+
+(* What the user set about themselves and their custom instructions, the
+   blocks [build] ends with, for an external harness's own prompt. *)
+let user_sections ?user_info ?(custom_instructions = []) () =
+  match
+    Option.to_list (Option.map user_info ~f:user_info_section)
+    @ Option.to_list (Custom_instruction.section custom_instructions)
+  with
+  | [] -> None
+  | sections -> Some (String.concat ~sep:"\n\n" sections)
 ;;
 
 let discretion =

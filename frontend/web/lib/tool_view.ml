@@ -185,10 +185,15 @@ let tool_icon_view name =
 
 (* How long a call took, from its message's end to its result: shown at the
    row's end by the stylesheet (from [data-took], so that the text of the
-   row does not change with the timing), and as its tooltip. *)
+   row does not change with the timing), and as its tooltip. Not when it
+   would read 0.0s: an agent CLI that reports a call only once it is done
+   gives its start and its end the same time. *)
 let took ~started (result : Message.Tool_result.t option) =
   match started, Option.bind result ~f:(fun r -> r.at) with
-  | Some started, Some ended when Time_ns.( >= ) ended started ->
+  | Some started, Some ended
+    when Time_ns.Span.( >= )
+           (Time_ns.diff ended started)
+           (Time_ns.Span.of_ms 50.) ->
     let span = Time_ns.diff ended started in
     let text =
       if Time_ns.Span.( < ) span (Time_ns.Span.of_sec 10.)

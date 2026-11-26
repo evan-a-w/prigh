@@ -114,6 +114,7 @@ let%expect_test "an approval's wait is its own span under the tool" =
   [%expect
     {|
     prompt 5.3s
+      mcp_refresh 0ms
       turn 1 4.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -154,6 +155,7 @@ let%expect_test "waiting for an answer to ask_user is its own span" =
   [%expect
     {|
     prompt 8.3s
+      mcp_refresh 0ms
       turn 1 7.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -227,6 +229,7 @@ let%expect_test "background subagents run side by side on their own tracks" =
   [%expect
     {|
     prompt 1.5s
+      mcp_refresh 0ms
       turn 1 900ms
         model_request deepseek/deepseek-flash 900ms  stop=tool_use
           connect 500ms
@@ -264,18 +267,20 @@ let%expect_test "background subagents run side by side on their own tracks" =
           first_token 100ms
           stream 0ms
     prompt 600ms
+      mcp_refresh 0ms
       turn 1 600ms
         model_request deepseek/deepseek-flash 600ms  stop=end_turn
           connect 500ms
           first_token 100ms
           stream 0ms
     prompt 600ms
+      mcp_refresh 0ms
       turn 1 600ms
         model_request deepseek/deepseek-flash 600ms  stop=end_turn
           connect 500ms
           first_token 100ms
           stream 0ms
-    track "main": 25 spans
+    track "main": 28 spans
     track "subagent a1": 12 spans
     track "subagent a2": 12 spans
     |}]
@@ -317,6 +322,7 @@ let%expect_test
   [%expect
     {|
     prompt 1.3s
+      mcp_refresh 0ms
       turn 1 700ms
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -335,12 +341,14 @@ let%expect_test
           first_token 100ms
           stream 0ms
     prompt 600ms
+      mcp_refresh 0ms
       turn 1 600ms
         model_request deepseek/deepseek-flash 600ms  stop=end_turn
           connect 500ms
           first_token 100ms
           stream 0ms
     prompt 1.3s
+      mcp_refresh 0ms
       turn 1 700ms
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -360,6 +368,7 @@ let%expect_test
           first_token 100ms
           stream 0ms
     prompt 1.3s
+      mcp_refresh 0ms
       turn 1 700ms
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -384,12 +393,13 @@ let%expect_test
           first_token 100ms
           stream 0ms
     prompt 600ms
+      mcp_refresh 0ms
       turn 1 600ms
         model_request deepseek/deepseek-flash 600ms  stop=end_turn
           connect 500ms
           first_token 100ms
           stream 0ms
-    track "main": 48 spans
+    track "main": 53 spans
     track "subagent a1": 6 spans
     track "subagent a2": 19 spans
     |}]
@@ -419,6 +429,7 @@ let%expect_test "a background job outlives the turn that started it" =
   [%expect
     {|
     prompt 1.3s
+      mcp_refresh 0ms
       turn 1 700ms
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -432,6 +443,7 @@ let%expect_test "a background job outlives the turn that started it" =
           first_token 100ms
           stream 0ms
     prompt 600ms
+      mcp_refresh 0ms
       turn 1 600ms
         model_request deepseek/deepseek-flash 600ms  stop=end_turn
           connect 500ms
@@ -493,6 +505,7 @@ let%expect_test "a call forwarded to a tool host times its round trip" =
   [%expect
     {|
     prompt 3.3s
+      mcp_refresh 0ms
       turn 1 2.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -519,6 +532,7 @@ let%expect_test "aborting mid-tool ends the prompt cancelled" =
     {|
     ()
     prompt 3.0s [cancelled]
+      mcp_refresh 0ms
       turn 1 3.0s [cancelled]
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -563,6 +577,7 @@ let%expect_test "the trace survives reloading the session, and goes with it" =
   [%expect
     {|
     prompt 2.3s
+      mcp_refresh 0ms
       turn 1 1.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
           connect 500ms
@@ -575,6 +590,7 @@ let%expect_test "the trace survives reloading the session, and goes with it" =
           first_token 100ms
           stream 0ms
     prompt 600ms
+      mcp_refresh 0ms
       turn 1 600ms
         model_request deepseek/deepseek-flash 600ms  stop=end_turn
           connect 500ms
@@ -700,7 +716,7 @@ let%expect_test "the summary and the Perfetto export of a session" =
   print_string (Trace_report.summary ~slowest:6 spans);
   [%expect
     {|
-    2 prompts, 8 turns, 8 model requests, 7 tool calls (54 spans)
+    2 prompts, 8 turns, 8 model requests, 7 tool calls (56 spans)
 
     Wall time 22.4s (the main agent, prompt to idle):
       waiting on user  15.0s  67%
@@ -740,33 +756,34 @@ let%expect_test "the summary and the Perfetto export of a session" =
       {"name":"process_name","ph":"M","pid":1,"args":{"name":"prigh"}}
       {"name":"thread_name","ph":"M","pid":1,"tid":1,"args":{"name":"main"}}
       {"name":"thread_sort_index","ph":"M","pid":1,"tid":1,"args":{"sort_index":1}}
-      {"name":"thread_name","ph":"M","pid":1,"tid":2,"args":{"name":"subagent a1"}}
+      {"name":"thread_name","ph":"M","pid":1,"tid":2,"args":{"name":"main (2)"}}
       {"name":"thread_sort_index","ph":"M","pid":1,"tid":2,"args":{"sort_index":2}}
-      {"name":"thread_name","ph":"M","pid":1,"tid":3,"args":{"name":"main (2)"}}
+      {"name":"thread_name","ph":"M","pid":1,"tid":3,"args":{"name":"subagent a1"}}
       {"name":"thread_sort_index","ph":"M","pid":1,"tid":3,"args":{"sort_index":3}}
       {"name":"thread_name","ph":"M","pid":1,"tid":4,"args":{"name":"job j1"}}
       {"name":"thread_sort_index","ph":"M","pid":1,"tid":4,"args":{"sort_index":4}}
       {"name":"prompt","cat":"prompt","ph":"X","ts":0,"dur":21800000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash"}}
       {"name":"turn 1","cat":"turn","ph":"X","ts":0,"dur":4100000,"pid":1,"tid":1,"args":{"status":"ok","turn":1,"tool_calls":3}}
+      {"name":"mcp_refresh","cat":"mcp_refresh","ph":"X","ts":0,"dur":0,"pid":1,"tid":2,"args":{"status":"ok"}}
       {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":0,"dur":1100000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":6,"stop":"tool_use"}}
       {"name":"connect","cat":"connect","ph":"X","ts":0,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"first_token","cat":"first_token","ph":"X","ts":500000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"stream","cat":"stream","ph":"X","ts":600000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"tool subagent","cat":"tool","ph":"X","ts":1100000,"dur":0,"pid":1,"tid":1,"args":{"status":"ok","tool":"subagent","call_id":"c1","where":"local","result_bytes":119,"is_error":false}}
       {"name":"tool work","cat":"tool","ph":"X","ts":1100000,"dur":3000000,"pid":1,"tid":1,"args":{"status":"ok","tool":"work","call_id":"w2","where":"local","result_bytes":9,"is_error":false}}
-      {"name":"subagent a1","cat":"subagent","ph":"X","ts":1100000,"dur":2300000,"pid":1,"tid":2,"args":{"status":"ok","agent_id":"a1","model":"deepseek/deepseek-flash","background":true,"forked":false,"continued":false}}
-      {"name":"tool work","cat":"tool","ph":"X","ts":1100000,"dur":2000000,"pid":1,"tid":3,"args":{"status":"ok","tool":"work","call_id":"w1","where":"local","result_bytes":9,"is_error":false}}
-      {"name":"turn 1","cat":"turn","ph":"X","ts":1100000,"dur":1700000,"pid":1,"tid":2,"args":{"status":"ok","turn":1,"tool_calls":1}}
-      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":1100000,"dur":700000,"pid":1,"tid":2,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"off","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
-      {"name":"connect","cat":"connect","ph":"X","ts":1100000,"dur":500000,"pid":1,"tid":2,"args":{"status":"ok"}}
-      {"name":"first_token","cat":"first_token","ph":"X","ts":1600000,"dur":100000,"pid":1,"tid":2,"args":{"status":"ok"}}
-      {"name":"stream","cat":"stream","ph":"X","ts":1700000,"dur":100000,"pid":1,"tid":2,"args":{"status":"ok"}}
-      {"name":"tool work","cat":"tool","ph":"X","ts":1800000,"dur":1000000,"pid":1,"tid":2,"args":{"status":"ok","tool":"work","call_id":"w1","where":"local","result_bytes":9,"is_error":false}}
-      {"name":"turn 2","cat":"turn","ph":"X","ts":2800000,"dur":600000,"pid":1,"tid":2,"args":{"status":"ok","turn":2,"tool_calls":0}}
-      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":2800000,"dur":600000,"pid":1,"tid":2,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"off","input_tokens":10,"output_tokens":5,"cache_read_tokens":0,"cost_usd":9e-06,"deltas":1,"stop":"end_turn"}}
-      {"name":"connect","cat":"connect","ph":"X","ts":2800000,"dur":500000,"pid":1,"tid":2,"args":{"status":"ok"}}
-      {"name":"first_token","cat":"first_token","ph":"X","ts":3300000,"dur":100000,"pid":1,"tid":2,"args":{"status":"ok"}}
-      {"name":"stream","cat":"stream","ph":"X","ts":3400000,"dur":0,"pid":1,"tid":2,"args":{"status":"ok"}}
+      {"name":"subagent a1","cat":"subagent","ph":"X","ts":1100000,"dur":2300000,"pid":1,"tid":3,"args":{"status":"ok","agent_id":"a1","model":"deepseek/deepseek-flash","background":true,"forked":false,"continued":false}}
+      {"name":"tool work","cat":"tool","ph":"X","ts":1100000,"dur":2000000,"pid":1,"tid":2,"args":{"status":"ok","tool":"work","call_id":"w1","where":"local","result_bytes":9,"is_error":false}}
+      {"name":"turn 1","cat":"turn","ph":"X","ts":1100000,"dur":1700000,"pid":1,"tid":3,"args":{"status":"ok","turn":1,"tool_calls":1}}
+      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":1100000,"dur":700000,"pid":1,"tid":3,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"off","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
+      {"name":"connect","cat":"connect","ph":"X","ts":1100000,"dur":500000,"pid":1,"tid":3,"args":{"status":"ok"}}
+      {"name":"first_token","cat":"first_token","ph":"X","ts":1600000,"dur":100000,"pid":1,"tid":3,"args":{"status":"ok"}}
+      {"name":"stream","cat":"stream","ph":"X","ts":1700000,"dur":100000,"pid":1,"tid":3,"args":{"status":"ok"}}
+      {"name":"tool work","cat":"tool","ph":"X","ts":1800000,"dur":1000000,"pid":1,"tid":3,"args":{"status":"ok","tool":"work","call_id":"w1","where":"local","result_bytes":9,"is_error":false}}
+      {"name":"turn 2","cat":"turn","ph":"X","ts":2800000,"dur":600000,"pid":1,"tid":3,"args":{"status":"ok","turn":2,"tool_calls":0}}
+      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":2800000,"dur":600000,"pid":1,"tid":3,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"off","input_tokens":10,"output_tokens":5,"cache_read_tokens":0,"cost_usd":9e-06,"deltas":1,"stop":"end_turn"}}
+      {"name":"connect","cat":"connect","ph":"X","ts":2800000,"dur":500000,"pid":1,"tid":3,"args":{"status":"ok"}}
+      {"name":"first_token","cat":"first_token","ph":"X","ts":3300000,"dur":100000,"pid":1,"tid":3,"args":{"status":"ok"}}
+      {"name":"stream","cat":"stream","ph":"X","ts":3400000,"dur":0,"pid":1,"tid":3,"args":{"status":"ok"}}
       {"name":"turn 2","cat":"turn","ph":"X","ts":4100000,"dur":4700000,"pid":1,"tid":1,"args":{"status":"ok","turn":2,"tool_calls":1}}
       {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":4100000,"dur":700000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
       {"name":"connect","cat":"connect","ph":"X","ts":4100000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
@@ -796,6 +813,7 @@ let%expect_test "the summary and the Perfetto export of a session" =
       {"name":"stream","cat":"stream","ph":"X","ts":21800000,"dur":0,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"prompt","cat":"prompt","ph":"X","ts":21800000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash"}}
       {"name":"turn 1","cat":"turn","ph":"X","ts":21800000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","turn":1,"tool_calls":0}}
+      {"name":"mcp_refresh","cat":"mcp_refresh","ph":"X","ts":21800000,"dur":0,"pid":1,"tid":2,"args":{"status":"ok"}}
       {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":21800000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":10,"output_tokens":5,"cache_read_tokens":0,"cost_usd":9e-06,"deltas":1,"stop":"end_turn"}}
       {"name":"connect","cat":"connect","ph":"X","ts":21800000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"first_token","cat":"first_token","ph":"X","ts":22300000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}

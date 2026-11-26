@@ -123,7 +123,7 @@ let common_params =
         "PATH JSON array of scripted provider replies (implies -faux; loops \
          when exhausted)"
   and auth_file = auth_file_path_flag in
-  fun ~env ~sw ?(backend_host = true) ?world () ->
+  fun ~env ~sw ?(backend_host = true) ?world ?member () ->
     let world =
       match world with
       | Some world -> world
@@ -181,7 +181,15 @@ let common_params =
         then
           Faux_provider.create
             (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
-        else Provider_router.create ~env ~getenv ~models ~store ()
+        else
+          Provider_router.create
+            ~env
+            ~getenv
+            ~models
+            ?member
+            ~ledger:(Account_ledger.create ~home)
+            ~store
+            ()
     in
     let session =
       Option.map session ~f:(fun key ->
@@ -272,7 +280,7 @@ let common_params =
           ~user_info:(fun () -> User_info.text user_info)
           ~custom_instructions:(fun () ->
             Custom_instructions.for_model custom_instructions)
-          ~provider
+          ~provider:(Agent.following_account (fun () -> !agent_ref) provider)
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
           ~home
@@ -283,6 +291,10 @@ let common_params =
           ~env
           ~sw
           ~provider
+          ~accounts:(fun provider ->
+            Login_choice.list ?member store provider
+            |> Result.ok
+            |> Option.value ~default:[])
           ~tools:
             (if no_tools
              then []
@@ -664,6 +676,13 @@ let serve_command =
          ~doc:
            " never run tools on the backend machine, only on connected tool \
             hosts (also: $PRIGH_NO_BACKEND_HOST=1)"
+     and no_sharing =
+       flag
+         "-no-sharing"
+         no_arg
+         ~doc:
+           " -tokens users cannot share their model logins with each other \
+            (also: $PRIGH_SHARING=off)"
      and web =
        flag
          "-web"
@@ -680,6 +699,23 @@ let serve_command =
             build)"
      and open_browser =
        flag "-open" no_arg ~doc:" open the web frontend in a browser"
+     and engines =
+       flag
+         "-engines"
+         (optional string)
+         ~doc:
+           "ENGINE,... what runs sessions: harness (prigh's own agent loop), \
+            composer (drives coding agents such as Codex and Claude Code on \
+            the session's tool host), or both; the first is the default for \
+            new sessions (default: $PRIGH_ENGINES, else harness)"
+     and adapters =
+       flag
+         "-adapters"
+         (optional string)
+         ~doc:
+           "ADAPTER,... the agents the composer drives: codex, claude, prigh, \
+            acp:NAME; the first is the default (default: $PRIGH_ADAPTERS, else \
+            codex,claude)"
      and nix_gc_helper =
        flag
          "-nix-gc-helper"
@@ -706,6 +742,18 @@ let serve_command =
            | Error e ->
              eprintf "%s\n" (Error.to_string_hum e);
              exit 2)
+       in
+       let engines =
+         match
+           Or_error.bind
+             (Engines.of_flags ~engines ~adapters ~getenv:Sys.getenv)
+             ~f:(fun engines ->
+               Or_error.map (Engines.check_build engines) ~f:(fun () -> engines))
+         with
+         | Ok engines -> engines
+         | Error e ->
+           eprintf "%s\n" (Error.to_string_hum e);
+           exit 2
        in
        let superusers =
          Option.map
@@ -784,7 +832,29 @@ let serve_command =
             | Some dir -> Nix_store_ops.helper ~env ~dir
             | None -> Nix_store_ops.local ~env)
        in
+       let shares =
+         Option.map access ~f:(fun _ ->
+           Account_shares.create
+             ~enabled:
+               (not
+                  (no_sharing
+                   || Option.equal
+                        String.equal
+                        (Sys.getenv "PRIGH_SHARING")
+                        (Some "off")))
+             ())
+       in
        let create_server ?token ?namespace ?world () =
+         let member =
+           Option.map2 shares namespace ~f:(fun shares user ->
+             Option.iter world ~f:(fun (world : Namespace.World.t) ->
+               Account_shares.register
+                 shares
+                 ~user
+                 ~store:world.store
+                 ~home:world.home);
+             { Account_shares.Member.shares; user })
+         in
          let { Setup.session
              ; cwd
              ; new_agent
@@ -800,7 +870,7 @@ let serve_command =
              ; search
              }
            =
-           make_agent ~env ~sw ~backend_host ?world ()
+           make_agent ~env ~sw ~backend_host ?world ?member ()
          in
          let login =
            Login_manager.create
@@ -825,6 +895,8 @@ let serve_command =
              ~sw
              ?token
              ?namespace
+             ?member
+             ~ledger:(Account_ledger.create ~home:world.home)
              ~backend_host
              ~home:world.home
              ~nix_store
@@ -837,6 +909,7 @@ let serve_command =
              ~mcp_auth
              ~sessions_dir:world.sessions_dir
              ~cwd
+             ~engines
              ~new_agent
              ?default_agent
              ()
@@ -1781,6 +1854,27 @@ let desktop_command =
        exit 0)
 ;;
 
+let mcp_bridge_command =
+  Command.basic
+    ~summary:
+      "Serve prigh's tools to a harness prigh runs on this tool host (Codex, \
+       an ACP agent): a stdio MCP server relaying to the socket in \
+       $PRIGH_MCP_SOCKET. The harness starts it; not for use by hand"
+    (let%map_open.Command () = return () in
+     fun () ->
+       match
+         Eio_main.run (fun env ->
+           Mcp_bridge.run
+             env
+             ~socket:(Sys.getenv Mcp_bridge.socket_env)
+             ~token:(Sys.getenv Mcp_bridge.token_env))
+       with
+       | Ok () -> ()
+       | Error e ->
+         eprintf "prigh mcp-bridge: %s\n" (Error.to_string_hum e);
+         exit 1)
+;;
+
 let acp_command =
   Command.basic
     ~summary:
@@ -2050,7 +2144,7 @@ let login_command =
             (match
                Provider_auth.login ~env store provider method_ interaction
              with
-             | Ok () ->
+             | Ok (_ : Account_id.t) ->
                eprintf
                  "Logged in to %s (%s); saved to %s\n"
                  (Provider_id.display_name provider)
@@ -2625,7 +2719,13 @@ let compaction_eval_command =
              Model_registry.create ~env ~sw ~home ~store ~getenv ()
            in
            let provider =
-             Provider_router.create ~env ~getenv ~models ~store ()
+             Provider_router.create
+               ~env
+               ~getenv
+               ~models
+               ~ledger:(Account_ledger.create ~home)
+               ~store
+               ()
            in
            let resolve id =
              match Model_registry.resolve models id with
@@ -2690,6 +2790,9 @@ let () =
        ~argv:((prog ^ " compaction-eval") :: args)
        compaction_eval_command;
      exit 0
+   | _ :: "fake-cli" :: args ->
+     Fake_cli.main args;
+     exit 0
    | _ -> ());
   Command_unix.run
     ~version:Version.to_string
@@ -2700,6 +2803,7 @@ let () =
        ; "tool-host", tool_host_command
        ; "browser-signin", browser_signin_command
        ; "acp", acp_command
+       ; "mcp-bridge", mcp_bridge_command
        ; "web", web_command
        ; "desktop", desktop_command
        ; "sessions", sessions_command

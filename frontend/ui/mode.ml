@@ -7,6 +7,7 @@ module Picker_kind = struct
     | Scoped_models
     | Thinking
     | Verbosity
+    | Engines of { switch : bool }
     | Transcript_filter
     | Login
     | Logout
@@ -31,6 +32,8 @@ module Picker_kind = struct
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string
+    | Adapter_login of string (** [/adapters login]: the adapter's *)
+    | Commands
   [@@deriving sexp_of, equal]
 end
 
@@ -66,6 +69,10 @@ end
 module Confirm_action = struct
   type t =
     | Logout of string
+    | Logout_login of
+        { provider : string
+        ; account : string
+        }
     | Forge_logout of string (** the host *)
     | Rewind of string
     | Trim of string
@@ -98,7 +105,10 @@ module Confirm_action = struct
     | Clear_user_info
     | Chat_without_host of string
     | Nix_gc of Nix_generations.t
-    (** [/nix-gc run DAYS|all]: deleting profile generations *)
+    | Import_adapter_login of
+        { adapter : string
+        ; host : string
+        } (** [/nix-gc run DAYS|all]: deleting profile generations *)
     | Browser_signin
     (** a sign-in proxy guards the backend: sign in to it through the
         browser *)

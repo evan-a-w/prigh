@@ -45,6 +45,8 @@ module Argument : sig
     | Generate_model (** [off] or a model *)
     | Approval_model (** [off] or a model *)
     | Naming (** [model], then [off] or a model *)
+    | Engine (** [/new]: the backend's engines and adapters *)
+    | Adapter (** [/engine]: the composer's adapters *)
   [@@deriving sexp_of, equal]
 end
 

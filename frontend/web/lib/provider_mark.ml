@@ -29,7 +29,26 @@ let icon provider : Html.Icon.t option =
   else None
 ;;
 
+(* An ACP agent offers other makers' models: each shows its maker's. *)
+let of_model ~provider ~name =
+  if String.is_prefix provider ~prefix:"acp:"
+  then (
+    let n = String.lowercase name in
+    if
+      String.is_prefix n ~prefix:"gpt"
+      || String.is_substring n ~substring:"openai"
+    then "openai"
+    else (
+      match icon name with
+      | Some _ -> name
+      | None -> provider))
+  else provider
+;;
+
 let letter provider =
+  let provider =
+    Option.value (String.chop_prefix provider ~prefix:"acp:") ~default:provider
+  in
   match String.find provider ~f:Char.is_alphanum with
   | Some c -> String.of_char (Char.uppercase c)
   | None -> "?"

@@ -675,13 +675,189 @@ let%expect_test "auth events" =
       Auth (
         Done
         (provider anthropic)
-        (method_  oauth))))
+        (method_  oauth)
+        (account ()))))
     (Event (
       Auth (
         Failed
         (provider openai)
         (error    nope))))
-    (Event (Auth (Logged_out deepseek)))
+    (Event (Auth (Logged_out (provider deepseek) (account ()))))
+    |}]
+;;
+
+let%expect_test "accounts: auth events, status and usage" =
+  decode
+    {|{"type":"event","event":"auth","kind":"done","provider":"openai-codex","method":"oauth","account":"work"}|};
+  decode
+    {|{"type":"event","event":"auth","kind":"logged_out","provider":"openai-codex","account":"work"}|};
+  decode {|{"type":"event","event":"accounts_changed"}|};
+  [%expect
+    {|
+    (Event (
+      Auth (
+        Done
+        (provider openai-codex)
+        (method_  oauth)
+        (account (work)))))
+    (Event (Auth (Logged_out (provider openai-codex) (account (work)))))
+    (Event Accounts_changed)
+    |}];
+  let show f json =
+    match Json.parse json with
+    | Error e -> print_s [%message "parse" (e : Error.t)]
+    | Ok j ->
+      (match f j with
+       | Ok s -> print_s s
+       | Error e -> print_s [%message "decode" (e : Error.t)])
+  in
+  show
+    (fun j -> Or_error.map (Auth_status.of_json j) ~f:Auth_status.sexp_of_t)
+    {|{"provider":"openai-codex","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":1700000000000,"accounts":[{"ref":"openai-codex/main","id":"main","label":"Personal","method":"oauth","source":"oauth","expires_ms":1700000000000,"default":true,"fallback":true,"shareable":true,"shared_with":[{"user":"bob","since_ms":1700000000000}],"usage":{"today":{"requests":2,"input":3000,"output":200,"cache_read":1000,"cost_usd":0.42},"last_30_days":{"requests":9,"input":12000,"output":900,"cache_read":4000,"cost_usd":1.5}}},{"ref":"~alice/openai-codex/work","id":"~alice/work","label":"Work","method":"oauth","source":"shared by alice","default":false,"fallback":false,"shared_by":"alice","hidden":true}]}|};
+  show
+    (fun j ->
+       Or_error.map
+         (Subscription_usage.of_json j)
+         ~f:Subscription_usage.sexp_of_t)
+    {|{"fetched_at_ms":1700000000000,"providers":[{"provider":"openai-codex","name":"ChatGPT","status":"api_key","accounts":[{"ref":"openai-codex/main","id":"main","label":"Personal","default":true,"status":"api_key"},{"ref":"openai-codex/work","id":"work","label":"Work","default":false,"status":"error","error":"sign in again"},{"ref":"~alice/openai-codex/work","id":"~alice/work","label":"Work","default":false,"shared_by":"alice","status":"limits","plan":"pro","windows":[{"id":"primary","label":"5-hour session","used_percent":42,"resets_at_ms":1700003600000}]}]}]}|};
+  show
+    (fun j ->
+       Or_error.map
+         (Login_usage.User.list_of_json j)
+         ~f:[%sexp_of: Login_usage.User.t list])
+    {|[{"user":"alice","you":true,"today":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0.01},"last_7_days":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0.01},"last_30_days":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0.01}},{"user":"bob","last_30_days":{"requests":3,"input":30,"output":15,"cache_read":0,"cost_usd":0.03}}]|};
+  [%expect
+    {|
+    ((provider openai-codex)
+     (name     ChatGPT)
+     (methods ((
+       (method_ oauth)
+       (label   "ChatGPT Plus/Pro"))))
+     (configured ((
+       (method_ oauth)
+       (source  oauth))))
+     (expires_ms (1700000000000))
+     (custom ())
+     (accounts (
+       ((ref_    openai-codex/main)
+        (id      main)
+        (label   Personal)
+        (method_ oauth)
+        (source  oauth)
+        (expires_ms (1700000000000))
+        (default   true)
+        (fallback  true)
+        (shareable true)
+        (shared_with ((
+          (user     bob)
+          (since_ms 1700000000000))))
+        (shared_by ())
+        (hidden false)
+        (usage ((
+          (today (
+            (requests   2)
+            (input      3000)
+            (output     200)
+            (cache_read 1000)
+            (cost_usd   0.42)))
+          (last_7_days (
+            (requests   0)
+            (input      0)
+            (output     0)
+            (cache_read 0)
+            (cost_usd   0)))
+          (last_30_days (
+            (requests   9)
+            (input      12000)
+            (output     900)
+            (cache_read 4000)
+            (cost_usd   1.5)))))))
+       ((ref_    ~alice/openai-codex/work)
+        (id      ~alice/work)
+        (label   Work)
+        (method_ oauth)
+        (source  "shared by alice")
+        (expires_ms ())
+        (default   false)
+        (fallback  false)
+        (shareable false)
+        (shared_with ())
+        (shared_by (alice))
+        (hidden true)
+        (usage ())))))
+    ((fetched_at (2023-11-14 22:13:20.000000000Z))
+     (providers ((
+       (provider openai-codex)
+       (name     ChatGPT)
+       (status   Api_key)
+       (accounts (
+         ((ref_    openai-codex/main)
+          (id      main)
+          (label   Personal)
+          (default true)
+          (shared_by ())
+          (status Api_key))
+         ((ref_    openai-codex/work)
+          (id      work)
+          (label   Work)
+          (default false)
+          (shared_by ())
+          (status (Failed "sign in again")))
+         ((ref_    ~alice/openai-codex/work)
+          (id      ~alice/work)
+          (label   Work)
+          (default false)
+          (shared_by (alice))
+          (status (
+            Limits
+            (plan (pro))
+            (windows ((
+              (id           primary)
+              (label        "5-hour session")
+              (used_percent 42)
+              (resets_at ((2023-11-14 23:13:20.000000000Z)))))))))))))))
+    (((user alice)
+      (you  true)
+      (usage (
+        (today (
+          (requests   1)
+          (input      10)
+          (output     5)
+          (cache_read 0)
+          (cost_usd   0.01)))
+        (last_7_days (
+          (requests   1)
+          (input      10)
+          (output     5)
+          (cache_read 0)
+          (cost_usd   0.01)))
+        (last_30_days (
+          (requests   1)
+          (input      10)
+          (output     5)
+          (cache_read 0)
+          (cost_usd   0.01))))))
+     ((user bob)
+      (you  false)
+      (usage (
+        (today (
+          (requests   0)
+          (input      0)
+          (output     0)
+          (cache_read 0)
+          (cost_usd   0)))
+        (last_7_days (
+          (requests   0)
+          (input      0)
+          (output     0)
+          (cache_read 0)
+          (cost_usd   0)))
+        (last_30_days (
+          (requests   3)
+          (input      30)
+          (output     15)
+          (cache_read 0)
+          (cost_usd   0.03)))))))
     |}]
 ;;
 
@@ -718,13 +894,15 @@ let%expect_test "auth status, models, sessions" =
        (method_ oauth)
        (source  auth.json))))
      (expires_ms (1700000000000))
-     (custom ()))
+     (custom   ())
+     (accounts ()))
     ((provider openai)
      (name     OpenAI)
      (methods    ())
      (configured ())
      (expires_ms ())
-     (custom     ()))
+     (custom     ())
+     (accounts   ()))
     ((provider aiproxy)
      (name     aiproxy)
      (methods ((
@@ -737,7 +915,8 @@ let%expect_test "auth status, models, sessions" =
      (custom ((
        (base_url http://localhost:3000/v1)
        (api      chat)
-       (api_label "OpenAI chat completions (/chat/completions)")))))
+       (api_label "OpenAI chat completions (/chat/completions)"))))
+     (accounts ()))
     ((id   abc)
      (path /p)
      (name ("build fix"))
@@ -2402,7 +2581,8 @@ let%expect_test "MCP sign-ins: the listing, the event, an OAuth client" =
   in
   round_trip
     {|{"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}|};
-  [%expect {|
+  [%expect
+    {|
     (Http
       (url https://x.example/mcp)
       (headers ())
@@ -2450,5 +2630,103 @@ let%expect_test "remembered calls: in the state, and forgetting them" =
      "read {\"path\":\"a\"} on box in /work (by m)")
     {"id":1,"method":"forget_allowed_call","params":{"call":"bash {\"command\":\"make\"} on box in /work (by you)"}}
     {"id":1,"method":"forget_allowed_call","params":{"all":true}}
+    |}]
+;;
+
+let%expect_test "state: the session's engine (absent means the harness)" =
+  let engine json =
+    match Json.parse json |> Or_error.bind ~f:State.of_json with
+    | Ok state ->
+      print_s
+        [%sexp
+          (state.engine : Session_engine.t)
+        , (Session_engine.is_harness state.engine : bool)]
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  let base =
+    {|"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"m","provider":"p","key":"p/m","name":"M","context_window":1,"max_output":1,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0|}
+  in
+  engine (sprintf "{%s}" base);
+  engine
+    (sprintf
+       {|{%s,"engine":"composer","adapter":"codex","capabilities":{"rewind":"by_handoff","compact":"auto_only","steer":"between_turns","plan_mode":false,"subagents":"observe","something_new":true},"unavailable":"the composer engine isn't available in this build of prigh yet"}|}
+       base);
+  engine
+    (sprintf
+       {|{%s,"engine":"composer","capabilities":{"fork":"sideways"}}|}
+       base);
+  [%expect
+    {|
+    (((engine harness)
+      (capabilities (
+        (fork           Native)
+        (rewind         Native)
+        (context_edit   true)
+        (compact        Native)
+        (steer          In_run)
+        (plan_mode      true)
+        (btw            true)
+        (subagents      Full)
+        (model_fallback true)
+        (images         true)
+        (ask_user       true))))
+     true)
+    (((engine  composer)
+      (adapter codex)
+      (capabilities (
+        (fork           Native)
+        (rewind         By_handoff)
+        (context_edit   true)
+        (compact        Auto_only)
+        (steer          Between_turns)
+        (plan_mode      false)
+        (btw            true)
+        (subagents      Observe)
+        (model_fallback true)
+        (images         true)
+        (ask_user       true)))
+      (unavailable
+       "the composer engine isn't available in this build of prigh yet"))
+     false)
+    (((engine composer)
+      (capabilities (
+        (fork           Unsupported)
+        (rewind         Native)
+        (context_edit   true)
+        (compact        Native)
+        (steer          In_run)
+        (plan_mode      true)
+        (btw            true)
+        (subagents      Full)
+        (model_fallback true)
+        (images         true)
+        (ask_user       true))))
+     false)
+    |}]
+;;
+
+let%expect_test "hello reply: the engines a backend deploys" =
+  List.iter
+    [ {|{"client_id":"c"}|}
+    ; {|{"client_id":"c","features":["pasted_text","engines"],"engines":["harness","composer"],"adapters":["codex","claude"]}|}
+    ; {|{"client_id":"c","engines":"harness"}|}
+    ]
+    ~f:(fun json ->
+      let d =
+        Deployed_engines.of_hello_json (Or_error.ok_exn (Json.parse json))
+      in
+      print_s
+        [%sexp
+          (d : Deployed_engines.t Or_error.t)
+        , (Or_error.map d ~f:Deployed_engines.has_choice : bool Or_error.t)]);
+  [%expect
+    {|
+    ((Ok ((engines (harness)))) (Ok false))
+    ((Ok (
+       (engines  (harness composer))
+       (adapters (codex   claude))))
+     (Ok true))
+    ((Error "field \"engines\": expected array, got \"harness\"")
+     (Error "field \"engines\": expected array, got \"harness\""))
     |}]
 ;;

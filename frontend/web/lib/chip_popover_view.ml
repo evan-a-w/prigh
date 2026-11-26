@@ -204,6 +204,10 @@ let session_sections (m : App.Model.t) ~inject =
                          (Status_view.tokens (Float.of_int state.context_tokens))
                          (Status_view.tokens (Float.of_int state.model.context_window)))
                   ]
+              | None when state.context_tokens > 0 ->
+                span
+                  ~cls:"session-of font-mono text-xs text-muted-foreground"
+                  (Status_view.tokens (Float.of_int state.context_tokens) ^ " in context")
               | None -> Node.none)
            ; Status_view.cost state ~inject
            ])

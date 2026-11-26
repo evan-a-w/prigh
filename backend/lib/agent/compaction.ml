@@ -243,6 +243,7 @@ let full_request
            (summary_max_tokens
             + Option.value (Thinking.budget_tokens thinking) ~default:0))
   ; cache_key = prompt.cache_key
+  ; account = None
   }
 ;;
 
@@ -308,6 +309,7 @@ let transcript_request (model : Model.t) ~previous ?instructions older =
   ; thinking = Off
   ; max_tokens = Some (Int.min model.max_output summary_max_tokens)
   ; cache_key = None
+  ; account = None
   }
 ;;
 

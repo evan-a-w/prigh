@@ -215,6 +215,29 @@ module Method : sig
         ; task : string option (** [Branch_name]: what the branch is for *)
         } (** {!Generated} *)
     | Generate_cancel of { gen_id : string }
+    | List_adapters of { refresh : bool }
+    (** {!Adapter_status.list_of_json}: the composer's agent CLIs on each
+        connected host; [refresh] checks again rather than answering from
+        what was checked in the last minute *)
+    | Retry_models
+    (** asks the session's agent CLI for its models again, after it could not
+        list them ([state]'s [harness_models]) *)
+    | Set_adapter of { adapter : string }
+    | Set_adapter_login of
+        { adapter : string
+        ; login : string option (** a login's ref; [None]: the CLI's own *)
+        }
+    (** {!Adapter_login.list_of_json}: the CLI runs the user's composer
+        sessions on that login from their next turn *)
+    | Import_adapter_login of
+        { adapter : string
+        ; host : string option (** id or name; [None]: the session's *)
+        ; confirm : bool
+        }
+    (** {!Adapter_login.Import}: moves the host's own CLI login into
+        prigh; without [confirm] only finds it, for the user to consent *)
+    (** moves the attached session to [adapter] (or ["harness"]), with a
+        handoff; replies with its {!State} *)
     | Nix_store_status (** superusers: {!Nix_store_status} *)
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
     (** superusers: {!Nix_gc_progress} events, then a {!Nix_gc_report}; can

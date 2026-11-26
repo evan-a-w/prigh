@@ -16,12 +16,17 @@ module Event = struct
     | Done of
         { provider : Provider_id.t
         ; method_ : Provider_auth.Method.t
+        ; account : Account_id.t
         }
     | Failed of
         { provider : string
         ; error : string
         }
-    | Logged_out of Provider_id.t
+    | Logged_out of
+        { provider : Provider_id.t
+        ; account : Account_id.t option
+        }
+    | Accounts_changed
     | Forge_done of
         { host : string
         ; user : string option
@@ -147,14 +152,18 @@ let start_custom t ?name () =
     | Ok p ->
       emit
         t
-        (Done { provider = Custom_provider.provider_id p; method_ = Api_key })
+        (Done
+           { provider = Custom_provider.provider_id p
+           ; method_ = Api_key
+           ; account = Account_id.main
+           })
     | Error e ->
       emit
         t
         (Failed { provider = provider_name; error = Error.to_string_hum e }))
 ;;
 
-let start t (provider : Provider_id.t) method_ =
+let start t ?account ?label (provider : Provider_id.t) method_ =
   if
     not
       (List.mem
@@ -170,19 +179,27 @@ let start t (provider : Provider_id.t) method_ =
   else (
     match provider with
     | Custom name -> start_custom t ~name ()
-    | Anthropic | Openai | Openai_codex | Deepseek ->
+    | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity ->
       run_flow
         t
-        ~run:(Provider_auth.login ~env:t.env t.store provider method_)
+        ~run:(fun interaction ->
+          Provider_auth.login
+            ~env:t.env
+            ?account
+            ?label
+            t.store
+            provider
+            method_
+            interaction)
         ~finish:(function
-        | Ok () -> emit t (Done { provider; method_ })
-        | Error e ->
-          emit
-            t
-            (Failed
-               { provider = Provider_id.to_string provider
-               ; error = Error.to_string_hum e
-               })))
+          | Ok account -> emit t (Done { provider; method_; account })
+          | Error e ->
+            emit
+              t
+              (Failed
+                 { provider = Provider_id.to_string provider
+                 ; error = Error.to_string_hum e
+                 })))
 ;;
 
 let respond t ~id value =
@@ -207,7 +224,7 @@ let cancel t =
 
 let wait t = Option.iter t.flow ~f:(fun flow -> Promise.await flow.finished)
 
-let logout t (provider : Provider_id.t) =
+let logout t ?account (provider : Provider_id.t) =
   match provider with
   | Custom name when Option.is_some (Model_registry.find_provider t.models name)
     ->
@@ -215,7 +232,8 @@ let logout t (provider : Provider_id.t) =
       t
       ~run:(Custom_login.logout ~models:t.models ~store:t.store name)
       ~finish:(function
-      | Ok (Key_removed | Provider_removed) -> emit t (Logged_out provider)
+      | Ok (Key_removed | Provider_removed) ->
+        emit t (Logged_out { provider; account = None })
       | Ok Kept -> ()
       | Error e ->
         (* Cancelled: nothing happened, and the dialog is gone already. *)
@@ -225,9 +243,16 @@ let logout t (provider : Provider_id.t) =
             t
             (Failed
                { provider = name; error = "logout: " ^ Error.to_string_hum e }))
-  | Anthropic | Openai | Openai_codex | Deepseek | Custom _ ->
-    Or_error.map (Provider_auth.logout t.store provider) ~f:(fun () ->
-      emit t (Logged_out provider))
+  | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity | Custom _
+    ->
+    Or_error.map (Provider_auth.logout ?account t.store provider) ~f:(fun () ->
+      emit t (Logged_out { provider; account }))
+;;
+
+let update_account t provider account update =
+  Or_error.map
+    (Provider_accounts.update t.store provider account update)
+    ~f:(fun () -> emit t Accounts_changed)
 ;;
 
 let start_forge t ~host ~run =

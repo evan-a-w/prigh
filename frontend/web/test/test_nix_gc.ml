@@ -14,6 +14,7 @@ let superuser () =
          ; user = Some "alice"
          ; superuser = true
          ; features = []
+         ; deployed = Prigh_protocol.Deployed_engines.harness_only
          }));
   h
 ;;
@@ -189,6 +190,7 @@ let%expect_test "to everyone else /nix-gc does not exist" =
          ; user = Some "bob"
          ; superuser = false
          ; features = []
+         ; deployed = Prigh_protocol.Deployed_engines.harness_only
          }));
   let completions () =
     print_s
@@ -236,6 +238,7 @@ let%expect_test "a superuser acting as another user keeps /nix-gc" =
          ; user = Some "alice"
          ; superuser = true
          ; features = []
+         ; deployed = Prigh_protocol.Deployed_engines.harness_only
          });
     H.type_ h "/nix-gc");
   H.act h Send;

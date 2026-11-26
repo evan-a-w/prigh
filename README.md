@@ -1,7 +1,7 @@
 # prigh
 
 A coding agent. The backend is OCaml (OxCaml, Eio) and talks to Anthropic,
-OpenAI, OpenAI Codex (ChatGPT), DeepSeek and any OpenAI- or
+the OpenAI API, ChatGPT (a Plus/Pro subscription), DeepSeek and any OpenAI- or
 Anthropic-compatible endpoint. You drive it from a terminal UI, from
 prigh-web in a browser (installable as an app, phone included), from a
 desktop app, or from an editor over ACP. There are no plugins: tools,
@@ -140,7 +140,8 @@ Beyond the TUI it has:
 - panels: a terminal on the tool host (Ctrl+\`), a file browser with
   transfers (Ctrl+Shift+F), a code editor (Alt+E), the review page with
   line comments, commit, push and pull requests (Alt+R), and subagents
-  and jobs (Alt+1…9);
+  and jobs (Alt+1…9); a subagent's chat shows its own host, model,
+  folder, branch and context, and the composer writes to it;
 - a message menu (right-click) to copy, delete or trim the context, with
   undo; temporary sessions (Ctrl+Shift+O); a settings page whose
   preferences are kept per user on the backend;
@@ -186,7 +187,8 @@ machine's tool host, so sessions run their tools here, as with a TUI.
 ```nix
 # Home Manager (flake input `prigh`):
 imports = [ prigh.homeManagerModules.default ];
-programs.prigh.enable = true;          # prigh on the PATH
+programs.prigh.enable = true;          # prigh, codex, opencode, bwrap on PATH (agents.*: claudeCode,
+                                       # on when unfree is allowed; extraPackages)
 programs.prigh.desktop.enable = true;  # "prigh" in the application menu
 # also desktop.ui, .window, .browser (table below), .extraArgs,
 # .useSystemNixpkgs, .disableDmabuf (troubleshooting), .computerUse
@@ -283,6 +285,50 @@ hosts each user connects), `-superusers NAME,...` may act as others
 (`/setusr`) and clean the Nix store (`/nix-gc`), and `-host-tokens
 NAME=TOKEN,...` sign in as NAME but never as a superuser, for tool hosts.
 
+### Engines
+
+A backend runs sessions on the **harness**, prigh's own agent loop calling
+the model's API (the default), and, when you deploy it, the **composer**,
+which hands the work to a coding agent installed and signed in on the
+session's tool host: the Codex CLI (`codex app-server`), Claude Code
+(`claude`, stream-json), an ACP agent (`acp:opencode`, `acp:antigravity`
+(`agy acp`), `acp:grok` (Grok Build), `acp:gemini`, `acp:goose`, or
+`acp:mine=my-agent --acp`) or `prigh`, prigh's own harness as an adapter.
+prigh keeps the session: its log (messages, tool calls, models, usage and
+the cost the agent reports), naming, search, worktrees, approvals and the
+UI, so a Codex or Claude Code session looks and works like any other. Their
+tools run on the tool host you choose, and prigh's own tools they lack
+(`render_ui`, `memory`, `sessions`, pull requests and issues, worktrees,
+...) are served to them as an MCP server named `prigh`; your custom
+instructions and what prigh knows about you go to them too.
+
+```
+prigh serve -engines harness,composer -adapters codex,claude
+```
+
+(or `$PRIGH_ENGINES`, `$PRIGH_ADAPTERS`; the first engine is the default for
+new sessions). Users, settings and sign-ins are the same on either engine,
+so one backend can run both or you can run one of each. With the composer
+deployed, prigh-web's new-session screen has an engine chip, `/new codex`
+(or `/new` for a picker) starts a session on an adapter, and `/engine`
+switches a session to another agent (or the harness), which gets the
+conversation so far quoted in a handoff ahead of your next message, as does
+an agent taking over on another tool host. The model chip and status line
+say which agent runs it (`Codex · gpt-5.2-codex`; a cost Codex does not
+report shows as `subscription`). Codex and Claude Code sessions rewind files
+too (in a git repository) and fork their thread. What an agent cannot do is
+refused with what to do instead, its controls hidden. A session made on an
+engine the backend does not run can still be read there.
+
+The agent CLIs ask prigh before they act, so your approval mode, rules and
+Smart mode apply to their commands and edits (Codex runs commands it knows
+to be read-only without asking). A repository's `.claude` settings and
+hooks are not loaded. Settings → Engines in prigh-web, and `/adapters` in
+the TUI, show whether each CLI is installed and logged in on each tool host,
+and what to run there when not ("Claude Code on laptop is not logged in:
+run `claude auth login` there"); prigh never installs one or logs in for
+you.
+
 ### Computer use
 
 The `computer` tool drives a screen, mouse and keyboard through
@@ -330,6 +376,49 @@ The file has the same shape as pi's `auth.json`. To share pi's logins,
 symlink it (`ln -s ~/.pi/agent/auth.json ~/.config/prigh/auth.json`)
 rather than copying it, because Anthropic rotates refresh tokens.
 
+A provider can have several logins (accounts): `/login PROVIDER as LABEL`
+adds one (prigh-web: Settings → Models, Add login). `/accounts` lists them
+to use, rename, make the default, reorder or log out of (prigh-web: each
+login's Manage), and `/account` picks the session's. The first stays under pi's key;
+the others are `account:PROVIDER:ID`, with labels, order and the default
+in `"prigh:accounts"`. `/model openai-codex/gpt-6-sol@work` pins a login
+for the session. When a usage limit stops a run, prigh carries on with the
+provider's next login that allows fallback (OAuth ones by default, API
+keys only if you turn it on) before handing over to `fallback_models`.
+A composer session on Codex, Claude Code or an ACP agent runs on that
+CLI's own login, except that Codex can run on one of your ChatGPT logins in
+prigh (yours or one shared with you): Settings → Engines, or `/adapters
+login codex [LOGIN|own]` in the TUI. prigh hands Codex short-lived access
+tokens over its stdin (never a file on the host), refreshes them, and
+counts the usage on that login; the status line reads `Codex · MODEL@LOGIN`.
+A Codex too old for that runs on its own login, with a notice to update it.
+Claude Code can run on one of your Anthropic logins likewise: it gets the
+access token on a private descriptor (`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`),
+not in its environment, so the commands it runs never see it; a tool host
+whose prigh predates that gets it in `CLAUDE_CODE_OAUTH_TOKEN`, with a notice
+to update prigh there. An API key goes in `ANTHROPIC_API_KEY`.
+Antigravity (`acp:antigravity`) can run on an Antigravity (Google) login
+(`google-antigravity`): `/adapters import antigravity` moves agy's Google login
+from a tool host (its `~/.gemini/antigravity-cli/antigravity-oauth-token`, or
+the Linux keyring, which it then clears: Google does not retire copies), and
+`/login google-antigravity` signs in with Google's Antigravity client, which
+prigh finds in an installed `agy` (or `PRIGH_ANTIGRAVITY_CLIENT_ID`/`_SECRET`).
+Each agy process gets an access token alone, in a private `--gemini-dir` that
+links the rest of `~/.gemini` and is deleted at exit, with the keyring cut
+off; prigh restarts it on the session before the token expires. Settings →
+Usage shows its plan and 5-hour/weekly limits per model group, from Google's
+Code Assist quota summary.
+
+With `prigh serve -tokens`, a user can share one of their built-in
+providers' logins with other users: `/accounts share LOGIN [with USER]`
+(prigh-web: the login's Share…, a picker of the other users) and
+`/accounts unshare LOGIN from USER`. The others see it as "LABEL (from
+OWNER)" to pick or pin (`/account`, the model chip), or hide; they never
+get its key, and what they spend on it is theirs, though its owner sees it
+per user. Revoking moves their sessions back to their default login.
+Host-token connections cannot manage logins, and `-no-sharing` (or
+`PRIGH_SHARING=off`) turns sharing off.
+
 ### Custom OpenAI-compatible providers
 
 Any server that speaks OpenAI chat completions, the Responses API or
@@ -350,7 +439,10 @@ lists the server's models. The models appear as `<name>/<model id>`
 ```
 
 `api` is `chat` (the default), `responses` or `anthropic`. `cost` is in
-dollars per million tokens.
+dollars per million tokens. Gemini works through its chat endpoint
+(`https://generativelanguage.googleapis.com/v1beta/openai`): prigh sends
+each tool call's thought signature back, and the documented placeholder
+for tool calls Gemini did not write (another model's history).
 
 ## Configuration
 
@@ -436,10 +528,10 @@ These are the main ones. `/help` lists them all, with their arguments.
 | Area | Commands |
 |---|---|
 | Model | `/model`, `/thinking`, `/scoped-models`, `/change_default`, `/fallback` |
-| Credentials | `/login`, `/logout`, `/auth` |
+| Credentials | `/login`, `/logout`, `/auth`, `/accounts`, `/account` |
 | Sessions | `/new`, `/sessions`, `/switch`, `/name`, `/fork`, `/rewind`, `/tree`, `/clone`, `/pin`, `/archive`, `/delete`, `/export`, `/import`, `/temporary` (web) |
 | Context | `/compact`, `/trim`, `/delete`, `/compaction`, `/session`, `/trace` |
-| Long runs | `/goal`, `/budget`, `/remind`, `/resume`, `/usage` (web) |
+| Long runs | `/goal`, `/budget`, `/remind`, `/resume`, `/usage` |
 | Modes | `/mode`, `/plan`, `/chat`, `/confirm`, `/permissions`, `/todos` |
 | Agents | `/agents`, `/jobs`, `/queue`, `/btw`, `/abort` |
 | Where | `/host`, `/cd`, `/mkdir`, `/terminal` and `/files` (web), `/default-dir`, `/default-host` |
@@ -531,9 +623,8 @@ prigh run -session ID "go on"          # continue a saved session
 prigh sessions list                    # also: delete ID..., prune -dry-run
 prigh trace SESSION                    # where the time went (-perfetto out.json)
 prigh serve                            # JSON-lines RPC on stdio
+prigh SUBCOMMAND -help                 # each one's flags
 ```
-
-Each subcommand has `-help`.
 
 ## Development
 
@@ -543,16 +634,14 @@ The code is in `backend/` (the agent and servers, `prigh`), `frontend/`
 gives the OxCaml toolchain; `backend/` and `frontend/` are separate dune
 projects (run one dune at a time).
 
-**Testing.** `./test` is the test suite, and the only one to run. Run it
-before pushing and before merging. It builds and tests everything, then
-runs a browser smoke test and the desktop's `cargo test`. It skips whatever
-has not changed, so it takes seconds to under a minute.
+**Testing.** `./test` is the test suite, and the only one to run: before
+pushing and before merging. It builds and tests everything, then runs a
+browser smoke test and the desktop's `cargo test`, skipping whatever has
+not changed (seconds to under a minute). `./test --full` adds the slow tier
+and every browser e2e script in Chromium, Firefox and WebKit: run it **only
+when the user explicitly asks for it**, never by default or "to be safe"
+before merging.
 
-`./test --full` adds the slow tier and every browser e2e script in
-Chromium, Firefox and WebKit. Run it **only when the user explicitly asks
-for it**: never by default, and never "to be safe" before merging.
-
-Contributor conventions (OCaml style, tests, pull requests, the shared
-machine) are in [AGENTS.md](AGENTS.md). How the pieces fit together is in
-[ARCHITECTURE.md](ARCHITECTURE.md), and the container is in
-[DOCKER.md](DOCKER.md).
+Conventions (OCaml style, tests, pull requests, the shared machine) are in
+[AGENTS.md](AGENTS.md), how the pieces fit together in
+[ARCHITECTURE.md](ARCHITECTURE.md), the container in [DOCKER.md](DOCKER.md).

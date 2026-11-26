@@ -146,6 +146,8 @@ docker run --rm -it -v "$PWD:/work" -w /work ghcr.io/evan-a-w/prigh:main prigh t
 | `PRIGH_TOKENS` | – | `name=token,name2=token2`; replaces `PRIGH_TOKEN` |
 | `PRIGH_SUPERUSERS` | – | comma-separated users allowed `/setusr` and Nix store cleaning |
 | `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container |
+| `PRIGH_ENGINES` | `harness` | what runs sessions: `harness`, `composer` (drives Codex, Claude Code and other agents on each session's tool host: see [Engines](#engines)) or both, the first the default |
+| `PRIGH_ADAPTERS` | `codex,claude` | the agents the composer drives (`codex`, `claude`, `prigh`, `acp:NAME`); install and sign in to them on the tool hosts yourself |
 | `PRIGH_ALLOW_NO_TOKEN` | – | `1`: start without a token |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` behind a proxy) |
 | `PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7790, 7777 | host ports |
@@ -212,6 +214,22 @@ The OAuth redirect goes to `localhost` on your machine, not the container:
 when the page fails to load, copy the full URL from the address bar and
 paste it at the prompt. Credentials live under `/home/prigh` (readable only
 by `prigh`) and survive rebuilds.
+
+## Engines
+
+`PRIGH_ENGINES=harness,composer` (or `composer` alone) also runs sessions on
+coding agents you sign in to yourself, `PRIGH_ADAPTERS` saying which
+(`codex,claude` by default); a container can serve the harness, the
+composer or both, users and settings being the same on each. The image
+bundles none of the CLIs. Each runs on the session's tool host as the
+user who owns it, so install and log in to it there: in the container, from
+that user's terminal in prigh-web (`nix profile install nixpkgs#codex`,
+then `codex login`; `claude auth login` for Claude Code), or on the machine
+of a tool host they connect (with `PRIGH_NO_BACKEND_HOST=1`, the only
+place). Its login (`~/.codex`, `~/.claude`) stays in that user's home.
+Settings → Engines (`/adapters` in the TUI) shows each CLI's state per
+host and what to run when it is not installed or not logged in; prigh never
+installs one or logs in.
 
 ## Git and SSH
 

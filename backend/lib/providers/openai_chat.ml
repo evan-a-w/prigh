@@ -12,20 +12,93 @@ module Quirks = struct
   type t =
     { thinking_param : Thinking_param.t
     ; replay_reasoning : bool
+    ; gemini : bool
     }
   [@@deriving sexp_of]
 
-  let deepseek = { thinking_param = Deepseek; replay_reasoning = true }
-  let generic = { thinking_param = Reasoning_effort; replay_reasoning = false }
+  let deepseek =
+    { thinking_param = Deepseek; replay_reasoning = true; gemini = false }
+  ;;
+
+  let generic =
+    { thinking_param = Reasoning_effort
+    ; replay_reasoning = false
+    ; gemini = false
+    }
+  ;;
+
+  let gemini = { generic with gemini = true }
+
+  let of_url url =
+    match Uri.host (Uri.of_string url) with
+    | Some host
+      when String.equal host "googleapis.com"
+           || String.is_suffix host ~suffix:".googleapis.com" -> gemini
+    | Some _ | None -> generic
+  ;;
 end
 
-let wire_tool_call (c : Content.Tool_call.t) : Json.t =
+(* Gemini's documented signature for function calls it did not write
+   (another model's history), which skips the signature check. *)
+let skip_signature = "skip_thought_signature_validator"
+
+let google_signature (extra : Json.t option) =
+  Option.bind extra ~f:(Json.member "google")
+  |> Option.bind ~f:(Json.member "thought_signature")
+  |> Option.is_some
+;;
+
+let with_skip_signature (extra : Json.t option) : Json.t =
+  let signature = "thought_signature", `String skip_signature in
+  let others = function
+    | Some (`Object fields) ->
+      List.filter fields ~f:(fun (k, _) -> not (String.equal k "google"))
+    | Some _ | None -> []
+  in
+  let google =
+    match Option.bind extra ~f:(Json.member "google") with
+    | Some (`Object fields) -> `Object (fields @ [ signature ])
+    | Some _ | None -> `Object [ signature ]
+  in
+  `Object (("google", google) :: others extra)
+;;
+
+(* The calls' [extra_content], sent back only to the provider (for Gemini,
+   the model) that wrote it. Gemini rejects a step whose calls carry no
+   thought signature, so a step from elsewhere gets the documented dummy on
+   its first call (Gemini signs only the first of parallel calls). *)
+let tool_call_extras
+      ~(quirks : Quirks.t)
+      ~replay
+      (calls : Content.Tool_call.t list)
+  =
+  let extras =
+    List.map calls ~f:(fun c ->
+      if not replay
+      then None
+      else
+        Option.bind c.extra ~f:(fun s ->
+          match Json.parse s with
+          | Ok (`Object _ as json) -> Some json
+          | Ok _ | Error _ -> None))
+  in
+  if quirks.gemini && not (List.exists extras ~f:google_signature)
+  then (
+    match extras with
+    | first :: rest -> Some (with_skip_signature first) :: rest
+    | [] -> [])
+  else extras
+;;
+
+let wire_tool_call (c : Content.Tool_call.t) (extra : Json.t option) : Json.t =
   `Object
-    [ "id", `String c.id
-    ; "type", `String "function"
-    ; ( "function"
-      , `Object [ "name", `String c.name; "arguments", `String c.arguments ] )
-    ]
+    ([ "id", `String c.id
+     ; "type", `String "function"
+     ; ( "function"
+       , `Object [ "name", `String c.name; "arguments", `String c.arguments ] )
+     ]
+     @ Option.value_map extra ~default:[] ~f:(fun extra ->
+       [ "extra_content", extra ]))
 ;;
 
 let image_part (image : Image.t) : Json.t =
@@ -64,9 +137,20 @@ let text_with_server_tools (a : Message.Assistant.t) =
   |> String.concat
 ;;
 
-let assistant_message ~(quirks : Quirks.t) (a : Message.Assistant.t) : Json.t =
+let assistant_message
+      ~(quirks : Quirks.t)
+      ~(model : Model.t)
+      (a : Message.Assistant.t)
+  : Json.t
+  =
   let thinking = Message.Assistant.thinking a in
   let tool_calls = Message.Assistant.tool_calls a in
+  let replay =
+    if quirks.gemini
+    then String.equal a.model (Model.key model)
+    else Model.written_by a.model model.provider
+  in
+  let extras = tool_call_extras ~quirks ~replay tool_calls in
   `Object
     (List.concat
        [ [ "role", `String "assistant"
@@ -77,7 +161,10 @@ let assistant_message ~(quirks : Quirks.t) (a : Message.Assistant.t) : Json.t =
           else [ "reasoning_content", `String thinking ])
        ; (if List.is_empty tool_calls
           then []
-          else [ "tool_calls", `Array (List.map tool_calls ~f:wire_tool_call) ])
+          else
+            [ ( "tool_calls"
+              , `Array (List.map2_exn tool_calls extras ~f:wire_tool_call) )
+            ])
        ])
 ;;
 
@@ -86,7 +173,7 @@ let image_count n = if n = 1 then "1 image" else sprintf "%d images" n
 (* A tool message's content is text only, so a result's images follow the
    run of tool messages (which must stay contiguous after the assistant's
    tool calls) as one user message. *)
-let wire_messages ~quirks (messages : Message.t list) : Json.t list =
+let wire_messages ~quirks ~model (messages : Message.t list) : Json.t list =
   let tool_images = ref [] in
   let flush () =
     match List.rev !tool_images with
@@ -132,7 +219,7 @@ let wire_messages ~quirks (messages : Message.t list) : Json.t list =
       ]
     | User { text; images; origin = _ } ->
       flush () @ [ user_message ~text images ]
-    | Assistant a -> flush () @ [ assistant_message ~quirks a ]
+    | Assistant a -> flush () @ [ assistant_message ~quirks ~model a ]
   in
   let wired = List.concat_map messages ~f:wire in
   wired @ flush ()
@@ -180,7 +267,8 @@ let request_body ~quirks (r : Provider.Request.t) : Json.t =
   `Object
     (List.concat
        [ [ "model", `String r.model.id
-         ; "messages", `Array (system @ wire_messages ~quirks r.messages)
+         ; ( "messages"
+           , `Array (system @ wire_messages ~quirks ~model:r.model r.messages) )
          ; "stream", `True
          ; "stream_options", `Object [ "include_usage", `True ]
          ]
@@ -209,9 +297,39 @@ module Tool_calls = struct
     { mutable started : Int.Set.t
     ; mutable ids : (string * int) list
     ; mutable last : int
+    ; mutable started_ids : (string * int) list
+    ; mutable extras : Json.t Int.Map.t
+      (** each call's latest [extra_content] (Gemini's thought signature),
+        which may come on any of its deltas *)
     }
 
-  let create () = { started = Int.Set.empty; ids = []; last = 0 }
+  let create () =
+    { started = Int.Set.empty
+    ; ids = []
+    ; last = 0
+    ; started_ids = []
+    ; extras = Int.Map.empty
+    }
+  ;;
+
+  let attach_extras t (a : Message.Assistant.t) =
+    if Map.is_empty t.extras
+    then a
+    else
+      { a with
+        content =
+          List.map a.content ~f:(function
+            | Content.Tool_call c ->
+              let extra =
+                List.Assoc.find t.started_ids ~equal:String.equal c.id
+                |> Option.bind ~f:(Map.find t.extras)
+                |> Option.map ~f:Json.to_string
+              in
+              Content.Tool_call
+                { c with extra = Option.first_some extra c.extra }
+            | (Text _ | Thinking _ | Server_tool _) as block -> block)
+      }
+  ;;
 end
 
 let member_string name json =
@@ -262,6 +380,10 @@ let parse_tool_call_delta (state : Tool_calls.t) json : Assistant_event.t list =
        | None, _ -> state.last)
   in
   state.last <- index;
+  (match Json.member "extra_content" json with
+   | Some (`Object _ as extra) ->
+     state.extras <- Map.set state.extras ~key:index ~data:extra
+   | _ -> ());
   Option.iter id ~f:(fun id ->
     if not (List.Assoc.mem state.ids ~equal:String.equal id)
     then state.ids <- (id, index) :: state.ids);
@@ -270,6 +392,7 @@ let parse_tool_call_delta (state : Tool_calls.t) json : Assistant_event.t list =
     | Some name when not (Set.mem state.started index) ->
       state.started <- Set.add state.started index;
       let id = Option.value id ~default:(sprintf "call_%d" index) in
+      state.started_ids <- (id, index) :: state.started_ids;
       [ Assistant_event.Tool_call_start { index; id; name } ]
     | _ -> []
   in
@@ -400,6 +523,7 @@ let stream
            !finish_reason)
   in
   Assistant_builder.finish builder ~stop_reason ~usage:!usage
+  |> Tool_calls.attach_extras tool_calls
 ;;
 
 let create ~env ?timeout ~name ~url ~headers ~quirks () =
@@ -414,6 +538,17 @@ module For_testing = struct
   let parse_stream jsons =
     let tool_calls = Tool_calls.create () in
     List.map jsons ~f:(parse_chunk ~tool_calls)
+  ;;
+
+  let parse_reply jsons =
+    let builder = Assistant_builder.create ~model:"test/m" in
+    let tool_calls = Tool_calls.create () in
+    List.iter jsons ~f:(fun json ->
+      match parse_chunk ~tool_calls json with
+      | Ok chunk -> List.iter chunk.events ~f:(Assistant_builder.apply builder)
+      | Error e -> Error.raise e);
+    Assistant_builder.finish builder ~stop_reason:Tool_use ~usage:Usage.zero
+    |> Tool_calls.attach_extras tool_calls
   ;;
 
   let parse_chunk json = parse_chunk json

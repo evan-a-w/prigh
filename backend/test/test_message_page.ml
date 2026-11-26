@@ -66,10 +66,12 @@ let assistant ?(calls = []) text =
     { content =
         Text text
         :: List.map calls ~f:(fun id ->
-          Content.Tool_call { id; name = "bash"; arguments = "{}" })
+          Content.Tool_call
+            { id; name = "bash"; arguments = "{}"; extra = None })
     ; stop_reason = (if List.is_empty calls then End_turn else Tool_use)
     ; usage = Usage.zero
     ; model = "m"
+    ; account = None
     }
 ;;
 

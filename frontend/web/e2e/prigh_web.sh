@@ -60,8 +60,12 @@
 # /permissions forgetting the calls it remembered, Settings → Models → Approvals, on a desktop and two phones, then ui.mjs,
 # then chat.mjs, chat mode on a backend with no tool host, on a desktop and
 # phones, then quiet.mjs, the quiet transcript's runs of steps, on a desktop
-# and two phones, then editor.mjs, the editor mode, on a desktop and two
-# phones, then smoke.mjs, ./test's suite: the main flows once each) in each browser and diffs the output with ENGINE.expected (chromium.expected,
+# and two phones, then overscroll.mjs, the transcript's end while a reply
+# streams and the user scrolls on past it, on a desktop and two phones, then
+# editor.mjs, the editor mode, on a desktop and two
+# phones, then engines.mjs, the composer engine with stand-ins for the
+# Codex and Claude Code CLIs (prigh fake-cli), on a desktop and two phones,
+# then smoke.mjs, ./test's suite: the main flows once each) in each browser and diffs the output with ENGINE.expected (chromium.expected,
 # firefox.expected, webkit.expected). The scripts all run at once (JOBS at a
 # time, default: the number of CPUs, fewer if the memory available would not
 # hold them; and on Linux none starts while less than MEM_PER_JOB is
@@ -126,7 +130,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch session_card review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings sidebar_select new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small editor:desktop editor:phone editor:small smoke"
+scripts="prigh_web temporary accounts sharing reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch session_card review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings sidebar_select new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small overscroll:desktop overscroll:phone overscroll:small editor:desktop editor:phone editor:small engines:desktop engines:phone engines:small smoke"
 # The core suite, ./test's: smoke.mjs alone, what only a real browser
 # catches on the main flows, in one script with three page loads. ./test
 # --full runs every script.

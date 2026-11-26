@@ -12,7 +12,7 @@ let of_state (s : P.State.t) =
   { approval = s.approval_mode; plan = s.plan_mode; chat = s.chat_mode }
 ;;
 
-let cycle t =
+let cycle ?(plan = true) t =
   if t.chat
   then { approval = Ask; plan = false; chat = false }
   else if t.plan
@@ -22,7 +22,7 @@ let cycle t =
     | Ask -> { t with approval = Auto_edit }
     | Auto_edit -> { t with approval = Smart }
     | Smart -> { t with approval = Auto }
-    | Auto -> { t with plan = true })
+    | Auto -> if plan then { t with plan = true } else { t with chat = true })
 ;;
 
 let label t =
@@ -35,10 +35,11 @@ let label t =
 
 let names = [ "ask"; "auto-edit"; "smart"; "auto"; "plan"; "chat" ]
 
-let choices ~current =
+let choices ?(plan = true) ~current () =
   List.map P.Approval_mode.all ~f:(fun approval ->
     { approval; plan = false; chat = false })
-  @ [ { current with plan = true; chat = false }; { current with chat = true } ]
+  @ (if plan then [ { current with plan = true; chat = false } ] else [])
+  @ [ { current with chat = true } ]
 ;;
 
 let of_name ~current name =

@@ -11,6 +11,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -210,8 +211,7 @@ const sheet = async p => {
   await p.locator(".session-card-row").tap();
   await p.locator(".session-card.sheet").waitFor();
   await unfold(p);
-  await p.waitForFunction(() =>
-    document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+  await animationsOver(p);
 };
 const closeSheet = async p => {
   await p.keyboard.press("Escape");
@@ -221,8 +221,7 @@ const closeSheet = async p => {
 const drawer = async p => {
   if (!(await p.locator(".sidebar-drawer").count())) await p.locator(".chat-chrome .toggle-sidebar").tap();
   await p.locator(".sidebar-drawer").waitFor();
-  await p.waitForFunction(() =>
-    document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+  await animationsOver(p);
 };
 // Into the session [title] by its row, counting [watched]'s worktrees in
 // the card while it is open, until the list has settled (the listings

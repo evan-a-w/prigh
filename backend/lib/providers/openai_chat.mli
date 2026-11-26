@@ -11,7 +11,9 @@ open! Import
     so. Models without [supports_images] get a note per image instead.
     Thinking arrives as [reasoning_content] or [reasoning] deltas; tool calls
     are accumulated by [index] (tolerating servers that repeat the id and
-    name in every delta, or omit the index or the id). *)
+    name in every delta, or omit the index or the id). A call's
+    [extra_content] (Gemini's thought signature) is kept with it and sent
+    back with it. *)
 
 (** How a server takes the thinking level. *)
 module Thinking_param : sig
@@ -28,11 +30,19 @@ module Quirks : sig
     ; replay_reasoning : bool
       (** send earlier thinking back as [reasoning_content] (DeepSeek needs
           it for tool-call turns) *)
+    ; gemini : bool
+      (** Gemini's OpenAI-compatible endpoint: a tool-call step without a
+          thought signature (another model's history) gets the documented
+          dummy, as Gemini 3 rejects it otherwise *)
     }
   [@@deriving sexp_of]
 
   val deepseek : t
   val generic : t
+  val gemini : t
+
+  (** [gemini] for a [googleapis.com] URL, else [generic]. *)
+  val of_url : string -> t
 end
 
 (** [url] is the full chat-completions URL; [headers] carry the
@@ -63,4 +73,8 @@ module For_testing : sig
 
   (** Chunks of one stream, sharing the tool-call bookkeeping. *)
   val parse_stream : Json.t list -> Chunk.t Or_error.t list
+
+  (** The message a stream of chunks builds, as [create]'s provider returns
+      it (model [test/m]). *)
+  val parse_reply : Json.t list -> Message.Assistant.t
 end

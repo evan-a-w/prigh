@@ -21,7 +21,8 @@ module Block = struct
     | Thinking { text; signature } ->
       Thinking { text = Buffer.contents text; signature }
     | Tool_call { id; name; arguments; index = _ } ->
-      Tool_call { id; name; arguments = Buffer.contents arguments }
+      Tool_call
+        { id; name; arguments = Buffer.contents arguments; extra = None }
     | Server_tool tool -> Server_tool !tool
   ;;
 end
@@ -135,9 +136,15 @@ let snapshot t =
   ; stop_reason = End_turn
   ; usage = Usage.zero
   ; model = t.model
+  ; account = None
   }
 ;;
 
 let finish t ~stop_reason ~usage =
-  { Message.Assistant.content = content t; stop_reason; usage; model = t.model }
+  { Message.Assistant.content = content t
+  ; stop_reason
+  ; usage
+  ; model = t.model
+  ; account = None
+  }
 ;;

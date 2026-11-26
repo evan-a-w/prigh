@@ -371,10 +371,11 @@ let state (s : Agent.State.t) =
      ; "plan", Option.value_map s.plan ~default:`Null ~f:Plan.to_json
      ; "session_rules", `Array (List.map s.session_rules ~f:str)
      ]
-     @
-     if List.is_empty s.allowed_calls
-     then []
-     else [ "allowed_calls", `Array (List.map s.allowed_calls ~f:str) ])
+     @ (if List.is_empty s.allowed_calls
+        then []
+        else [ "allowed_calls", `Array (List.map s.allowed_calls ~f:str) ])
+     @ Option.value_map s.account ~default:[] ~f:(fun id ->
+       [ "account", str (Account_ref.to_string id) ]))
 ;;
 
 let job ~now task =
@@ -482,11 +483,73 @@ let hidden (h : Session.Hidden.t) =
     )
 ;;
 
+let history_op : Capabilities.History_op.t -> Json.t = function
+  | Unsupported -> str "unsupported"
+  | Native -> str "native"
+  | By_handoff -> str "by_handoff"
+;;
+
+let capabilities (c : Capabilities.t) =
+  let bool b = if b then `True else `False in
+  `Object
+    ([ "fork", history_op c.fork
+    ; "rewind", history_op c.rewind
+    ; "context_edit", bool c.context_edit
+    ; ( "compact"
+      , str
+          (match c.compact with
+           | Unsupported -> "unsupported"
+           | Native -> "native"
+           | Auto_only -> "auto_only"
+           | Command | Summary -> "native") )
+    ; ( "steer"
+      , str
+          (match c.steer with
+           | Between_turns -> "between_turns"
+           | In_run -> "in_run") )
+    ; "plan_mode", bool c.plan_mode
+    ; "btw", bool c.btw
+    ; ( "subagents"
+      , str
+          (match c.subagents with
+           | Unsupported -> "unsupported"
+           | Observe -> "observe"
+           | Full -> "full") )
+    ; "model_fallback", bool c.model_fallback
+    ; "images", bool c.images
+    ; "ask_user", bool c.ask_user
+    ]
+    @ Option.value_map c.rewind_note ~default:[] ~f:(fun note ->
+      [ "rewind_note", str note ]))
+;;
+
+(* The harness's sessions (every one from before engines) carry none of
+   this, so frontends treat its absence as the harness with everything. *)
+let engine_fields (s : Agent.State.t) =
+  (if Engine_choice.is_harness s.engine
+   then []
+   else
+     [ "engine", str (Engine_id.to_string s.engine.engine)
+     ; ( "adapter"
+       , Option.value_map s.engine.adapter ~default:`Null ~f:(fun a ->
+           str (Adapter_id.to_string a)) )
+     ])
+  @ (if
+       Sexp.equal
+         (Capabilities.sexp_of_t s.capabilities)
+         (Capabilities.sexp_of_t Capabilities.harness)
+     then []
+     else [ "capabilities", capabilities s.capabilities ])
+  @ Option.value_map s.unavailable ~default:[] ~f:(fun u ->
+    [ "unavailable", str u ])
+;;
+
 let state (s : Agent.State.t) =
   match state s with
   | `Object fields ->
     `Object
       (fields
+       @ engine_fields s
        @ home s.home
        @ Option.value_map s.trim ~default:[] ~f:(fun t -> [ "trim", trim t ])
        @ Option.value_map s.transcript_filter ~default:[] ~f:(fun f ->
@@ -557,7 +620,7 @@ let entry (e : Session.Entry.t) =
   let payload =
     match e.payload with
     | Message m -> [ "kind", str "message"; "message", message m ]
-    | Model { model; thinking = t } ->
+    | Model { model; thinking = t; account = _ } ->
       [ "kind", str "model"; "model", str model; "thinking", thinking t ]
     | Compaction { summary; kept_from; pinned } ->
       [ "kind", str "compaction"
@@ -631,6 +694,30 @@ let entry (e : Session.Entry.t) =
       [ "kind", str "trim_after"; "after", str after; "through", str through ]
     | Delete { message } -> [ "kind", str "delete"; "message", str message ]
     | Restore { entry } -> [ "kind", str "restore"; "entry", str entry ]
+    | Engine { engine; adapter } ->
+      [ "kind", str "engine"
+      ; "engine", str engine
+      ; "adapter", Option.value_map adapter ~default:`Null ~f:str
+      ]
+    | Thread { adapter; host; thread_id; cwd; fork_from = _ } ->
+      [ "kind", str "thread"
+      ; "adapter", str adapter
+      ; "host", str host
+      ; "thread_id", str thread_id
+      ; "cwd", str cwd
+      ]
+    | External_turn { thread_id; turn_id; through; _ } ->
+      [ "kind", str "external_turn"
+      ; "thread_id", str thread_id
+      ; "turn_id", str turn_id
+      ; "through", str through
+      ]
+    | Handoff { from_adapter; to_adapter; text } ->
+      [ "kind", str "handoff"
+      ; "from_adapter", Option.value_map from_adapter ~default:`Null ~f:str
+      ; "to_adapter", str to_adapter
+      ; "text", str text
+      ]
   in
   `Object
     ([ "id", str e.id
@@ -640,7 +727,85 @@ let entry (e : Session.Entry.t) =
      @ payload)
 ;;
 
-let auth_status (s : Provider_auth.Status.t) =
+let account_ref provider account =
+  sprintf
+    "%s/%s"
+    (Provider_id.to_string provider)
+    (Account_id.to_string account)
+;;
+
+let grant (g : Account_meta.Grant.t) =
+  `Object [ "user", str g.user; "since_ms", int g.since_ms ]
+;;
+
+let usage_fields ~usage provider ref_ =
+  match usage with
+  | None -> []
+  | Some usage ->
+    let (u : Account_ledger.Periods.t) = usage provider ref_ in
+    if u.last_30_days.requests = 0
+    then []
+    else [ "usage", Account_ledger.Periods.to_json u ]
+;;
+
+let auth_account ~shareable ~usage provider (a : Provider_auth.Account_status.t)
+  =
+  `Object
+    ([ "ref", str (account_ref provider a.id)
+     ; "id", str (Account_id.to_string a.id)
+     ; "label", str a.label
+     ; "method", str (Provider_auth.Method.to_string a.method_)
+     ; "source", str a.source
+     ; "default", bool a.default
+     ; "fallback", bool a.fallback
+     ]
+     @ Option.value_map a.expires_ms ~default:[] ~f:(fun e ->
+       [ "expires_ms", int e ])
+     @ (if shareable && not (Provider_id.is_custom provider)
+        then [ "shareable", bool true ]
+        else [])
+     @ usage_fields ~usage provider (Account_ref.Own a.id)
+     @
+     match a.shared_with with
+     | [] -> []
+     | grants -> [ "shared_with", `Array (List.map grants ~f:grant) ])
+;;
+
+let shared_account ~usage ~default (s : Account_shares.Shared.t) =
+  `Object
+    ([ "ref", str (Account_shares.Shared.key s)
+     ; "id", str (Account_ref.to_string (Account_shares.Shared.ref_ s))
+     ; "label", str s.label
+     ; "method", str (Provider_auth.Method.to_string s.method_)
+     ; "source", str ("shared by " ^ s.owner)
+     ; "default", bool default
+     ; "fallback", bool s.pref.fallback
+     ; "shared_by", str s.owner
+     ]
+     @ usage_fields ~usage s.provider (Account_shares.Shared.ref_ s)
+     @ if s.pref.hidden then [ "hidden", bool true ] else [])
+;;
+
+let auth_status
+      ?(shared = [])
+      ?(shareable = false)
+      ?usage
+      (s : Provider_auth.Status.t)
+  =
+  let shared =
+    List.filter shared ~f:(fun (sh : Account_shares.Shared.t) ->
+      Provider_id.equal sh.provider s.provider)
+  in
+  let shared_default =
+    if List.is_empty s.accounts
+    then List.find shared ~f:(fun sh -> not sh.pref.hidden)
+    else None
+  in
+  let configured =
+    match s.configured, shared_default with
+    | None, Some sh -> Some (sh.method_, "shared by " ^ sh.owner)
+    | configured, _ -> configured
+  in
   `Object
     ([ "provider", str (Provider_id.to_string s.provider)
      ; "name", str (Provider_id.display_name s.provider)
@@ -652,7 +817,7 @@ let auth_status (s : Provider_auth.Status.t) =
                 ; "label", str (Provider_auth.Method.label s.provider m)
                 ])) )
      ; ( "configured"
-       , match s.configured with
+       , match configured with
          | None -> `Null
          | Some (m, source) ->
            `Object
@@ -660,6 +825,15 @@ let auth_status (s : Provider_auth.Status.t) =
              ; "source", str source
              ] )
      ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
+     ; ( "accounts"
+       , `Array
+           (List.map s.accounts ~f:(auth_account ~shareable ~usage s.provider)
+            @ List.map shared ~f:(fun sh ->
+              shared_account
+                ~usage
+                ~default:
+                  (Option.exists shared_default ~f:(fun d -> phys_equal d sh))
+                sh)) )
      ]
      @
      match s.custom with
@@ -713,17 +887,21 @@ let login_event (e : Login_manager.Event.t) =
     | Prompt_cancelled { id } ->
       [ "kind", str "prompt_cancelled"; "id", str id ]
     | Progress message -> [ "kind", str "progress"; "message", str message ]
-    | Done { provider; method_ } ->
+    | Done { provider; method_; account } ->
       [ "kind", str "done"
       ; "provider", str (Provider_id.to_string provider)
       ; "method", str (Provider_auth.Method.to_string method_)
+      ; "account", str (Account_id.to_string account)
       ]
     | Failed { provider; error } ->
       [ "kind", str "failed"; "provider", str provider; "error", str error ]
-    | Logged_out provider ->
+    | Logged_out { provider; account } ->
       [ "kind", str "logged_out"
       ; "provider", str (Provider_id.to_string provider)
       ]
+      @ Option.value_map account ~default:[] ~f:(fun a ->
+        [ "account", str (Account_id.to_string a) ])
+    | Accounts_changed -> []
     | Forge_done { host; user; method_ } ->
       [ "kind", str "forge_done"
       ; "host", str host
@@ -733,7 +911,10 @@ let login_event (e : Login_manager.Event.t) =
     | Forge_logged_out host ->
       [ "kind", str "forge_logged_out"; "host", str host ]
   in
-  `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
+  match e with
+  | Accounts_changed ->
+    `Object [ "type", str "event"; "event", str "accounts_changed" ]
+  | _ -> `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;
 
 let agent_queues agents =
@@ -774,6 +955,11 @@ let rec event ?now ?(resync = false) (e : Agent.Event.t) =
       ; "max_attempts", int max_attempts
       ; "error", str error
       ; "delay_ms", ms delay
+      ]
+    | Loop (Agent_waiting { agent; starting }) ->
+      [ "event", str "agent_waiting"
+      ; "agent", str agent
+      ; "starting", bool starting
       ]
     | Loop (Tool_start call) ->
       [ "event", str "tool_start"; "call", tool_call call ]
@@ -823,8 +1009,10 @@ let rec event ?now ?(resync = false) (e : Agent.Event.t) =
            ; task
            ; name
            ; model
+           ; thinking = level
            ; tools
            ; host
+           ; cwd
            ; worktree
            ; forked
            ; continued
@@ -835,6 +1023,8 @@ let rec event ?now ?(resync = false) (e : Agent.Event.t) =
       ; "task", str task
       ; "name", str name
       ; "model", str model
+      ; "thinking", thinking level
+      ; "cwd", str cwd
       ; "tools", `Array (List.map tools ~f:str)
       ]
       @ Option.value_map host ~default:[] ~f:(fun host -> [ "host", str host ])
@@ -931,6 +1121,11 @@ let subagent_summary (s : Subagent_log.Summary.t) =
      ; "model", str s.model
      ]
      @ Option.value_map s.host ~default:[] ~f:(fun host -> [ "host", str host ])
+     @ Option.value_map s.thinking ~default:[] ~f:(fun t ->
+       [ "thinking", str t ])
+     @ Option.value_map s.cwd ~default:[] ~f:(fun cwd -> [ "cwd", str cwd ])
+     @ Option.value_map s.worktree ~default:[] ~f:(fun w ->
+       [ "worktree", agent_worktree w ])
      @ [ "state", str (Subagent_log.State.to_string s.state)
        ; "started_at_ms", ms s.started_at
        ; "updated_at_ms", ms s.updated_at

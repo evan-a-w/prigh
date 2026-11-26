@@ -28,6 +28,13 @@ type t =
       }
   (** The provider failed transiently: the reply is requested again after
       [delay]; a [Message_start] begins the new attempt. *)
+  | Agent_waiting of
+      { agent : string (** who: "Codex", "Claude Code" *)
+      ; starting : bool (** its process is starting: not asked yet *)
+      }
+  (** The composer's agent CLI is starting, or was asked and has said
+      nothing since: frontends show they wait for it, as they do for the
+      model after the harness's [Message_start]. *)
   | Tool_start of Content.Tool_call.t
   | Tool_output of
       { call_id : string
@@ -87,10 +94,12 @@ type t =
       ; task : string
       ; name : string (** {!Subagent_name} *)
       ; model : string
+      ; thinking : Thinking.t
       ; tools : string list
       ; host : string option
         (** the tool host its tools run on (its name), when not the
             session's active one ([subagent]'s [host]) *)
+      ; cwd : string (** where it works, on that host *)
       ; worktree : Agent_worktree.t option
         (** the worktree it works in, made for it ([subagent]'s
             [worktree]) *)

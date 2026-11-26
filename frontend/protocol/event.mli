@@ -32,6 +32,12 @@ type t =
   | Message_update of Stream_update.t
   | Message_end of Message.t
   | Retry of Retry.t
+  | Agent_waiting of
+      { agent : string (** "Codex", "Claude Code" *)
+      ; starting : bool (** its process is starting: not asked yet *)
+      }
+  (** The session's agent CLI (a composer session's) is starting, or was
+      asked and has said nothing since. *)
   | Tool_start of Tool_call.t
   | Tool_output of
       { call_id : string
@@ -151,6 +157,9 @@ type t =
       { gen_id : string
       ; delta : string
       } (** streamed text of our own [generate_text] request *)
+  | Accounts_changed
+  (** a provider's accounts were renamed, reordered or given a new default:
+      reread [auth_status] *)
   | Sessions_changed of Session_summary.Change.t option
   (** something [list_sessions] shows changed, in any session: what, or
       [None] to refetch it *)
@@ -163,6 +172,12 @@ type t =
       } (** the temporary session this client left is deleted *)
   | Prefs_changed of Prefs.Change.t list
   (** another frontend of the user changed their preferences *)
+  | Adapters_changed of Adapter_status.t list
+  (** the composer's agent CLIs were checked again on a host, or a host
+      connected: every status checked so far *)
+  | Models_changed
+  (** what [list_models] answers changed (a Codex or Claude Code session's
+      CLI listed its models or usage limits): ask again *)
   | Memory_changed of Memory.t
   (** a note was saved, edited or forgotten, or memory turned on or off *)
   | Custom_instructions_changed of Custom_instructions.t

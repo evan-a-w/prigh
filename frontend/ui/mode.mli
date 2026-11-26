@@ -9,6 +9,8 @@ module Picker_kind : sig
     | Scoped_models
     | Thinking
     | Verbosity
+    | Engines of { switch : bool }
+    (** [/new] (a new session's engine) or [/engine] (this session's adapter) *)
     | Transcript_filter (** [/filter]: the kinds on show, checked *)
     | Login
     | Logout
@@ -36,6 +38,10 @@ module Picker_kind : sig
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string (** login prompt id *)
+    | Adapter_login of string (** [/adapters login]: the adapter's *)
+    | Commands
+    (** item ids are slash commands, run when picked; one ending in a space
+        goes to the editor to be finished *)
   [@@deriving sexp_of, equal]
 end
 
@@ -74,6 +80,10 @@ end
 module Confirm_action : sig
   type t =
     | Logout of string
+    | Logout_login of
+        { provider : string
+        ; account : string (** its id *)
+        }
     | Forge_logout of string (** the host *)
     | Rewind of string
     | Trim of string (** the message's entry id: [trim] before it *)
@@ -110,6 +120,10 @@ module Confirm_action : sig
         kept in the editor): send it as a chat (chat mode) instead *)
     | Nix_gc of Nix_generations.t
     (** [/nix-gc run DAYS|all]: deleting profile generations *)
+    | Import_adapter_login of
+        { adapter : string
+        ; host : string (** its name *)
+        } (** [/adapters import]: moving the host's own CLI login into prigh *)
     | Browser_signin
     (** a sign-in proxy guards the backend: sign in to it through the
         browser *)

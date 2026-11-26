@@ -14,6 +14,7 @@ let request ~model messages =
   ; thinking = Off
   ; max_tokens = None
   ; cache_key = None
+  ; account = None
   }
 ;;
 

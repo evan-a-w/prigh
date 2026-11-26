@@ -57,9 +57,10 @@ let%expect_test "Opening Usage asks once; loading, then each provider's windows"
   [%expect
     {|
     (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
     At a limit
     Resume after a usage limit
     A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
@@ -68,7 +69,7 @@ let%expect_test "Opening Usage asks once; loading, then each provider's windows"
     Reading your usage from the providers…
     (Reading…)
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
     At a limit
     Resume after a usage limit
     A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
@@ -112,11 +113,13 @@ let%expect_test "Refresh asks again and keeps the last answer meanwhile" =
   [%expect
     {|
     (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Subscription limits
     Read 10:00 (5m ago). Updated when you open this page or press Refresh.
     (Refresh)
     Usage_refresh
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Subscription limits
     Read 10:00 (5m ago). Updated when you open this page or press Refresh.
@@ -147,9 +150,10 @@ let%expect_test "Not signed in and API keys say how to sign in" =
   [%expect
     {|
     (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
     At a limit
     Resume after a usage limit
     A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
@@ -181,9 +185,10 @@ let%expect_test "A provider's error, a plan without windows, a failed call" =
   [%expect
     {|
     (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
     At a limit
     Resume after a usage limit
     A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
@@ -198,9 +203,10 @@ let%expect_test "A provider's error, a plan without windows, a failed call" =
     No limits reported
     The provider reported no usage windows for this plan.
     (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
     At a limit
     Resume after a usage limit
     A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
@@ -222,6 +228,7 @@ let%expect_test "/usage opens the section; switching users forgets it" =
          ; user = Some "alice"
          ; superuser = true
          ; features = []
+         ; deployed = Prigh_protocol.Deployed_engines.harness_only
          }));
   H.act h (Run "/usage");
   H.reply h "usage_limits" usage_json;
@@ -239,6 +246,7 @@ let%expect_test "/usage opens the section; switching users forgets it" =
   [%expect
     {|
     (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     (Rpc (method_ nix_store_status) (params ())
      (tag (Nix_status (open_settings false))))
@@ -253,7 +261,7 @@ let%expect_test "until" =
   List.iter
     [ 0.; 0.5; 1.; 59.; 60.; 134.; 1440.; 1440. +. 240.; 2880. ]
     ~f:(fun min ->
-      print_endline (Prigh_web.Usage_view.until (Time_ns.Span.of_min min)));
+      print_endline (Prigh_ui.Login_usage_text.until (Time_ns.Span.of_min min)));
   [%expect
     {|
     under a minute
@@ -265,5 +273,144 @@ let%expect_test "until" =
     1d
     1d 4h
     2d
+    |}]
+;;
+
+let%expect_test
+    "a Codex or Claude Code session's CLI reports its own login's limits"
+  =
+  let h = opened () in
+  H.quiet h (fun () ->
+    H.reply
+      h
+      "usage_limits"
+      {|{"fetched_at_ms":1791194400000,"providers":[
+          {"provider":"codex","name":"Codex","status":"limits","plan":"pro",
+           "windows":[
+             {"id":"primary","label":"5-hour session","used_percent":42,
+              "resets_at_ms":1791196920000}]},
+          {"provider":"claude","name":"Claude Code","status":"error",
+           "error":"Claude Code on backend did not say: check that it is installed and logged in there (Settings → Engines)"}]}|});
+  section h;
+  [%expect
+    {|
+    (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
+    Usage
+    Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
+    At a limit
+    Resume after a usage limit
+    A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+    (Stay stopped at a usage limit (/resume off))
+    Subscription limits
+    Read 10:00 (just now). Updated when you open this page or press Refresh.
+    (Refresh)
+    Codex Pro
+    5-hour session
+    Resets in 42m · 10:42
+    42% used
+    Claude Code
+    Could not read the limits
+    Claude Code on backend did not say: check that it is installed and logged in there (Settings → Engines)
+    |}]
+;;
+
+(* A card per login with usage to show, by provider, as Settings → Models
+   lists them: a subscription's limits, an API key's requests and who used
+   it, a login shared with the user; a provider with none says how to sign
+   in. *)
+let logins_json =
+  let totals r =
+    sprintf
+      {|{"requests":%d,"input":%d,"output":%d,"cache_read":0,"cost_usd":%d}|}
+      r
+      (r * 4000)
+      (r * 300)
+      r
+  in
+  let usage a b =
+    sprintf
+      {|"usage":{"today":%s,"last_7_days":%s,"last_30_days":%s}|}
+      (totals a)
+      (totals b)
+      (totals b)
+  in
+  sprintf
+    {|[{"provider":"anthropic","name":"Claude","methods":[{"method":"oauth","label":"Claude Pro/Max"}],"configured":{"method":"oauth","source":"oauth"},"accounts":[
+         {"ref":"anthropic/main","id":"main","label":"Personal","method":"oauth","source":"oauth","default":true,"fallback":true,"shareable":true},
+         {"ref":"anthropic/work","id":"work","label":"Work","method":"oauth","source":"oauth","default":false,"fallback":false,"shareable":true}]},
+       {"provider":"openai-codex","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":null},
+       {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"API key"}],"configured":{"method":"api_key","source":"auth.json"},"accounts":[
+         {"ref":"deepseek/default","id":"default","label":"DeepSeek API key","method":"api_key","source":"auth.json","default":true,"fallback":true,"shareable":true,"shared_with":[{"user":"bob","since_ms":1700000000000}],%s},
+         {"ref":"~carol/deepseek/team","id":"~carol/team","label":"Team","method":"api_key","source":"shared by carol","default":false,"fallback":false,"shared_by":"carol",%s},
+         {"ref":"~dave/deepseek/old","id":"~dave/old","label":"Old","method":"api_key","source":"shared by dave","default":false,"fallback":false,"shared_by":"dave","hidden":true,%s}]}]|}
+    (usage 2 5)
+    (usage 0 1)
+    (usage 1 1)
+;;
+
+let limits_json =
+  {|{"fetched_at_ms":1791194400000,"providers":[
+      {"provider":"anthropic","name":"Claude","status":"limits","plan":"max","windows":[],"accounts":[
+        {"ref":"anthropic/main","id":"main","label":"Personal","default":true,"status":"limits","plan":"max","windows":[{"id":"five_hour","label":"5-hour session","used_percent":42,"resets_at_ms":1791199800000}]},
+        {"ref":"anthropic/work","id":"work","label":"Work","default":false,"status":"limits","plan":"pro","windows":[]}]},
+      {"provider":"openai-codex","name":"ChatGPT","status":"not_signed_in","accounts":[]}]}|}
+;;
+
+let%expect_test "a card per login, by provider; shared ones from their owner" =
+  let h = H.create () in
+  H.quiet h (fun () ->
+    H.act h (Clock H.now);
+    H.act h (Reply (Auth_status Refresh, Ok (Jsonaf.of_string logins_json))));
+  H.act h (Settings_section Usage);
+  H.reply h "auth_status" logins_json;
+  H.reply h "usage_limits" limits_json;
+  H.reply
+    h
+    "account_usage"
+    {|[{"user":"alice","you":true,"today":{"requests":1,"input":4000,"output":300,"cache_read":0,"cost_usd":1},"last_7_days":{"requests":3,"input":12000,"output":900,"cache_read":0,"cost_usd":3},"last_30_days":{"requests":3,"input":12000,"output":900,"cache_read":0,"cost_usd":3}},
+       {"user":"bob","today":{"requests":1,"input":4000,"output":300,"cache_read":0,"cost_usd":1},"last_7_days":{"requests":2,"input":8000,"output":600,"cache_read":0,"cost_usd":2},"last_30_days":{"requests":2,"input":8000,"output":600,"cache_read":0,"cost_usd":2}}]|};
+  H.text h ~selector:".settings-panel-usage .settings-group:not(:first-child)";
+  [%expect
+    {|
+    (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
+    (Rpc (method_ account_usage) (params ((ref deepseek/default)))
+     (tag (Login_users deepseek/default)))
+    (Rpc (method_ account_share_targets) (params ()) (tag Share_targets))
+    At a limit
+    Resume after a usage limit
+    A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+    (Stay stopped at a usage limit (/resume off))
+    Subscription limits
+    Read 10:00 (just now). Updated when you open this page or press Refresh.
+    (Refresh)
+    Claude
+    Personal
+    Subscription, default, takes over at usage limits. Max plan.
+    (Share…) (Manage)
+    5-hour session Resets in 1h 30m · 11:30
+    42% used
+    ChatGPT
+    Not signed in
+    Sign in with your ChatGPT subscription to see its limits: /login openai-codex.
+    (Sign in)
+    DeepSeek
+    API key
+    API key, default, takes over at usage limits, shared with bob.
+    (Share…) (Manage)
+    Today 2 req 8.6k tok $2.00
+    7 days 5 req 22k tok $5.00
+    30 days 5 req 22k tok $5.00
+    You today 1 req 4.3k tok $1.00 · 30 days 3 req 13k tok $3.00
+    bob today 1 req 4.3k tok $1.00 · 30 days 2 req 8.6k tok $2.00
+    Team (from carol)
+    API key, shared by carol.
+    (Hide) (Manage)
+    Today 0 req 0 tok $0.00
+    7 days 1 req 4.3k tok $1.00
+    30 days 1 req 4.3k tok $1.00
     |}]
 ;;

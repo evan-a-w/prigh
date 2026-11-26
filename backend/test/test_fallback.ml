@@ -10,12 +10,18 @@ let exhausted =
     ""
 ;;
 
-let with_agent ?(config = []) ?(cwd = fun dir -> dir) replies f =
+let with_agent ?(config = []) ?(cwd = fun dir -> dir) ?logins replies f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
   write t ".prigh/config.json" (Jsonaf.to_string (`Object config));
+  let accounts =
+    Option.map logins ~f:(fun logins ->
+      let store = Auth_store.create ~path:(Filename.concat t.dir "auth.json") in
+      logins store;
+      fun provider -> Or_error.ok_exn (Login_choice.list store provider))
+  in
   let provider =
     Faux_provider.create
       ~on_request:(fun (r : Provider.Request.t) ->
@@ -26,14 +32,35 @@ let with_agent ?(config = []) ?(cwd = fun dir -> dir) replies f =
           | Some (Tool_result _) -> "tool result"
           | None -> "nothing"
         in
-        printf "request to %s, last %s\n" (Model.key r.model) last)
+        printf
+          "request to %s%s, last %s\n"
+          (Model.key r.model)
+          (Option.value_map r.account ~default:"" ~f:(fun a ->
+             "@" ^ Account_ref.to_string a))
+          last)
       replies
+  in
+  (* As the router: the reply records the login that wrote it. *)
+  let provider =
+    { provider with
+      stream =
+        (fun r ~cancel ~on_event ->
+          let reply = provider.stream r ~cancel ~on_event in
+          { reply with
+            account =
+              Option.bind r.account ~f:(fun a ->
+                Option.some_if
+                  (not (Account_ref.equal a Account_ref.main))
+                  (Account_ref.to_string a))
+          })
+    }
   in
   let agent =
     Agent.create
       ~env:t.env
       ~sw
       ~provider
+      ?accounts
       ~tools:[]
       ~sessions_dir:(Filename.concat t.dir "sessions")
       ~home:t.dir
@@ -44,8 +71,9 @@ let with_agent ?(config = []) ?(cwd = fun dir -> dir) replies f =
     | Notice n -> print_endline ("notice: " ^ n)
     | Loop (Message_end (Assistant a)) ->
       printf
-        "assistant (%s): %s %s\n"
+        "assistant (%s%s): %s %s\n"
         a.model
+        (Option.value_map a.account ~default:"" ~f:(( ^ ) "@"))
         (Message.Assistant.text a)
         (Sexp.to_string [%sexp (a.stop_reason : Stop_reason.t)])
     | _ -> ());
@@ -319,4 +347,150 @@ let%expect_test "default_cwd: where new sessions start" =
     default_cwd: work must be absolute (or start with ~/)
     ok
     |}]
+;;
+
+let codex_logins store =
+  let oauth access =
+    Credential.Oauth
+      { access
+      ; refresh = "r-" ^ access
+      ; expires_ms = Int.max_value
+      ; account_id = Some access
+      }
+  in
+  let add ?label credential =
+    ignore
+      (Or_error.ok_exn
+         (Provider_accounts.save_login ?label store Openai_codex credential)
+       : Account_id.t)
+  in
+  add (oauth "personal");
+  add ~label:"Work" (oauth "work");
+  add ~label:"Key" (Api_key "sk-key")
+;;
+
+let%expect_test
+    "a usage limit tries the provider's other logins before the chain; API \
+     keys only when allowed"
+  =
+  with_agent
+    ~config:chain
+    ~logins:codex_logins
+    [ exhausted; exhausted; Reply.text "done it" ]
+  @@ fun _t agent ->
+  Or_error.ok_exn (Agent.prompt agent "fix the bug");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    request to openai-codex/gpt-6-sol, last user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    fix the bug
+    assistant (gpt-6-sol):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
+    notice: openai-codex/gpt-6-sol: HTTP 429: The usage limit has been reached (usage limit reached); carrying on with the Work login (work)
+    request to openai-codex/gpt-6-sol@work, last assistant
+    assistant (gpt-6-sol@work):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
+    notice: openai-codex/gpt-6-sol@work: HTTP 429: The usage limit has been reached (usage limit reached); handing over to anthropic/claude-opus-5-5
+    request to anthropic/claude-opus-5-5, last user: [prigh: openai-codex/gpt-6-sol@work cannot continue (HTTP 429: The usage limit has been reached (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
+    assistant (claude-opus-5-5): done it End_turn
+    |}];
+  print_s
+    [%sexp
+      (Model.key (Agent.state agent).model : string)
+    , ((Agent.state agent).account : Account_ref.t option)];
+  [%expect {| (anthropic/claude-opus-5-5 ()) |}]
+;;
+
+let%expect_test "a pinned login is used, kept with the session, and tried first"
+  =
+  with_agent
+    ~config:chain
+    ~logins:(fun store ->
+      codex_logins store;
+      Or_error.ok_exn
+        (Provider_accounts.update
+           store
+           Openai_codex
+           (Or_error.ok_exn (Account_id.of_string "key"))
+           { Provider_accounts.Update.empty with fallback = Some true }))
+    [ Reply.text "hello"; exhausted; exhausted; Reply.text "done it" ]
+  @@ fun _t agent ->
+  let work = Account_ref.Own (Or_error.ok_exn (Account_id.of_string "work")) in
+  Agent.set_model ~account:work agent (Agent.state agent).model;
+  Or_error.ok_exn (Agent.prompt agent "hi");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    request to openai-codex/gpt-6-sol@work, last user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    hi
+    assistant (gpt-6-sol@work): hello End_turn
+    |}];
+  print_s
+    [%sexp
+      (Session.account (Agent.session agent) : string option)
+    , ((Agent.state agent).account : Account_ref.t option)];
+  [%expect {| ((work) ((Own work))) |}];
+  Or_error.ok_exn (Agent.prompt agent "again");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    request to openai-codex/gpt-6-sol@work, last user: again
+    assistant (gpt-6-sol@work):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
+    notice: openai-codex/gpt-6-sol@work: HTTP 429: The usage limit has been reached (usage limit reached); carrying on with the Key login (key)
+    request to openai-codex/gpt-6-sol@key, last assistant
+    assistant (gpt-6-sol@key):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
+    notice: openai-codex/gpt-6-sol@key: HTTP 429: The usage limit has been reached (usage limit reached); carrying on with the ChatGPT Plus/Pro login (main)
+    request to openai-codex/gpt-6-sol@main, last assistant
+    assistant (gpt-6-sol): done it End_turn
+    |}]
+;;
+
+let%expect_test "subagents' requests use the session's pinned login" =
+  with_agent ~logins:codex_logins []
+  @@ fun _t agent ->
+  let seen = ref [] in
+  let recording : Provider.t =
+    { name = "recording"
+    ; stream =
+        (fun r ~cancel:_ ~on_event:_ ->
+          seen := r.account :: !seen;
+          raise_s [%message "not sent"])
+    }
+  in
+  let subagents = Agent.following_account (fun () -> Some agent) recording in
+  let model key =
+    Option.value_exn (Model_registry.find (Model_registry.builtin ()) key)
+  in
+  let send key =
+    let model = model key in
+    try
+      ignore
+        (subagents.stream
+           { Provider.Request.model
+           ; system = None
+           ; messages = []
+           ; tools = []
+           ; thinking = Off
+           ; max_tokens = None
+           ; cache_key = None
+           ; account = None
+           }
+           ~cancel:(Cancellation.create ())
+           ~on_event:ignore
+         : Message.Assistant.t)
+    with
+    | _ -> ()
+  in
+  send "openai-codex/gpt-6-sol";
+  Agent.set_model
+    ~account:(Account_ref.Own (Or_error.ok_exn (Account_id.of_string "work")))
+    agent
+    (model "openai-codex/gpt-6-sol");
+  send "openai-codex/gpt-6-sol";
+  (* Another model of the provider (a subagent's own choice) too. *)
+  send "openai-codex/gpt-6-luna";
+  (* Another provider's model keeps its own default. *)
+  send "anthropic/claude-opus-5-5";
+  print_s [%sexp (List.rev !seen : Account_ref.t option list)];
+  [%expect {| (() ((Own work)) ((Own work)) ()) |}]
 ;;

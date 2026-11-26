@@ -7,7 +7,8 @@ let option_id i = sprintf "popover-option-%d" i
 
 let provider_name (m : App.Model.t) id =
   List.find m.auth ~f:(fun (s : Auth_status.t) -> String.equal s.provider id)
-  |> Option.value_map ~default:id ~f:(fun s -> s.name)
+  |> Option.value_map ~default:(Session_engine.adapter_label id) ~f:(fun s ->
+    s.name)
 ;;
 
 let access_label (mode : Session_mode.t) =
@@ -96,7 +97,9 @@ let row (m : App.Model.t) ~searching ~selected ~inject i (item : Picker.Item.t) 
         ; Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
         ]
       [ (match model with
-         | Some l -> Provider_mark.view l.provider
+         | Some l ->
+           Provider_mark.view
+             (Provider_mark.of_model ~provider:l.provider ~name:l.name)
          | None -> Node.none)
       ; Node.span
           ~attrs:[ Attr.class_ "model-name" ]
@@ -203,8 +206,54 @@ let reasoning (m : App.Model.t) ~inject =
           ]
       ; div
           ~cls:"model-reasoning-note"
-          [ Node.text "This model does not reason." ]
+          [ Node.text
+              (if String.is_prefix model.provider ~prefix:"acp:"
+               then
+                 sprintf
+                   "%s chooses how much it reasons."
+                   (Session_engine.adapter_label model.provider)
+               else "This model does not reason.")
+          ]
       ]
+  | _ -> Node.none
+;;
+
+(* The session's login of its provider, when it has several: a tap pins the
+   session to one ([/account]). *)
+let logins (m : App.Model.t) ~inject =
+  let module Logins = Prigh_ui.Provider_logins in
+  match m.state with
+  | Some state when Option.is_some (Logins.of_session m.auth state) ->
+    let provider = Logins.provider_name m.auth state.model.provider in
+    Node.div
+      ~attrs:
+        [ Attr.class_ "model-reasoning model-logins"
+        ; Attr.role "group"
+        ; Attr.create "aria-label" (provider ^ " login")
+        ]
+      (div
+         ~cls:"model-reasoning-head"
+         [ span ~cls:"model-reasoning-title" "Login"
+         ; span ~cls:"model-reasoning-model" provider
+         ]
+       :: List.map
+            (Logins.session_rows m.auth state)
+            ~f:(fun (r : Logins.Row.t) ->
+              let on = r.marked in
+              Node.button
+                ~attrs:
+                  [ classes [ "reasoning-row" ] [ "on", on ]
+                  ; Attr.type_ "button"
+                  ; Attr.tabindex (-1)
+                  ; Attr.title (sprintf "%s (%s)" r.detail r.id)
+                  ; Attr.create "aria-pressed" (Bool.to_string on)
+                  ; Attr.on_click (fun _ -> inject (Action.Run r.id))
+                  ]
+                [ span ~cls:"reasoning-label" r.label
+                ; (if on
+                   then Html.mark ~cls:"reasoning-check" Check
+                   else Node.span ~attrs:[ Attr.class_ "reasoning-check" ] [])
+                ]))
   | _ -> Node.none
 ;;
 
@@ -226,31 +275,36 @@ let access (m : App.Model.t) ~inject =
                ; Attr.role "menu"
                ; Attr.create "aria-label" "When tools ask first"
                ]
-             (List.map (Session_mode.choices ~current) ~f:(fun mode ->
-                let on = Session_mode.equal mode current in
-                Node.button
-                  ~attrs:
-                    [ classes [ "model-access-item" ] [ "on", on ]
-                    ; Attr.type_ "button"
-                    ; Attr.role "menuitemradio"
-                    ; Attr.create "aria-checked" (Bool.to_string on)
-                    ; Attr.title (Session_mode.describe mode)
-                    ; Attr.on_click (fun _ ->
-                        Effect.Many
-                          [ inject Action.Model_menu_access
-                          ; inject (Action.Set_mode mode)
-                          ])
-                    ]
-                  [ icon (if mode.chat then Message else Shield)
-                  ; Node.span
-                      ~attrs:[ Attr.class_ "menu-text" ]
-                      [ span ~cls:"menu-label" (access_label mode)
-                      ; span ~cls:"menu-detail" (Session_mode.title mode)
+             (List.map
+                (Session_mode.choices
+                   ~plan:(Session_engine.supports state.engine Plan_mode)
+                   ~current
+                   ())
+                ~f:(fun mode ->
+                  let on = Session_mode.equal mode current in
+                  Node.button
+                    ~attrs:
+                      [ classes [ "model-access-item" ] [ "on", on ]
+                      ; Attr.type_ "button"
+                      ; Attr.role "menuitemradio"
+                      ; Attr.create "aria-checked" (Bool.to_string on)
+                      ; Attr.title (Session_mode.describe mode)
+                      ; Attr.on_click (fun _ ->
+                          Effect.Many
+                            [ inject Action.Model_menu_access
+                            ; inject (Action.Set_mode mode)
+                            ])
                       ]
-                  ; (if on
-                     then Html.mark ~cls:"model-check" Check
-                     else Node.span ~attrs:[ Attr.class_ "model-check" ] [])
-                  ]))
+                    [ icon (if mode.chat then Message else Shield)
+                    ; Node.span
+                        ~attrs:[ Attr.class_ "menu-text" ]
+                        [ span ~cls:"menu-label" (access_label mode)
+                        ; span ~cls:"menu-detail" (Session_mode.title mode)
+                        ]
+                    ; (if on
+                       then Html.mark ~cls:"model-check" Check
+                       else Node.span ~attrs:[ Attr.class_ "model-check" ] [])
+                    ]))
          else Node.none)
       ; Node.button
           ~attrs:
@@ -274,6 +328,116 @@ let access (m : App.Model.t) ~inject =
           ; icon ~cls:"chevron" Chevron
           ]
       ]
+;;
+
+(* The session's engine, beside the access mode: switching it takes this
+   session to another agent (a fresh one: a new session on it). *)
+let engine (m : App.Model.t) ~inject =
+  match App.engine_options m with
+  | [] -> Node.none
+  | options ->
+    let mark (c : Deployed_engines.Choice.t) =
+      match c.adapter with
+      | None | Some "prigh" -> icon Bot
+      | Some _ -> Provider_mark.view (Deployed_engines.Choice.label c)
+    in
+    let current =
+      List.find options ~f:(fun (o : App.Engine_option.t) -> o.current)
+    in
+    let label =
+      match current with
+      | Some o -> Deployed_engines.Choice.label o.choice
+      | None -> "Engine"
+    in
+    let busy = App.Model.running m in
+    let open_ = m.model_menu.engine_open in
+    Node.div
+      ~attrs:[ classes [ "model-access"; "model-engine" ] [ "open", open_ ] ]
+      [ (if open_
+         then
+           Node.div
+             ~attrs:
+               [ Attr.class_ "model-access-menu menu-surface"
+               ; Attr.role "menu"
+               ; Attr.create "aria-label" "Engine"
+               ]
+             ((if busy
+               then
+                 [ div ~cls:"model-engine-busy" [ Node.text App.engine_busy ] ]
+               else [])
+              @ List.map options ~f:(fun (o : App.Engine_option.t) ->
+                Node.button
+                  ~attrs:
+                    [ classes
+                        [ "model-access-item" ]
+                        [ "on", o.current; "trouble", o.trouble ]
+                    ; Attr.type_ "button"
+                    ; Attr.role "menuitemradio"
+                    ; Attr.create "aria-checked" (Bool.to_string o.current)
+                    ; Attr.title o.hint
+                    ; (if busy then Attr.disabled else Attr.empty)
+                    ; Attr.on_click (fun _ ->
+                        inject
+                          (Action.Model_menu_engine_pick
+                             (Deployed_engines.Choice.key o.choice)))
+                    ]
+                  [ mark o.choice
+                  ; Node.span
+                      ~attrs:[ Attr.class_ "menu-text" ]
+                      [ span
+                          ~cls:"menu-label"
+                          (Deployed_engines.Choice.label o.choice)
+                      ; span ~cls:"menu-detail" o.hint
+                      ]
+                  ; (if o.current
+                     then Html.mark ~cls:"model-check" Check
+                     else Node.span ~attrs:[ Attr.class_ "model-check" ] [])
+                  ]))
+         else Node.none)
+      ; Node.button
+          ~attrs:
+            [ Attr.class_ "model-access-button"
+            ; Attr.type_ "button"
+            ; Attr.title
+                (if busy
+                 then App.engine_busy
+                 else sprintf "Runs on %s: switch the engine (Alt+E)" label)
+            ; Attr.create "aria-label" (sprintf "Engine: %s" label)
+            ; Attr.create "aria-haspopup" "menu"
+            ; Attr.create "aria-expanded" (Bool.to_string open_)
+            ; Attr.on_click (fun _ -> inject Action.Model_menu_engine)
+            ]
+          [ (match current with
+             | Some o -> mark o.choice
+             | None -> icon Bot)
+          ; span ~cls:"chip-label" label
+          ; icon ~cls:"chevron" Chevron
+          ]
+      ]
+;;
+
+(* Why the session's agent CLI could not list its models, and a button per
+   thing to do about it. *)
+let harness_trouble (m : App.Model.t) ~inject =
+  match m.state with
+  | Some { engine = { models = Some (Failed { message; fixes; _ }); _ }; _ } ->
+    Node.div
+      ~attrs:[ Attr.class_ "model-trouble"; Attr.role "alert" ]
+      [ div ~cls:"model-trouble-text" [ Node.text message ]
+      ; div
+          ~cls:"model-trouble-fixes"
+          (List.map fixes ~f:(fun fix ->
+             Node.button
+               ~attrs:
+                 [ Attr.class_ "model-trouble-fix"
+                 ; Attr.type_ "button"
+                 ; Attr.title (Harness_models.Fix.command fix)
+                 ; Attr.on_click (fun _ ->
+                     inject (Action.Run (Harness_models.Fix.command fix)))
+                 ]
+               [ Node.text (Harness_models.Fix.label fix) ]))
+      ]
+  | _ -> Node.none
 ;;
 
 let view (m : App.Model.t) (p : Picker.t) ~inject =
@@ -345,6 +509,7 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
                       ]
                     ()
                 ]
+            ; harness_trouble m ~inject
             ; div ~cls:"model-list-head" [ Node.text heading ]
             ; (match empty with
                | Some text -> div ~cls:"popover-empty" [ Node.text text ]
@@ -371,13 +536,14 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
                            ~inject)))
             ]
         ; reasoning m ~inject
+        ; logins m ~inject
         ]
     ; div
         ~cls:"model-menu-foot"
         [ span
             ~cls:"menu-keys"
             "↑ ↓ models · ← → providers · Enter switches · Esc closes"
-        ; access m ~inject
+        ; div ~cls:"model-foot-controls" [ access m ~inject; engine m ~inject ]
         ]
     ]
 ;;

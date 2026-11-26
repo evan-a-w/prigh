@@ -10,6 +10,7 @@ let costs =
   ; "test_ask_user_timeout", 0.9
   ; "test_process", 0.8
   ; "test_loop_features", 0.8
+  ; "test_composer_runner", 0.7
   ; "test_job_input", 0.8
   ; "test_acp_interaction", 0.7
   ; "test_reminders", 0.7
@@ -24,6 +25,8 @@ let costs =
   ; "test_review_compare", 0.5
   ; "test_worktree", 0.5
   ; "test_tools", 0.4
+  ; "test_acp_adapter", 0.3
+  ; "test_host_process", 0.3
   ; "test_git_review", 0.4
   ; "test_forge_tools", 0.4
   ; "test_lock_dir", 0.4

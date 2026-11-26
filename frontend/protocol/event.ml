@@ -45,6 +45,10 @@ type t =
   | Message_update of Stream_update.t
   | Message_end of Message.t
   | Retry of Retry.t
+  | Agent_waiting of
+      { agent : string
+      ; starting : bool
+      }
   | Tool_start of Tool_call.t
   | Tool_output of
       { call_id : string
@@ -155,6 +159,7 @@ type t =
       { gen_id : string
       ; delta : string
       } (** streamed text of our own [generate_text] request *)
+  | Accounts_changed
   | Sessions_changed of Session_summary.Change.t option
   | Temporary_ended of
       { session : string
@@ -162,6 +167,8 @@ type t =
       ; kept : (string * string) list
       }
   | Prefs_changed of Prefs.Change.t list
+  | Adapters_changed of Adapter_status.t list
+  | Models_changed
   | Memory_changed of Memory.t
   | Custom_instructions_changed of Custom_instructions.t
   | User_info_changed of User_info.t
@@ -193,6 +200,10 @@ let rec of_json j =
   | "message_end" ->
     Json.object_field j "message" >>= Message.of_json >>| fun m -> Message_end m
   | "retry" -> Retry.of_json j >>| fun r -> Retry r
+  | "agent_waiting" ->
+    let%bind agent = Json.string_field j "agent" in
+    let%map starting = Json.bool_default_field j "starting" ~default:false in
+    Agent_waiting { agent; starting }
   | "tool_start" ->
     Json.object_field j "call" >>= Tool_call.of_json >>| fun c -> Tool_start c
   | "tool_output" ->
@@ -235,6 +246,7 @@ let rec of_json j =
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
   | "review" ->
     Json.object_field j "review" >>= Review.of_json >>| fun r -> Review r
+  | "accounts_changed" -> Ok Accounts_changed
   | "sessions_changed" ->
     Session_summary.Change.of_json j >>| fun change -> Sessions_changed change
   | "temporary_ended" ->
@@ -249,12 +261,15 @@ let rec of_json j =
     Temporary_ended { session; messages; kept }
   | "nix_gc_progress" ->
     Nix_gc_progress.of_json j >>| fun p -> Nix_gc_progress p
+  | "adapters_changed" ->
+    Adapter_status.list_of_json j >>| fun l -> Adapters_changed l
   | "memory_changed" -> Memory.of_json j >>| fun m -> Memory_changed m
   | "custom_instructions_changed" ->
     Custom_instructions.of_json j >>| fun c -> Custom_instructions_changed c
   | "user_info_changed" ->
     User_info.of_json j >>| fun info -> User_info_changed info
   | "mcp_auth_changed" -> Ok Mcp_auth_changed
+  | "models_changed" -> Ok Models_changed
   | "mcp_settings_changed" ->
     Mcp_settings.of_json j >>| fun servers -> Mcp_settings_changed servers
   | "prefs_changed" ->

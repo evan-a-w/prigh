@@ -156,7 +156,18 @@ let%expect_test "cwd, extra env and signal exit" =
                                \n") (stderr ""))
     |}];
   print_s [%sexp ((sh ~env "kill -TERM $$").exit : Process.Exit.t)];
-  [%expect {| (Signaled sigterm) |}]
+  [%expect {| (Signaled sigterm) |}];
+  print_s
+    [%sexp
+      (Process.run_collect
+         ~env
+         ~extra_env:[ "PRIGH_TEST_VAR", "yes" ]
+         ~unset_env:[ "HOME" ]
+         ~prog:"sh"
+         ~args:[ "-c"; "echo $PRIGH_TEST_VAR ${HOME-unset}" ]
+         ()
+       : Process.Output.t)];
+  [%expect {| ((exit (Exited 0)) (stdout "yes unset\n") (stderr "")) |}]
 ;;
 
 let%expect_test "missing program" =
@@ -358,5 +369,48 @@ let%expect_test "cancel kills what left the process group" =
     ((Cancelled) (under_2s true))
     (killed true)
     false
+    |}]
+;;
+
+let%expect_test "term_grace: SIGTERM and the end of input first, then SIGKILL" =
+  Eio_main.run
+  @@ fun env ->
+  let run ?(grace = 5000) script =
+    let cancel = Cancellation.create () in
+    let out = Buffer.create 16 in
+    let input = Stdin_feed.create () in
+    let exit =
+      Process.run
+        ~env
+        ~input
+        ~cancel
+        ~term_grace:(Time_ns.Span.of_int_ms grace)
+        ~on_stdout:(fun s ->
+          Buffer.add_string out s;
+          if String.is_substring s ~substring:"ready"
+          then Cancellation.cancel cancel)
+        ~prog:"sh"
+        ~args:[ "-c"; script ]
+        ()
+    in
+    print_s [%sexp (exit : Process.Exit.t), (Buffer.contents out : string)]
+  in
+  (* Saves its state on TERM. *)
+  run "trap 'echo saved; exit 0' TERM; echo ready; while :; do sleep 0.01; done";
+  (* Ends at the end of its input. *)
+  run "trap '' TERM; echo ready; cat; echo eof";
+  (* Ignores both: killed after the grace (the others end within theirs). *)
+  run
+    ~grace:20
+    "trap '' TERM; echo ready; exec 0<&-; while :; do sleep 0.01; done";
+  [%expect
+    {|
+    (Cancelled  "ready\
+               \nsaved\
+               \n")
+    (Cancelled  "ready\
+               \neof\
+               \n")
+    (Cancelled "ready\n")
     |}]
 ;;

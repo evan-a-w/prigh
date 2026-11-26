@@ -161,6 +161,8 @@ let%expect_test "help lists every key and command" =
     switch to the list's Nth model
     Alt+F (in the model menu)
     star or unstar the highlighted model
+    Alt+E (in the model menu)
+    pick the session's engine (Codex, Claude Code, …), as its foot's engine menu does
     ↑ ↓ or Enter or Esc (a chip's menu)
     move / choose / close it; type to filter the models or hosts
     Tab (a chip's menu; ← → in the host's)
@@ -315,7 +317,9 @@ let%expect_test "help lists every key and command" =
     /settings [section]
     appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new
-    start a new session
+    start a new session (/new ENGINE: on another engine or adapter, e.g. codex or claude, when the backend runs several; the new-session screen picks one too)
+    /engine [adapter]
+    switch this session to another of the composer's adapters (codex, claude, ...): it carries on from a summary of the session so far
     /temporary
     a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name]
@@ -466,10 +470,14 @@ let%expect_test "help lists every key and command" =
     open a subagent's chat (none: the session card), cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
     /jobs [kill <id>]
     background jobs: the session card, or kill one
-    /login [provider|github [HOST]|forgejo HOST|HOST] [token]
-    log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
-    /logout [provider|HOST]
-    remove a provider's login, or sign out of a git host (github: github.com)
+    /login [provider [as LABEL]|github [HOST]|forgejo HOST|HOST] [token]
+    log in to a model provider (or /login custom; as LABEL: another login of it), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
+    /logout [provider[@LOGIN]|HOST]
+    remove a provider's login (@LOGIN: one of several), or sign out of a git host (github: github.com)
+    /accounts [QUERY|default|rename|fallback|up|down|remove LOGIN]
+    a provider's logins: pick one to use, rename, make the default or log out of
+    /account [LOGIN|default]
+    the login of the model's provider this session uses (or /model MODEL@LOGIN)
     /auth
     show which providers and git hosts are logged in
     /pr [list [open|closed|all]|view N|new [title]|checkout N]
@@ -521,7 +529,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
     (Focus picker-input)
     Anthropic Claude subscription, logged in via auth.json ✓
     Anthropic API key
-    OpenAI API key
+    OpenAI API API key
     DeepSeek API key
     Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
     GitHub (github.com) not signed in
@@ -540,7 +548,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   H.text h ~selector:".modal";
   [%expect
     {|
-    Log in to OpenAI
+    Log in to OpenAI API
     (Close (Esc))
     Waiting for the provider…
     (Cancel)
@@ -559,7 +567,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   [%expect
     {|
     (Focus dialog-input)
-    Log in to OpenAI
+    Log in to OpenAI API
     (Close (Esc))
     Sign in, then paste the code.
     (Open the login page)
@@ -675,7 +683,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     (Focus dialog)
     Anthropic logged in with oauth (auth.json)
     (Log out)
-    OpenAI not logged in
+    OpenAI API not logged in
     (Log in)
     DeepSeek not logged in
     (Log in)
@@ -875,6 +883,7 @@ let%expect_test "signing out" =
        ; user = Some "ann"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.text h ~selector:".sidebar-footer";
   [%expect

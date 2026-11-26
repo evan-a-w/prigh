@@ -30,11 +30,13 @@ type t [@@deriving sexp_of, equal]
 val create
   :  ?query:string
   -> ?highlight:string
+  -> ?note:string (** a line above the search field *)
   -> title:string
   -> Item.t list
   -> t
 
 val title : t -> string
+val note : t -> string option
 val query : t -> string
 
 (** The items matching [query], best first. *)

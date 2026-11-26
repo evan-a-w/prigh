@@ -40,7 +40,10 @@ let%expect_test
     {|
     (1789820702579)
     out of range: field "n": integer "1789820702579" out of range
-    (Ok ((input 2169597936) (output 5) (cache_read 2100000000)))
+    (Ok (
+      (input      2169597936)
+      (output     5)
+      (cache_read 2100000000)))
     |}]
 ;;
 

@@ -16,6 +16,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -145,7 +146,7 @@ const transcript = () => page.evaluate(() =>
 const menu = async () => {
   const m = page.locator(".context-menu.placed");
   await m.waitFor();
-  await m.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(a => a.finished)));
+  await animationsOver(page, ".context-menu.placed");
   return m;
 };
 const menuText = async () => clean(await (await menu()).evaluate(m =>
@@ -383,7 +384,7 @@ try {
   console.log(`undone: ${await transcript()}`);
   console.log(`toasts: ${await contextToasts()}`);
   await page.mouse.move(310, 400);
-  await page.locator(".jump-to-bottom").evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+  await animationsOver(page, ".jump-to-bottom");
   await screenshot("toasts");
   await page.locator(".jump-to-bottom").click();
 

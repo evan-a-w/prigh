@@ -12,6 +12,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -159,7 +160,7 @@ try {
   const confirm = page.locator("#confirm");
   await confirm.waitFor();
   // The sheet's entrance done.
-  await page.waitForFunction(() => document.querySelector("#confirm").getAnimations().every(a => a.playState !== "running"));
+  await animationsOver(page, "#confirm");
   section("left to the user");
   console.log(flat(await confirm.innerText()));
   for (const cls of ["allow", "deny"]) console.log(`${cls}: ${await inView(`#confirm .confirm-answer.${cls}`)}`);

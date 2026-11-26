@@ -103,6 +103,9 @@ val running : t -> bool
 (** What the agent is doing, from its events ([Idle] unless [running]). *)
 val activity : t -> Prigh_ui.Activity.t
 
+(** The message being streamed (the newest entry), if one is. *)
+val streaming : t -> Message.Assistant.t option
+
 (** As the backend says (its state's [running]): a transcript fetched or
     cached while the agent was not known to be working. [t] itself when that
     is what it says. *)

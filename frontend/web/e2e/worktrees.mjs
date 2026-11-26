@@ -16,6 +16,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -404,7 +405,7 @@ try {
   await phone.locator(".session-card-row").tap();
   await phone.locator(".session-card.sheet").waitFor();
   await unfoldWorktrees(phone);
-  await phone.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running"));
+  await animationsOver(phone);
   await tree("on a phone", phone, { sessions: false });
   const row = phone.locator(".session-card.sheet .session-card-worktree").first();
   const box = await row.boundingBox();
@@ -457,8 +458,6 @@ try {
     }
     return out.length ? out.join("\n") : "ok";
   }, scope);
-  const settled = target => target.waitForFunction(() =>
-    document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
   const deleteOnPhone = async (from, w, h, { pwa = false } = {}) => {
     const tag = `${w}x${h}${pwa ? " PWA" : ""}`;
     const context = await browser.newContext({
@@ -477,7 +476,7 @@ try {
     await p.locator(".chat-chrome .toggle-sidebar").tap();
     const row = p.locator(".sidebar .session-item.selected [data-session]").first();
     await row.waitFor();
-    await settled(p);
+    await animationsOver(p);
     const title = await p.locator(".sidebar .session-item.selected .session-title").innerText();
     const box = await row.boundingBox();
     await row.dispatchEvent("pointerdown", {
@@ -486,7 +485,7 @@ try {
     await p.waitForTimeout(700);
     await row.dispatchEvent("pointerup", { pointerType: "touch", bubbles: true });
     await p.locator(".context-menu.placed [data-item=delete]").waitFor();
-    await settled(p);
+    await animationsOver(p);
     section(`deleting the session we are in on a phone, ${tag}: its sheet`);
     console.log(await p.evaluate(() => {
       const r = document.querySelector(".context-menu.placed").getBoundingClientRect();
@@ -498,7 +497,7 @@ try {
     await screenshot(`phone ${tag} deleting the session we are in: its sheet`, p);
     await p.locator(".context-menu.placed [data-item=delete]").tap();
     await p.locator(".delete-dialog").waitFor();
-    await settled(p);
+    await animationsOver(p);
     section(`deleting the session we are in on a phone, ${tag}: asked`);
     console.log(`deleting: ${title}`);
     console.log(clean(await p.locator(".delete-dialog").innerText()).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>"));
@@ -512,7 +511,7 @@ try {
     await p.waitForFunction(t =>
       [...document.querySelectorAll(".session-title")].every(e => e.innerText !== t)
       && document.querySelector(".session-item.selected") && !document.querySelector(".session.opening"), title);
-    await settled(p);
+    await animationsOver(p);
     section(`deleting the session we are in on a phone, ${tag}: where we land`);
     console.log(clean(await p.evaluate(() => {
       const id = document.querySelector(".session-item.selected [data-session]")?.dataset.session;

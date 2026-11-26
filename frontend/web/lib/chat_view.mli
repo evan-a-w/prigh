@@ -43,6 +43,9 @@ val view
   -> ?index:Message_index.t
   -> ?deleting:Int.Set.t
   -> ?dividers:Divider.t list
+  -> ?names:string String.Map.t
+       (** models' names by key, for the replies' footers (by default
+           their keys) *)
   -> Message_time.t
   -> Chat.t
   -> Node.t

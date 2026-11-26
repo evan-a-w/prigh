@@ -213,6 +213,7 @@ let transcript (m : Model.t) ~inject =
      @ [ Chat_view.view
            ~ui:{ state = m.ui; inject = ui_inject inject; sent = [] }
            ~fold:(Model.fold m)
+           ~names:(Model.model_names m)
            ?menu:
              (match m.dialog with
               | Some

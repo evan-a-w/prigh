@@ -20,12 +20,20 @@ module Event : sig
     | Done of
         { provider : Provider_id.t
         ; method_ : Provider_auth.Method.t
+        ; account : Account_id.t
         }
     | Failed of
         { provider : string (** ["custom"] while a new one has no name yet *)
         ; error : string
         }
-    | Logged_out of Provider_id.t
+    | Logged_out of
+        { provider : Provider_id.t
+        ; account : Account_id.t option
+        }
+    | Accounts_changed
+    (** a provider's accounts changed otherwise than by [Done] or
+        [Logged_out] (renamed, reordered, a new default): clients reread
+        the status *)
     | Forge_done of
         { host : string
         ; user : string option
@@ -60,8 +68,16 @@ val status : t -> Provider_auth.Status.t list Or_error.t
 val in_progress : t -> bool
 
 (** Starts the flow in the background; completion is reported by [Done] or
-    [Failed]. A custom provider runs {!Custom_login.login} to edit it. *)
-val start : t -> Provider_id.t -> Provider_auth.Method.t -> unit Or_error.t
+    [Failed]. A custom provider runs {!Custom_login.login} to edit it.
+    [account] and [label] pick the account as {!Provider_accounts.save_login}
+    does. *)
+val start
+  :  t
+  -> ?account:Account_id.t
+  -> ?label:string
+  -> Provider_id.t
+  -> Provider_auth.Method.t
+  -> unit Or_error.t
 
 (** [/login custom]: defines a new custom provider (or edits [name]). *)
 val start_custom : t -> ?name:string -> unit -> unit Or_error.t
@@ -72,8 +88,16 @@ val wait : t -> unit
 
 (** For a configured custom provider this is a flow ({!Custom_login.logout}:
     its prompt asks whether to remove the definition too) ending in
-    [Logged_out], or nothing when the user keeps everything or cancels. *)
-val logout : t -> Provider_id.t -> unit Or_error.t
+    [Logged_out], or nothing when the user keeps everything or cancels.
+    A built-in one logs [account] out (default: the default account). *)
+val logout : t -> ?account:Account_id.t -> Provider_id.t -> unit Or_error.t
+
+val update_account
+  :  t
+  -> Provider_id.t
+  -> Account_id.t
+  -> Provider_accounts.Update.t
+  -> unit Or_error.t
 
 (** Signs in to a git host with [run] (see {!Forges.login}), as a flow
     like [start]'s ending in [Forge_done] or [Failed]. *)

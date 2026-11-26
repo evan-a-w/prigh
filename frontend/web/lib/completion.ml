@@ -44,8 +44,12 @@ let command_items ~superuser ~prefix =
 ;;
 
 let logged_in (auth : Auth_status.t list) provider =
-  List.exists auth ~f:(fun s ->
-    String.equal s.provider provider && Option.is_some s.configured)
+  match
+    List.find auth ~f:(fun (s : Auth_status.t) ->
+      String.equal s.provider provider)
+  with
+  | None -> true
+  | Some s -> Option.is_some s.configured
 ;;
 
 let skill_items skills =
@@ -80,13 +84,25 @@ let argument_items
       ~(skills : Skill.t list)
       ~(snippets : Snippet.t list)
       ~(forges : Forge_account.t list)
+      ~(engines : Deployed_engines.t)
+      ~composer
       ~superuser
   =
   let simple items =
     List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
   in
+  let engine_items choices =
+    List.map choices ~f:(fun c ->
+      Picker.Item.create
+        ~id:(Deployed_engines.Choice.key c)
+        ~detail:(Deployed_engines.Choice.describe c)
+        ~search:
+          (Deployed_engines.Choice.key c ^ " " ^ Deployed_engines.Choice.label c)
+        (Deployed_engines.Choice.label c))
+  in
   match kind with
   | Model -> model_items models ~auth ~current_model
+  | Adapter -> engine_items (Deployed_engines.switch_targets engines)
   | Thinking ->
     let llm =
       Option.bind current_model ~f:(fun key ->
@@ -219,13 +235,15 @@ let argument_items
       ; "off", "the model may not change them (they stay in context)"
       ]
   | Settings ->
-    List.map (Settings_section.available ~superuser) ~f:(fun section ->
-      let arg = Settings_section.arg section in
-      Picker.Item.create
-        ~id:arg
-        ~detail:(Settings_section.about section)
-        ~search:(arg ^ " " ^ Settings_section.name section)
-        arg)
+    List.map
+      (Settings_section.available ~composer ~superuser ())
+      ~f:(fun section ->
+        let arg = Settings_section.arg section in
+        Picker.Item.create
+          ~id:arg
+          ~detail:(Settings_section.about section)
+          ~search:(arg ^ " " ^ Settings_section.name section)
+          arg)
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create
@@ -338,8 +356,10 @@ let compute
       ?(snippets = [])
       ?(reminders = [])
       ?(forges = [])
+      ?(engines = Deployed_engines.harness_only)
       ?(worktrees = [])
       ?(refs = Git_diff.Refs.empty)
+      ?(composer = false)
       ~superuser
       ~text
       ~cursor
@@ -476,6 +496,8 @@ let compute
                        ~skills
                        ~snippets
                        ~forges
+                       ~engines
+                       ~composer
                        ~superuser)
                     ~f:(fun (i : Picker.Item.t) ->
                       String.is_prefix i.id ~prefix)
@@ -497,6 +519,8 @@ let compute
                        ~skills
                        ~snippets
                        ~forges
+                       ~engines
+                       ~composer
                        ~superuser)
                 with
                 | [] -> None

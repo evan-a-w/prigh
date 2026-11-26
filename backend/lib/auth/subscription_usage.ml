@@ -23,10 +23,22 @@ module Status = struct
   [@@deriving sexp_of, equal]
 end
 
+module Account_usage = struct
+  type t =
+    { id : Account_id.t
+    ; shared_by : string option
+    ; label : string
+    ; default : bool
+    ; status : Status.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Provider_usage = struct
   type t =
     { provider : Provider_id.t
     ; status : Status.t
+    ; accounts : Account_usage.t list
     }
   [@@deriving sexp_of, equal]
 end
@@ -37,11 +49,13 @@ type t =
   }
 [@@deriving sexp_of, equal]
 
-let providers : Provider_id.t list = [ Anthropic; Openai_codex ]
+let providers : Provider_id.t list =
+  [ Anthropic; Openai_codex; Google_antigravity ]
+;;
 
 let name : Provider_id.t -> string = function
   | Anthropic -> "Claude"
-  | Openai_codex -> "ChatGPT"
+  | Google_antigravity -> "Antigravity"
   | p -> Provider_id.display_name p
 ;;
 
@@ -70,17 +84,66 @@ let status_fields : Status.t -> (string * Json.t) list = function
   | Failed error -> [ "status", `String "error"; "error", `String error ]
 ;;
 
-let to_json t =
+module Harness_usage = struct
+  type t =
+    { adapter : string
+    ; name : string
+    ; status : Status.t
+    }
+end
+
+let to_json ?(harnesses = []) t =
   `Object
     [ "fetched_at_ms", ms t.fetched_at
     ; ( "providers"
       , `Array
-          (List.map t.providers ~f:(fun (p : Provider_usage.t) ->
+          (List.map harnesses ~f:(fun (h : Harness_usage.t) ->
+             `Object
+               ([ "provider", `String h.adapter; "name", `String h.name ]
+                @ status_fields h.status))
+           @ List.map t.providers ~f:(fun (p : Provider_usage.t) ->
              `Object
                ([ "provider", `String (Provider_id.to_string p.provider)
                 ; "name", `String (name p.provider)
                 ]
-                @ status_fields p.status))) )
+                @ status_fields p.status
+                @ [ ( "accounts"
+                    , `Array
+                        (List.map p.accounts ~f:(fun (a : Account_usage.t) ->
+                           `Object
+                             ([ ( "ref"
+                                , `String
+                                    (match a.shared_by with
+                                     | None ->
+                                       sprintf
+                                         "%s/%s"
+                                         (Provider_id.to_string p.provider)
+                                         (Account_id.to_string a.id)
+                                     | Some owner ->
+                                       sprintf
+                                         "~%s/%s/%s"
+                                         owner
+                                         (Provider_id.to_string p.provider)
+                                         (Account_id.to_string a.id)) )
+                              ; ( "id"
+                                , `String
+                                    (match a.shared_by with
+                                     | None -> Account_id.to_string a.id
+                                     | Some owner ->
+                                       sprintf
+                                         "~%s/%s"
+                                         owner
+                                         (Account_id.to_string a.id)) )
+                              ; "label", `String a.label
+                              ; ("default", if a.default then `True else `False)
+                              ]
+                              @ Option.value_map
+                                  a.shared_by
+                                  ~default:[]
+                                  ~f:(fun owner ->
+                                    [ "shared_by", `String owner ])
+                              @ status_fields a.status))) )
+                  ]))) )
     ]
 ;;
 
@@ -88,17 +151,16 @@ module Http = struct
   type t =
     url:string
     -> headers:(string * string) list
+    -> ?body:string
     -> unit
     -> (int * (string * string) list * string, string) Result.t
 
-  let real ~env ~url ~headers () =
+  let real ~env ~url ~headers ?body () =
+    let timeout = Time_ns.Span.of_int_sec 20 in
     match
-      Http_client.get
-        ~env
-        ~timeout:(Time_ns.Span.of_int_sec 20)
-        ~url
-        ~headers
-        ()
+      match body with
+      | None -> Http_client.get ~env ~timeout ~url ~headers ()
+      | Some body -> Http_client.post ~env ~timeout ~url ~headers ~body ()
     with
     | Ok (response, body) -> Ok (response.status, response.headers, body)
     | Error e -> Error (Http_client.Error.to_string e)
@@ -353,6 +415,68 @@ let parse_codex ~now body =
     Limits { plan = string_field json "plan_type"; windows = main @ additional }
 ;;
 
+let antigravity_plan load =
+  let tier key =
+    Option.bind (parse_json load |> Result.ok) ~f:(fun json -> field json key)
+  in
+  List.find_map [ "paidTier"; "currentTier" ] ~f:(fun key ->
+    Option.bind (tier key) ~f:(fun tier ->
+      match Option.map (string_field tier "id") ~f:String.lowercase with
+      | Some "free-tier" -> Some "Free"
+      | Some "standard-tier" -> Some "Standard"
+      | Some "g1-pro-tier" -> Some "Pro"
+      | Some "g1-ultra-tier" -> Some "Ultra"
+      | id -> Option.first_some (string_field tier "name") id))
+;;
+
+let antigravity_window_label = function
+  | "5h" -> "5-hour"
+  | "weekly" -> "Weekly"
+  | "daily" -> "Daily"
+  | w -> humanize w
+;;
+
+(* A group's buckets, labelled "5-hour · Gemini Models". *)
+let antigravity_windows group =
+  let group_name = string_field group "displayName" in
+  match field group "buckets" with
+  | Some (`Array buckets) ->
+    List.filter_map buckets ~f:(fun bucket ->
+      let open Option.Let_syntax in
+      let%bind remaining = number_field bucket "remainingFraction" in
+      let%map id =
+        Option.first_some
+          (string_field bucket "bucketId")
+          (string_field bucket "displayName")
+      in
+      let window =
+        match string_field bucket "window" with
+        | Some w -> antigravity_window_label w
+        | None -> Option.value (string_field bucket "displayName") ~default:id
+      in
+      { Window.id
+      ; label =
+          Option.value_map group_name ~default:window ~f:(fun g ->
+            window ^ " · " ^ g)
+      ; used_percent =
+          Float.clamp_exn ((1. -. remaining) *. 100.) ~min:0. ~max:100.
+      ; resets_at = Option.bind (field bucket "resetTime") ~f:time
+      })
+  | _ -> []
+;;
+
+let parse_antigravity ~load body =
+  match parse_json body with
+  | Error e -> Status.Failed ("Antigravity's quota answer: " ^ e)
+  | Ok json ->
+    let windows =
+      match field json "groups" with
+      | Some (`Array groups) -> List.concat_map groups ~f:antigravity_windows
+      | _ -> []
+    in
+    Limits { plan = antigravity_plan load; windows }
+;;
+
 let anthropic_origin = "https://api.anthropic.com"
 let codex_origin = "https://chatgpt.com"
 
@@ -423,14 +547,74 @@ let answer provider ~parse result =
             detail))
 ;;
 
-let fetch_one ~env ?getenv ?refresh ~(http : Http.t) ~now store provider =
+(* agy's [--cloud_code_endpoint]; with another User-Agent only the Claude
+   and GPT group is answered. *)
+let antigravity_origin = "https://daily-cloudcode-pa.googleapis.com"
+let antigravity_default_project = "default-cli-project"
+
+let antigravity_user_agent =
+  sprintf
+    "antigravity/cli/%s (prigh/%s; os_type=linux; arch=amd64; \
+     auth_method=consumer)"
+    Oauth_antigravity.agy_version
+    Version.to_string
+;;
+
+let antigravity ?getenv ~(http : Http.t) token =
+  let post path body =
+    http
+      ~url:(url ?getenv antigravity_origin ("/v1internal:" ^ path))
+      ~headers:
+        [ "Authorization", "Bearer " ^ token
+        ; "Content-Type", "application/json"
+        ; "Accept", "application/json"
+        ; "User-Agent", antigravity_user_agent
+        ]
+      ~body:(Json.to_string body)
+      ()
+  in
+  let loaded =
+    post
+      "loadCodeAssist"
+      (`Object
+          [ "cloudaicompanionProject", `String antigravity_default_project
+          ; ( "metadata"
+            , `Object
+                [ "ideType", `String "IDE_UNSPECIFIED"
+                ; "platform", `String "PLATFORM_UNSPECIFIED"
+                ; "pluginType", `String "GEMINI"
+                ; "duetProject", `String antigravity_default_project
+                ] )
+          ])
+  in
+  match loaded with
+  | Ok (200, _, load) ->
+    let project =
+      Option.bind
+        (parse_json load |> Result.ok)
+        ~f:(fun json -> string_field json "cloudaicompanionProject")
+      |> Option.value ~default:antigravity_default_project
+    in
+    (match
+       post "retrieveUserQuotaSummary" (`Object [ "project", `String project ])
+     with
+     | Ok (404, _, _) ->
+       Status.Failed
+         "Google does not give this login's quota summary (HTTP 404): agy's \
+          /usage, on a tool host, shows it"
+     | summary ->
+       answer Google_antigravity ~parse:(parse_antigravity ~load) summary)
+  | other -> answer Google_antigravity ~parse:(fun _ -> Not_signed_in) other
+;;
+
+let of_resolved ?getenv ~(http : Http.t) ~now provider resolved =
   let login = "/login " ^ Provider_id.to_string provider in
-  match Provider_auth.resolve ~env ?getenv ?refresh store provider with
+  match resolved with
   | Error e ->
     Status.Failed
       (sprintf "%s: sign in again with %s" (Error.to_string_hum e) login)
   | Ok None -> Not_signed_in
-  | Ok (Some resolved) ->
+  | Ok (Some (resolved : Provider_auth.Resolved.t)) ->
     (match (provider : Provider_id.t) with
      | Anthropic ->
        (match
@@ -471,16 +655,82 @@ let fetch_one ~env ?getenv ?refresh ~(http : Http.t) ~now store provider =
                  ; "User-Agent", "prigh/" ^ Version.to_string
                  ]
                ()))
+     | Google_antigravity -> antigravity ?getenv ~http resolved.token
      | Openai | Deepseek | Custom _ -> Not_signed_in)
 ;;
 
-let fetch ~env ?getenv ?refresh ~http ~now store =
+module Shared = struct
+  type t =
+    { owner : string
+    ; provider : Provider_id.t
+    ; id : Account_id.t
+    ; label : string
+    ; resolve : unit -> Provider_auth.Resolved.t option Or_error.t
+    }
+end
+
+let fetch ~env ?getenv ?refresh ?(shared = []) ~http ~now store =
   let providers =
     Fiber.List.map
       (fun provider ->
-         { Provider_usage.provider
-         ; status = fetch_one ~env ?getenv ?refresh ~http ~now store provider
-         })
+         let fetch ?account () =
+           of_resolved
+             ?getenv
+             ~http
+             ~now
+             provider
+             (Provider_auth.resolve
+                ~env
+                ?getenv
+                ?refresh
+                ?account
+                store
+                provider)
+         in
+         let shared =
+           Fiber.List.map
+             (fun (s : Shared.t) ->
+                { Account_usage.id = s.id
+                ; shared_by = Some s.owner
+                ; label = s.label
+                ; default = false
+                ; status =
+                    (match s.resolve () with
+                     | Error e -> Failed (Error.to_string_hum e)
+                     | resolved ->
+                       of_resolved ?getenv ~http ~now provider resolved)
+                })
+             (List.filter shared ~f:(fun (s : Shared.t) ->
+                Provider_id.equal s.provider provider))
+         in
+         match Provider_accounts.list store provider with
+         | Error _ | Ok [] ->
+           (match shared with
+            | [] ->
+              { Provider_usage.provider; status = fetch (); accounts = [] }
+            | first :: rest ->
+              { provider
+              ; status = first.status
+              ; accounts = { first with default = true } :: rest
+              })
+         | Ok accounts ->
+           let accounts =
+             Fiber.List.map
+               (fun (a : Provider_accounts.Account.t) ->
+                  { Account_usage.id = a.id
+                  ; shared_by = None
+                  ; label = a.label
+                  ; default = a.default
+                  ; status = fetch ~account:a.id ()
+                  })
+               accounts
+           in
+           let status =
+             match List.find accounts ~f:(fun a -> a.default) with
+             | Some a -> a.status
+             | None -> fetch ()
+           in
+           { provider; status; accounts = accounts @ shared })
       providers
   in
   { fetched_at = now (); providers }

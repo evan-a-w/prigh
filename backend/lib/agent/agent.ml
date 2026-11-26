@@ -94,6 +94,7 @@ module State = struct
     ; cwd : string
     ; git_branch : string option
     ; model : Model.t
+    ; account : Account_ref.t option
     ; thinking : Thinking.t
     ; running : bool
     ; message_count : int
@@ -124,6 +125,14 @@ module State = struct
     ; hidden : Session.Hidden.t list [@sexp.list]
     ; transcript_filter : string option [@sexp.option]
     ; temporary : bool [@sexp.bool]
+    ; engine : Engine_choice.t [@sexp_drop_if Engine_choice.is_harness]
+    ; capabilities : Capabilities.t
+          [@sexp_drop_if
+            fun c ->
+              Sexp.equal
+                (Capabilities.sexp_of_t c)
+                (Capabilities.sexp_of_t Capabilities.harness)]
+    ; unavailable : string option [@sexp.option]
     }
   [@@deriving sexp_of]
 end
@@ -208,6 +217,12 @@ type t =
   { env : Env.t
   ; sw : Switch.t
   ; provider : Provider.t
+  ; mutable runner : Runner.t option
+    (** the session's engine when it is not the harness on [provider] *)
+  ; mutable unavailable : string option
+  ; accounts : Provider_id.t -> Login_choice.t list
+  ; mutable login : Account_ref.t option
+    (** the account of [model]'s provider to use ([None]: its default) *)
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
   ; user_info : User_info.t option
@@ -222,6 +237,10 @@ type t =
   ; mutable repo_asked : (string * string) option
     (** the client host and directory last asked where it is in git *)
   ; mutable model : Model.t
+  ; mutable harness_model : Model.t
+    (** the model prigh's own loop and aux requests use while [model] is
+        an external harness's *)
+  ; mutable aux_noted : bool (* told that aux requests fail *)
   ; mutable thinking : Thinking.t
   ; mutable run : Run.t option
   ; mutable describing : unit Promise.t option
@@ -359,6 +378,13 @@ let settle_thinking model thinking =
   else thinking
 ;;
 
+let is_external (m : Model.t) = External_model.is_external (Model.key m)
+
+(* The model of requests prigh makes itself (approval verdicts, names,
+   descriptions): the session's, or prigh's own while an external harness
+   runs the session. *)
+let aux_model t = if is_external t.model then t.harness_model else t.model
+
 let restore_settings t =
   t.goal <- Session.goal t.session;
   t.review <- Session.review t.session;
@@ -366,9 +392,13 @@ let restore_settings t =
   (match Session.model t.session with
    | Some (model_id, thinking) ->
      Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
-       t.model <- m);
-     t.thinking <- settle_thinking t.model thinking
-   | None -> ());
+       t.model <- m;
+       t.harness_model <- m);
+     t.thinking <- settle_thinking t.model thinking;
+     t.login
+     <- Option.bind (Session.account t.session) ~f:(fun id ->
+          Result.ok (Account_ref.of_string id))
+   | None -> t.login <- None);
   restore_approvals t
 ;;
 
@@ -525,6 +555,15 @@ let model_of t name =
   else Option.value (Model_registry.find t.models name) ~default:t.model
 ;;
 
+(* What the reply [usage] of the model [name] cost at prigh's prices: none
+   for an external harness's (a composer session's), whose reported cost
+   its runner recorded as spend. *)
+let reply_cost t name usage =
+  if External_model.is_external name
+  then 0.
+  else Model.cost_usd (model_of t name) usage
+;;
+
 (* Every response in the session file (all branches, also those a compaction
    summarised), each at its own model's price, and the recorded spend of
    everything else (subagents, compactions, [btw]). *)
@@ -534,10 +573,16 @@ let session_spend t =
     (Session.replies t.session)
     ~init:(Session.spend t.session)
     ~f:(fun (usage, cost) (name, u) ->
-      let model =
-        Hashtbl.find_or_add models name ~default:(fun () -> model_of t name)
+      let cost_u =
+        if External_model.is_external name
+        then 0.
+        else (
+          let model =
+            Hashtbl.find_or_add models name ~default:(fun () -> model_of t name)
+          in
+          Model.cost_usd model u)
       in
-      Usage.add usage u, cost +. Model.cost_usd model u)
+      Usage.add usage u, cost +. cost_u)
 ;;
 
 let spent_usd t = snd (session_spend t)
@@ -608,18 +653,101 @@ let describe_allowed t =
     | None -> id)
 ;;
 
+(* A session naming an engine this prigh does not know is shown as the
+   harness's; [unavailable] says why it cannot run. *)
+let engine_choice t =
+  Session.engine t.session
+  |> Result.ok
+  |> Option.value ~default:Engine_choice.harness
+;;
+
+(* A session that cannot run here (its engine is not deployed) can only be
+   read: nothing would put what it does in its harness's thread. *)
+let runner_capabilities t =
+  match t.runner, t.unavailable with
+  | Some runner, _ -> Runner.capabilities runner
+  | None, Some _ -> Capabilities.none
+  | None, None -> Capabilities.harness
+;;
+
+(* The harness's own description of [m] (its name, levels), once it listed
+   its models. *)
+let listed t (m : Model.t) =
+  Option.bind t.runner ~f:Runner.models
+  |> Option.bind
+       ~f:
+         (List.find ~f:(fun (l : Model.t) ->
+            Provider_id.equal l.provider m.provider && String.equal l.id m.id))
+  |> Option.value_map ~default:m ~f:(fun (l : Model.t) ->
+    { m with
+      name = l.name
+    ; thinking_levels = l.thinking_levels
+    ; can_disable_thinking = l.can_disable_thinking
+    ; context_window =
+        (if m.context_window > 0 then m.context_window else l.context_window)
+    })
+;;
+
+(* A composer session's model is its harness's: the one it runs (an
+   {!External_model}), else (before the harness listed its models) the one
+   that wrote its latest reply, else the placeholder. *)
+let shown_model t =
+  match engine_choice t with
+  | _ when is_external t.model && not (External_model.is_placeholder t.model) ->
+    listed t t.model
+  | { engine = Composer; adapter = Some adapter } ->
+    let prefix = Adapter_id.to_string adapter ^ "/" in
+    let placeholder =
+      if is_external t.model
+      then listed t t.model
+      else
+        listed
+          t
+          (External_model.pending ~adapter:(Adapter_id.to_string adapter))
+    in
+    (match
+       List.rev (Session.replies t.session)
+       |> List.find_map ~f:(fun (name, _) -> String.chop_prefix name ~prefix)
+     with
+     | Some name when not (String.equal name External_model.default_id) ->
+       let models =
+         Option.value (Option.bind t.runner ~f:Runner.models) ~default:[]
+       in
+       (match
+          List.find models ~f:(fun (m : Model.t) ->
+            String.equal m.id name || External_model.same_model m.name name)
+        with
+        | Some m -> listed t m
+        | None -> { placeholder with id = name; name })
+     | _ -> placeholder)
+  | _ -> t.model
+;;
+
 let state t =
   let messages = messages t in
   let assistant_usage, assistant_cost = session_spend t in
   let usage = assistant_usage in
-  let context_tokens = Session.context_tokens t.session in
+  let context_tokens =
+    (* An external harness says how full its context is; the usage it
+       reports per turn covers every request of the turn. *)
+    match Option.bind t.runner ~f:(fun r -> fst (Runner.context r)) with
+    | Some tokens -> tokens
+    | None when is_external t.model ->
+      (* What its last reply reported may sum a turn's requests. *)
+      let estimate = Message.estimate_tokens (Session.messages t.session) in
+      (match Session.context_tokens t.session with
+       | 0 -> estimate
+       | reported -> Int.min reported estimate)
+    | None -> Session.context_tokens t.session
+  in
   { State.session_id = Session.id t.session
   ; session_path = Session.path t.session
   ; session_name = Session.name t.session
   ; session_description = Session.description t.session
   ; cwd = t.cwd
   ; git_branch = t.git_branch
-  ; model = t.model
+  ; model = shown_model t
+  ; account = (if is_external t.model then None else t.login)
   ; thinking = t.thinking
   ; running = is_running t
   ; message_count = List.length messages
@@ -665,6 +793,9 @@ let state t =
   ; hidden = Session.hidden t.session
   ; transcript_filter = Session.transcript_filter t.session
   ; temporary = Session.temporary t.session
+  ; engine = engine_choice t
+  ; capabilities = runner_capabilities t
+  ; unavailable = t.unavailable
   }
 ;;
 
@@ -837,13 +968,18 @@ let confirm
           | Some w when phys_equal w.resolver resolver -> Error after
           | Some _ | None -> answered ())
   in
-  let answer =
-    Trace.span "approval_wait" (fun () ->
-      Cancellation.protect context.cancel ~f:wait)
+  (* Also when the waiting fiber is cancelled (its turn ended): the
+     frontends would show the dialog for good otherwise. *)
+  let done_ () =
+    (match Hashtbl.find t.pending_confirms key with
+     | Some w when phys_equal w.resolver resolver ->
+       Hashtbl.remove t.pending_confirms key
+     | Some _ | None -> ());
+    broadcast t (Loop (Tool_confirm_done { call_id; agent_id }))
   in
-  Hashtbl.remove t.pending_confirms key;
-  broadcast t (Loop (Tool_confirm_done { call_id; agent_id }));
-  answer
+  Exn.protect ~finally:done_ ~f:(fun () ->
+    Trace.span "approval_wait" (fun () ->
+      Cancellation.protect context.cancel ~f:wait))
 ;;
 
 let respond_confirm ?agent_id t ~call_id (answer : Confirm_answer.t) =
@@ -911,6 +1047,12 @@ let ask_user t ~cancel ~call_id ~timeout_seconds questions =
           | Some _ | None -> answered ())
     | _ -> answered
   in
+  let forget () =
+    match Hashtbl.find t.pending_questions call_id with
+    | Some (_, r) when phys_equal r resolver ->
+      Hashtbl.remove t.pending_questions call_id
+    | Some _ | None -> ()
+  in
   let reply =
     match
       Trace.span
@@ -920,8 +1062,14 @@ let ask_user t ~cancel ~call_id ~timeout_seconds questions =
     with
     | None -> User_question.Reply.Cancelled
     | Some reply -> reply
+    | exception exn ->
+      (* Its fiber was cancelled (the turn ended): the frontends would show
+         the question for good otherwise. *)
+      forget ();
+      broadcast t (Loop (Ask_user_done { call_id; timed_out = false }));
+      raise exn
   in
-  Hashtbl.remove t.pending_questions call_id;
+  forget ();
   let timed_out =
     match reply with
     | Timed_out _ -> true
@@ -1400,6 +1548,19 @@ let activate_host t (host : Host.t) ~cwd ~pinned =
   state_changed t
 ;;
 
+let active_host_name t = t.active_host_name
+
+let user_instructions t =
+  System_prompt.user_sections
+    ?user_info:(Option.bind t.user_info ~f:User_info.text)
+    ~custom_instructions:
+      (Option.value_map
+         t.custom_instructions
+         ~default:[]
+         ~f:Custom_instructions.for_model)
+    ()
+;;
+
 let host_unavailable_message t =
   if String.is_empty t.active_host
   then no_host_message
@@ -1457,7 +1618,13 @@ let set_hosts ?(returning = String.Map.empty) t clients =
       t.active_host_name <- host.name;
       state_changed t
     | None, _ ->
-      if was_connected then notice (host_unavailable_message t);
+      if was_connected
+      then (
+        (* What is sent to a program there while it is away is lost: an
+           external harness's turn ends now, and the next one starts it
+           again, continuing its thread. *)
+        Option.iter t.runner ~f:Runner.close;
+        notice (host_unavailable_message t));
       state_changed t)
 ;;
 
@@ -1710,7 +1877,7 @@ let tool_hosts t =
 
 let approval_model t =
   match t.config.approval_model with
-  | None -> Ok t.model
+  | None -> Ok (aux_model t)
   | Some name ->
     Model_registry.resolve t.models name
     |> Result.map_error ~f:(fun e ->
@@ -2952,6 +3119,152 @@ let loop_config ?cancel t =
   }
 ;;
 
+let harness_runner t =
+  Harness_runner.create ~provider:t.provider ~config:(fun ~cancel ->
+    loop_config ~cancel t)
+;;
+
+let runner t =
+  match t.runner with
+  | Some runner -> runner
+  | None -> harness_runner t
+;;
+
+(* The session records the model it is on, unless it is [current]. *)
+let record_model ?account t ~current =
+  if not (Option.equal String.equal current (Some (Model.key t.model)))
+  then
+    ignore
+      (Session.set_model
+         ?account
+         t.session
+         ~model:(Model.key t.model)
+         ~thinking:t.thinking
+       : Session.Entry.t)
+;;
+
+(* The session's model follows its runner: an external harness's (the one
+   the session recorded, else the harness's default) or prigh's own. *)
+let settle_runner_model t =
+  let external_models = Option.bind t.runner ~f:Runner.models in
+  match external_models, (engine_choice t).adapter with
+  | Some models, Some adapter ->
+    let adapter = Adapter_id.to_string adapter in
+    let current = Option.map (Session.model t.session) ~f:fst in
+    (* The model this harness ran last in the session, if it ran here. *)
+    let recorded =
+      Session.last_model t.session ~f:(String.is_prefix ~prefix:(adapter ^ "/"))
+      |> Option.map ~f:fst
+    in
+    let model =
+      if
+        External_model.of_adapter ~adapter t.model
+        && not (External_model.is_placeholder t.model)
+      then t.model
+      else (
+        match
+          Option.bind recorded ~f:(External_model.restore ~adapter ~models)
+        with
+        | Some m -> m
+        | None ->
+          (match models with
+           | m :: _ -> m
+           | [] -> External_model.pending ~adapter))
+    in
+    t.model <- model;
+    t.thinking <- settle_thinking model t.thinking;
+    record_model t ~current
+  | _ ->
+    if is_external t.model
+    then (
+      t.model <- t.harness_model;
+      t.thinking <- settle_thinking t.model t.thinking;
+      (* The login the session last pinned on one of prigh's models. *)
+      t.login
+      <- Option.bind
+           (Session.last_account t.session ~f:(fun m ->
+              not (External_model.is_external m)))
+           ~f:(fun id -> Result.ok (Account_ref.of_string id));
+      record_model
+        ?account:(Option.map t.login ~f:Account_ref.to_string)
+        t
+        ~current:(Option.map (Session.model t.session) ~f:fst))
+;;
+
+let set_runner t runner =
+  Option.iter t.runner ~f:Runner.close;
+  t.runner <- runner;
+  settle_runner_model t;
+  state_changed t
+;;
+
+let models_changed t =
+  if
+    Option.is_some t.runner
+    && is_external t.model
+    && External_model.is_placeholder t.model
+  then (
+    let before = Model.key t.model in
+    settle_runner_model t;
+    if not (String.equal before (Model.key t.model)) then state_changed t)
+;;
+
+(* The models the session can switch to when they are its external
+   harness's, not prigh's. *)
+let external_models t = Option.bind t.runner ~f:Runner.models
+let external_limits t = Option.bind t.runner ~f:Runner.limits
+let external_live t = Option.exists t.runner ~f:Runner.live
+let stop_engine t = Option.iter t.runner ~f:Runner.close
+let capabilities t = runner_capabilities t
+
+let engine t =
+  match t.runner, t.unavailable with
+  | None, Some _ -> (engine_choice t).engine
+  | _ -> Runner.engine (runner t)
+;;
+
+let engine_label t =
+  match engine t, (engine_choice t).adapter with
+  | Composer, Some adapter -> Adapter_id.label adapter
+  | engine, _ -> String.capitalize (Engine_id.to_string engine)
+;;
+
+(* Whether prigh's own loop calls the model: the harness, or the
+   composer's [prigh] adapter. *)
+let own_loop t =
+  match engine t, (engine_choice t).adapter with
+  | Harness, _ | Composer, Some Prigh -> true
+  | Composer, _ -> false
+;;
+
+(* Who a usage limit is with: the model, or the external harness. *)
+let limited_by t = if own_loop t then Model.key t.model else engine_label t
+
+let require t feature =
+  Capabilities.check (capabilities t) feature ~who:(engine_label t)
+;;
+
+(* An external harness that cannot compact: prigh does it for it. *)
+let agent_summarises t =
+  match (capabilities t).compact with
+  | Summary -> true
+  | Native | Command | Auto_only | Unsupported -> false
+;;
+
+let set_engine t (choice : Engine_choice.t) =
+  if not (Engine_choice.equal choice (engine_choice t))
+  then (
+    ignore (Session.set_engine t.session choice : Session.Entry.t);
+    state_changed t)
+;;
+
+let set_unavailable t why =
+  if not (Option.equal String.equal why t.unavailable)
+  then (
+    t.unavailable <- why;
+    state_changed t)
+;;
+
 (* The text with the attachments' [<file>] blocks, what they are, and their
    images. *)
 let with_attachments t ~cancel text attachments =
@@ -3048,7 +3361,7 @@ let rec account t ?(nested = false) (event : Agent_event.t) =
   match event with
   | Subagent { event; _ } -> account t ~nested:true event
   | Message_end (Assistant a) when nested ->
-    add a.usage (Model.cost_usd (model_of t a.model) a.usage)
+    add a.usage (reply_cost t a.model a.usage)
   | Compacted { usage; cost_usd; _ } -> add usage cost_usd
   | _ -> ()
 ;;
@@ -3134,8 +3447,10 @@ let deliveries t =
 ;;
 
 (* The system prompt names the tools of the model it was built for. *)
-let set_model t model =
+let set_model ?account t model =
   t.model <- model;
+  if not (is_external model) then t.harness_model <- model;
+  t.login <- (if is_external model then None else account);
   let thinking = settle_thinking model t.thinking in
   if not (Thinking.equal thinking t.thinking)
   then (
@@ -3155,9 +3470,51 @@ let set_model t model =
     t.thinking <- thinking);
   environment_changed t;
   ignore
-    (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
+    (Session.set_model
+       ?account:(Option.map account ~f:Account_ref.to_string)
+       t.session
+       ~model:(Model.key model)
+       ~thinking:t.thinking
      : Session.Entry.t);
   state_changed t
+;;
+
+let notice t text = broadcast t (Notice text)
+
+let model_ref t =
+  match t.login with
+  | None -> Model.key t.model
+  | Some id -> Model.key t.model ^ "@" ^ Account_ref.to_string id
+;;
+
+(* The account the current model's requests use: the pinned one, else the
+   provider's default. *)
+let current_account t =
+  match t.login with
+  | Some id -> Some id
+  | None ->
+    List.find_map (t.accounts t.model.provider) ~f:(fun a ->
+      Option.some_if a.default a.ref_)
+;;
+
+(* Before handing over to another model, another login of the same
+   provider: the next account after the current one (in the user's order)
+   that may be fallen over to and that this chain has not tried. *)
+let next_account t ~tried =
+  let accounts = t.accounts t.model.provider in
+  match current_account t with
+  | None -> None
+  | Some current ->
+    let after =
+      match
+        List.findi accounts ~f:(fun _ a -> Account_ref.equal a.ref_ current)
+      with
+      | Some (i, _) -> List.drop accounts (i + 1) @ List.take accounts i
+      | None -> accounts
+    in
+    List.find_map after ~f:(fun (a : Login_choice.t) ->
+      let key = Model.key t.model ^ "@" ^ Account_ref.to_string a.ref_ in
+      Option.some_if (a.fallback && not (Set.mem tried key)) a)
 ;;
 
 (* The model to continue with when [model] cannot be used: the next one in
@@ -3204,17 +3561,6 @@ let handover_message ~from ~(to_ : Model.t) ~error =
        (Model.key to_))
 ;;
 
-(* Masks [session]'s messages up to its [through]th, as [Agent_loop.run]'s
-   [mask]. *)
-let mask_session session ~through =
-  match List.nth (Session.context_ids session) through with
-  | Some (Some id) ->
-    ignore (Session.append_masked session ~through:id : Session.Entry.t);
-    Ok (Session.messages session)
-  | Some None | None ->
-    Or_error.error_s [%message "no entry to mask up to" (through : int)]
-;;
-
 let compacted t (outcome : Compaction.Outcome.t) =
   account
     t
@@ -3224,6 +3570,29 @@ let compacted t (outcome : Compaction.Outcome.t) =
        ; cost_usd = outcome.cost_usd
        });
   broadcast t (Compacted { summary = outcome.summary })
+;;
+
+(* A composer session whose agent cannot compact its context: prigh
+   summarises the session as it compacts its own (with [compaction_model],
+   else prigh's own model), and the agent drops its thread for a new one, handed
+   the compacted session. *)
+let summarise_for_agent ?instructions ?cancel t =
+  let%map.Or_error outcome =
+    Compaction.compact
+      ~env:t.env
+      ~provider:t.provider
+      ~model:
+        (Compaction_settings.summary_model
+           (compaction_settings t)
+           (aux_model t))
+      ~prompt:Compaction.Prompt.none
+      ?cancel
+      ?instructions
+      t.session
+  in
+  compacted t outcome;
+  Option.iter t.runner ~f:Runner.compacted;
+  outcome
 ;;
 
 let mail t =
@@ -3267,6 +3636,41 @@ let resume_message =
     ~origin:{ Injected.empty with source = Some Resume }
     "[prigh: the usage limit has reset. Carry on with the interrupted task \
      where it left off.]"
+;;
+
+(* After a composer turn that left its agent's context past the compaction
+   threshold, between turns: an agent with a compact command is asked to
+   compact ([compact_turn]); one without is compacted by prigh. Codex and
+   Claude Code compact by themselves. A model whose window is unknown has no
+   threshold. Whether prigh summarised (a new thread follows). *)
+let composer_auto_compact
+      t
+      ~(kind : Engine_intf.Turn.Kind.t)
+      ~added
+      ~cancel
+      ~compact_turn
+  =
+  let over_threshold () =
+    match kind, last_stop added, fst (Runner.context (runner t)) with
+    | Prompt, (Some (End_turn | Length | Tool_use) | None), Some tokens ->
+      t.model.context_window > 0
+      && Compaction_settings.should_compact
+           (compaction_settings t)
+           t.model
+           ~input_tokens:tokens
+    | Compact _, _, _ | _, Some (Error _ | Aborted), _ | _, _, None -> false
+  in
+  match (capabilities t).compact with
+  | Command when over_threshold () ->
+    compact_turn ();
+    false
+  | Summary when over_threshold () ->
+    (match summarise_for_agent ~cancel t with
+     | Ok _ -> true
+     | Error e ->
+       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
+       false)
+  | Command | Summary | Native | Auto_only | Unsupported -> false
 ;;
 
 let duration_hum seconds =
@@ -3329,7 +3733,7 @@ let run_failed t ~resolve exn =
    models a hand-over chain has used so far (empty for a user's prompt). *)
 let generate_model t =
   match t.config.generate_model with
-  | None -> Ok t.model
+  | None -> Ok (aux_model t)
   | Some name ->
     Model_registry.resolve t.models name
     |> Result.map_error ~f:(fun e ->
@@ -3353,14 +3757,16 @@ let naming_model t =
    that a name still comes; the notice says what to fix. *)
 let with_naming_model t ~f =
   let fix = "change it with /naming model, or /naming model off" in
+  let session_model = aux_model t in
   match naming_model t with
   | Error e ->
     broadcast
       t
       (Notice
          (sprintf "%s; named with the session's model" (Error.to_string_hum e)));
-    f t.model
-  | Ok model when String.equal (Model.key model) (Model.key t.model) -> f model
+    f session_model
+  | Ok model when String.equal (Model.key model) (Model.key session_model) ->
+    f model
   | Ok model ->
     (match f model with
      | Ok _ as ok -> ok
@@ -3373,7 +3779,7 @@ let with_naming_model t ~f =
                (Error.to_string_hum e)
                (Model.key model)
                fix));
-       f t.model)
+       f session_model)
 ;;
 
 let name_subagent t ~task ~siblings ~cancel =
@@ -3382,12 +3788,68 @@ let name_subagent t ~task ~siblings ~cancel =
   |> Result.ok
 ;;
 
+let run_tools t =
+  (tools t @ reply_tools t)
+  @
+  (* An external harness is told of [goal_complete] at its start: it has it
+     always, and it refuses when no goal is active. *)
+  if own_loop t then [] else [ Tool_goal.create ~complete:(complete_goal t) ]
+;;
+
+let turn_input t ~context ~prompts ~kind : Engine_intf.Turn.Input.t =
+  { context
+  ; prompts
+  ; chat = t.chat_mode
+  ; thinking = t.thinking
+  ; approval = t.approval_mode
+  ; plan = t.plan_mode
+  ; model = External_model.native_id t.model
+  ; kind
+  }
+;;
+
+(* An external harness's process, started when the session is opened so
+   that its first message does not wait for it: what it needs of a run's
+   services is where it works and the tools it is offered. *)
+let prewarm t =
+  match t.runner, t.unavailable with
+  | Some runner, None
+    when (not (is_running t)) && (not (own_loop t)) && active_host_connected t
+    ->
+    Runner.prewarm
+      runner
+      { env = t.env
+      ; cwd = t.cwd
+      ; session = t.session
+      ; emit = ignore
+      ; notice = (fun n -> broadcast t (Notice n))
+      ; approve = approve t
+      ; ask_user = ask_user t ~cancel:Cancellation.never
+      ; ui = ui_host t ~cancel:Cancellation.never
+      ; tools = run_tools t
+      ; execute = executor t
+      ; background = t.background
+      ; steer = (fun () -> [])
+      ; halt = (fun () -> None)
+      ; add_spend = (fun ~usage:_ ~cost_usd:_ -> ())
+      }
+      (turn_input t ~context:[] ~prompts:[] ~kind:Prompt)
+  | _ -> ()
+;;
+
+(* No run starts on a session this backend cannot run (its engine is not
+   deployed here): neither the user's nor mail, resumes, goals or
+   background reports, which would otherwise run the harness in its place. *)
 let rec start_run
+          ?(kind = Engine_intf.Turn.Kind.Prompt)
           ?(tried = String.Set.empty)
           ?(then_ = fun ~cancel:_ -> [])
           t
           prompts
   =
+  if Option.is_none t.unavailable then run_now ~kind ~tried ~then_ t prompts
+
+and run_now ~kind ~tried ~then_ t prompts =
   if not t.chat_mode then refresh_location t;
   cancel_resume_timer t;
   close_interrupted t;
@@ -3405,6 +3867,8 @@ let rec start_run
     ~on_error:(run_failed t ~resolve)
     (fun () ->
        Trace.run t.tracer
+       @@ fun () ->
+       Turn_timings.with_ (Turn_timings.create ())
        @@ fun () ->
        let prompt_span =
          Trace.start
@@ -3425,7 +3889,10 @@ let rec start_run
          Promise.resolve resolve ();
          if idle then state_changed t
        in
-       if not t.chat_mode then refresh_mcp_for_run t ~cancel;
+       if not t.chat_mode
+       then
+         Turn_timings.phase "mcp_refresh" (fun () ->
+           refresh_mcp_for_run t ~cancel);
        let halted = ref None in
        (* The prompts are in the session (and its file made) before the
           system prompt is built: that asks the tool host, which may take
@@ -3437,22 +3904,19 @@ let rec start_run
          broadcast t (Loop (Message_start m));
          broadcast t (Loop (Message_end m)));
        let recorded m = List.mem prompts m ~equal:phys_equal in
-       let config = loop_config ~cancel t in
-       let added =
-         match
-           Agent_loop.run
-             ~env:t.env
-             ~provider:t.provider
-             ~config
-             ~cwd:t.cwd
-             ~cancel
-             ~approve:(approve t)
-             ~ask_user:(ask_user t ~cancel)
-             ~ui:(ui_host t ~cancel)
-             ~chat:t.chat_mode
-             ~execute:(executor t)
-             ~background:t.background
-             ~steer:(fun () ->
+       let services : Engine_intf.Services.t =
+         { env = t.env
+         ; cwd = t.cwd
+         ; session
+         ; notice = (fun n -> broadcast t (Notice n))
+         ; approve = approve t
+         ; ask_user = ask_user t ~cancel
+         ; ui = ui_host t ~cancel
+         ; tools = run_tools t
+         ; execute = executor t
+         ; background = t.background
+         ; steer =
+             (fun () ->
                let l = Steer_queue.take_steers t.queue in
                if not (List.is_empty l) then queue_update t;
                let queued = List.map l ~f:(user_message t) in
@@ -3473,28 +3937,8 @@ let rec start_run
                  else []
                in
                deliveries t @ mail t @ note @ queued @ due_reminders t)
-             ~compact:
-               (fun
-                 ~model ~keep_recent_tokens ~overflowed ~cancel _messages ->
-               match
-                 Compaction.compact
-                   ~env:t.env
-                   ~provider:t.provider
-                   ~model
-                   ~prompt:(Agent_loop.Config.compaction_prompt config)
-                   ~overflowed
-                   ~keep_recent_tokens
-                   ~cancel
-                   session
-               with
-               | Ok outcome -> Ok (Session.messages session, outcome)
-               | Error e ->
-                 broadcast
-                   t
-                   (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
-                 Error e)
-             ~mask:(fun ~through _messages -> mask_session session ~through)
-             ~halt:(fun () ->
+         ; halt =
+             (fun () ->
                let reason =
                  match !halted with
                  | Some _ as interrupted -> interrupted
@@ -3502,7 +3946,12 @@ let rec start_run
                in
                Option.iter reason ~f:(fun r -> halted := Some r);
                reason)
-             ~emit:(fun event ->
+         ; add_spend =
+             (fun ~usage ~cost_usd ->
+               ignore
+                 (Session.add_spend session ~usage ~cost_usd : Session.Entry.t))
+         ; emit =
+             (fun event ->
                account t event;
                track_plan t event;
                match event with
@@ -3534,49 +3983,104 @@ let rec start_run
                  ignore (Session.append_message session m : Session.Entry.t);
                  broadcast t (Loop event)
                | _ -> broadcast t (Loop event))
-             ~context
-             ~prompts
-             ()
+         }
+       in
+       let added =
+         match
+           Runner.run_turn
+             (runner t)
+             services
+             ~cancel
+             (turn_input t ~context ~prompts ~kind)
          with
          | added -> added
          | exception exn ->
            broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
            []
        in
+       (* An external harness says what its models are, and how big the
+          context of the one it runs is. *)
+       models_changed t;
+       if is_external t.model
+       then (
+         let r = runner t in
+         let model =
+           Option.bind (Runner.models r) ~f:(fun models ->
+             List.find models ~f:(fun (m : Model.t) ->
+               String.equal m.id t.model.id))
+           |> Option.value ~default:t.model
+         in
+         let tokens, window = Runner.context r in
+         let window =
+           match tokens, window with
+           | Some tokens, Some window when tokens <= window -> window
+           | None, Some window -> window
+           | _ -> model.context_window
+         in
+         (* A window its context is over is not its model's: unknown. *)
+         let window =
+           match tokens with
+           | Some tokens when tokens > window -> 0
+           | _ -> window
+         in
+         t.model <- { model with context_window = window };
+         t.thinking <- settle_thinking t.model t.thinking);
        Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
        sweep_orphans t ~main_running:false;
-       let tried = Set.add tried (Model.key t.model) in
        let cancelled = Cancellation.is_cancelled cancel in
        let current = phys_equal session t.session in
        let unavailable =
          if cancelled || not current then None else unavailable_error added
        in
+       let tried =
+         let tried = Set.add tried (Model.key t.model) in
+         match Option.bind unavailable ~f:(fun _ -> current_account t) with
+         | None -> tried
+         | Some id ->
+           Set.add tried (Model.key t.model ^ "@" ^ Account_ref.to_string id)
+       in
        let handover =
-         Option.bind unavailable ~f:(fun error ->
-           match next_model t ~tried with
-           | None ->
-             if not (List.is_empty t.config.fallback_models)
-             then
+         Option.bind
+           (Option.some_if (capabilities t).model_fallback unavailable
+            |> Option.join)
+           ~f:(fun error ->
+             match next_account t ~tried, next_model t ~tried with
+             | Some (account : Login_choice.t), _ ->
+               let from = model_ref t in
                broadcast
                  t
                  (Notice
                     (sprintf
-                       "%s cannot continue and no model in fallback_models is \
-                        left to hand over to; /model picks another"
-                       (Model.key t.model)));
-             None
-           | Some next ->
-             let from = Model.key t.model in
-             broadcast
-               t
-               (Notice
-                  (sprintf
-                     "%s: %s; handing over to %s"
-                     from
-                     error
-                     (Model.key next)));
-             set_model t next;
-             Some [ handover_message ~from ~to_:next ~error ])
+                       "%s: %s; carrying on with the %s login (%s)"
+                       from
+                       error
+                       account.label
+                       (Account_ref.to_string account.ref_)));
+               set_model ~account:account.ref_ t t.model;
+               Some []
+             | None, None ->
+               if not (List.is_empty t.config.fallback_models)
+               then
+                 broadcast
+                   t
+                   (Notice
+                      (sprintf
+                         "%s cannot continue and no model in fallback_models \
+                          is left to hand over to; /model picks another"
+                         (Model.key t.model)));
+               None
+             | None, Some next ->
+               let from = model_ref t in
+               broadcast
+                 t
+                 (Notice
+                    (sprintf
+                       "%s: %s; handing over to %s"
+                       from
+                       error
+                       (Model.key next)));
+               set_model t next;
+               Some [ handover_message ~from ~to_:next ~error ])
        in
        let resuming =
          match unavailable, handover with
@@ -3601,7 +4105,27 @@ let rec start_run
        (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
        if Steer_queue.steers_first t.queue then queue_update t;
-       auto_compact t;
+       let summarised =
+         if own_loop t
+         then (
+           auto_compact t;
+           false)
+         else if current && not cancelled
+         then
+           composer_auto_compact t ~kind ~added ~cancel ~compact_turn:(fun () ->
+             ignore
+               (Runner.run_turn
+                  (runner t)
+                  services
+                  ~cancel
+                  (turn_input
+                     t
+                     ~context:(Session.messages session)
+                     ~prompts:[]
+                     ~kind:(Compact { instructions = None }))
+                : Message.t list))
+         else false
+       in
        (* The goal carries on after a run that ended normally; anything else
        stops it, except a hand-over or a resume, which carry on the run. *)
        let goal_continues =
@@ -3706,6 +4230,7 @@ let rec start_run
          prompt_span
          ~status:(if Cancellation.is_cancelled cancel then Cancelled else Ok);
        finish ~idle:(Option.is_none next);
+       if summarised && Option.is_none next then prewarm t;
        Option.iter next ~f:(function
          | `Handover prompts -> start_run ~tried t prompts
          | `Prompts prompts -> start_run t prompts);
@@ -3728,7 +4253,7 @@ and schedule_resume t ~error =
               "%s: the usage limit is reached and the provider did not say \
                when it resets, so the run will not resume by itself; send a \
                message to try again, or /model picks another model"
-              (Model.key t.model)));
+              (limited_by t)));
       false
     | Some reset ->
       let now = Eio.Time.now (Eio.Stdenv.clock t.env) in
@@ -3762,7 +4287,7 @@ and schedule_resume t ~error =
            (sprintf
               "%s: the usage limit is reached; the run resumes %s: /resume now \
                retries at once, /resume cancel stays stopped"
-              (Model.key t.model)
+              (limited_by t)
               when_));
       true)
 
@@ -3817,6 +4342,18 @@ and auto_describe t =
         in
         match with_naming_model t ~f:describe with
         | Ok _ -> if phys_equal session t.session then state_changed t
+        | Error e when is_external t.model ->
+          (* prigh may have no model of its own to call: said once. *)
+          if not t.aux_noted
+          then (
+            t.aux_noted <- true;
+            broadcast
+              t
+              (Notice
+                 (sprintf
+                    "%s; this session is not described (name it with /name, or \
+                     pick a model prigh can call with /naming model)"
+                    (Error.to_string_hum e))))
         | Error e -> broadcast t (Notice (Error.to_string_hum e)));
       t.describing <- None;
       Promise.resolve resolve ()))
@@ -3850,7 +4387,8 @@ and auto_compact t =
              ; "tokens_saved", Int plan.tokens_saved
              ; "masked", Int plan.masked
              ]
-           (fun () -> mask_session t.session ~through:plan.through)
+           (fun () ->
+              Harness_runner.mask_session t.session ~through:plan.through)
        with
        | Error _ -> tokens
        | Ok _ ->
@@ -3957,10 +4495,39 @@ let restore_resume t =
     else Session.set_resume_at t.session None
 ;;
 
+(* [provider] with requests that name no account sent with [pinned]'s, when
+   [pinned] names one of the request model's provider. *)
+let with_pinned ~pinned (provider : Provider.t) : Provider.t =
+  { name = provider.name
+  ; stream =
+      (fun request ->
+        let request =
+          match (request : Provider.Request.t).account, pinned () with
+          | None, Some (p, account)
+            when Provider_id.equal p request.model.provider ->
+            { request with account = Some account }
+          | _ -> request
+        in
+        provider.stream request)
+  }
+;;
+
+let pinned_account t =
+  if is_external t.model
+  then None
+  else Option.map t.login ~f:(fun a -> t.model.provider, a)
+;;
+
+let following_account agent provider =
+  with_pinned provider ~pinned:(fun () ->
+    Option.bind (agent ()) ~f:pinned_account)
+;;
+
 let create
       ~env
       ~sw
       ~provider
+      ?(accounts = fun (_ : Provider_id.t) -> [])
       ~tools
       ~sessions_dir
       ~home
@@ -3982,6 +4549,7 @@ let create
       ?mcp_auth
       ?user_info
       ?custom_instructions
+      ?runner
       ~cwd
       ()
   =
@@ -4025,10 +4593,16 @@ let create
       Session.create ~dir:sessions_dir ~cwd ()
   in
   let cwd = Session.cwd session in
+  let pinned = ref (fun () -> None) in
+  let provider = with_pinned provider ~pinned:(fun () -> !pinned ()) in
   let t =
     { env
     ; sw
     ; provider
+    ; runner
+    ; unavailable = None
+    ; accounts
+    ; login = None
     ; tools
     ; offered
     ; user_info
@@ -4045,6 +4619,8 @@ let create
          else None)
     ; repo_asked = None
     ; model
+    ; harness_model = model
+    ; aux_noted = false
     ; thinking
     ; run = None
     ; describing = None
@@ -4119,6 +4695,7 @@ let create
     ; on_noted = ignore
     }
   in
+  (pinned := fun () -> pinned_account t);
   restore_settings t;
   restore_host t;
   restore_told t;
@@ -4204,9 +4781,12 @@ let to_queue t ~attachments ~pasted ~images ~client ~ui_action text =
 (* Why a message cannot start a run now: outside chat mode, it needs a
    tool host. *)
 let cannot_start t =
-  match budget_exhausted t with
-  | Some _ as exhausted -> exhausted
-  | None -> if t.chat_mode then None else no_host t
+  match t.unavailable with
+  | Some _ as unavailable -> unavailable
+  | None ->
+    (match budget_exhausted t with
+     | Some _ as exhausted -> exhausted
+     | None -> if t.chat_mode then None else no_host t)
 ;;
 
 let prompt
@@ -4316,16 +4896,19 @@ let has_running_background t = Background_tasks.has_running t.background
 let running_background t = Background_tasks.running_count t.background
 
 let steer_subagent t ~agent_id ~kind text =
+  let%bind.Or_error () = require t Steer_subagent in
   Background_tasks.send t.background ~id:agent_id kind ~from:User text
 ;;
 
 let dequeue_subagent t ~agent_id =
+  let%bind.Or_error () = require t Steer_subagent in
   Or_error.map
     (Background_tasks.inbox_of t.background agent_id)
     ~f:Subagent_inbox.pop_last
 ;;
 
 let remove_subagent_queued t ~agent_id ~queue ~index ~text =
+  let%bind.Or_error () = require t Steer_subagent in
   Or_error.bind
     (Background_tasks.inbox_of t.background agent_id)
     ~f:(fun inbox -> Subagent_inbox.remove inbox queue ~index ~text)
@@ -4353,7 +4936,8 @@ let shutdown t =
   Subagent_log.detach t.subagent_log;
   Mcp_refresh.cancel t.mcp_refresh;
   cancel_background ~discard:true t;
-  ignore (abort t : string list)
+  ignore (abort t : string list);
+  stop_engine t
 ;;
 
 let jobs t = Background_tasks.tasks t.background ~kind:Job
@@ -4426,6 +5010,7 @@ let shell t ~command ~add_to_context =
       { id = call_id
       ; name = "shell"
       ; arguments = Json.to_string (`Object [ "command", `String command ])
+      ; extra = None
       }
     in
     let output = Buffer.create 1024 in
@@ -4492,8 +5077,35 @@ let set_thinking t thinking =
 ;;
 
 let compact ?instructions t =
+  let%bind.Or_error () = require t Compact in
   if is_running t
   then Or_error.error_string "cannot compact while a run is in progress"
+  else if (not (own_loop t)) && agent_summarises t
+  then (
+    let result =
+      summarise_for_agent ?instructions t
+      |> Or_error.map ~f:(fun (outcome : Compaction.Outcome.t) ->
+        outcome.summary)
+    in
+    state_changed t;
+    prewarm t;
+    result)
+  else if not (own_loop t)
+  then (
+    (* The external harness compacts its own context, in a run of its own;
+       the reply waits for it as for prigh's compaction. *)
+    let before = List.length (Session.messages t.session) in
+    start_run ~kind:(Compact { instructions }) t [];
+    Option.iter t.run ~f:(fun run -> Promise.await run.finished);
+    match
+      List.find_map
+        (List.rev (List.drop (Session.messages t.session) before))
+        ~f:(function
+          | Message.Assistant a -> Some a.stop_reason
+          | User _ | Tool_result _ -> None)
+    with
+    | Some (Error message) -> Or_error.error_string message
+    | Some _ | None -> Ok "")
   else (
     let model = summary_model t in
     Trace.run t.tracer (fun () ->
@@ -4791,7 +5403,7 @@ let set_goal t text =
     Or_error.error_string
       "say what done means, e.g. /goal all tests pass (/goal off clears it)"
   else (
-    match budget_exhausted t with
+    match Option.first_some t.unavailable (budget_exhausted t) with
     | Some reason -> Or_error.error_string reason
     | None ->
       let goal = Goal.create text in
@@ -4816,7 +5428,7 @@ let resume_goal t =
   | Some goal when Goal.is_active goal ->
     Or_error.error_string "the goal is already active"
   | Some goal ->
-    (match budget_exhausted t with
+    (match Option.first_some t.unavailable (budget_exhausted t) with
      | Some reason -> Or_error.error_string reason
      | None ->
        let goal = { goal with status = Active; continuations = 0 } in
@@ -4945,6 +5557,7 @@ let last_reply_failed t =
 ;;
 
 let downsize_images t =
+  let%bind.Or_error () = require t Downsize_images in
   if not t.model.supports_images
   then
     Or_error.errorf
@@ -4958,6 +5571,7 @@ let downsize_images t =
 ;;
 
 let btw t ~question ~cancel ~on_delta =
+  let%bind.Or_error () = require t Btw in
   let session = t.session in
   let model = t.model in
   let system =
@@ -5004,6 +5618,7 @@ let complete t ~model ~system ~user ~max_tokens ~cancel ~on_delta =
     ; thinking = Off
     ; max_tokens = Some max_tokens
     ; cache_key = None
+    ; account = None
     }
   in
   let reply =
@@ -5038,6 +5653,11 @@ let replace_session t session ~keep_host =
   Background_tasks.cancel_all ~discard:true t.background;
   wait_idle t;
   Background_tasks.forget_finished t.background;
+  (* The old session's engine drives its own thread: the new one gets its
+     own, from whoever attaches it. *)
+  Option.iter t.runner ~f:Runner.close;
+  t.runner <- None;
+  t.unavailable <- None;
   t.session <- session;
   Hashtbl.clear t.judgements;
   t.tracer <- tracer_for ~clock:t.trace_clock ~config:t.config session;
@@ -5072,6 +5692,7 @@ let switch_session t ~path =
 ;;
 
 let fork t ?at () =
+  let%bind.Or_error () = require t Fork in
   Or_error.map
     (Session.fork ?at t.session ~dir:t.sessions_dir)
     ~f:(fun session -> replace_session t session ~keep_host:true)
@@ -5091,33 +5712,40 @@ let unless_running t ~doing f =
 ;;
 
 let trim t ~before =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"trim" (Session.append_trim ~before)
 ;;
 
 let trim_after t ~after =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"trim" (Session.append_trim_after ~after)
 ;;
 
 let untrim ?entry t =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"undo a trim" (Session.append_untrim ?entry)
 ;;
 
 let delete_message t ~message =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"delete a message" (Session.append_delete ~message)
 ;;
 
 let undelete ?entry t =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"undo a deletion" (Session.append_undelete ?entry)
 ;;
 
 let rewind t ~to_ =
+  let%bind.Or_error () = require t Rewind in
   if is_running t
   then Or_error.error_string "cannot rewind while a run is in progress"
-  else
+  else (
+    let%bind.Or_error () = Runner.rewind (runner t) t.session ~to_ in
     Or_error.map (Session.rewind t.session ~to_) ~f:(fun () ->
       t.plan <- Plan.latest (path_messages t.session);
       restore_told t;
-      state_changed t)
+      state_changed t))
 ;;
 
 let set_session_name t name =
@@ -5412,10 +6040,9 @@ let session_stats t =
     Session.spend_for t.session ~purpose:Approval_judge.purpose
   in
   let context_percent =
-    match state.context_tokens with
-    | 0 -> 0.
-    | tokens ->
-      Float.of_int tokens /. Float.of_int t.model.context_window *. 100.
+    match state.context_tokens, state.model.context_window with
+    | 0, _ | _, 0 -> 0.
+    | tokens, window -> Float.of_int tokens /. Float.of_int window *. 100.
   in
   { Session_stats.message_count = List.length messages
   ; turns = List.length assistants
@@ -5507,19 +6134,30 @@ let leftovers t =
   List.dedup_and_sort (t.noted @ outputs @ worktrees) ~compare:Leftover.compare
 ;;
 
-let host_call_on t ~host ~cwd ~name arguments =
+let host_call_on
+      t
+      ?stdin
+      ?(cancel = Cancellation.never)
+      ?(on_output = ignore)
+      ~host
+      ~cwd
+      ~name
+      arguments
+  =
   match find_host t host with
   | None -> Tool.Result.error (sprintf "tool host %S is not connected" host)
   | Some h ->
-    host_exec_on
+    host_exec_with_stdin
       t
       h
-      ~cancel:Cancellation.never
-      ~on_output:ignore
+      ?stdin
+      ~cancel
+      ~on_output
       ~call_id:"leftover"
       ~cwd
       ~name
       ~arguments
+      ()
 ;;
 
 let remove_leftover t (leftover : Leftover.t) =

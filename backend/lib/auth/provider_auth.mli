@@ -6,16 +6,7 @@ open! Import
     provider; environment variables are consulted only when nothing is stored,
     and a failed OAuth refresh is an error rather than a silent fallback. *)
 
-module Method : sig
-  type t =
-    | Api_key
-    | Oauth
-  [@@deriving sexp, equal, enumerate]
-
-  val to_string : t -> string
-  val of_string : string -> t option
-  val label : Provider_id.t -> t -> string
-end
+module Method = Login_method
 
 module Resolved : sig
   type t =
@@ -23,6 +14,23 @@ module Resolved : sig
     ; method_ : Method.t
     ; account_id : string option
     ; source : string
+    ; account : Account_id.t option (** [None]: from the environment *)
+    ; expires_ms : int option (** an OAuth token's expiry, Unix ms *)
+    }
+  [@@deriving sexp_of]
+end
+
+(** One of a provider's stored logins ({!Provider_accounts}). *)
+module Account_status : sig
+  type t =
+    { id : Account_id.t
+    ; label : string
+    ; method_ : Method.t
+    ; source : string
+    ; expires_ms : int option
+    ; default : bool
+    ; fallback : bool
+    ; shared_with : Account_meta.Grant.t list
     }
   [@@deriving sexp_of]
 end
@@ -34,6 +42,8 @@ module Status : sig
     ; configured : (Method.t * string) option
     ; expires_ms : int option
     ; custom : Custom_provider.t option
+    ; accounts : Account_status.t list
+      (** [configured] and [expires_ms] are the default one's *)
     }
   [@@deriving sexp_of]
 end
@@ -41,14 +51,30 @@ end
 val methods : Provider_id.t -> Method.t list
 val env_vars : Provider_id.t -> string list
 
+(** Refreshes an OAuth login at its provider's token endpoint. *)
+val refresh_oauth
+  :  env:Env.t
+  -> cancel:Cancellation.t
+  -> store:Auth_store.t (** where Antigravity's client is kept *)
+  -> Provider_id.t
+  -> refresh_token:string
+  -> Credential.Oauth.t Or_error.t
+
 (** Refreshes OAuth tokens that expire within five minutes, persisting the
-    rotated credential under the store lock. [None] means not configured. *)
+    rotated credential under the store lock. [None] means not configured.
+    [account] (default: the provider's default one) must be logged in.
+    [refused]: an access token a client was refused with (an agent CLI
+    got a 401): refreshed if it is still the stored one. [valid_for_ms]:
+    refresh one that expires within that long. *)
 val resolve
   :  env:Env.t
   -> ?cancel:Cancellation.t
   -> ?getenv:(string -> string option)
   -> ?refresh:
        (Provider_id.t -> refresh_token:string -> Credential.Oauth.t Or_error.t)
+  -> ?refused:string
+  -> ?valid_for_ms:int
+  -> ?account:Account_id.t
   -> Auth_store.t
   -> Provider_id.t
   -> Resolved.t option Or_error.t
@@ -62,12 +88,21 @@ val status
   -> Auth_store.t
   -> Status.t list Or_error.t
 
+(** Stores the login as {!Provider_accounts.save_login} does; returns its
+    account. *)
 val login
   :  env:Env.t
+  -> ?account:Account_id.t
+  -> ?label:string
   -> Auth_store.t
   -> Provider_id.t
   -> Method.t
   -> Auth_interaction.t
-  -> unit Or_error.t
+  -> Account_id.t Or_error.t
 
-val logout : Auth_store.t -> Provider_id.t -> unit Or_error.t
+(** [account] defaults to the default one; nothing to do without one. *)
+val logout
+  :  ?account:Account_id.t
+  -> Auth_store.t
+  -> Provider_id.t
+  -> unit Or_error.t

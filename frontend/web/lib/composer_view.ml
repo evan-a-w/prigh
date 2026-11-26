@@ -18,6 +18,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Backend_directory -> "Directories on the backend"
       | Argument (Path | File) | Path -> "Files"
       | Argument Verbosity -> "Verbosity"
+      | Argument Adapter -> "Switch this session to"
       | Argument Confirm -> "Mode, also for new sessions"
       | Argument Mode -> "Modes"
       | Argument Plan -> "Plan mode"
@@ -228,40 +229,89 @@ let menu_attrs = Session_chips_view.menu_attrs
 
 (* The provider's mark and the model's short name ("6.2 Sol"); the tooltip
    and the menu have the reasoning level. *)
-let model_chip (m : App.Model.t) (state : State.t) ~inject =
+let model_chip (m : App.Model.t) (state : State.t) ~fixed ~inject =
   match m.pending.model with
-  | Some key ->
+  | Some key when not fixed ->
     let name =
       List.find m.models ~f:(fun model -> String.equal model.key key)
       |> Option.value_map ~default:key ~f:(fun model -> model.name)
     in
     pending_chip ~cls:"model-chip" (Model_menu.short_name name)
-  | None ->
-    let thinking = Option.value m.pending.thinking ~default:state.thinking in
+  | Some _ | None ->
+    let thinking =
+      if fixed
+      then state.thinking
+      else Option.value m.pending.thinking ~default:state.thinking
+    in
     let level = Reasoning.chip_label state.model ~current:thinking in
+    (* model@login when the provider has several logins; the title always
+       names it. *)
+    let login = Prigh_ui.Provider_logins.beside_model m.auth state in
+    let at login = Option.value_map login ~default:"" ~f:(fun l -> "@" ^ l) in
+    (* Its agent CLI could not list its models: why, in place of the
+       placeholder; the menu says what to do. *)
+    let trouble =
+      match state.engine.models with
+      | Some (Failed _ as status) -> Some (Harness_models.chip status)
+      | Some Loading | None -> None
+    in
     button
-      ~cls:"chip-button model-chip"
+      ~cls:
+        (String.concat
+           ~sep:" "
+           ([ "chip-button model-chip" ]
+            @ (if fixed then [ "subagent-own" ] else [])
+            @ if Option.is_some trouble then [ "trouble" ] else []))
       ~title:
         (sprintf
-           "%s%s: models, reasoning and access (Ctrl+L)"
-           state.model.name
+           (if fixed
+            then "%s%s%s: the subagent's own, set when it started"
+            else "%s%s%s: models, reasoning and access (Ctrl+L)")
+           (Session_engine.model_label state.engine ~model:state.model.name)
+           (at (Prigh_ui.Provider_logins.login_name m.auth state))
            (Option.value_map level ~default:"" ~f:(fun l -> ", reasoning " ^ l)))
       ~label:
         (sprintf
-           "Model: %s%s"
-           state.model.name
+           "%s: %s%s%s"
+           (if fixed then "The subagent's model" else "Model")
+           (Session_engine.model_label state.engine ~model:state.model.name)
+           (at login)
            (Option.value_map level ~default:"" ~f:(fun l -> ", " ^ l)))
-      ~attrs:(menu_attrs m Model)
+      ~attrs:(if fixed then [] else menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
-      [ Provider_mark.view state.model.provider
-      ; span ~cls:"chip-label" (Model_menu.short_name state.model.name)
-      ]
+      ([ Provider_mark.view
+           (Provider_mark.of_model
+              ~provider:state.model.provider
+              ~name:state.model.name)
+       ; (if Session_engine.is_harness state.engine
+          then span ~cls:"chip-label" (Model_menu.short_name state.model.name)
+          else
+            (* On the narrowest phones the model keeps the room: the engine
+               is in the chip's title and label. *)
+            Node.span
+              ~attrs:[ Attr.class_ "chip-label" ]
+              [ Node.span
+                  ~attrs:[ Attr.class_ "chip-engine max-[359px]:hidden" ]
+                  [ Node.text
+                      (Session_engine.who state.engine
+                       ^ if Option.is_some trouble then ": " else " · ")
+                  ]
+              ; Node.text
+                  (Option.value_or_thunk trouble ~default:(fun () ->
+                     Model_menu.short_name state.model.name))
+              ])
+       ]
+       @ Option.value_map login ~default:[] ~f:(fun l ->
+         [ span
+             ~cls:"chip-login max-w-[9ch] truncate text-muted-foreground"
+             ("@" ^ l)
+         ]))
 ;;
 
 (* Where tools run, always named, also while that host is disconnected (its
    server struck through, "offline" beside it); no host at all is lit. A
    chat uses none. *)
-let host_chip (m : App.Model.t) (state : State.t) ~inject =
+let host_chip (m : App.Model.t) (state : State.t) ~fixed ~inject =
   let cls, title, aria, content =
     match Active_host.of_state state with
     | _ when state.chat_mode ->
@@ -273,7 +323,10 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
       , [ icon Message; span ~cls:"chip-label" "no host" ] )
     | Connected h ->
       ( ""
-      , sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd
+      , (if fixed
+         then
+           sprintf "The subagent's tools run on %s, set when it started" h.name
+         else sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd)
       , Some h.name
       , [ icon Server; span ~cls:"chip-label" h.name ] )
     | Disconnected { name; _ } ->
@@ -296,10 +349,13 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
       , [ icon Server; span ~cls:"chip-label" "no host" ] )
   in
   button
-    ~cls:("chip-button host-chip" ^ cls)
+    ~cls:("chip-button host-chip" ^ cls ^ if fixed then " subagent-own" else "")
     ~title
-    ?label:aria
-    ~attrs:(menu_attrs m Host)
+    ?label:
+      (if fixed
+       then Option.map aria ~f:(fun a -> "The subagent's tool host: " ^ a)
+       else aria)
+    ~attrs:(if fixed then [] else menu_attrs m Host)
     ~on_click:(inject (Action.Open_chip Host))
     (content @ [ icon ~cls:"chevron" Chevron ])
 ;;
@@ -308,9 +364,10 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
    each opening its menu over itself; the model's has the reasoning level
    and the mode too. *)
 let chips (m : App.Model.t) ~inject =
-  match m.state with
+  match App.Model.shown_state m with
   | None -> Node.none
   | Some state ->
+    let fixed = Option.is_some (App.Model.shown_subagent m) in
     Node.div
       ~attrs:
         [ classes
@@ -319,8 +376,16 @@ let chips (m : App.Model.t) ~inject =
         ; Attr.role "group"
         ; Attr.create "aria-label" "Host and model"
         ]
-      [ Session_chips_view.anchor m Host (host_chip m state ~inject) ~inject
-      ; Session_chips_view.anchor m Model (model_chip m state ~inject) ~inject
+      [ Session_chips_view.anchor
+          m
+          Host
+          (host_chip m state ~fixed ~inject)
+          ~inject
+      ; Session_chips_view.anchor
+          m
+          Model
+          (model_chip m state ~fixed ~inject)
+          ~inject
       ]
 ;;
 
@@ -352,9 +417,7 @@ let plus (m : App.Model.t) ~inject =
 ;;
 
 (* The subagent whose chat is on show: the composer writes to it. *)
-let subagent (m : App.Model.t) =
-  Option.bind m.subagent_chat ~f:(Agents.find_agent m.agents)
-;;
+let subagent = App.Model.shown_subagent
 
 let subagent_running (a : Agents.Agent.t) =
   match a.status with
@@ -384,6 +447,12 @@ let placeholder (m : App.Model.t) =
   let text s = s in
   if Option.is_some m.session_gone
   then text "Session gone: /new starts one"
+  else if Option.is_some (Engine_banner.reason m)
+  then
+    text
+      (if cramped
+       then "Can't run here"
+       else "This session can't run here: see above")
   else if not (connected m)
   then
     text
@@ -465,6 +534,7 @@ let view (m : App.Model.t) ~inject =
           ]
       ]
     [ Computer_banner.view m ~inject
+    ; Engine_banner.view m ~inject
     ; No_host_banner.view m ~inject
     ; rest (Queue_view.view m ~inject)
     ; Node.div
@@ -572,13 +642,18 @@ let view (m : App.Model.t) ~inject =
                             button
                               ~cls:"primary round send"
                               ~title:
-                                (if not connected
+                                (if Option.is_some (Engine_banner.reason m)
+                                 then "This session can't run here: see above"
+                                 else if not connected
                                  then "Not connected to the backend"
                                  else if running
                                  then "Steer (Enter)"
                                  else "Send (Enter)")
                               ~label:(if running then "Steer" else "Send")
-                              ~disabled:((not has_input) || not connected)
+                              ~disabled:
+                                ((not has_input)
+                                 || (not connected)
+                                 || Option.is_some (Engine_banner.reason m))
                               ~on_click:(inject Action.Send)
                               [ icon Send ])
                        ]

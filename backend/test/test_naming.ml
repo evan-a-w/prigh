@@ -78,6 +78,7 @@ let%expect_test
       ; usage = Usage.zero
       ; stop_reason = End_turn
       ; model = "m"
+      ; account = None
       }
   in
   let long = String.concat ~sep:" " (List.init 400 ~f:(fun _ -> "word")) in

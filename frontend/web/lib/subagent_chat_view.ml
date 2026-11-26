@@ -21,6 +21,7 @@ let transcript (m : Model.t) ~inject (a : Agents.Agent.t) =
   | Some s when not (List.is_empty (Chat.entries s.chat)) ->
     Chat_view.view
       ~fold:(Fold.scoped (Model.fold m) s.agent_id)
+      ~names:(Model.model_names m)
       (Model.message_time m)
       s.chat
   | Some _ -> note [ lamp (); Node.text "Starting…" ]

@@ -35,6 +35,11 @@ module Summary : sig
     ; host : string option
       (** the tool host it ran on (its name), when not the session's active
           one *)
+    ; thinking : string option
+      (** its reasoning level; [None] in logs written before it was kept *)
+    ; cwd : string option
+      (** where it worked, on that host; [None] in logs written before *)
+    ; worktree : Agent_worktree.t option (** a worktree made for it *)
     ; state : State.t
     ; started_at : float
     ; updated_at : float (** last event *)

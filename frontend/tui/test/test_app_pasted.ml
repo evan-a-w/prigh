@@ -21,6 +21,7 @@ let connected ?(features = [ "pasted_text" ]) () =
        ; user = None
        ; superuser = false
        ; features
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   h
 ;;

@@ -702,6 +702,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Terminal_kill _
   | P.Event.Btw_delta _
   | P.Event.Sessions_changed _
+  | P.Event.Accounts_changed
   | P.Event.Nix_gc_progress _
   | P.Event.Prefs_changed _
   | P.Event.Memory_changed _
@@ -713,6 +714,9 @@ let apply t (event : P.Event.t) =
   | P.Event.Generate_delta _
   | P.Event.Agent_queues _
   | P.Event.Temporary_ended _
+  | P.Event.Adapters_changed _
+  | P.Event.Agent_waiting _
+  | P.Event.Models_changed
   | P.Event.Mcp_auth_changed -> t
 ;;
 

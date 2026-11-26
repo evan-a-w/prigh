@@ -66,6 +66,10 @@ let methods =
   ; "resume_now"
   ; "downsize_images"
   ; "new_session"
+  ; "set_adapter"
+  ; "list_adapters"
+  ; "set_adapter_login"
+  ; "import_adapter_login"
   ; "keep_session"
   ; "switch_session"
   ; "list_sessions"
@@ -110,6 +114,11 @@ let methods =
   ; "auth_respond"
   ; "auth_cancel"
   ; "logout"
+  ; "account_update"
+  ; "account_share"
+  ; "account_share_targets"
+  ; "account_hide"
+  ; "account_usage"
   ; "usage_limits"
   ; "forge_status"
   ; "forge_login"
@@ -289,6 +298,68 @@ let provider_param login params =
   Or_error.bind (string_param params "provider") ~f:(provider_of_string login)
 ;;
 
+(* An account named by [ref] (["<provider>/<id>"], as [auth_status] lists
+   it) or by [provider] and [account] (an id or a label). *)
+let account_param login params =
+  let open Or_error.Let_syntax in
+  let%bind provider, account =
+    match%bind string_param_opt params "ref" with
+    | Some r ->
+      (match String.rsplit2 r ~on:'/' with
+       | Some (p, a) ->
+         let%map provider = provider_of_string login p in
+         provider, a
+       | None ->
+         Or_error.errorf
+           "account ref %S is not <provider>/<account> (as auth_status lists \
+            it)"
+           r)
+    | None ->
+      let%bind provider = provider_param login params in
+      let%map account = string_param params "account" in
+      provider, account
+  in
+  let%map account =
+    Provider_accounts.find (Login_manager.store login) provider account
+  in
+  provider, account.id
+;;
+
+let optional_account_param login params =
+  match param params "account", param params "ref" with
+  | (None | Some `Null), (None | Some `Null) -> Ok None
+  | _ -> Or_error.map (account_param login params) ~f:(fun (_, id) -> Some id)
+;;
+
+(* A model key, or [key@account] (an account's id or label); [account]
+   instead of the suffix. A key with an [@] of its own still resolves. *)
+let model_with_account ?member login key ~account =
+  let open Or_error.Let_syntax in
+  let models = Login_manager.models login in
+  let%bind model, account =
+    match Model_registry.resolve models key, account with
+    | Ok model, _ -> Ok (model, account)
+    | (Error _ as error), Some _ -> Or_error.map error ~f:(fun m -> m, account)
+    | (Error _ as error), None ->
+      (match String.rsplit2 key ~on:'@' with
+       | Some (key, account) when not (String.is_empty account) ->
+         let%map model = Model_registry.resolve models key in
+         model, Some account
+       | Some _ | None -> Or_error.map error ~f:(fun m -> m, None))
+  in
+  match account with
+  | None -> Ok (model, None)
+  | Some account ->
+    let%map found =
+      Login_choice.find
+        ?member
+        (Login_manager.store login)
+        (model : Model.t).provider
+        account
+    in
+    model, Some found.ref_
+;;
+
 (* Confirmations and questions waiting for the user. *)
 let waiting agent =
   List.length (Agent.pending_confirms agent)
@@ -409,6 +480,9 @@ end
 
 type t =
   { login : Login_manager.t
+  ; member : Account_shares.Member.t option
+    (** the user and the logins shared among users ([-tokens]) *)
+  ; ledger : Account_ledger.t option (** what ran on the user's logins *)
   ; forges : Forges.t
   ; token : string option (** required in [hello] before anything else *)
   ; namespace : string option
@@ -417,6 +491,22 @@ type t =
   ; cwd : string
   ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
   ; default_agent : Agent.t option
+  ; engines : Engines.t (** what this backend deploys *)
+  ; adapter_health : Adapter_health.Cache.t
+    (** whether the composer's CLIs are installed and logged in, by host *)
+  ; login_seen : Adapter_health.Seen.Table.t
+    (** what starting the ACP agents showed of their own logins, by host *)
+  ; catalogs : Adapter_catalog.t
+    (** the composer's CLIs' models and usage limits, by host *)
+  ; spawn_external :
+      (Agent.t
+       -> host:string
+       -> Adapter.Launch.t
+       -> Line_transport.t Or_error.t)
+        option
+  ; catalog_keys : (string * string option) String.Table.t
+    (** the host and login each composer session's models were last asked
+        for, by session id: when either changes, its clients ask again *)
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
@@ -590,6 +680,7 @@ let end_temporary t agent ~notify =
   then (
     Hashtbl.remove t.agents id;
     Hashtbl.remove t.listed id;
+    Hashtbl.remove t.catalog_keys id;
     Hashtbl.remove t.temporaries id;
     Fiber.fork ~sw:t.sw (fun () ->
       Guarded.run ~what:"ending a temporary session" (fun () ->
@@ -761,6 +852,14 @@ let list_sessions t client =
   `Array (List.map (listings t client) ~f:(listing_json t))
 ;;
 
+(* The clients that have signed in: the namespace's events (its sessions,
+   settings, hosts and agent CLIs) are not for a connection that has not. *)
+let iter_authed t ~f =
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> if c.authed then f c)
+;;
+
+let broadcast t json = iter_authed t ~f:(fun (c : Client.t) -> c.send json)
+
 (* Every client of the server, whichever session it is in. With [changed]
    (sessions whose entries changed, in memory as they are now) or
    [removed] (session ids), they get those sessions' [list_sessions]
@@ -772,9 +871,7 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
       ([ "type", `String "event"; "event", `String "sessions_changed" ] @ fields)
   in
   if List.is_empty changed && List.is_empty removed
-  then (
-    let json = event [] in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json))
+  then broadcast t (event [])
   else (
     let live_now = live_sessions t in
     let live path =
@@ -803,7 +900,7 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
              ~f:(fun id -> `String id)) )
     in
     let now = t.now () in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+    iter_authed t ~f:(fun (c : Client.t) ->
       let archive_after_days = archive_after_days t c in
       c.send
         (event
@@ -832,6 +929,7 @@ let maybe_evict t agent =
   then (
     Hashtbl.remove t.agents (session_id agent);
     Hashtbl.remove t.listed (session_id agent);
+    Agent.stop_engine agent;
     let session = Agent.session agent in
     if Session.persisted session && not (Session.gone session)
     then (
@@ -951,9 +1049,184 @@ let send_to_clients t agent ~now (event : Agent.Event.t) json =
       | Resync -> c.send_shared (force resync) ~line:resync_line)
 ;;
 
+(* The login of prigh's the user runs [adapter]'s CLI on (Settings →
+   Engines), if one. *)
+let adapter_login t ~adapter =
+  match t.home, Cli_login.provider ~adapter with
+  | Some home, Some provider ->
+    (match Cli_login.find ~home ~adapter with
+     | Own -> None
+     | Prigh ref_ -> Some (provider, ref_))
+  | _ -> None
+;;
+
+(* What {!Adapter_catalog} keeps [adapter]'s catalog under for the login it
+   runs on: [None] for its own. *)
+let catalog_login t ~adapter =
+  Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
+    Provider_id.to_string provider ^ "/" ^ Account_ref.to_string ref_)
+;;
+
+let login_label t provider ref_ =
+  match
+    Login_choice.find
+      ?member:t.member
+      (Login_manager.store t.login)
+      provider
+      (Account_ref.to_string ref_)
+  with
+  | Ok choice -> choice.label
+  | Error _ -> Account_ref.to_string ref_
+;;
+
+(* What a composer session's CLI is handed: one of prigh's logins, whose
+   problems (gone, unshared) the CLI's start reports. *)
+let cli_credential t agent ~adapter =
+  Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
+    match
+      Cli_credential.of_store
+        ~env:(Agent.env agent)
+        ?member:t.member
+        ?ledger:t.ledger
+        (Login_manager.store t.login)
+        provider
+        ref_
+    with
+    | Ok credential -> credential
+    | Error e ->
+      Cli_credential.create
+        ~provider
+        ~account:ref_
+        ~label:(Account_ref.to_string ref_)
+        ~fetch:(fun ?refused:_ ?valid_for_ms:_ () -> Error e)
+        ())
+;;
+
+(* Where a composer session's harness is with listing its models while the
+   session's model is a placeholder: being asked, or why it could not. *)
+let harness_models t (s : Agent.State.t) =
+  match s.engine with
+  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) }
+    when External_model.is_placeholder s.model ->
+    let adapter = Adapter_id.to_string a in
+    let host = s.active_host in
+    let login = catalog_login t ~adapter in
+    (match
+       ( Adapter_catalog.asking t.catalogs ~host ~login adapter
+       , Adapter_catalog.failure t.catalogs ~host ~login adapter
+       , Adapter_catalog.find t.catalogs ~host ~login adapter )
+     with
+     | true, _, _ -> Some Harness_models.Loading
+     | false, Some why, _ ->
+       let host_name =
+         match
+           List.find s.hosts ~f:(fun (h : Agent.Host.t) ->
+             String.equal h.id host)
+         with
+         | Some h when not (String.is_empty h.name) -> h.name
+         | _ ->
+           (match s.active_host_name with
+            | Some name when not (String.is_empty name) -> name
+            | _ -> host)
+       in
+       Some
+         (Harness_models.failed
+            ~label:(Adapter_id.label a)
+            ~host_name
+            ~prigh_login:
+              (Option.map (adapter_login t ~adapter) ~f:(fun (provider, _) ->
+                 Provider_id.to_string provider))
+            ~install:
+              (Option.map
+                 (Adapter_health.Cache.find t.adapter_health ~host a)
+                 ~f:(fun (h : Adapter_health.Status.t) -> h.install))
+            why)
+     (* It listed none: it picks its own. *)
+     | false, None, Some { models = []; _ } -> None
+     | false, None, (Some { models = _ :: _; _ } | None) ->
+       Some Harness_models.Loading)
+  | _ -> None
+;;
+
+(* A session's state, with the label of prigh's login its CLI runs on and
+   where its harness is with listing its models. *)
+let state_json t (s : Agent.State.t) =
+  let json = Rpc_json.state s in
+  match s.engine, json with
+  | { engine = Composer; adapter = Some a }, `Object fields ->
+    `Object
+      (fields
+       @ (match adapter_login t ~adapter:(Adapter_id.to_string a) with
+          | Some (provider, ref_) ->
+            [ "adapter_login", `String (login_label t provider ref_) ]
+          | None -> [])
+       @
+       match harness_models t s with
+       | Some status -> [ "harness_models", Harness_models.to_json status ]
+       | None -> [])
+  | _ -> json
+;;
+
+(* Tells the session's clients its state when its harness's listing of its
+   models moved on (asked, failed) while its model is a placeholder: the
+   agent itself has nothing to say then. *)
+let send_harness_models t agent =
+  let s = Agent.state agent in
+  if Option.is_some (harness_models t s)
+  then (
+    let json =
+      `Object
+        [ "type", `String "event"
+        ; "event", `String "state"
+        ; "state", state_json t s
+        ]
+    in
+    List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json))
+;;
+
+(* The session's model list changed: its clients ask for it again. *)
+let models_changed t agent =
+  Agent.models_changed agent;
+  let json =
+    `Object [ "type", `String "event"; "event", `String "models_changed" ]
+  in
+  List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json);
+  send_harness_models t agent
+;;
+
+(* A composer session's harness lists its models on its tool host, on the
+   login it runs on: when the session moves to another host (as a new chat
+   does when the host the user picked connects) or the harness to another
+   login, its clients ask its models again, which asks them there. *)
+let note_catalog_key t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) } ->
+    let key =
+      Agent.active_host agent, catalog_login t ~adapter:(Adapter_id.to_string a)
+    in
+    let id = session_id agent in
+    (match Hashtbl.find t.catalog_keys id with
+     | Some old
+       when [%equal: string * string option] old key
+            || Agent.external_live agent -> ()
+     | Some _ ->
+       Hashtbl.set t.catalog_keys ~key:id ~data:key;
+       models_changed t agent
+     | None -> Hashtbl.set t.catalog_keys ~key:id ~data:key)
+  | _ -> ()
+;;
+
 let route t agent (event : Agent.Event.t) =
   let now = Eio.Time.now (Eio.Stdenv.clock (Agent.env agent)) in
   let json = Rpc_json.event ~now event in
+  let json =
+    match event, json with
+    | State_changed s, `Object fields ->
+      `Object
+        (List.map fields ~f:(fun (k, v) ->
+           if String.equal k "state" then k, state_json t s else k, v))
+    | _ -> json
+  in
   (match event with
    | Tool_exec { host; exec_id; _ } ->
      (match host_client t host with
@@ -992,6 +1265,7 @@ let route t agent (event : Agent.Event.t) =
    | _ -> ());
   match event with
   | State_changed { running; _ } ->
+    note_catalog_key t agent;
     if not running then maybe_evict t agent;
     (* A host's session name may have changed; [set_hosts] is a no-op when
        nothing did, so this does not loop. *)
@@ -999,9 +1273,453 @@ let route t agent (event : Agent.Event.t) =
   | _ -> ()
 ;;
 
+(* Why [agent]'s session cannot run here: its engine is not deployed, or it
+   names one this prigh does not know. *)
+let engine_unavailable t agent =
+  match Session.engine (Agent.session agent) with
+  | Ok choice -> Engines.unavailable t.engines choice
+  | Error e ->
+    Some
+      (sprintf
+         "this session was made by a newer prigh (%s): update prigh to run it; \
+          it can still be read here"
+         (Error.to_string_hum e))
+;;
+
+(* A probed status with what else is known of its login: the prigh login it
+   runs on, what starting it showed, a check under way. *)
+let with_evidence t (s : Adapter_health.Status.t) =
+  let adapter = Adapter_id.to_string s.adapter in
+  Adapter_health.Status.with_evidence
+    s
+    ~prigh_login:
+      (Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
+         login_label t provider ref_))
+    ~seen:(Adapter_health.Seen.Table.find t.login_seen ~host:s.host s.adapter)
+    ~checking:
+      (Adapter_catalog.asking t.catalogs ~host:s.host ~login:None adapter)
+;;
+
+(* The statuses of the deployed adapters on [hosts], in that order. *)
+let adapter_statuses t hosts =
+  List.concat_map hosts ~f:(fun (host : Agent.Host.t) ->
+    List.filter_map t.engines.adapters ~f:(fun adapter ->
+      Adapter_health.Cache.find t.adapter_health ~host:host.id adapter
+      |> Option.map ~f:(with_evidence t)))
+;;
+
+let adapters_json t statuses =
+  `Array (List.map statuses ~f:(Adapter_health.Status.to_json ~now:(t.now ())))
+;;
+
+let adapters_changed t ~hosts =
+  let json =
+    `Object
+      [ "type", `String "event"
+      ; "event", `String "adapters_changed"
+      ; "adapters", adapters_json t (adapter_statuses t hosts)
+      ]
+  in
+  broadcast t json
+;;
+
+(* Notes what starting an ACP agent on its own login on [host] showed of
+   that login: whether that changed what is known. *)
+let note_seen t ~host (adapter : Adapter_id.t) (result : _ Or_error.t) =
+  match adapter with
+  | Codex | Claude | Prigh -> false
+  | Acp _ ->
+    let at = t.now () in
+    let seen : Adapter_health.Seen.t =
+      match result with
+      | Ok _ -> Opened { at }
+      | Error e when Acp_adapter.is_not_logged_in e -> Refused { at }
+      | Error e -> Check_failed { at; why = Error.to_string_hum e }
+    in
+    let table = t.login_seen in
+    let before = Adapter_health.Seen.Table.find table ~host adapter in
+    Adapter_health.Seen.Table.record table ~host adapter seen;
+    let after = Adapter_health.Seen.Table.find table ~host adapter in
+    let kind : Adapter_health.Seen.t option -> int = function
+      | Some (Opened _) -> 1
+      | Some (Refused _) -> 2
+      | Some (Check_failed _) -> 3
+      | None -> 0
+    in
+    kind before <> kind after
+;;
+
+(* The session's active tool host by name, for messages. *)
+let active_host_label agent =
+  let id = Agent.active_host agent in
+  match
+    List.find (Agent.hosts agent) ~f:(fun (h : Agent.Host.t) ->
+      String.equal h.id id)
+  with
+  | Some host when not (String.is_empty host.name) -> host.name
+  | _ ->
+    let name = Agent.active_host_name agent in
+    if String.is_empty name then id else name
+;;
+
+(* The harness on the session's active tool host, in its cwd. *)
+let host_spawn t agent launch =
+  Host_transport.spawn
+    ~sw:t.sw
+    ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
+      Agent.host_call agent ~stdin ~cancel ~on_output ~name args)
+    ~host:(active_host_label agent)
+    launch
+;;
+
+(* [adapter]'s harness failed to start on the session's host: what was
+   known of it there is checked again, and the frontends told. *)
+let recheck_adapter t agent adapter =
+  let host = Agent.active_host agent in
+  Adapter_health.Cache.forget t.adapter_health ~host adapter;
+  Fiber.fork ~sw:t.sw (fun () ->
+    let statuses =
+      Adapter_health.probe
+        ~exec:(fun ~name arguments ->
+          Agent.host_call_on
+            agent
+            ~host
+            ~cwd:(Session.cwd (Agent.session agent))
+            ~name
+            arguments)
+        [ adapter ]
+        ~host
+        ~host_name:(active_host_label agent)
+        ~now:(t.now ())
+    in
+    Adapter_health.Cache.set t.adapter_health statuses;
+    adapters_changed t ~hosts:(Agent.state agent).hosts)
+;;
+
+(* The harness [adapter] said its catalog on [host], on the login [login]:
+   the sessions it runs there, on that login, show its models. *)
+let catalog_changed t ~host ~login adapter =
+  if [%equal: string option] login (catalog_login t ~adapter)
+  then
+    Hashtbl.iter t.agents ~f:(fun agent ->
+      match Agent.engine_choice agent with
+      | { engine = Composer; adapter = Some a }
+        when String.equal (Adapter_id.to_string a) adapter
+             && String.equal (Agent.active_host agent) host ->
+        models_changed t agent
+      | _ -> ())
+;;
+
+(* Why [adapter_id]'s harness, handed prigh's login [credential], did not
+   say its catalog: a refused login is that login's problem, not the
+   harness's own login on the host. *)
+let catalog_login_error (adapter_id : Adapter_id.t) credential e =
+  let label = Cli_credential.label credential in
+  let provider = Provider_id.to_string (Cli_credential.provider credential) in
+  let what_next =
+    sprintf
+      "/login %s logs in again, or Settings → Engines runs %s on its own login"
+      provider
+      (Adapter_id.label adapter_id)
+  in
+  let refused =
+    Acp_adapter.is_not_logged_in e
+    || String.is_substring (Error.to_string_hum e) ~substring:"refused prigh's"
+  in
+  match Cli_credential.last credential with
+  | Some (Error why) ->
+    Error.createf
+      "prigh's %s login %S gave it no token (%s): %s"
+      provider
+      label
+      (Error.to_string_hum why)
+      what_next
+  | (Some (Ok _) | None) when refused ->
+    Error.createf
+      "it was refused prigh's %s login %S, or could not use it: %s"
+      provider
+      label
+      what_next
+  | Some (Ok _) | None -> e
+;;
+
+(* Runs [adapter]'s harness on the tool host [host] (named [host_name]), in
+   [cwd], only to ask its catalog ({!Adapter.S.catalog}), on prigh's login
+   [login] (else its own: then what that shows of its own login is
+   noted). *)
+let fetch_catalog
+      t
+      agent
+      ~host
+      ~host_name
+      ~cwd
+      ~login
+      adapter_id
+      (module A : Adapter.S)
+      ()
+  =
+  let login = force login in
+  let start = { (Adapter.Start.default ~cwd) with login } in
+  let launch = A.launch start in
+  let result =
+    let%bind.Or_error transport =
+      match t.spawn_external with
+      | Some spawn -> spawn agent ~host launch
+      | None ->
+        Host_transport.spawn
+          ~sw:t.sw
+          ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
+            Agent.host_call_on
+              agent
+              ~stdin
+              ~cancel
+              ~on_output
+              ~host
+              ~cwd
+              ~name
+              args)
+          ~host:host_name
+          launch
+    in
+    Switch.run (fun sw ->
+      Exn.protect
+        ~finally:(fun () -> Line_transport.stop transport)
+        ~f:(fun () ->
+          A.catalog
+            ~sw
+            ~request_timeout:(Time_float.Span.of_sec 30.)
+            transport
+            start))
+  in
+  match login with
+  | None ->
+    ignore (note_seen t ~host adapter_id result : bool);
+    result
+  | Some credential ->
+    Result.map_error result ~f:(catalog_login_error adapter_id credential)
+;;
+
+(* Asks, in the background, the catalog of a Codex, Claude Code or ACP
+   session's harness on its tool host, on the login it runs on, unless one
+   younger than [max_age] seconds is kept. *)
+let ensure_catalog ?force ?(max_age = 1800.) t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer
+    ; adapter = Some ((Codex | Claude | Acp _) as adapter_id)
+    } ->
+    (match Composer_adapters.find t.engines adapter_id with
+     | Error _ -> ()
+     | Ok adapter ->
+       let host = Agent.active_host agent in
+       let name = Adapter_id.to_string adapter_id in
+       let login = catalog_login t ~adapter:name in
+       let was_asking = Adapter_catalog.asking t.catalogs ~host ~login name in
+       Adapter_catalog.refresh
+         ?force
+         t.catalogs
+         ~sw:t.sw
+         ~host
+         ~login
+         name
+         ~max_age
+         ~fetch:
+           (fetch_catalog
+              t
+              agent
+              ~host
+              ~host_name:(active_host_label agent)
+              ~cwd:(Session.cwd (Agent.session agent))
+              ~login:(lazy (cli_credential t agent ~adapter:name))
+              adapter_id
+              adapter)
+         ~on_done:(fun () ->
+           catalog_changed t ~host ~login name;
+           match adapter_id with
+           | Acp _ when Option.is_none login ->
+             adapters_changed t ~hosts:(hosts t)
+           | Acp _ | Codex | Claude | Prigh -> ());
+       if
+         (not was_asking) && Adapter_catalog.asking t.catalogs ~host ~login name
+       then send_harness_models t agent)
+  | _ -> ()
+;;
+
+(* The session's harness's catalog, as asked on its tool host on its
+   login. *)
+let find_catalog t agent (a : Adapter_id.t) =
+  let adapter = Adapter_id.to_string a in
+  Adapter_catalog.find
+    t.catalogs
+    ~host:(Agent.active_host agent)
+    ~login:(catalog_login t ~adapter)
+    adapter
+;;
+
+(* The session's harness listed no models when asked last (Goose): it
+   picks its own, and is not asked again. *)
+let lists_no_models t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some a } ->
+    (match find_catalog t agent a with
+     | Some { models = []; _ } -> true
+     | Some _ | None -> false)
+  | _ -> false
+;;
+
+(* The models of a session an external harness runs: its own, never
+   prigh's, even before it runs here. *)
+let external_models t agent =
+  match Agent.external_models agent, Agent.engine_choice agent with
+  | Some models, _ -> Some models
+  | None, { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) }
+    ->
+    Some
+      (match find_catalog t agent a with
+       | Some { models = _ :: _ as models; _ } -> models
+       | Some { models = []; _ } ->
+         [ External_model.unlisted ~adapter:(Adapter_id.to_string a) ]
+       | None -> [ External_model.pending ~adapter:(Adapter_id.to_string a) ])
+  | None, _ -> None
+;;
+
+(* A composer session's harness login's usage, as the harness says (asked
+   when it has not said lately). *)
+let harness_usage t agent : Subscription_usage.Harness_usage.t list =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some ((Codex | Claude) as adapter_id) } ->
+    let host = Agent.active_host agent in
+    let name = Adapter_id.to_string adapter_id in
+    ensure_catalog ~max_age:60. t agent;
+    if Option.is_none (Agent.external_limits agent)
+    then
+      Adapter_catalog.await
+        t.catalogs
+        ~host
+        ~login:(catalog_login t ~adapter:name)
+        name;
+    let label = Adapter_id.label adapter_id in
+    let status : Subscription_usage.Status.t =
+      match Agent.external_limits agent with
+      | Some status -> status
+      | None ->
+        Failed
+          (match adapter_login t ~adapter:name with
+           | None ->
+             sprintf
+               "%s on %s did not say: check that it is installed and logged in \
+                there (Settings → Engines)"
+               label
+               (active_host_label agent)
+           | Some (provider, ref_) ->
+             sprintf
+               "%s on %s did not say, on prigh's %s login %S: check that it is \
+                installed there and that the login works (Settings → Engines)"
+               label
+               (active_host_label agent)
+               (Provider_id.to_string provider)
+               (login_label t provider ref_))
+    in
+    [ { adapter = name; name = label; status } ]
+  | _ -> []
+;;
+
+(* A composer session's runner, driving its adapter's harness on the
+   session's tool host and continuing the thread the session recorded there
+   (each process records the threads it starts). *)
+let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
+  match adapter_id with
+  | Prigh ->
+    Ok (Prigh_adapter.runner ~harness:(fun () -> Agent.harness_runner agent))
+  | _ ->
+    let%map.Or_error adapter = Composer_adapters.find t.engines adapter_id in
+    let session = Agent.session agent in
+    let adapter_name = Adapter_id.to_string adapter_id in
+    let start ~cwd =
+      let host = Agent.active_host agent in
+      let (module A : Adapter.S) = adapter in
+      let thread =
+        List.find
+          (Session.threads session)
+          ~f:(fun (thread : Session.Thread.t) ->
+            String.equal thread.adapter adapter_name
+            && String.equal thread.host host)
+      in
+      (* A forked session continues a fork of its parent's thread, where the
+         agent forks one. *)
+      let resume, fork, at =
+        match thread with
+        | None -> None, false, None
+        | Some { fork_from = None; thread_id; _ } -> Some thread_id, false, None
+        | Some { fork_from = Some at; thread_id; _ } ->
+          if A.fork_native
+          then Some thread_id, true, Some at
+          else None, false, None
+      in
+      { (Adapter.Start.default ~cwd) with
+        resume
+      ; fork
+      ; at
+      ; developer_instructions = Agent.user_instructions agent
+      ; login = cli_credential t agent ~adapter:adapter_name
+      }
+    in
+    let on_thread thread_id =
+      ignore
+        (Session.record_thread
+           session
+           { adapter = adapter_name
+           ; host = Agent.active_host agent
+           ; thread_id
+           ; cwd = Session.cwd session
+           ; fork_from = None
+           }
+         : Session.Entry.t)
+    in
+    Composer_runner.runner
+      (Composer_runner.create
+         ~sw:t.sw
+         ~adapter
+         ~spawn:(fun launch ->
+           let spawned =
+             match t.spawn_external with
+             | Some spawn -> spawn agent ~host:(Agent.active_host agent) launch
+             | None -> host_spawn t agent launch
+           in
+           if Result.is_error spawned then recheck_adapter t agent adapter_id;
+           spawned)
+         ~start
+         ~on_thread
+         ~on_start:(fun (start : Adapter.Start.t) result ->
+           (* On one of prigh's logins, it shows nothing of its own. *)
+           if
+             Option.is_none start.login
+             && note_seen t ~host:(Agent.active_host agent) adapter_id result
+           then adapters_changed t ~hosts:(hosts t))
+         ~checkpoint:(fun args ->
+           Agent.host_call agent ~name:Checkpoint.op args)
+         ~host:(fun () -> Agent.active_host agent)
+         ?handoff_from
+         ~catalog:(fun () -> find_catalog t agent adapter_id)
+         ~on_change:(fun () -> models_changed t agent)
+         ())
+;;
+
+(* Gives a composer session (that can run here) its runner. *)
+let attach_engine t agent =
+  match Agent.engine_choice agent, (Agent.state agent).unavailable with
+  | { engine = Composer; adapter = Some adapter }, None
+    when not (Engine_id.equal (Agent.engine agent) Composer) ->
+    (match composer_runner t agent adapter with
+     | Ok runner -> Agent.set_runner agent (Some runner)
+     | Error e -> Agent.set_unavailable agent (Some (Error.to_string_hum e)))
+  | _ -> ()
+;;
+
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
 let register t agent =
+  Agent.set_unavailable agent (engine_unavailable t agent);
+  attach_engine t agent;
   Agent.set_hosts agent (hosts t) ~returning:(returning t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
@@ -1035,7 +1753,7 @@ let memory_changed (t : t) memory =
       `Object
         ([ "type", `String "event"; "event", `String "memory_changed" ] @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let custom_instructions_json ci =
@@ -1063,7 +1781,7 @@ let custom_instructions_changed (t : t) ci =
          ]
          @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let user_info_json user_info =
@@ -1090,7 +1808,7 @@ let user_info_changed (t : t) user_info =
         ([ "type", `String "event"; "event", `String "user_info_changed" ]
          @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let mcp_listing_json agent listing =
@@ -1112,7 +1830,7 @@ let mcp_settings_changed (t : t) mcp_settings =
          ([ "type", `String "event"; "event", `String "mcp_settings_changed" ]
           @ mcp_settings_json entries)
      in
-     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json));
+     broadcast t json);
   Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
 ;;
 
@@ -1122,8 +1840,41 @@ let mcp_auth_changed (t : t) =
   let json =
     `Object [ "type", `String "event"; "event", `String "mcp_auth_changed" ]
   in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json);
+  broadcast t json;
   Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
+;;
+
+let send_accounts_changed t =
+  let json = Rpc_json.login_event Accounts_changed in
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
+(* Another user shared or stopped sharing a login with this one: sessions
+   pinned to one no longer shared go back to the default login. *)
+let shares_changed t =
+  send_accounts_changed t;
+  Option.iter t.member ~f:(fun { shares; user } ->
+    Hashtbl.iter t.agents ~f:(fun agent ->
+      let state = Agent.state agent in
+      match state.account with
+      | Some (Shared { owner; id } as ref_)
+        when not
+               (Account_shares.granted
+                  shares
+                  ~recipient:user
+                  state.model.provider
+                  ~owner
+                  id) ->
+        Agent.set_model agent state.model;
+        Agent.notice
+          agent
+          (sprintf
+             "%s stopped sharing the %s login %s with you: carrying on with \
+              your default login (/account picks another)"
+             owner
+             (Provider_id.display_name state.model.provider)
+             (Account_ref.to_string ref_))
+      | _ -> ()))
 ;;
 
 let create
@@ -1136,6 +1887,8 @@ let create
       ?(host_timeout = 30.)
       ?heartbeat_clock
       ?namespace
+      ?member
+      ?ledger
       ?(backend_host = true)
       ?home
       ?forges
@@ -1149,6 +1902,8 @@ let create
       ~login
       ~sessions_dir
       ~cwd
+      ?(engines = Engines.default)
+      ?spawn_external
       ~new_agent
       ?default_agent
       ()
@@ -1167,6 +1922,8 @@ let create
   in
   let t =
     { login
+    ; member
+    ; ledger
     ; forges
     ; token
     ; namespace
@@ -1175,6 +1932,15 @@ let create
     ; cwd
     ; new_agent
     ; default_agent
+    ; engines
+    ; adapter_health = Adapter_health.Cache.create ~ttl:60.
+    ; login_seen = Adapter_health.Seen.Table.create ()
+    ; catalogs =
+        Adapter_catalog.create
+          ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
+          ()
+    ; spawn_external
+    ; catalog_keys = String.Table.create ()
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
     ; client_seq = 0
@@ -1261,10 +2027,22 @@ let create
       Option.iter
         (Option.bind t.login_owner ~f:(Hashtbl.find t.clients))
         ~f:(fun c -> c.send json)
-    | Done _ | Failed _ | Logged_out _ | Forge_done _ | Forge_logged_out _ ->
-      Hashtbl.iter t.clients ~f:(fun c -> c.send json));
+    | Done _
+    | Failed _
+    | Logged_out _
+    | Accounts_changed
+    | Forge_done _
+    | Forge_logged_out _ -> broadcast t json);
+  (* Recipients see a login's new label, or that it is gone. *)
+  Login_manager.subscribe login ~f:(function
+    | Done _ | Logged_out _ | Accounts_changed ->
+      Option.iter t.member ~f:(fun { shares; user } ->
+        Account_shares.changed shares ~owner:user)
+    | _ -> ());
+  Option.iter t.member ~f:(fun { shares; user } ->
+    Account_shares.subscribe shares ~user ~f:(fun () -> shares_changed t));
   Model_registry.subscribe (Login_manager.models login) ~f:(fun problem ->
-    Hashtbl.iter t.clients ~f:(fun c -> tell_problems c [ problem ]));
+    iter_authed t ~f:(fun c -> tell_problems c [ problem ]));
   t
 ;;
 
@@ -1293,7 +2071,8 @@ let attach t (client : Client.t) agent =
   else (
     Option.iter (preferred_host t client) ~f:(fun host ->
       Agent.prefer_host agent host.host_id);
-    Agent.chat_without_host agent)
+    Agent.chat_without_host agent);
+  Agent.prewarm agent
 ;;
 
 (* A brand-new session made or opened for [client] starts on a host chosen
@@ -1995,6 +2774,35 @@ let clean_leftovers t =
     Agent.shutdown agent)
 ;;
 
+let composer_deployed t =
+  List.mem t.engines.engines Composer ~equal:Engine_id.equal
+;;
+
+(* A host that (re)connects may have had its CLIs installed or logged in
+   meanwhile: its statuses are checked again when next asked for. *)
+let host_connected t (client : Client.t) =
+  if composer_deployed t
+  then (
+    Adapter_health.Cache.forget_host t.adapter_health ~host:client.host_id;
+    adapters_changed t ~hosts:(Agent.state client.agent).hosts)
+;;
+
+(* A backend deploying more than the harness says what, so that frontends
+   offer the choice; one with the harness alone says nothing, as before
+   engines. *)
+let engine_features t =
+  if Engines.equal t.engines Engines.default then [] else [ "engines" ]
+;;
+
+let engines_json t =
+  if Engines.equal t.engines Engines.default
+  then []
+  else
+    [ "engines", strings (Engines.engine_strings t.engines)
+    ; "adapters", strings (Engines.adapter_strings t.engines)
+    ]
+;;
+
 let hello t (client : Client.t) params =
   let string name =
     match param params name with
@@ -2083,22 +2891,24 @@ let hello t (client : Client.t) params =
             Fiber.fork ~sw:t.sw (fun () ->
               Guarded.run ~what:"cleaning up temporary sessions" (fun () ->
                 clean_leftovers t));
+          if tools then host_connected t client;
           `Object
-            [ "client_id", `String client.id
-            ; "host_id", `String client.host_id
-            ; ( "namespace"
-              , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
-                  `String n) )
-            ; ( "user"
-              , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
-                  `String s.user) )
-            ; ( "superuser"
-              , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
-                then `True
-                else `False )
-            ; "features", strings backend_features
-            ; "state", Rpc_json.state (Agent.state agent)
-            ]))))
+            ([ "client_id", `String client.id
+             ; "host_id", `String client.host_id
+             ; ( "namespace"
+               , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
+                   `String n) )
+             ; ( "user"
+               , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
+                   `String s.user) )
+             ; ( "superuser"
+               , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
+                 then `True
+                 else `False )
+             ; "features", strings (backend_features @ engine_features t)
+             ; "state", state_json t (Agent.state agent)
+             ]
+             @ engines_json t)))))
 ;;
 
 (* The namespace's file as it is now, which another session may have
@@ -2119,8 +2929,62 @@ let config_saved t agent =
 ;;
 
 (* What a client changing session needs first, saving it a [get_state]. *)
-let attached_state (client : Client.t) =
-  `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
+let attached_state t (client : Client.t) =
+  `Object [ "state", state_json t (Agent.state client.agent) ]
+;;
+
+(* Moves the attached session to another of the composer's adapters (the
+   new one's harness takes over at the next turn, handed what it has not
+   seen of the session), or back to prigh's harness engine ([harness]),
+   which reads the session itself. Not while a run goes on. *)
+let set_adapter t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let agent = client.agent in
+  let%bind name = string_param params "adapter" in
+  let%bind choice =
+    if String.equal name "harness"
+    then Engines.choose t.engines ~engine:(Some "harness") ~adapter:None
+    else Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
+  in
+  let previous = Agent.engine_choice agent in
+  if Engine_choice.equal choice previous
+  then Ok (attached_state t client)
+  else if Agent.is_running agent
+  then
+    Or_error.errorf
+      "%s is still running: wait for the run to end (or abort it with Esc), \
+       then switch to %s"
+      (Agent.engine_label agent)
+      (Option.value_map
+         choice.adapter
+         ~default:(Engine_choice.label choice)
+         ~f:Adapter_id.label)
+  else (
+    let%bind () =
+      match Engines.unavailable t.engines choice with
+      | None -> Ok ()
+      | Some why -> Error (Error.of_string why)
+    in
+    match choice with
+    | { engine = Harness; _ } ->
+      Agent.set_engine agent choice;
+      Agent.set_unavailable agent None;
+      Agent.set_runner agent None;
+      models_changed t agent;
+      Ok (attached_state t client)
+    | { engine = Composer; _ } ->
+      let%bind adapter =
+        Result.of_option
+          choice.adapter
+          ~error:(Error.of_string "the composer needs an adapter")
+      in
+      let%map runner = composer_runner t agent adapter ~handoff_from:previous in
+      Agent.set_engine agent choice;
+      Agent.set_unavailable agent None;
+      Agent.set_runner agent (Some runner);
+      Agent.prewarm agent;
+      models_changed t agent;
+      attached_state t client)
 ;;
 
 (* A temporary session is not saved or listed, and ends when its client
@@ -2168,7 +3032,12 @@ let new_session_start t (client : Client.t) =
     | _ -> start)
 ;;
 
-let new_session t (client : Client.t) ~temporary =
+let new_session
+      ?(engine = Engine_choice.harness)
+      t
+      (client : Client.t)
+      ~temporary
+  =
   let start = new_session_start t client in
   let cwd =
     match start with
@@ -2191,8 +3060,14 @@ let new_session t (client : Client.t) ~temporary =
       eprintf
         "prigh: the ledger of a temporary session: %s\n%!"
         (Exn.to_string exn));
-  start_new_agent t session start |> attach t client;
-  match attached_state client, key with
+  let agent = start_new_agent t session start in
+  (* Attached first: recording the engine changes the state, and a session
+     no client has is evicted when its state changes. *)
+  attach t client agent;
+  Agent.set_engine agent engine;
+  Agent.set_unavailable agent (engine_unavailable t agent);
+  attach_engine t agent;
+  match attached_state t client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])
   | state, _ -> state
@@ -2338,20 +3213,61 @@ module Deleted = struct
 end
 
 (* Deletes the session's files and everything kept for it in memory. *)
+(* Where a session kept checkpoints of its files (the tool hosts and
+   directories of its composer threads), for them to go with it. *)
+let checkpointed_places (summary : Session.Summary.t) =
+  match Session.load summary.path with
+  | Error _ -> []
+  | Ok session ->
+    if
+      List.exists (Session.external_turns ~all:true session) ~f:(fun run ->
+        Option.is_some run.after)
+    then
+      List.map (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
+        thread.host, thread.cwd)
+      |> List.dedup_and_sort ~compare:[%compare: string * string]
+    else []
+;;
+
+(* Best effort, in the background: a host away keeps them (hidden refs,
+   which git's gc keeps too). *)
+let drop_checkpoints t (client : Client.t) id places =
+  if not (List.is_empty places)
+  then
+    Fiber.fork ~sw:t.sw (fun () ->
+      List.iter places ~f:(fun (host, cwd) ->
+        ignore
+          (Agent.host_call_on
+             client.agent
+             ~host
+             ~cwd
+             ~name:Checkpoint.op
+             (`Object
+                 [ "action", `String "drop"
+                 ; "prefix", `String (Checkpoint.session_prefix ~session:id)
+                 ])
+           : Tool.Result.t)))
+;;
+
 let delete_saved ?leaving t client (summary : Session.Summary.t) =
   match refusal ?leaving t client summary with
   | Some refused -> Or_error.error_string refused
   | None ->
+    let checkpointed = checkpointed_places summary in
     Or_error.try_with (fun () ->
       let bytes = Session.disk_usage summary.path in
       Session.delete_files summary.path;
       let agent = Hashtbl.find t.agents summary.id in
       Hashtbl.remove t.agents summary.id;
       Hashtbl.remove t.listed summary.id;
+      Hashtbl.remove t.catalog_keys summary.id;
       Option.iter agent ~f:(fun agent ->
         if Agent.resume_pending agent
-        then ignore (Agent.cancel_resume agent : unit Or_error.t));
+        then ignore (Agent.cancel_resume agent : unit Or_error.t);
+        (* Its external harness, idle, would run on its host for good. *)
+        Agent.stop_engine agent);
       forget_session t summary.id;
+      drop_checkpoints t client summary.id checkpointed;
       { Deleted.path = summary.path; id = summary.id; bytes })
 ;;
 
@@ -2398,7 +3314,7 @@ let leave_for_deletion t (client : Client.t) ~switch_to keys =
               "switch_to is among the sessions to delete: name another one"
           else (
             attach t client target;
-            Ok (Some (attached_state client)))))
+            Ok (Some (attached_state t client)))))
 ;;
 
 (* One [sessions_changed] for the lot. *)
@@ -2843,7 +3759,7 @@ let prefs_changed t (from : Client.t) changes =
         ; "prefs", User_prefs.Change.to_json changes
         ]
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+    iter_authed t ~f:(fun (c : Client.t) ->
       if not (String.equal c.id from.id) then c.send json))
 ;;
 
@@ -3060,7 +3976,7 @@ let keep_session t (client : Client.t) =
     Agent.keep agent;
     Hashtbl.set t.listed ~key:id ~data:(Listed.of_agent agent);
     sessions_changed t ~changed:[ Agent.session agent ];
-    Ok (attached_state client))
+    Ok (attached_state t client))
 ;;
 
 let set_config t agent params =
@@ -3097,12 +4013,456 @@ let set_config t agent params =
     Config.to_json (Agent.config agent)
 ;;
 
+(* Every deployed adapter on every connected host, the session's host
+   first; statuses older than the cache's ttl (all of them with [refresh])
+   are probed again, the hosts in parallel. *)
+(* Which login each adapter that can take one of prigh's runs on, and the
+   logins it could. *)
+let adapter_logins_json t =
+  `Array
+    (List.filter_map Cli_login.adapters ~f:(fun adapter ->
+       Option.map (Cli_login.provider ~adapter) ~f:(fun provider ->
+         let choices =
+           Login_choice.list
+             ?member:t.member
+             (Login_manager.store t.login)
+             provider
+           |> Result.ok
+           |> Option.value ~default:[]
+         in
+         let login = adapter_login t ~adapter in
+         `Object
+           [ "adapter", `String adapter
+           ; "provider", `String (Provider_id.to_string provider)
+           ; ( "login"
+             , Option.value_map login ~default:`Null ~f:(fun (_, r) ->
+                 `String (Account_ref.to_string r)) )
+           ; ( "label"
+             , Option.value_map login ~default:`Null ~f:(fun (p, r) ->
+                 `String (login_label t p r)) )
+           ; ( "choices"
+             , `Array
+                 (List.map choices ~f:(fun (c : Login_choice.t) ->
+                    `Object
+                      [ "ref", `String (Account_ref.to_string c.ref_)
+                      ; "label", `String c.label
+                      ])) )
+           ])))
+;;
+
+(* [login]: a login of prigh's (ref, id or label), or ["own"] / null for the
+   CLI's own. The sessions on it show it, and take it at their next turn. *)
+let set_adapter_login t params =
+  let open Or_error.Let_syntax in
+  let%bind adapter = string_param params "adapter" in
+  let%bind login = string_param_opt params "login" in
+  let%bind home =
+    match t.home with
+    | Some home -> Ok home
+    | None -> Or_error.error_string "this backend keeps no settings"
+  in
+  let%bind provider =
+    match Cli_login.provider ~adapter with
+    | Some provider -> Ok provider
+    | None ->
+      Or_error.errorf
+        "%s runs only on its own login (prigh can hand one of its logins to: \
+         %s)"
+        adapter
+        (String.concat ~sep:", " Cli_login.adapters)
+  in
+  let%bind choice =
+    match login with
+    | None | Some "own" -> Ok Cli_login.Own
+    | Some login ->
+      let%map found =
+        Login_choice.find
+          ?member:t.member
+          (Login_manager.store t.login)
+          provider
+          login
+      in
+      Cli_login.Prigh found.ref_
+  in
+  let%map () = Cli_login.save ~home ~adapter choice in
+  Hashtbl.iter t.agents ~f:(fun agent ->
+    match Agent.engine_choice agent with
+    | { engine = Composer; adapter = Some a }
+      when String.equal (Adapter_id.to_string a) adapter ->
+      route t agent (State_changed (Agent.state agent))
+    | _ -> ());
+  `Object [ "adapter_logins", adapter_logins_json t ]
+;;
+
+(* Checks, in the background, the logins of the ACP agents on [host] that
+   nothing has shown ({!Adapter_health.Status.checkable}) by asking their
+   model lists, which starts them briefly on their own logins ([force], on
+   Refresh: even when asking failed lately, and those found logged out, which
+   may have logged in since). The adapters checked, with the host's id. *)
+let check_logins t agent ~force (host : Agent.Host.t) =
+  List.filter_map t.engines.adapters ~f:(fun adapter_id ->
+    let checkable =
+      Option.exists
+        (Adapter_health.Cache.find t.adapter_health ~host:host.id adapter_id)
+        ~f:(fun s ->
+          let s = with_evidence t s in
+          Adapter_health.Status.checkable s
+          ||
+          match force, s.adapter, s.install, s.auth with
+          | true, Acp _, Installed _, Logged_out -> true
+          | _ -> false)
+    in
+    match checkable, Composer_adapters.find t.engines adapter_id with
+    | true, Ok adapter ->
+      let name = Adapter_id.to_string adapter_id in
+      Adapter_catalog.refresh
+        ~force
+        t.catalogs
+        ~sw:t.sw
+        ~host:host.id
+        ~login:None
+        name
+        ~max_age:0.
+        ~fetch:
+          (fetch_catalog
+             t
+             agent
+             ~host:host.id
+             ~host_name:host.name
+             ~cwd:host.cwd
+             ~login:(lazy None)
+             adapter_id
+             adapter)
+        ~on_done:(fun () ->
+          catalog_changed t ~host:host.id ~login:None name;
+          adapters_changed t ~hosts:(hosts t));
+      Some (host.id, name)
+    | _ -> None)
+;;
+
+let list_adapters t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind () =
+    if composer_deployed t
+    then Ok ()
+    else
+      Or_error.error_string
+        "this backend does not run the composer engine, so it drives no agent \
+         CLIs: start one with prigh serve -engines composer"
+  in
+  let%map refresh = bool_param params "refresh" ~default:false in
+  let state = Agent.state client.agent in
+  let hosts =
+    let active, rest =
+      List.partition_tf state.hosts ~f:(fun (h : Agent.Host.t) ->
+        String.equal h.id state.active_host)
+    in
+    active @ rest
+  in
+  let cache = t.adapter_health in
+  let now = t.now () in
+  let changed =
+    Fiber.List.map
+      (fun (host : Agent.Host.t) ->
+         let stale =
+           List.filter t.engines.adapters ~f:(fun adapter ->
+             refresh
+             || not
+                  (Adapter_health.Cache.fresh cache ~now ~host:host.id adapter))
+         in
+         if List.is_empty stale
+         then false
+         else (
+           let statuses =
+             Adapter_health.probe
+               ~acp:(Engines.acp_agent t.engines)
+               ~exec:(fun ~name arguments ->
+                 Agent.host_call_on
+                   client.agent
+                   ~host:host.id
+                   ~cwd:host.cwd
+                   ~name
+                   arguments)
+               stale
+               ~host:host.id
+               ~host_name:host.name
+               ~now
+           in
+           let differs (s : Adapter_health.Status.t) =
+             match Adapter_health.Cache.find cache ~host:s.host s.adapter with
+             | None -> true
+             | Some old ->
+               not
+                 (Adapter_health.Status.equal
+                    { old with checked_at = 0. }
+                    { s with checked_at = 0. })
+           in
+           let changed = List.exists statuses ~f:differs in
+           Adapter_health.Cache.set cache statuses;
+           changed))
+      hosts
+    |> List.exists ~f:Fn.id
+  in
+  if changed then adapters_changed t ~hosts:state.hosts;
+  let checks =
+    List.concat_map hosts ~f:(check_logins t client.agent ~force:refresh)
+  in
+  if refresh
+  then
+    List.iter checks ~f:(fun (host, name) ->
+      Adapter_catalog.await t.catalogs ~host ~login:None name);
+  `Object
+    [ "adapters", adapters_json t (adapter_statuses t hosts)
+    ; "adapter_logins", adapter_logins_json t
+    ]
+;;
+
+let via_host_token (client : Client.t) =
+  Option.exists client.signed_in ~f:(fun s ->
+    s.User_access.Signed_in.via_host_token)
+;;
+
+(* An agent that has its tool host's token must not be able to log its
+   user in or out, or give their logins away. *)
+let check_manages_logins (client : Client.t) =
+  if via_host_token client
+  then
+    Or_error.error_string
+      "this connection signed in with a host token, which cannot change model \
+       logins: sign in as the user (prigh-web, or the user's own token)"
+  else Ok ()
+;;
+
+(* The tool host [host] names (id or name; default: the session's active
+   one). *)
+let import_host agent host =
+  let state = Agent.state agent in
+  let host = Option.value host ~default:state.active_host in
+  match
+    List.find state.hosts ~f:(fun (h : Agent.Host.t) ->
+      String.equal h.id host || String.equal h.name host)
+  with
+  | Some h -> Ok h
+  | None ->
+    Or_error.errorf
+      "no tool host %S is connected (connected: %s)"
+      host
+      (String.concat
+         ~sep:", "
+         (List.map state.hosts ~f:(fun (h : Agent.Host.t) -> h.name)))
+;;
+
+(* Moves a tool host's own CLI login into prigh ({!Cli_import}). Without
+   [confirm] it only finds it, answering what the user consents to; with
+   it, the login becomes prigh's and the adapter runs on it. *)
+let import_adapter_login t (client : Client.t) agent params =
+  let open Or_error.Let_syntax in
+  let%bind () = check_manages_logins client in
+  let%bind adapter = string_param params "adapter" in
+  let%bind host = string_param_opt params "host" in
+  let%bind confirm = bool_param params "confirm" ~default:false in
+  let%bind home =
+    match t.home with
+    | Some home -> Ok home
+    | None -> Or_error.error_string "this backend keeps no settings"
+  in
+  let%bind host = import_host agent host in
+  let exec ~name arguments =
+    Agent.host_call_on agent ~host:host.id ~cwd:host.cwd ~name arguments
+  in
+  let host_name = if String.is_empty host.name then host.id else host.name in
+  let logged_in =
+    match Adapter_id.of_string adapter with
+    | Ok adapter_id ->
+      (match
+         Adapter_health.Seen.Table.find t.login_seen ~host:host.id adapter_id
+       with
+       | Some (Opened _) -> true
+       | Some (Refused _ | Check_failed _) | None -> false)
+    | Error _ -> false
+  in
+  let%bind found =
+    Cli_import.find ~logged_in ~exec ~adapter ~host:host_name ()
+  in
+  let found_json =
+    [ "adapter", `String adapter
+    ; "provider", `String (Provider_id.to_string found.provider)
+    ; "host", `String host_name
+    ; "path", `String found.path
+    ; "label", `String (Cli_import.Found.label found)
+    ; "warning", `String (Cli_import.Found.warning found)
+    ]
+  in
+  if not confirm
+  then Ok (`Object (("confirmed", `False) :: found_json))
+  else (
+    let env = Agent.env agent in
+    let store = Login_manager.store t.login in
+    let%bind () =
+      match found.client with
+      | Some client -> Oauth_antigravity.Client.save store client
+      | None -> Ok ()
+    in
+    let%bind id, note =
+      Cli_import.take
+        ~exec
+        ~refresh:
+          (Provider_auth.refresh_oauth
+             ~env
+             ~cancel:Cancellation.never
+             ~store:(Login_manager.store t.login))
+        (Login_manager.store t.login)
+        found
+    in
+    let%map () = Cli_login.save ~home ~adapter (Prigh (Account_ref.Own id)) in
+    send_accounts_changed t;
+    Hashtbl.iter t.agents ~f:(fun agent ->
+      match Agent.engine_choice agent with
+      | { engine = Composer; adapter = Some a }
+        when String.equal (Adapter_id.to_string a) adapter ->
+        route t agent (State_changed (Agent.state agent))
+      | _ -> ());
+    `Object
+      ((("confirmed", `True) :: found_json)
+       @ [ "account", `String (Account_id.to_string id)
+         ; "note", Option.value_map note ~default:`Null ~f:(fun n -> `String n)
+         ; "adapter_logins", adapter_logins_json t
+         ]))
+;;
+
+let member_of t =
+  match t.member with
+  | Some m -> Ok m
+  | None ->
+    Or_error.error_string
+      "sharing logins needs users (prigh serve -tokens): this server has one"
+;;
+
+(* A login another user shares, named by its ref
+   (["~<owner>/<provider>/<id>"], as [auth_status] lists it). *)
+let shared_ref_param login params =
+  let open Or_error.Let_syntax in
+  match param params "ref" with
+  | Some (`String r) when String.is_prefix r ~prefix:"~" ->
+    (match String.split (String.drop_prefix r 1) ~on:'/' with
+     | [ owner; p; id ] when not (String.is_empty owner) ->
+       let%bind provider = provider_of_string login p in
+       let%map id = Account_id.of_string id in
+       Some (provider, owner, id)
+     | _ ->
+       Or_error.errorf
+         "shared login ref %S is not ~OWNER/PROVIDER/ACCOUNT (as auth_status \
+          lists it)"
+         r)
+  | _ -> Ok None
+;;
+
+let set_shared_pref t ~provider ~owner id ~f =
+  let open Or_error.Let_syntax in
+  let%bind { Account_shares.Member.shares; user } = member_of t in
+  let%map () = Account_shares.set_pref shares ~user provider ~owner id ~f in
+  send_accounts_changed t
+;;
+
+let account_methods t (client : Client.t) ~meth ~params =
+  let open Or_error.Let_syntax in
+  match meth with
+  | "account_share" ->
+    Some
+      (let%bind () = check_manages_logins client in
+       let%bind { Account_shares.Member.shares; user } = member_of t in
+       let%bind provider, account = account_param t.login params in
+       let%bind users =
+         match param params "users" with
+         | Some (`Array users) ->
+           Or_error.all
+             (List.map users ~f:(function
+                | `String u -> Ok u
+                | _ -> Or_error.error_string "param \"users\" must be names"))
+         | _ ->
+           Or_error.error_string
+             "missing param \"users\" (the user names to share with; [] stops \
+              sharing)"
+       in
+       let%map grants =
+         Account_shares.share shares ~owner:user provider account ~users
+       in
+       send_accounts_changed t;
+       `Object
+         [ ( "shared_with"
+           , `Array
+               (List.map grants ~f:(fun (g : Account_meta.Grant.t) ->
+                  `Object
+                    [ "user", `String g.user
+                    ; "since_ms", `Number (Int.to_string g.since_ms)
+                    ])) )
+         ])
+  | "account_share_targets" ->
+    Some
+      (let%bind { Account_shares.Member.shares; user } = member_of t in
+       let%map users = Account_shares.targets shares ~user in
+       `Array (List.map users ~f:(fun u -> `String u)))
+  | "account_hide" ->
+    Some
+      (let%bind () = check_manages_logins client in
+       let%bind hidden = bool_param params "hidden" ~default:true in
+       match%bind shared_ref_param t.login params with
+       | None ->
+         Or_error.error_string
+           "account_hide takes a shared login's ref (~OWNER/PROVIDER/ACCOUNT); \
+            your own logins are logged out instead"
+       | Some (provider, owner, id) ->
+         let%map () =
+           set_shared_pref t ~provider ~owner id ~f:(fun p -> { p with hidden })
+         in
+         `Object [])
+  | "account_usage" ->
+    Some
+      (let self =
+         Option.value_map
+           t.member
+           ~default:Account_ledger.single_user
+           ~f:(fun m -> m.user)
+       in
+       let%map rows =
+         match%bind shared_ref_param t.login params with
+         | Some (provider, owner, id) ->
+           let%bind { Account_shares.Member.shares; user } = member_of t in
+           Account_shares.usage shares ~user provider ~owner id
+         | None ->
+           let%map provider, id = account_param t.login params in
+           (match t.member, t.ledger with
+            | Some { shares; user }, _ ->
+              Account_shares.usage shares ~user provider ~owner:user id
+              |> Result.ok
+              |> Option.value ~default:[]
+            | None, Some ledger ->
+              Account_ledger.rows
+                ledger
+                ~login:(Account_ledger.login provider id)
+            | None, None -> [])
+       in
+       `Array
+         (List.map rows ~f:(fun (r : Account_ledger.Row.t) ->
+            match Account_ledger.Periods.to_json r.usage with
+            | `Object periods ->
+              `Object
+                ((("user", `String r.user)
+                  :: (if String.equal r.user self then [ "you", `True ] else [])
+                 )
+                 @ periods)
+            | json -> json)))
+  | _ -> None
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
   let agent = client.agent in
   match meth with
   | "hello" -> Some (hello t client params)
+  | "account_share" | "account_share_targets" | "account_hide" | "account_usage"
+    -> account_methods t client ~meth ~params
   | "list_users" ->
     Some
       (match client.signed_in with
@@ -3114,6 +4474,9 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some
       (Or_error.map (switch_user client params) ~f:(fun user ->
          `Object [ "user", `String user ]))
+  | "list_adapters" -> Some (list_adapters t client params)
+  | "set_adapter_login" -> Some (set_adapter_login t params)
+  | "import_adapter_login" -> Some (import_adapter_login t client agent params)
   | "set_active_host" ->
     Some
       (Or_error.bind (string_param params "host") ~f:(fun host ->
@@ -3192,18 +4555,23 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (Or_error.map (Agent.save_as_default client.agent) ~f:(fun () ->
          config_saved t client.agent;
          Config.to_json (Agent.config client.agent)))
+  | "set_adapter" -> Some (set_adapter t client params)
   | "new_session" ->
     Some
-      (Or_error.map
-         (bool_param params "temporary" ~default:false)
-         ~f:(fun temporary -> new_session t client ~temporary))
+      (let%bind.Or_error temporary =
+         bool_param params "temporary" ~default:false
+       in
+       let%bind.Or_error engine = string_param_opt params "engine" in
+       let%bind.Or_error adapter = string_param_opt params "adapter" in
+       let%map.Or_error engine = Engines.choose t.engines ~engine ~adapter in
+       new_session ~engine t client ~temporary)
   | "keep_session" -> Some (keep_session t client)
   | "switch_session" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
          Or_error.map (find_agent t client key) ~f:(fun target ->
            attach t client target;
-           attached_state client)))
+           attached_state t client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
   | "search_sessions" -> Some (search_sessions t params)
   | "list_worktrees" -> Some (list_worktrees t client params)
@@ -3291,7 +4659,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            start_agent t session start |> attach t client;
            if Session.persisted session
            then sessions_changed t ~changed:[ session ];
-           attached_state client))
+           attached_state t client))
   | "login" ->
     (* The flow may emit its first event before it is started. *)
     let owned start =
@@ -3302,8 +4670,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
       unit_result started
     in
     Option.some
-    @@
-      (match param params "provider" with
+    @@ Or_error.bind (check_manages_logins client) ~f:(fun () ->
+      match param params "provider" with
       | Some (`String "custom") -> owned (Login_manager.start_custom t.login)
       | _ ->
         Or_error.bind (provider_param t.login params) ~f:(fun provider ->
@@ -3315,28 +4683,149 @@ let dispatch_server t (client : Client.t) ~meth ~params
                | None -> Or_error.errorf "unknown login method %S" s)
             | _ -> Ok (List.hd_exn (Provider_auth.methods provider))
           in
-          Or_error.bind method_ ~f:(fun method_ ->
-            owned (fun () -> Login_manager.start t.login provider method_))))
+          let open Or_error.Let_syntax in
+          let%bind method_ = method_ in
+          let%bind account =
+            match%bind string_param_opt params "account" with
+            | None -> Ok None
+            | Some a -> Or_error.map (Account_id.of_string a) ~f:Option.some
+          in
+          let%bind label = string_param_opt params "label" in
+          owned (fun () ->
+            Login_manager.start t.login ?account ?label provider method_)))
   | "logout" ->
     (* A custom provider's logout asks the caller a question. *)
     Option.some
-    @@ Or_error.bind (provider_param t.login params) ~f:(fun provider ->
-      let previous = t.login_owner in
-      t.login_owner <- Some client.id;
-      let result = Login_manager.logout t.login provider in
-      if Result.is_error result || not (Login_manager.in_progress t.login)
-      then t.login_owner <- previous;
-      unit_result result)
-  | "usage_limits" ->
+    @@ Or_error.bind (check_manages_logins client) ~f:(fun () ->
+      match shared_ref_param t.login params with
+      | Error e -> Error e
+      | Ok (Some (provider, owner, id)) ->
+        Or_error.map
+          (set_shared_pref t ~provider ~owner id ~f:(fun p ->
+             { p with hidden = true }))
+          ~f:(fun () -> `Object [])
+      | Ok None ->
+        Or_error.bind (provider_param t.login params) ~f:(fun provider ->
+          let previous = t.login_owner in
+          t.login_owner <- Some client.id;
+          let result =
+            Or_error.bind
+              (optional_account_param t.login params)
+              ~f:(fun account -> Login_manager.logout t.login ?account provider)
+          in
+          if Result.is_error result || not (Login_manager.in_progress t.login)
+          then t.login_owner <- previous;
+          unit_result result))
+  | "account_update" ->
     Some
-      (ok
-         (Subscription_usage.to_json
-            (Subscription_usage.fetch
-               ~env:(Agent.env agent)
-               ~getenv:(Login_manager.getenv t.login)
-               ~http:t.usage_http
-               ~now:t.now
-               (Login_manager.store t.login))))
+      (let open Or_error.Let_syntax in
+       let%bind () = check_manages_logins client in
+       match%bind shared_ref_param t.login params with
+       | Some (provider, owner, id) ->
+         if
+           List.exists [ "label"; "default"; "before" ] ~f:(fun name ->
+             Option.is_some (param params name))
+         then
+           Or_error.errorf
+             "%s shares this login with you: you can hide it or let it take \
+              over at usage limits (fallback), not rename, reorder or make it \
+              the default"
+             owner
+         else (
+           let%bind fallback = bool_param params "fallback" ~default:false in
+           set_shared_pref t ~provider ~owner id ~f:(fun p ->
+             { p with fallback })
+           |> unit_result)
+       | None ->
+         let%bind provider, account = account_param t.login params in
+         let%bind label = string_param_opt params "label" in
+         let%bind make_default = bool_param params "default" ~default:false in
+         let%bind fallback =
+           match param params "fallback" with
+           | None | Some `Null -> Ok None
+           | Some _ ->
+             Or_error.map
+               (bool_param params "fallback" ~default:false)
+               ~f:Option.some
+         in
+         let%bind move_before =
+           match param params "before" with
+           | None -> Ok None
+           | Some `Null -> Ok (Some None)
+           | Some (`String r) ->
+             let%bind before_provider, before =
+               account_param t.login (`Object [ "ref", `String r ])
+             in
+             if Provider_id.equal before_provider provider
+             then Ok (Some (Some before))
+             else
+               Or_error.errorf
+                 "%S is another provider's account: accounts move among their \
+                  provider's"
+                 r
+           | Some _ ->
+             Or_error.error_string
+               "param \"before\" must be an account ref or null"
+         in
+         Login_manager.update_account
+           t.login
+           provider
+           account
+           { label; make_default; fallback; move_before }
+         |> unit_result)
+  | "usage_limits" ->
+    let env = Agent.env agent in
+    let shared =
+      match t.member with
+      | None -> []
+      | Some { shares; user } ->
+        Account_shares.shared_with shares ~user
+        |> List.filter ~f:(fun (s : Account_shares.Shared.t) ->
+          not s.pref.hidden)
+        |> List.map ~f:(fun (s : Account_shares.Shared.t) ->
+          { Subscription_usage.Shared.owner = s.owner
+          ; provider = s.provider
+          ; id = s.id
+          ; label = s.label
+          ; resolve =
+              (fun () ->
+                Or_error.map
+                  (Account_shares.resolve
+                     shares
+                     ~env
+                     ~recipient:user
+                     s.provider
+                     ~owner:s.owner
+                     s.id)
+                  ~f:Option.some)
+          })
+    in
+    let harnesses = harness_usage t agent in
+    let usage =
+      Subscription_usage.fetch
+        ~env
+        ~shared
+        ~getenv:(Login_manager.getenv t.login)
+        ~http:t.usage_http
+        ~now:t.now
+        (Login_manager.store t.login)
+    in
+    (* With a harness's own login shown, prigh's logins it lacks are noise. *)
+    let usage =
+      if List.is_empty harnesses
+      then usage
+      else
+        { usage with
+          providers =
+            List.filter
+              usage.providers
+              ~f:(fun (p : Subscription_usage.Provider_usage.t) ->
+                not
+                  (Subscription_usage.Status.equal p.status Not_signed_in
+                   && List.is_empty p.accounts))
+        }
+    in
+    Some (ok (Subscription_usage.to_json ~harnesses usage))
   | "forge_status" ->
     Some
       (Or_error.map (Forges.accounts t.forges) ~f:(fun accounts ->
@@ -3381,12 +4870,33 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "pr_checkout" -> Some (checkout_pull t client params)
   | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
+  | "retry_models" ->
+    (* The session's harness, which could not list its models, asked again
+       now: its clients hear of it as for any asking. *)
+    let agent = client.agent in
+    Hashtbl.remove t.catalog_keys (session_id agent);
+    ensure_catalog ~force:true t agent;
+    Some (ok (`Object []))
   | "list_models" ->
-    let models = Login_manager.models t.login in
-    Model_registry.reload models;
-    tell_problems client (Model_registry.problems models);
-    Some
-      (ok (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model)))
+    let agent = client.agent in
+    (match external_models t agent with
+     | Some models ->
+       (* Only the harness's default until it says its models: asked now,
+          unless its process is up (its session says them) or it listed
+          none before. *)
+       if
+         List.length models <= 1
+         && (not (Agent.external_live agent))
+         && not (lists_no_models t agent)
+       then ensure_catalog t agent;
+       Some (ok (`Array (List.map models ~f:Rpc_json.model)))
+     | None ->
+       let models = Login_manager.models t.login in
+       Model_registry.reload models;
+       tell_problems client (Model_registry.problems models);
+       Some
+         (ok
+            (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model))))
   | _ -> None
 ;;
 
@@ -3406,7 +4916,37 @@ let ui_action_param params ~meth =
           "a prompt with ui_action takes no text: send text \"\"")
 ;;
 
-let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t =
+(* One of an external harness's models, by key ([codex/gpt-5]), id or
+   name. *)
+let resolve_external (models : Model.t list) query ~who =
+  let q = String.lowercase query in
+  match
+    List.find models ~f:(fun m ->
+      String.equal (Model.key m) query
+      || String.equal m.id query
+      || String.equal (String.lowercase m.name) q)
+  with
+  | Some m -> Ok m
+  | None ->
+    Or_error.errorf
+      "%s has no model %S: pick one of %s (/model lists them)"
+      who
+      query
+      (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
+;;
+
+let dispatch
+      ?member
+      ?ledger
+      agent
+      login
+      ~external_models
+      ~state_json
+      ~(client : Client.t)
+      ~meth
+      ~params
+  : Json.t Or_error.t
+  =
   match meth with
   | "ping" -> ok (`String "pong")
   | "resync" ->
@@ -3568,7 +5108,7 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
                   [ "text", `String result.text
                   ; ("is_error", if result.is_error then `True else `False)
                   ])))
-  | "get_state" -> ok (Rpc_json.state (Agent.state agent))
+  | "get_state" -> ok (state_json (Agent.state agent))
   | "get_pending" ->
     let steer, follow_up = Agent.queued_texts agent in
     ok
@@ -3616,12 +5156,37 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
           ; "entries", `Array (List.map entries ~f:Rpc_json.entry)
           ])
   | "set_model" ->
-    Or_error.bind (string_param params "model") ~f:(fun id ->
-      Or_error.map
-        (Model_registry.resolve (Login_manager.models login) id)
-        ~f:(fun model ->
-          Agent.set_model agent model;
-          `Object []))
+    let open Or_error.Let_syntax in
+    let%bind id = string_param params "model" in
+    let%bind account = string_param_opt params "account" in
+    (match external_models () with
+     | Some models ->
+       let who = Agent.engine_label agent in
+       let%bind () =
+         match account with
+         | None -> Ok ()
+         | Some _ ->
+           Or_error.errorf
+             "%s uses its own login, not prigh's: pick the model without @LOGIN"
+             who
+       in
+       let%map model =
+         match resolve_external models id ~who, String.rsplit2 id ~on:'@' with
+         | Ok model, _ -> Ok model
+         | Error _, Some (key, _)
+           when Result.is_ok (resolve_external models key ~who) ->
+           Or_error.errorf
+             "%s uses its own login, not prigh's: pick %s without @LOGIN"
+             who
+             key
+         | (Error _ as error), _ -> error
+       in
+       Agent.set_model agent model;
+       `Object []
+     | None ->
+       let%map model, account = model_with_account ?member login id ~account in
+       Agent.set_model ?account agent model;
+       `Object [])
   | "set_thinking" ->
     Or_error.bind (string_param params "thinking") ~f:(fun s ->
       Or_error.bind (Rpc_json.thinking_of_string s) ~f:(fun thinking ->
@@ -3825,7 +5390,7 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
     let%bind plan = flag "plan_mode" in
     let%bind chat = flag "chat_mode" in
     Agent.set_mode ?approval ?plan ?chat agent;
-    ok (Rpc_json.state (Agent.state agent))
+    ok (state_json (Agent.state agent))
   | "forget_allowed_call" ->
     let open Or_error.Let_syntax in
     let%bind all = bool_param params "all" ~default:false in
@@ -3872,8 +5437,32 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
     in
     unit_result (Agent.answer_question agent ~call_id reply)
   | "auth_status" ->
+    let shared, shareable =
+      match member with
+      | None -> [], false
+      | Some { shares; user } ->
+        ( Account_shares.shared_with shares ~user
+        , (not (via_host_token client))
+          &&
+            (match Account_shares.targets shares ~user with
+            | Ok (_ :: _) -> true
+            | Ok [] | Error _ -> false) )
+    in
+    let usage provider (ref_ : Account_ref.t) =
+      match ref_, ledger, member with
+      | Own id, Some ledger, _ ->
+        Account_ledger.usage ledger ~login:(Account_ledger.login provider id)
+      | Shared { owner; id }, _, Some { shares; user } ->
+        (match Account_shares.usage shares ~user provider ~owner id with
+         | Ok rows ->
+           List.fold rows ~init:Account_ledger.Periods.zero ~f:(fun acc r ->
+             Account_ledger.Periods.add acc r.usage)
+         | Error _ -> Account_ledger.Periods.zero)
+      | _ -> Account_ledger.Periods.zero
+    in
     Or_error.map (Login_manager.status login) ~f:(fun statuses ->
-      `Array (List.map statuses ~f:Rpc_json.auth_status))
+      `Array
+        (List.map statuses ~f:(Rpc_json.auth_status ~shared ~shareable ~usage)))
   | "auth_respond" ->
     Or_error.bind (string_param params "id") ~f:(fun id ->
       Or_error.bind (string_param params "value") ~f:(fun value ->
@@ -3903,9 +5492,14 @@ let handle t client (request : Json.t) : Json.t =
             Or_error.error_string
               "unauthorised: send hello with the token first"
           else (
-            match dispatch_server t client ~meth ~params with
-            | Some result -> result
-            | None ->
+            match
+              Or_error.bind
+                (Engine_gate.check client.agent ~meth ~params)
+                ~f:(fun () -> Ok (dispatch_server t client ~meth ~params))
+            with
+            | Error e -> Error e
+            | Ok (Some result) -> result
+            | Ok None ->
               let agent = agent_of_client t client in
               let by =
                 Option.map client.signed_in ~f:(fun s ->
@@ -3924,7 +5518,17 @@ let handle t client (request : Json.t) : Json.t =
                       (Git_rpc.dispatch agent ~meth ~params))
                with
                | Some result -> result
-               | None -> dispatch agent t.login ~client ~meth ~params))
+               | None ->
+                 dispatch
+                   ?member:t.member
+                   ?ledger:t.ledger
+                   agent
+                   t.login
+                   ~external_models:(fun () -> external_models t agent)
+                   ~state_json:(state_json t)
+                   ~client
+                   ~meth
+                   ~params))
         with
         | result -> result
         | exception exn ->
