@@ -490,18 +490,18 @@ let%expect_test "codex: the picker lists Codex's models before the first turn" =
   chip ();
   [%expect
     {|
-    chip: codex/default (Default)
+    chip: codex/default (…)
     list_models, before Codex said:
     spawn codex on backend
-      codex/default "Default" thinking=[default low medium high]
+      codex/default "\226\128\166" thinking=[default low medium high]
     codex got initialize
     codex got model/list
     codex got account/rateLimits/read
     event: models_changed
     list_models, after:
-      codex/default "GPT-6.2-Sol" thinking=[default low medium high]
+      codex/gpt-6.2-sol "GPT-6.2-Sol" thinking=[default low medium high]
       codex/gpt-6.2-mini "GPT-6.2-Mini" thinking=[default low xhigh]
-    chip: codex/default (GPT-6.2-Sol)
+    chip: codex/gpt-6.2-sol (GPT-6.2-Sol)
     |}];
   ignore (call ~params:{|{"model": "gpt-6.2-mini"}|} "set_model" : Json.t);
   chip ();
@@ -536,10 +536,10 @@ let%expect_test "claude: its models and plan limits from its own login" =
     claude got get_usage
     event: models_changed
     usage claude "Claude Code" limits five_hour=12%
-      claude/default "Opus 5.5 (1M context)" thinking=[off default low medium high xhigh max]
+      claude/opus[1m] "Opus 5.5 (1M context)" thinking=[off default low medium high xhigh max]
       claude/sonnet "Sonnet 5.5" thinking=[off default low medium high xhigh max]
       claude/haiku "Haiku 4.5" thinking=[off default low medium high max]
-    chip: claude/default (Opus 5.5 (1M context))
+    chip: claude/opus[1m] (Opus 5.5 (1M context))
     |}]
 ;;
 
@@ -593,14 +593,14 @@ let%expect_test
     {|
     list_models, before Antigravity said:
     spawn agy on backend
-      acp:antigravity/default "Default" thinking=[off]
+      acp:antigravity/default "\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
     list_models, after:
-      acp:antigravity/default "Gemini 3.8 Flash" thinking=[off]
+      acp:antigravity/flash "Gemini 3.8 Flash" thinking=[off]
       acp:antigravity/gpt-oss "GPT-OSS 120B (Medium)" thinking=[off]
-    chip: acp:antigravity/default (Gemini 3.8 Flash)
+    chip: acp:antigravity/flash (Gemini 3.8 Flash)
     |}];
   let changed = next_change () in
   ignore (call ~params:{|{"adapter": "codex"}|} "set_adapter" : Json.t);
@@ -616,14 +616,14 @@ let%expect_test
     event: models_changed
     list_models, on Codex:
     spawn codex on backend
-      codex/default "Default" thinking=[default low medium high]
+      codex/default "\226\128\166" thinking=[default low medium high]
     codex got initialize
     codex got model/list
     codex got account/rateLimits/read
     event: models_changed
-      codex/default "GPT-6.2-Sol" thinking=[default low medium high]
+      codex/gpt-6.2-sol "GPT-6.2-Sol" thinking=[default low medium high]
       codex/gpt-6.2-mini "GPT-6.2-Mini" thinking=[default low xhigh]
-    chip: codex/default (GPT-6.2-Sol)
+    chip: codex/gpt-6.2-sol (GPT-6.2-Sol)
     |}]
 ;;
 
@@ -706,10 +706,10 @@ let%expect_test
     {|
     spawn grok on backend
     event: models_changed
-    notice: Grok Build on <machine> did not list its models, so the picker shows only its default: grok: command not found. Check that it is installed and logged in there (Settings → Engines).
-      acp:grok/default "Default" thinking=[off]
-      acp:grok/default "Default" thinking=[off]
-      acp:grok/default "Default" thinking=[off]
+    notice: Grok Build on <machine> could not list its models: grok: command not found. Check that it is installed and logged in there (Settings → Engines).
+      acp:grok/default "\226\128\166" thinking=[off]
+      acp:grok/default "\226\128\166" thinking=[off]
+      acp:grok/default "\226\128\166" thinking=[off]
     |}]
 ;;
 
@@ -741,12 +741,12 @@ let%expect_test
   [%expect
     {|
     spawn agy on backend
-      acp:antigravity/default "Default" thinking=[off]
+      acp:antigravity/default "\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
-    notice: Antigravity on <machine> did not list its models, so the picker shows only its default: Antigravity is not logged in on this host: run `agy acp --login` there. Check that it is installed and logged in there (Settings → Engines).
-      acp:antigravity/default "Default" thinking=[off]
+    notice: Antigravity on <machine> could not list its models: Antigravity is not logged in on this host: run `agy acp --login` there. Check that it is installed and logged in there (Settings → Engines).
+      acp:antigravity/default "\226\128\166" thinking=[off]
     |}];
   let changed = next_change () in
   connect_host ~id:"host-desktop" ~name:"desktop";
@@ -760,11 +760,11 @@ let%expect_test
     notice: tools now run on desktop in $DIR
     event: models_changed
     spawn agy on host-desktop
-      acp:antigravity/default "Default" thinking=[off]
+      acp:antigravity/default "\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
-      acp:antigravity/default "Gemini 3.8 Flash" thinking=[off]
+      acp:antigravity/flash "Gemini 3.8 Flash" thinking=[off]
       acp:antigravity/gpt-oss "GPT-OSS 120B (Medium)" thinking=[off]
     |}]
 ;;
@@ -798,11 +798,11 @@ let%expect_test
   [%expect
     {|
     spawn agy on backend with prigh's token in $PRIGH_AGY_TOKEN_FD
-      acp:antigravity/default "Default" thinking=[off]
+      acp:antigravity/default "\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
-      acp:antigravity/default "Gemini 3.8 Flash" thinking=[off]
+      acp:antigravity/flash "Gemini 3.8 Flash" thinking=[off]
       acp:antigravity/gpt-oss "GPT-OSS 120B (Medium)" thinking=[off]
     |}];
   (* Back on agy's own login: asked again, on it. *)
@@ -820,7 +820,7 @@ let%expect_test
     {|
     event: models_changed
     spawn agy on backend
-      acp:antigravity/default "Default" thinking=[off]
+      acp:antigravity/default "\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
@@ -844,7 +844,7 @@ let%expect_test
     event: models_changed
     event: models_changed
     spawn codex on backend
-      codex/default "Default" thinking=[default low medium high]
+      codex/default "\226\128\166" thinking=[default low medium high]
     codex got initialize
     codex got account/login/start
     codex was handed token tok-openai-codex
@@ -854,7 +854,7 @@ let%expect_test
     event: models_changed
     event: models_changed
     spawn claude on backend with prigh's token in $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
-      claude/default "Default" thinking=[off default low medium high max]
+      claude/default "\226\128\166" thinking=[off default low medium high max]
     claude got initialize
     claude got get_usage
     event: models_changed
@@ -885,11 +885,11 @@ let%expect_test "prigh's login refused: what to do is about that login" =
   [%expect
     {|
     spawn agy on backend with prigh's token in $PRIGH_AGY_TOKEN_FD
-      acp:antigravity/default "Default" thinking=[off]
+      acp:antigravity/default "\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
-    notice: Antigravity on <machine> did not list its models, so the picker shows only its default: it was refused prigh's google-antigravity login "Work", or could not use it: /login google-antigravity logs in again, or Settings → Engines runs Antigravity on its own login. Check that it is installed there (Settings → Engines).
-      acp:antigravity/default "Default" thinking=[off]
+    notice: Antigravity on <machine> could not list its models: it was refused prigh's google-antigravity login "Work", or could not use it: /login google-antigravity logs in again, or Settings → Engines runs Antigravity on its own login. Check that it is installed there (Settings → Engines).
+      acp:antigravity/default "\226\128\166" thinking=[off]
     |}]
 ;;

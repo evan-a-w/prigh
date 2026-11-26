@@ -1234,7 +1234,8 @@ module R = struct
        | [] ->
          (match t.catalog () with
           | Some { models = _ :: _ as models; _ } -> models
-          | Some _ | None -> [ External_model.default ~adapter:A.id ]))
+          | Some { models = []; _ } -> [ External_model.unlisted ~adapter:A.id ]
+          | None -> [ External_model.pending ~adapter:A.id ]))
   ;;
 
   let context t = t.context

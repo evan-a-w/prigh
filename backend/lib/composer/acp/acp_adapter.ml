@@ -589,7 +589,7 @@ let create
     let on_change _ _ = ()
 
     (* The choices of its [model] option, in its order, the one it started
-       with first as [default] (named as that model). *)
+       with first. *)
     let models_of ~agent_default config =
       match Codec.Session_config.option config ~category:"model" with
       | Some { value = Select { current; choices }; _ } ->
@@ -603,17 +603,11 @@ let create
             c.value
         in
         let default = Option.value agent_default ~default:current in
-        (match
-           List.partition_tf
-             choices
-             ~f:(fun (c : Codec.Config_option.Choice.t) ->
-               String.equal c.value default)
-         with
-         | c :: _, rest ->
-           { (model c) with id = External_model.default_id }
-           :: List.map rest ~f:model
-         | [], _ ->
-           External_model.default ~adapter:id :: List.map choices ~f:model)
+        let first, rest =
+          List.partition_tf choices ~f:(fun (c : Codec.Config_option.Choice.t) ->
+            String.equal c.value default)
+        in
+        List.map (first @ rest) ~f:model
       | Some _ | None -> []
     ;;
 

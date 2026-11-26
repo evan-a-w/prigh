@@ -60,10 +60,7 @@ let model
   =
   { id
   ; provider = Custom adapter
-  ; name =
-      Option.value
-        name
-        ~default:(if String.equal id default_id then "Default" else id)
+  ; name = Option.value name ~default:id
   ; context_window =
       Option.value_or_thunk context_window ~default:(fun () ->
         window ~adapter ~id ~name)
@@ -81,16 +78,22 @@ let model
 
 (* Before the harness lists its models: the levels every model of it takes
    (Claude Code's are budgets prigh sets). *)
-let default ~adapter =
+let placeholder ~adapter ~name =
   match adapter with
   | "claude" ->
     model
       ~adapter
+      ~name
       ~thinking_levels:[ Low; Medium; High; Max ]
       ~can_disable_thinking:true
       default_id
-  | "codex" -> model ~adapter ~thinking_levels:[ Low; Medium; High ] default_id
-  | _ -> model ~adapter default_id
+  | "codex" -> model ~adapter ~name ~thinking_levels:[ Low; Medium; High ] default_id
+  | _ -> model ~adapter ~name default_id
+;;
+
+let pending ~adapter = placeholder ~adapter ~name:"…"
+let unlisted ~adapter = placeholder ~adapter ~name:"its own model"
+let is_placeholder (m : Model.t) = String.equal m.id default_id
 ;;
 
 let of_adapter ~adapter (m : Model.t) =
@@ -113,6 +116,10 @@ let restore ~adapter ~models key =
   | Some id ->
     (match List.find models ~f:(fun (m : Model.t) -> String.equal m.id id) with
      | Some m -> Some m
+     | None when String.equal id default_id ->
+       (* Recorded before prigh named the harness's default: the model it
+          stands for, once listed. *)
+       List.find models ~f:(Fn.non is_placeholder)
      | None -> Some (model ~adapter id))
 ;;
 

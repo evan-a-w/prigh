@@ -318,6 +318,11 @@ val capabilities : t -> Capabilities.t
     closing the old one; between runs. *)
 val set_runner : t -> Runner.t option -> unit
 
+(** Its external harness's models changed (it or its catalog listed them):
+    a session still on the placeholder model ({!External_model.pending})
+    takes the harness's default, or the model it recorded. *)
+val models_changed : t -> unit
+
 (** The models the session can switch to when an external harness runs it
     (its, {!External_model}); [None]: prigh's ({!Model_registry}). *)
 val external_models : t -> Model.t list option

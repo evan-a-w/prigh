@@ -120,7 +120,7 @@ let with_agent ~commands ~used f =
       ()
   in
   Agent.set_engine agent { engine = Composer; adapter = Some (Acp acp.name) };
-  Agent.set_model agent (External_model.default ~adapter:"acp:opencode");
+  Agent.set_model agent (External_model.pending ~adapter:"acp:opencode");
   Agent.subscribe agent ~f:print_event;
   f agent;
   Composer_runner.close composer

@@ -3,8 +3,10 @@ open! Import
 
 (** The models of composer sessions run by an external harness (Codex,
     Claude Code, an ACP agent). They are recorded as [ADAPTER/MODEL]
-    ([codex/gpt-5], [claude/default], [acp:opencode/default]) under the
-    provider [Custom ADAPTER]; [default] is the harness's own choice. Such a
+    ([codex/gpt-5], [acp:antigravity/gemini-3-pro]) under the provider
+    [Custom ADAPTER], always the real model the harness listed (its default
+    first); only before it listed them, or when it lists none, is the model a
+    placeholder ([default]: the harness picks). Such a
     model has no price of prigh's: its cost is what the harness reported,
     recorded as spend. *)
 
@@ -14,7 +16,7 @@ val name : adapter:string -> string option -> string
 (** Whether a recorded model name is an external harness's. *)
 val is_external : string -> bool
 
-(** The id that means the harness's own default model. *)
+(** The placeholder's id: the harness picks. *)
 val default_id : string
 
 (** A model of [adapter]'s, as the session's [Model.t]: free, with the
@@ -35,17 +37,26 @@ val model
     (Gemini, Claude, GPT-OSS). *)
 val known_window : id:string -> name:string option -> int option
 
-(** [adapter]'s default model ({!default_id}). *)
-val default : adapter:string -> Model.t
+(** [adapter]'s placeholder ({!default_id}) before it listed its models,
+    named as pending. *)
+val pending : adapter:string -> Model.t
+
+(** [adapter]'s placeholder ({!default_id}) when it lists no models. *)
+val unlisted : adapter:string -> Model.t
+
+(** Whether [m] is a placeholder, not a model the harness listed. *)
+val is_placeholder : Model.t -> bool
 
 (** Whether [model] is one of [adapter]'s. *)
 val of_adapter : adapter:string -> Model.t -> bool
 
-(** The id to send the harness: [None] for its default. *)
+(** The id to send the harness: [None] for a placeholder. *)
 val native_id : Model.t -> string option
 
 (** The model the session recorded as [key] ([ADAPTER/ID]) among
-    [models], else made from the key; [None] when [key] is not [adapter]'s. *)
+    [models], else made from the key ([default], recorded before prigh named
+    the harness's default: the first of [models], [None] before they are
+    listed); [None] when [key] is not [adapter]'s. *)
 val restore : adapter:string -> models:Model.t list -> string -> Model.t option
 
 (** Whether a model's name ([Opus 5 (1M context)]) and an id a harness

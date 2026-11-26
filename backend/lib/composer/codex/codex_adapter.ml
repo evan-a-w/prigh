@@ -48,8 +48,9 @@ let launch (start : Adapter.Start.t) : Adapter.Launch.t =
 
 (* The model's efforts in Codex's names, once Codex has listed its models. *)
 let efforts models (s : Adapter.Settings.t) =
-  let id = Option.value s.model ~default:External_model.default_id in
-  List.find models ~f:(fun (m : Model.t) -> String.equal m.id id)
+  (match s.model with
+   | Some id -> List.find models ~f:(fun (m : Model.t) -> String.equal m.id id)
+   | None -> List.hd models)
   |> Option.map ~f:(fun (m : Model.t) ->
     (if m.can_disable_thinking then [ "none" ] else [])
     @ List.map m.thinking_levels ~f:Thinking.Level.to_string)
@@ -151,16 +152,12 @@ let list_models driver codec =
   match infos with
   | [] -> []
   | _ ->
-    (* Its default stands for the model it names: listed once. *)
-    (match
-       List.partition_tf infos ~f:(fun (m : Codex_codec.Model_info.t) ->
-         m.is_default)
-     with
-     | m :: _, others ->
-       { (model_of m ~id) with id = External_model.default_id }
-       :: List.map others ~f:(model_of ~id)
-     | [], _ ->
-       External_model.default ~adapter:id :: List.map infos ~f:(model_of ~id))
+    (* Its default first. *)
+    let default, others =
+      List.partition_tf infos ~f:(fun (m : Codex_codec.Model_info.t) ->
+        m.is_default)
+    in
+    List.map (default @ others) ~f:(model_of ~id)
 ;;
 
 (* Codex asks in a turn of its own, which no prigh turn is there to answer. *)

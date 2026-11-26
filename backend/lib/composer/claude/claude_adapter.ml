@@ -120,37 +120,36 @@ let currently description =
   close 0 0 |> Option.filter ~f:(fun s -> not (String.is_empty s))
 ;;
 
-(* Claude Code's models, its default first (as [default]), listed once:
-   named as the model it stands for, whose own row goes. *)
+(* Claude Code's models, its default first, listed once: its [default] row
+   stands for a model, listed under that model's own row (else its id). *)
 let models_of (infos : Claude_codec.Model_info.t list) =
-  match infos with
-  | [] -> []
-  | _ ->
-    let default, others =
-      List.partition_tf infos ~f:(fun (m : Claude_codec.Model_info.t) ->
-        String.equal m.value External_model.default_id)
+  let default, others =
+    List.partition_tf infos ~f:(fun (m : Claude_codec.Model_info.t) ->
+      String.equal m.value External_model.default_id)
+  in
+  match default with
+  | [] -> List.map others ~f:model_of
+  | d :: _ ->
+    let same, rest =
+      List.partition_tf others ~f:(fun (m : Claude_codec.Model_info.t) ->
+        Option.is_some d.resolved
+        && Option.equal String.equal m.resolved d.resolved)
     in
-    (match default with
-     | [] ->
-       External_model.model
-         ~adapter:id
-         ~thinking_levels
-         ~can_disable_thinking:true
-         External_model.default_id
-       :: List.map others ~f:model_of
-     | d :: _ ->
-       let same, rest =
-         List.partition_tf others ~f:(fun (m : Claude_codec.Model_info.t) ->
-           Option.is_some d.resolved
-           && Option.equal String.equal m.resolved d.resolved)
-       in
-       let name =
-         match same, Option.bind d.description ~f:currently with
-         | _, Some current -> current
-         | m :: _, None -> name_of m
-         | [], None -> d.display_name
-       in
-       { (model_of d) with name } :: List.map rest ~f:model_of)
+    let name =
+      match same, Option.bind d.description ~f:currently with
+      | _, Some current -> current
+      | m :: _, None -> name_of m
+      | [], None -> d.display_name
+    in
+    let first =
+      match same with
+      | m :: _ -> model_of m
+      | [] ->
+        { (model_of d) with
+          id = Option.value d.resolved ~default:External_model.default_id
+        }
+    in
+    { first with name } :: List.map rest ~f:model_of
 ;;
 
 let mcp_config ~injected (start : Adapter.Start.t) =

@@ -1118,6 +1118,7 @@ let state_json t (s : Agent.State.t) =
 
 (* The session's model list changed: its clients ask for it again. *)
 let models_changed t agent =
+  Agent.models_changed agent;
   let json =
     `Object [ "type", `String "event"; "event", `String "models_changed" ]
   in
@@ -1484,8 +1485,7 @@ let catalog_failure t agent =
          adapter)
       ~f:(fun e ->
         sprintf
-          "%s on %s did not list its models, so the picker shows only its \
-           default: %s. %s"
+          "%s on %s could not list its models: %s. %s"
           (Adapter_id.label a)
           (active_host_label agent)
           (Error.to_string_hum e)
@@ -1508,8 +1508,8 @@ let find_catalog t agent (a : Adapter_id.t) =
     adapter
 ;;
 
-(* The session's harness listed no models when asked last (Goose): it has
-   only its default, and is not asked again. *)
+(* The session's harness listed no models when asked last (Goose): it
+   picks its own, and is not asked again. *)
 let lists_no_models t agent =
   match Agent.engine_choice agent with
   | { engine = Composer; adapter = Some a } ->
@@ -1529,8 +1529,9 @@ let external_models t agent =
     Some
       (match find_catalog t agent a with
        | Some { models = _ :: _ as models; _ } -> models
-       | Some _ | None ->
-         [ External_model.default ~adapter:(Adapter_id.to_string a) ])
+       | Some { models = []; _ } ->
+         [ External_model.unlisted ~adapter:(Adapter_id.to_string a) ]
+       | None -> [ External_model.pending ~adapter:(Adapter_id.to_string a) ])
   | None, _ -> None
 ;;
 

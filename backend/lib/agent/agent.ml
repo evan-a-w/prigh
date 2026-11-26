@@ -688,48 +688,36 @@ let listed t (m : Model.t) =
     })
 ;;
 
-(* A composer session's model is its harness's: the one picked (an
-   {!External_model}), else (the harness's default picked, or none) the one
-   that wrote its latest reply ([codex/gpt-5] shows as [gpt-5]), else the
-   harness's default. *)
+(* A composer session's model is its harness's: the one it runs (an
+   {!External_model}), else (before the harness listed its models) the one
+   that wrote its latest reply, else the placeholder. *)
 let shown_model t =
   match engine_choice t with
-  | _
-    when is_external t.model
-         && Option.is_some (External_model.native_id t.model) ->
+  | _ when is_external t.model && not (External_model.is_placeholder t.model) ->
     listed t t.model
   | { engine = Composer; adapter = Some adapter } ->
     let prefix = Adapter_id.to_string adapter ^ "/" in
+    let placeholder =
+      if is_external t.model
+      then listed t t.model
+      else
+        listed t (External_model.pending ~adapter:(Adapter_id.to_string adapter))
+    in
     (match
        List.rev (Session.replies t.session)
        |> List.find_map ~f:(fun (name, _) -> String.chop_prefix name ~prefix)
      with
      | Some name when not (String.equal name External_model.default_id) ->
-       (* The harness's default is listed once, under its own name: a reply
-          from it shows as that row. *)
        let models =
          Option.value (Option.bind t.runner ~f:Runner.models) ~default:[]
        in
        (match
-          List.find models ~f:(fun (m : Model.t) -> String.equal m.id name)
+          List.find models ~f:(fun (m : Model.t) ->
+            String.equal m.id name || External_model.same_model m.name name)
         with
-        | Some m -> listed t { t.model with id = m.id; provider = m.provider }
-        | None ->
-          (match
-             List.find models ~f:(fun (m : Model.t) ->
-               String.equal m.id External_model.default_id
-               && External_model.same_model m.name name)
-           with
-           | Some m ->
-             listed t { t.model with id = m.id; provider = m.provider }
-           | None -> { t.model with id = name; name }))
-     | _ ->
-       if is_external t.model
-       then listed t t.model
-       else
-         listed
-           t
-           (External_model.default ~adapter:(Adapter_id.to_string adapter)))
+        | Some m -> listed t m
+        | None -> { placeholder with id = name; name })
+     | _ -> placeholder)
   | _ -> t.model
 ;;
 
@@ -3168,6 +3156,7 @@ let settle_runner_model t =
     in
     let model =
       if External_model.of_adapter ~adapter t.model
+         && not (External_model.is_placeholder t.model)
       then t.model
       else (
         match
@@ -3177,7 +3166,7 @@ let settle_runner_model t =
         | None ->
           (match models with
            | m :: _ -> m
-           | [] -> External_model.default ~adapter))
+           | [] -> External_model.pending ~adapter))
     in
     t.model <- model;
     t.thinking <- settle_thinking model t.thinking;
@@ -3204,6 +3193,16 @@ let set_runner t runner =
   t.runner <- runner;
   settle_runner_model t;
   state_changed t
+;;
+
+let models_changed t =
+  if Option.is_some t.runner
+     && is_external t.model
+     && External_model.is_placeholder t.model
+  then (
+    let before = Model.key t.model in
+    settle_runner_model t;
+    if not (String.equal before (Model.key t.model)) then state_changed t)
 ;;
 
 (* The models the session can switch to when they are its external
@@ -3997,6 +3996,7 @@ and run_now ~kind ~tried ~then_ t prompts =
        in
        (* An external harness says what its models are, and how big the
           context of the one it runs is. *)
+       models_changed t;
        if is_external t.model
        then (
          let r = runner t in

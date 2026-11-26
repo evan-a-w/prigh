@@ -671,7 +671,7 @@ let%expect_test
     agent got initialize
     agent got session/new session=- mcp=[]
     agent got session/prompt "one"
-      acp:opencode/default "Gemini 3.8 Flash" thinking=[low,medium,high]
+      acp:opencode/gemini-flash "Gemini 3.8 Flash" thinking=[low,medium,high]
       acp:opencode/gpt-oss "GPT-OSS 120B (Medium)" thinking=[low,medium,high]
       acp:opencode/sonnet "Claude Sonnet 4.6 (Thinking)" thinking=[low,medium,high]
     agent got session/set_model sonnet
@@ -703,7 +703,7 @@ let%expect_test "an ACP agent's catalog: a session opened to read its models" =
     {|
     agent got initialize
     agent got session/new session=- mcp=[]
-    acp:opencode/default "Gemini 3.8 Flash"
+    acp:opencode/gemini-flash "Gemini 3.8 Flash"
     acp:opencode/gpt-oss "GPT-OSS 120B (Medium)"
     acp:opencode/sonnet "Claude Sonnet 4.6 (Thinking)"
     |}]
