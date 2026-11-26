@@ -360,7 +360,10 @@ The composer (`composer/`), from the bottom up:
   `--setting-sources=user --strict-mcp-config`, so a repository's `.claude`
   settings and hooks do not apply): prigh's approval mode, rules and Smart
   judge decide, the mode only picking Codex's sandbox (Codex still runs
-  commands it knows to be read-only without asking).
+  commands it knows to be read-only without asking). Where that sandbox
+  cannot run (no user namespaces, as in Docker), `Codex_sandbox` finds out
+  once per host and binary and Codex runs without one
+  (`Adapter.Start.no_sandbox`), still asking, the session told once.
 - **`Handoff`** quotes the session for an adapter taking over (another
   adapter or host, a thread it cannot resume; `set_adapter` switches):
   within a token budget, the latest messages verbatim under a header saying

@@ -28,6 +28,9 @@ module Settings : sig
       (** the model's reasoning efforts, when Codex listed them: the
             effort sent is the one asked for if it is among them, else the
             nearest (the lowest for thinking off) *)
+    ; sandbox : bool
+      (** Codex's sandbox for the mode; [false] where it cannot run: none,
+          Codex still asking before what it does not know to be read-only *)
     }
   [@@deriving sexp_of]
 end

@@ -496,6 +496,8 @@ type t =
     (** whether the composer's CLIs are installed and logged in, by host *)
   ; login_seen : Adapter_health.Seen.Table.t
     (** what starting the ACP agents showed of their own logins, by host *)
+  ; codex_sandbox : Codex_sandbox.Cache.t
+    (** whether Codex's own sandbox can run, by host *)
   ; catalogs : Adapter_catalog.t
     (** the composer's CLIs' models and usage limits, by host *)
   ; spawn_external :
@@ -1291,6 +1293,13 @@ let engine_unavailable t agent =
 let with_evidence t (s : Adapter_health.Status.t) =
   let adapter = Adapter_id.to_string s.adapter in
   Adapter_health.Status.with_evidence
+    ?no_sandbox:
+      (match s.adapter with
+       | Codex ->
+         (match Codex_sandbox.Cache.find t.codex_sandbox ~host:s.host with
+          | Some (Unavailable why) -> Some why
+          | Some (Works | Unknown _) | None -> None)
+       | Claude | Prigh | Acp _ -> None)
     s
     ~prigh_login:
       (Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
@@ -1377,6 +1386,7 @@ let host_spawn t agent launch =
 let recheck_adapter t agent adapter =
   let host = Agent.active_host agent in
   Adapter_health.Cache.forget t.adapter_health ~host adapter;
+  Codex_sandbox.Cache.forget_host t.codex_sandbox ~host;
   Fiber.fork ~sw:t.sw (fun () ->
     let statuses =
       Adapter_health.probe
@@ -1623,6 +1633,37 @@ let harness_usage t agent : Subscription_usage.Harness_usage.t list =
   | _ -> []
 ;;
 
+(* Why [adapter]'s own sandbox cannot run on [host], found out once per host
+   and binary: Codex runs without it there. Not for a harness [spawn_external]
+   runs, which is not the host's. *)
+let no_sandbox t agent ~host ~host_name ~cwd (adapter : Adapter_id.t) =
+  let installed () =
+    match Adapter_health.Cache.find t.adapter_health ~host adapter with
+    | Some { install = Installed { path; _ }; _ } -> `Path path
+    | Some { install = Not_installed _; _ } -> `None
+    | Some { install = Unknown _; _ } | None -> `Unknown
+  in
+  match adapter, t.spawn_external with
+  | (Claude | Prigh | Acp _), _ | Codex, Some _ -> None
+  | Codex, None ->
+    (match installed () with
+     | `None -> None
+     | (`Path _ | `Unknown) as installed ->
+       (match
+          Codex_sandbox.Cache.status
+            t.codex_sandbox
+            ~host
+            ~installed:
+              (match installed with
+               | `Path path -> Some path
+               | `Unknown -> None)
+            ~exec:(fun ~name arguments ->
+              Agent.host_call_on agent ~host ~cwd ~name arguments)
+        with
+        | Unavailable why -> Some (sprintf "%s (%s)" host_name why)
+        | Works | Unknown _ -> None))
+;;
+
 (* A composer session's runner, driving its adapter's harness on the
    session's tool host and continuing the thread the session recorded there
    (each process records the threads it starts). *)
@@ -1661,6 +1702,14 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
       ; at
       ; developer_instructions = Agent.user_instructions agent
       ; login = cli_credential t agent ~adapter:adapter_name
+      ; no_sandbox =
+          no_sandbox
+            t
+            agent
+            ~host
+            ~host_name:(active_host_label agent)
+            ~cwd
+            adapter_id
       }
     in
     let on_thread thread_id =
@@ -1935,6 +1984,7 @@ let create
     ; engines
     ; adapter_health = Adapter_health.Cache.create ~ttl:60.
     ; login_seen = Adapter_health.Seen.Table.create ()
+    ; codex_sandbox = Codex_sandbox.Cache.create ()
     ; catalogs =
         Adapter_catalog.create
           ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
@@ -2784,6 +2834,7 @@ let host_connected t (client : Client.t) =
   if composer_deployed t
   then (
     Adapter_health.Cache.forget_host t.adapter_health ~host:client.host_id;
+    Codex_sandbox.Cache.forget_host t.codex_sandbox ~host:client.host_id;
     adapters_changed t ~hosts:(Agent.state client.agent).hosts)
 ;;
 
@@ -4199,6 +4250,22 @@ let list_adapters t (client : Client.t) params =
            in
            let changed = List.exists statuses ~f:differs in
            Adapter_health.Cache.set cache statuses;
+           (* Settings → Engines says when Codex's sandbox cannot run. *)
+           if
+             List.exists statuses ~f:(fun s ->
+               match s.adapter, s.install with
+               | Codex, Installed _ -> true
+               | _ -> false)
+           then
+             ignore
+               (no_sandbox
+                  t
+                  client.agent
+                  ~host:host.id
+                  ~host_name:host.name
+                  ~cwd:host.cwd
+                  Codex
+                : string option);
            changed))
       hosts
     |> List.exists ~f:Fn.id

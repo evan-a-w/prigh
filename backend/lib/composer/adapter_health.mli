@@ -88,6 +88,9 @@ module Status : sig
     ; checking : bool (** its login is being checked (by starting it) *)
     ; check_failed : string option
       (** why the last check of its login could not tell *)
+    ; no_sandbox : string option
+      (** why its own sandbox cannot run there ({!Codex_sandbox}): it runs
+          without it, which {!hint} says *)
     }
   [@@deriving sexp_of, equal]
 
@@ -107,9 +110,11 @@ module Status : sig
   (** [t] with what is known beyond the probe: [prigh_login], the label of
       the prigh login it runs on (its own login on the host is then beside
       the point); [seen], what starting it showed (ACP agents only);
-      [checking], whether that is under way. *)
+      [checking], whether that is under way; [no_sandbox], why its own
+      sandbox cannot run there. *)
   val with_evidence
-    :  t
+    :  ?no_sandbox:string
+    -> t
     -> prigh_login:string option
     -> seen:Seen.t option
     -> checking:bool

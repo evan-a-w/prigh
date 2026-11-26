@@ -85,6 +85,103 @@ let%expect_test "installed and logged in" =
     |}]
 ;;
 
+let%expect_test "Codex's sandbox: probed with [codex sandbox -- true]" =
+  print_s [%sexp (Codex_sandbox.request : Host_probe.Request.t)];
+  let sandbox ?(is_error = false) text =
+    let path, status =
+      Codex_sandbox.of_result { Tool.Result.text; is_error; images = [] }
+    in
+    print_s [%sexp (path : string option), (status : Codex_sandbox.Status.t)]
+  in
+  let ran output =
+    sandbox
+      (sprintf
+         {|{"programs":[{"name":"codex","path":"/usr/bin/codex","version":%s}],"paths":[],"env":{}}|}
+         output)
+  in
+  ran (out 0 "");
+  (* Docker's default seccomp profile *)
+  ran
+    (out
+       1
+       ""
+       ~stderr:
+         "WARNING: proceeding\n\
+          bwrap: No permissions to create a new namespace, likely because the \
+          kernel does not allow non-privileged user namespaces.\n");
+  ran (out 1 "" ~stderr:"bwrap: setting up uid map: Permission denied\n");
+  (* a Codex without [sandbox] keeps its sandbox *)
+  ran (out 2 "" ~stderr:"error: unrecognized subcommand 'sandbox'\n");
+  sandbox
+    {|{"programs":[{"name":"codex","path":null,"version":null}],"paths":[],"env":{}}|};
+  sandbox ~is_error:true {|tool host "h1" is not connected|};
+  [%expect
+    {|
+    ((programs (((name codex) (version (sandbox -- true)) (status ()))))
+     (paths ()) (env ()))
+    ((/usr/bin/codex) Works)
+    ((/usr/bin/codex) (Unavailable "no user namespaces"))
+    ((/usr/bin/codex)
+     (Unavailable "bwrap: setting up uid map: Permission denied"))
+    ((/usr/bin/codex) (Unknown "error: unrecognized subcommand 'sandbox'"))
+    (() (Unknown "codex is not installed"))
+    (() (Unknown "tool host \"h1\" is not connected"))
+    |}];
+  (* Probed once per host and binary. *)
+  let cache = Codex_sandbox.Cache.create () in
+  let status ~host ~installed =
+    Codex_sandbox.Cache.status cache ~host ~installed ~exec:(fun ~name:_ _ ->
+      printf "probing %s\n" host;
+      { Tool.Result.text =
+          sprintf
+            {|{"programs":[{"name":"codex","path":"/usr/bin/codex","version":%s}],"paths":[],"env":{}}|}
+            (out 1 "" ~stderr:"bwrap: Creating new namespace failed\n")
+      ; is_error = false
+      ; images = []
+      })
+    |> [%sexp_of: Codex_sandbox.Status.t]
+    |> print_s
+  in
+  status ~host:"h1" ~installed:None;
+  status ~host:"h1" ~installed:(Some "/usr/bin/codex");
+  status ~host:"h2" ~installed:None;
+  status ~host:"h1" ~installed:(Some "/home/u/.nix-profile/bin/codex");
+  Codex_sandbox.Cache.forget_host cache ~host:"h2";
+  status ~host:"h2" ~installed:None;
+  [%expect
+    {|
+    probing h1
+    (Unavailable "no user namespaces")
+    (Unavailable "no user namespaces")
+    probing h2
+    (Unavailable "no user namespaces")
+    probing h1
+    (Unavailable "no user namespaces")
+    probing h2
+    (Unavailable "no user namespaces")
+    |}];
+  (* What Settings → Engines says of it. *)
+  show
+    [ Adapter_health.Status.with_evidence
+        ~no_sandbox:"no user namespaces"
+        (List.hd_exn
+           (of_text
+              (sprintf
+                 {|{"programs":[{"name":"codex","path":"/usr/bin/codex","version":%s,"status":%s}],"paths":[],"env":{}}|}
+                 (out 0 "codex-cli 0.171.0\n")
+                 (out 0 "" ~stderr:"Logged in using ChatGPT\n"))))
+        ~prigh_login:None
+        ~seen:None
+        ~checking:false
+    ];
+  [%expect
+    {|
+    codex: ((Installed (version (0.171.0)) (path /usr/bin/codex))
+     (Logged_in (account (ChatGPT)) (via Status_command)))
+      (ready) Codex's sandbox cannot run on laptop (no user namespaces): it runs without it, and prigh still asks before its commands and edits as the session's mode says
+    |}]
+;;
+
 let%expect_test "not installed (one only in a login shell), logged out" =
   show
     (of_text
@@ -245,6 +342,7 @@ let%expect_test "the cache" =
     ; quirks = Acp_agent.Quirks.none
     ; checking = false
     ; check_failed = None
+    ; no_sandbox = None
     }
   in
   Adapter_health.Cache.set

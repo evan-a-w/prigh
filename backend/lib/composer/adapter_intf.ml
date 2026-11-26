@@ -29,6 +29,10 @@ module Start = struct
     ; login_refused : (string option[@sexp.opaque])
       (** the token of [login] the previous process was refused with: this
           one wants a newer one ({!S.renewal}) *)
+    ; no_sandbox : string option
+      (** the harness's own sandbox cannot run on the tool host: where and
+          why (e.g. ["laptop (no user namespaces)"]). It runs without it,
+          still asking prigh before what the session's mode asks about. *)
     }
   [@@deriving sexp_of]
 
@@ -46,6 +50,7 @@ module Start = struct
     ; mcp_servers = []
     ; login = None
     ; login_refused = None
+    ; no_sandbox = None
     }
   ;;
 end

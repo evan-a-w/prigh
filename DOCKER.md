@@ -249,12 +249,15 @@ only the agents). Users and settings are the same on either engine.
 - On a tool host outside the container (`PRIGH_NO_BACKEND_HOST=1`),
   install the CLIs on that machine.
 - Codex's sandbox (bubblewrap) needs user namespaces, which Docker's
-  default seccomp profile forbids without `CAP_SYS_ADMIN`, so in the
-  container Codex cannot sandbox the commands it runs. Use Codex in the
-  Auto access mode (no sandbox, prigh's approval rules still apply), or
-  give the container a seccomp profile that allows `unshare` and `clone`
-  with `CLONE_NEWUSER` if the host's kernel permits unprivileged user
-  namespaces. The container's per-user isolation still applies either way.
+  default seccomp profile forbids without `CAP_SYS_ADMIN`. prigh finds
+  this out once per tool host and Codex binary (`codex sandbox -- true`)
+  and then runs Codex there without its sandbox, in every access mode,
+  saying so once per session (and in Settings → Engines): prigh still
+  asks before Codex's commands and edits as the session's mode says. To
+  keep Codex's sandbox, give the container a seccomp profile that allows
+  `unshare` and `clone` with `CLONE_NEWUSER`, if the host's kernel
+  permits unprivileged user namespaces. The container's per-user
+  isolation applies either way.
 
 ## Git and SSH
 
