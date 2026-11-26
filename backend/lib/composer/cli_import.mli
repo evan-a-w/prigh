@@ -25,7 +25,7 @@ module Found : sig
     }
   [@@deriving sexp_of]
 
-  (** ["imported from laptop"] *)
+  (** The login's label in prigh: the host's name, ["laptop"]. *)
   val label : t -> string
 
   (** What the user consents to. *)

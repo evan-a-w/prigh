@@ -61,6 +61,15 @@ val names_login : string -> bool
     provider's default when it has several. *)
 val of_session : P.Auth_status.t list -> P.State.t -> Login.t option
 
+(** The session's login by name ([short]): [of_session]'s, or the one of
+    prigh's its agent CLI runs on. *)
+val login_name : P.Auth_status.t list -> P.State.t -> string option
+
+(** [login_name] where it disambiguates, beside the model on the chip and the
+    status line: only when the provider has several logins (own and shared,
+    not hidden). *)
+val beside_model : P.Auth_status.t list -> P.State.t -> string option
+
 (** [/login]'s words split at [as]: [(before, Some label)]. *)
 val split_as : string list -> string list * string option
 

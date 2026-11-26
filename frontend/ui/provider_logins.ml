@@ -196,6 +196,21 @@ let of_session auth (state : P.State.t) =
        | logins -> List.find logins ~f:(fun l -> l.account.default)))
 ;;
 
+let login_name auth (state : P.State.t) =
+  if own_login state
+  then state.engine.login
+  else Option.map (of_session auth state) ~f:(fun l -> short l.account)
+;;
+
+let beside_model auth (state : P.State.t) =
+  let several =
+    List.count (all auth) ~f:(fun l ->
+      String.equal l.provider.provider state.model.provider)
+    >= 2
+  in
+  if several then login_name auth state else None
+;;
+
 let split_as words =
   match List.findi words ~f:(fun _ w -> String.equal w "as") with
   | None -> words, None

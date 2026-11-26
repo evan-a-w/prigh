@@ -240,33 +240,23 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
   | None ->
     let thinking = Option.value m.pending.thinking ~default:state.thinking in
     let level = Reasoning.chip_label state.model ~current:thinking in
-    (* The login, when the provider has several: model@login; an agent
-       CLI's, when it runs on one of prigh's (in [model_label]). *)
-    let login =
-      if Session_engine.is_harness state.engine
-      then
-        Prigh_ui.Provider_logins.of_session m.auth state
-        |> Option.map ~f:(fun l -> Prigh_ui.Provider_logins.short l.account)
-      else state.engine.login
-    in
-    let at =
-      match login with
-      | Some l when Session_engine.is_harness state.engine -> "@" ^ l
-      | _ -> ""
-    in
+    (* model@login when the provider has several logins; the title always
+       names it. *)
+    let login = Prigh_ui.Provider_logins.beside_model m.auth state in
+    let at login = Option.value_map login ~default:"" ~f:(fun l -> "@" ^ l) in
     button
       ~cls:"chip-button model-chip"
       ~title:
         (sprintf
            "%s%s%s: models, reasoning and access (Ctrl+L)"
            (Session_engine.model_label state.engine ~model:state.model.name)
-           at
+           (at (Prigh_ui.Provider_logins.login_name m.auth state))
            (Option.value_map level ~default:"" ~f:(fun l -> ", reasoning " ^ l)))
       ~label:
         (sprintf
            "Model: %s%s%s"
            (Session_engine.model_label state.engine ~model:state.model.name)
-           at
+           (at login)
            (Option.value_map level ~default:"" ~f:(fun l -> ", " ^ l)))
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))

@@ -154,6 +154,51 @@ let%expect_test "/model MODEL@LABEL pins the login; the chip and menu show it" =
     |}]
 ;;
 
+(* One ChatGPT login: the chip has no @LABEL (nothing to tell apart), its
+   title and menu still name it; an agent CLI on prigh's login alike. *)
+let one_login_json =
+  {|[{"provider":"openai","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":null,"accounts":[{"ref":"openai/main","id":"main","label":"desktop","method":"oauth","source":"oauth","default":true,"fallback":true}]}]|}
+;;
+
+let%expect_test "the chip's @LABEL only when the provider has several logins" =
+  let chip ~auth fields =
+    let h =
+      H.create
+        ~state:
+          (H.state_json ~fields:(("model", Jsonaf.of_string gpt) :: fields) ())
+        ()
+    in
+    H.quiet h (fun () ->
+      H.act h (Reply (Auth_status Refresh, Ok (Jsonaf.of_string auth))));
+    H.names h ~selector:".model-chip";
+    h
+  in
+  let pinned = [ "account", `String "main" ] in
+  let cli login =
+    [ "engine", `String "composer"
+    ; "adapter", `String "codex"
+    ; "adapter_login", `String login
+    ]
+  in
+  let h = chip ~auth:one_login_json pinned in
+  H.act h (Open_chip Model);
+  H.text h ~selector:".model-logins";
+  ignore (chip ~auth:one_login_json (cli "desktop") : H.t);
+  ignore (chip ~auth:logins_json pinned : H.t);
+  ignore (chip ~auth:logins_json (cli "Work") : H.t);
+  [%expect
+    {|
+    button "Model: GPT-6" -- GPT-6@desktop: models, reasoning and access (Ctrl+L)
+    (Focus popover-filter)
+    Place_popover
+    Login ChatGPT
+    (desktop ✓) (The provider's default)
+    button "Model: Codex \194\183 GPT-6" -- Codex · GPT-6@desktop: models, reasoning and access (Ctrl+L)
+    button "Model: GPT-6@Personal" -- GPT-6@Personal: models, reasoning and access (Ctrl+L)
+    button "Model: Codex \194\183 GPT-6@Work" -- Codex · GPT-6@Work: models, reasoning and access (Ctrl+L)
+    |}]
+;;
+
 (* Alice may share Work (bob has it); dave shares his "Team" with her. *)
 let sharing_json =
   {|[{"provider":"openai","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":null,"accounts":[{"ref":"openai/main","id":"main","label":"Personal","method":"oauth","source":"oauth","default":true,"fallback":true,"shareable":true},{"ref":"openai/work","id":"work","label":"Work","method":"oauth","source":"oauth","default":false,"fallback":false,"shareable":true,"shared_with":[{"user":"bob","since_ms":1700000000000}]},{"ref":"~dave/openai/team","id":"~dave/team","label":"Team","method":"oauth","source":"shared by dave","default":false,"fallback":false,"shared_by":"dave"}]}]|}

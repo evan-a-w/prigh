@@ -287,7 +287,9 @@ let%expect_test "Engines: Codex's login, own or one of prigh's ChatGPT logins" =
     |}]
 ;;
 
-let%expect_test "a Codex session on prigh's login: Codex · MODEL@LOGIN" =
+let%expect_test
+    "a Codex session on prigh's only login: Codex · MODEL, no @LOGIN"
+  =
   let h =
     H.create
       ~state:
@@ -301,7 +303,7 @@ let%expect_test "a Codex session on prigh's login: Codex · MODEL@LOGIN" =
       ()
   in
   H.text h ~selector:".model-chip";
-  [%expect {| (Codex · Opus 5.5 @Work) |}]
+  [%expect {| (Codex · Opus 5.5) |}]
 ;;
 
 let%expect_test "Engines: Claude Code's login warns of Anthropic's terms" =
@@ -321,9 +323,7 @@ let%expect_test "Engines: Claude Code's login warns of Anthropic's terms" =
     |}]
 ;;
 
-let%expect_test
-    "a Claude Code session on prigh's login: Claude Code · MODEL@LOGIN"
-  =
+let%expect_test "a Claude Code session on prigh's only login: no @LOGIN" =
   let h =
     H.create
       ~state:
@@ -337,7 +337,7 @@ let%expect_test
       ()
   in
   H.text h ~selector:".model-chip";
-  [%expect {| (Claude Code · Opus 5.5 @Max) |}]
+  [%expect {| (Claude Code · Opus 5.5) |}]
 ;;
 
 let import_reply ~confirmed =

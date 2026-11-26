@@ -226,12 +226,7 @@ let who t =
 
 let model_label t ~model =
   match t.adapter with
-  | Some adapter ->
-    sprintf
-      "%s · %s%s"
-      (adapter_label adapter)
-      model
-      (Option.value_map t.login ~default:"" ~f:(fun l -> "@" ^ l))
+  | Some adapter -> sprintf "%s · %s" (adapter_label adapter) model
   | None when is_harness t || String.equal t.engine "harness" -> model
   | None -> sprintf "%s · %s" (engine_label t.engine) model
 ;;

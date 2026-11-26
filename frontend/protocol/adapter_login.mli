@@ -49,7 +49,7 @@ module Import : sig
     { adapter : string
     ; host : string (** the host's name *)
     ; path : string (** the CLI's credentials file there *)
-    ; label : string (** the login's in prigh, ["imported from HOST"] *)
+    ; label : string (** the login's in prigh, the host's name *)
     ; warning : string (** what moving it does *)
     ; confirmed : bool
     ; note : string option (** moved, but the file could not be renamed *)

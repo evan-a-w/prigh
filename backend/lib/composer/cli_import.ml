@@ -22,7 +22,7 @@ module Found = struct
     }
   [@@deriving sexp_of]
 
-  let label t = "imported from " ^ t.host
+  let label t = t.host
   let cli t = cli_name t.adapter
 
   let warning t =

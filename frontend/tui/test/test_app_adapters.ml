@@ -259,7 +259,7 @@ let%expect_test "a Codex session on prigh's login says so" =
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ─────────────────── Codex runs on prigh's login Work: /adapters login codex changes it ───
     > ▏
-    /work  Codex · gpt-5.5@Work  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  Codex · gpt-5.5  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 

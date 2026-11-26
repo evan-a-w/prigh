@@ -992,8 +992,8 @@ let status (m : App.Model.t) : Content.Line.t =
           (P.Session_engine.model_label
              s.engine
              ~model:
-               (match Provider_logins.of_session m.auth s with
-                | Some l -> s.model.id ^ "@" ^ Provider_logins.short l.account
+               (match Provider_logins.beside_model m.auth s with
+                | Some l -> s.model.id ^ "@" ^ l
                 | None -> s.model.id))
       ]
     in

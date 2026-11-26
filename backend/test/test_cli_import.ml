@@ -253,14 +253,14 @@ let%expect_test "taking a login refreshes it, stores it and renames the file" =
   [%expect
     {|
     (main ()
-     (((id main) (label "imported from laptop")
+     (((id main) (label laptop)
        (credential
         (Oauth
          ((access prigh-access) (refresh prigh-refresh) (expires_ms 1000)
           (account_id (acct-1)))))
        (default true) (fallback true) (shared_with ()))))
     (main ()
-     (((id main) (label "imported from laptop")
+     (((id main) (label laptop)
        (credential
         (Oauth
          ((access prigh-access) (refresh prigh-refresh) (expires_ms 1000)
@@ -409,7 +409,7 @@ let%expect_test "Antigravity: from its token file or the keyring, with consent" 
     (Ok (main ()))
     ()
     ((Google_antigravity 1//host-refresh) (Google_antigravity 1//host-refresh))
-    ((main "imported from laptop"))
+    ((main laptop))
     "Antigravity on laptop has no login in the keyring or /home/u/.gemini/antigravity-cli/antigravity-oauth-token: run `agy acp --login` there, or log prigh in with /login google-antigravity"
     "Antigravity on laptop signs in with \"gcp\", not a personal Google login, which is the one prigh takes: sign agy in with Google there, or use /login google-antigravity"
     "Antigravity on laptop keeps its login in the macOS keychain, which prigh does not read: /login google-antigravity logs prigh in instead"

@@ -55,6 +55,43 @@ let%expect_test "status line names the login when the provider has several" =
     |}]
 ;;
 
+(* One ChatGPT login: nothing to tell apart, so no @LABEL, pinned or not;
+   an agent CLI on one of prigh's logins alike. *)
+let one_login_json =
+  {|[{"provider":"openai","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":null,"accounts":[{"ref":"openai/main","id":"main","label":"desktop","method":"oauth","source":"oauth","default":true,"fallback":true}]}]|}
+;;
+
+let%expect_test "status line: @LABEL only when the provider has several logins" =
+  let status ~auth extra =
+    let h = Test_app.connected ~width:72 ~model:gpt () in
+    H.reply ~quiet:true h Auth_refresh auth;
+    H.reply ~quiet:true h Initial_state (state_json ~model:gpt ~extra ());
+    Prigh_ui.Render.screen h.model
+    |> Prigh_ui.Screen.to_plain ~show_cursor:false
+    |> String.split_lines
+    |> List.last_exn
+    |> print_endline
+  in
+  let pinned = [ "account", {|"main"|} ] in
+  let cli login =
+    [ "engine", {|"composer"|}
+    ; "adapter", {|"codex"|}
+    ; "adapter_login", sprintf "%S" login
+    ]
+  in
+  status ~auth:one_login_json pinned;
+  status ~auth:one_login_json (cli "desktop");
+  status ~auth:logins_json pinned;
+  status ~auth:logins_json (cli "Work");
+  [%expect
+    {|
+    /work  gpt-5.5  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  Codex · gpt-5.5  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    /work  gpt-5.5@Personal  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    /work  Codex · gpt-5.5@Work  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
 let%expect_test "/accounts picks a login, then what to do with it" =
   let h = connected () in
   H.keys h "/accounts";
