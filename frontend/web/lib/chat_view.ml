@@ -46,11 +46,11 @@ module More = struct
 end
 
 let tokens n =
-  if n < 1000
-  then Int.to_string n
-  else if n < 100_000
-  then sprintf "%.1fk" (Float.of_int n /. 1000.)
-  else sprintf "%dk" (n / 1000)
+  if Float.(n < 1000.)
+  then sprintf "%.0f" n
+  else if Float.(n < 100_000.)
+  then sprintf "%.1fk" (n /. 1000.)
+  else sprintf "%.0fk" (Float.round_down (n /. 1000.))
 ;;
 
 let time times at =
@@ -381,12 +381,12 @@ let stopped (message : Message.Assistant.t) =
 let footer ~names times (message : Message.Assistant.t) =
   let usage =
     match message.stop_reason with
-    | End_turn when message.usage.output > 0 ->
+    | End_turn when Float.(message.usage.output > 0.) ->
       let { Usage.input; output; cache_read } = message.usage in
       [ Option.value (Map.find names message.model) ~default:message.model
       ; tokens input ^ " in"
       ]
-      @ (if cache_read > 0 then [ tokens cache_read ^ " cached" ] else [])
+      @ (if Float.(cache_read > 0.) then [ tokens cache_read ^ " cached" ] else [])
       @ [ tokens output ^ " out" ]
     | _ -> []
   in

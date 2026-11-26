@@ -1,9 +1,9 @@
 open! Core
 
 type t =
-  { input : int
-  ; output : int
-  ; cache_read : int
+  { input : float
+  ; output : float
+  ; cache_read : float
   }
 [@@deriving sexp_of, equal]
 

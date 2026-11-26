@@ -6,7 +6,7 @@ open! Import
     {!Context_ring_view} shows them). *)
 
 (** ["12k"], ["1.2M"]. *)
-val tokens : int -> string
+val tokens : float -> string
 
 (** How full the context is, in percent; [None] while the model's window is
     unknown. *)

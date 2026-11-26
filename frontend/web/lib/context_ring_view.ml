@@ -23,8 +23,8 @@ let level ~compacts_at percent =
 ;;
 
 let usd_of (model : Llm.t) (usage : Usage.t) =
-  let per_m tokens price = Float.of_int tokens *. price /. 1e6 in
-  per_m (usage.input - usage.cache_read) model.cost.input
+  let per_m tokens price = tokens *. price /. 1e6 in
+  per_m (usage.input -. usage.cache_read) model.cost.input
   +. per_m usage.cache_read model.cost.cache_read
   +. per_m usage.output model.cost.output
 ;;
@@ -70,12 +70,12 @@ let card (m : App.Model.t) (state : State.t) ~inject =
     else Option.value m.pending.thinking ~default:state.thinking
   in
   let cache_rate =
-    if state.usage.input > 0
+    if Float.(state.usage.input > 0.)
     then
       Some
         (100.
-         *. Float.of_int state.usage.cache_read
-         /. Float.of_int state.usage.input)
+         *. state.usage.cache_read
+         /. state.usage.input)
     else None
   in
   Node.div
@@ -107,9 +107,9 @@ let card (m : App.Model.t) (state : State.t) ~inject =
              then
                sprintf
                  "%s / %s"
-                 (tokens state.context_tokens)
-                 (tokens state.model.context_window)
-             else tokens state.context_tokens)
+                 (tokens (Float.of_int state.context_tokens))
+                 (tokens (Float.of_int state.model.context_window))
+             else tokens (Float.of_int state.context_tokens))
         ]
     ; (match percent with
        | Some p ->
@@ -156,7 +156,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
                  "%.0f%% used · compacts at %s (%.0f%%)"
                  p
                  (tokens
-                    (Float.iround_nearest_exn
+                    (Float.round_nearest
                        (at /. 100. *. Float.of_int state.model.context_window)))
                  at
              | None -> "Window unknown: no automatic compaction")

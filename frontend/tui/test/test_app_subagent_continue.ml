@@ -23,7 +23,11 @@ let end_ ~turns ~cost_usd ~is_error text =
   P.Event.Subagent_end
     { call_id = "c1"
     ; agent_id = "a1"
-    ; usage = { input = 10 * turns; output = 5 * turns; cache_read = 0 }
+    ; usage =
+        { input = Float.of_int (10 * turns)
+        ; output = Float.of_int (5 * turns)
+        ; cache_read = 0.
+        }
     ; turns
     ; cost_usd
     ; result = { text; is_error }

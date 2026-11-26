@@ -958,15 +958,15 @@ let format_price (c : P.Model.Cost.t) =
 ;;
 
 let format_tokens n =
-  if n < 1000
-  then Int.to_string n
-  else if n < 10000
-  then sprintf "%.1fk" (Float.of_int n /. 1e3)
-  else if n < 1_000_000
-  then sprintf "%dk" (Int.of_float (Float.round (Float.of_int n /. 1e3)))
-  else if n < 10_000_000
-  then sprintf "%.1fM" (Float.of_int n /. 1e6)
-  else sprintf "%dM" (Int.of_float (Float.round (Float.of_int n /. 1e6)))
+  if Float.(n < 1000.)
+  then sprintf "%.0f" n
+  else if Float.(n < 10000.)
+  then sprintf "%.1fk" (n /. 1e3)
+  else if Float.(n < 1e6)
+  then sprintf "%.0fk" (Float.round (n /. 1e3))
+  else if Float.(n < 1e7)
+  then sprintf "%.1fM" (n /. 1e6)
+  else sprintf "%.0fM" (Float.round (n /. 1e6))
 ;;
 
 let model_items m ~logged_in_only =
@@ -987,7 +987,7 @@ let model_items m ~logged_in_only =
            ~sep:"  "
            ([ model.key ^ scoped_mark ]
             @ (if model.context_window > 0
-               then [ "ctx " ^ format_tokens model.context_window ]
+               then [ "ctx " ^ format_tokens (Float.of_int model.context_window) ]
                else [])
             @ [ format_price model.cost ]
             @ if logged then [] else [ "not logged in" ]))

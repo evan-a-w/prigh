@@ -25,8 +25,8 @@ let model ~models ~(current : Llm.t) id =
 ;;
 
 let usd_of (model : Llm.t) (usage : Usage.t) =
-  let per_m tokens price = Float.of_int tokens *. price /. 1e6 in
-  per_m (usage.input - usage.cache_read) model.cost.input
+  let per_m tokens price = tokens *. price /. 1e6 in
+  per_m (usage.input -. usage.cache_read) model.cost.input
   +. per_m usage.cache_read model.cost.cache_read
   +. per_m usage.output model.cost.output
 ;;
@@ -61,9 +61,9 @@ let of_agent (s : State.t) ~models (a : Agents.Agent.t) ~transcript ~cost_usd =
   let usages = replies transcript in
   let usage =
     List.fold usages ~init:Usage.zero ~f:(fun (t : Usage.t) u ->
-      { input = t.input + u.input
-      ; output = t.output + u.output
-      ; cache_read = t.cache_read + u.cache_read
+      { input = t.input +. u.input
+      ; output = t.output +. u.output
+      ; cache_read = t.cache_read +. u.cache_read
       })
   in
   { s with
@@ -82,7 +82,7 @@ let of_agent (s : State.t) ~models (a : Agents.Agent.t) ~transcript ~cost_usd =
         List.sum (module Float) usages ~f:(usd_of model))
   ; context_tokens =
       (match List.last usages with
-       | Some u -> u.input + u.output
+       | Some u -> Float.iround_nearest_exn (u.input +. u.output)
        | None -> 0)
   ; active_host
   ; active_host_name

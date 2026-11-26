@@ -11,4 +11,4 @@ val click : App.Model.t -> row:int -> col:int -> Intent.t option
 (** The status bar alone (also used by tests). *)
 val status : App.Model.t -> Content.Line.t
 
-val format_tokens : int -> string
+val format_tokens : float -> string

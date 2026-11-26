@@ -947,8 +947,8 @@ let context_text (s : P.State.t) =
       (if Float.( < ) percent 10.
        then sprintf "%.1f" percent
        else sprintf "%.0f" (Float.round_down percent))
-      (format_tokens window))
-  else "ctx:" ^ format_tokens s.context_tokens
+      (format_tokens (Float.of_int window)))
+  else "ctx:" ^ format_tokens (Float.of_int s.context_tokens)
 ;;
 
 let server_part (m : App.Model.t) =
