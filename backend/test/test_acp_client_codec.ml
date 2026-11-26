@@ -972,6 +972,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       agent_start
     search_web, pending
       turn_start
+      agent_waiting Antigravity
       message_start assistant
     search_web, in progress
       message_end assistant ""
@@ -982,6 +983,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       turn_end stop=Tool_use tool_results=1
     a search titled with its query, only completed
       turn_start
+      agent_waiting Antigravity
       message_start assistant
       message_end assistant ""
       tool_start web_search {"query":"site:developers.google.com OR site:ai.google.dev Ultra API credits"}
@@ -989,6 +991,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       turn_end stop=Tool_use tool_results=1
     a fetch
       turn_start
+      agent_waiting Antigravity
       message_start assistant
       message_end assistant ""
       tool_start web_fetch {"url":"https://ai.google.dev/pricing"}
@@ -997,6 +1000,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       turn_end stop=Tool_use tool_results=1
     grep_search
       turn_start
+      agent_waiting Antigravity
       message_start assistant
       message_end assistant ""
       tool_start grep {"pattern":"usage_limit","path":"/work/backend"}
@@ -1005,6 +1009,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       turn_end stop=Tool_use tool_results=1
     find_by_name
       turn_start
+      agent_waiting Antigravity
       message_start assistant
       message_end assistant ""
       tool_start find {"pattern":"*.ml","path":"/work"}
@@ -1012,6 +1017,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       turn_end stop=Tool_use tool_results=1
     a grep without a tool name
       turn_start
+      agent_waiting Antigravity
       message_start assistant
       message_end assistant ""
       tool_start grep {"pattern":"TODO","path":"src"}
@@ -1019,6 +1025,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       turn_end stop=Tool_use tool_results=1
     a search that says what it is nowhere
       turn_start
+      agent_waiting Antigravity
       message_start assistant
       message_end assistant ""
       tool_start Looking things up {}
@@ -1026,6 +1033,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       turn_end stop=Tool_use tool_results=1
     a web search named in its _meta, of kind other
       turn_start
+      agent_waiting Antigravity
       message_start assistant
       message_end assistant ""
       tool_start web_search {"query":"ocaml eio"}
