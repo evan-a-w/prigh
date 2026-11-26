@@ -105,6 +105,7 @@ let default_model t id =
   if String.equal t.model (model_name ~adapter:t.adapter None)
   then t.model <- model_name ~adapter:t.adapter (Some id)
 ;;
+
 let cost_usd t = t.cost_usd
 let context t = t.context
 let last_input t = t.last_input

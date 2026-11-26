@@ -701,7 +701,9 @@ let shown_model t =
       if is_external t.model
       then listed t t.model
       else
-        listed t (External_model.pending ~adapter:(Adapter_id.to_string adapter))
+        listed
+          t
+          (External_model.pending ~adapter:(Adapter_id.to_string adapter))
     in
     (match
        List.rev (Session.replies t.session)
@@ -3155,8 +3157,9 @@ let settle_runner_model t =
       |> Option.map ~f:fst
     in
     let model =
-      if External_model.of_adapter ~adapter t.model
-         && not (External_model.is_placeholder t.model)
+      if
+        External_model.of_adapter ~adapter t.model
+        && not (External_model.is_placeholder t.model)
       then t.model
       else (
         match
@@ -3196,9 +3199,10 @@ let set_runner t runner =
 ;;
 
 let models_changed t =
-  if Option.is_some t.runner
-     && is_external t.model
-     && External_model.is_placeholder t.model
+  if
+    Option.is_some t.runner
+    && is_external t.model
+    && External_model.is_placeholder t.model
   then (
     let before = Model.key t.model in
     settle_runner_model t;

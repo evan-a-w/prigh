@@ -87,14 +87,14 @@ let placeholder ~adapter ~name =
       ~thinking_levels:[ Low; Medium; High; Max ]
       ~can_disable_thinking:true
       default_id
-  | "codex" -> model ~adapter ~name ~thinking_levels:[ Low; Medium; High ] default_id
+  | "codex" ->
+    model ~adapter ~name ~thinking_levels:[ Low; Medium; High ] default_id
   | _ -> model ~adapter ~name default_id
 ;;
 
 let pending ~adapter = placeholder ~adapter ~name:"loading models…"
 let unlisted ~adapter = placeholder ~adapter ~name:"its own model"
 let is_placeholder (m : Model.t) = String.equal m.id default_id
-;;
 
 let of_adapter ~adapter (m : Model.t) =
   match m.provider with

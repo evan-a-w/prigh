@@ -727,7 +727,10 @@ let%expect_test
   (* Recorded on the placeholder: the agent's default once listed, nothing
      before. *)
   let restore models =
-    External_model.restore ~adapter:"acp:opencode" ~models "acp:opencode/default"
+    External_model.restore
+      ~adapter:"acp:opencode"
+      ~models
+      "acp:opencode/default"
     |> Option.map ~f:Model.key
   in
   print_s

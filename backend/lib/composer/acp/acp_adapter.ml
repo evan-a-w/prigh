@@ -604,8 +604,10 @@ let create
         in
         let default = Option.value agent_default ~default:current in
         let first, rest =
-          List.partition_tf choices ~f:(fun (c : Codec.Config_option.Choice.t) ->
-            String.equal c.value default)
+          List.partition_tf
+            choices
+            ~f:(fun (c : Codec.Config_option.Choice.t) ->
+              String.equal c.value default)
         in
         List.map (first @ rest) ~f:model
       | Some _ | None -> []
