@@ -2,8 +2,8 @@ open! Core
 open! Import
 
 let usage =
-  "/adapters [refresh | retry] | /adapters login [ADAPTER] [LOGIN|own] | /adapters \
-   import ADAPTER [HOST]"
+  "/adapters [refresh | retry] | /adapters login [ADAPTER] [LOGIN|own] | \
+   /adapters import ADAPTER [HOST]"
 ;;
 
 module Action = struct

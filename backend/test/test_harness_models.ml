@@ -22,8 +22,7 @@ let%expect_test "failure kinds, and what to do" =
     ~install:(Not_installed { login_shell_path = None })
     "exited before answering";
   show "agy: command not found";
-  show
-    "Antigravity is not logged in on this host: run `agy acp --login` there";
+  show "Antigravity is not logged in on this host: run `agy acp --login` there";
   show
     ~prigh_login:"google-antigravity"
     "it was refused prigh's google-antigravity login \"Work\", or could not \

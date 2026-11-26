@@ -81,8 +81,8 @@ let%expect_test "/adapters lists each host's CLIs and what to run" =
     ▌ earlier question
       earlier answer
     ┌─ Error ────────────────────────────────────────────────────────────────────────────────┐
-    │ unknown argument "now": /adapters [refresh] | /adapters login [ADAPTER] [LOGIN|own] |  │
-    │ /adapters import ADAPTER [HOST]                                                        │
+    │ unknown argument "now": /adapters [refresh | retry] | /adapters login [ADAPTER]        │
+    │ [LOGIN|own] | /adapters import ADAPTER [HOST]                                          │
     └──────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ──────────────────────────────────────────────────────────────────────────────────────────
     > /adapters now▏

@@ -57,16 +57,21 @@ let problem ~prigh_login ~install why : Problem.t =
   | _
     when says
            text
-           ~any:[ "command not found"; "not installed"; "no such file or directory" ]
-    -> Not_installed
+           ~any:
+             [ "command not found"
+             ; "not installed"
+             ; "no such file or directory"
+             ] -> Not_installed
   | _
     when Option.is_some prigh_login
          && says text ~any:[ "refused prigh's"; "gave it no token" ] ->
     Login_refused
   | _
     when Acp_adapter.is_not_logged_in why
-         || says text ~any:[ "not logged in"; "authentication required"; "log in" ]
-    -> Not_logged_in
+         || says
+              text
+              ~any:[ "not logged in"; "authentication required"; "log in" ] ->
+    Not_logged_in
   | Some (Installed _ | Unknown _) | None -> Failed
 ;;
 
@@ -82,14 +87,16 @@ let failed ~label ~host_name ~prigh_login ~install why =
   in
   let what_next =
     match problem, prigh_login with
-    | Unreachable, _ -> Some "Start prigh's tool host there, or pick another host."
+    | Unreachable, _ ->
+      Some "Start prigh's tool host there, or pick another host."
     | Not_installed, _ ->
       Some
         "Install it there (prigh never installs it), then retry; Settings → \
          Engines says what is missing."
     | Login_refused, Some _ -> None (* [why] says what to do *)
     | _, None ->
-      Some "Check that it is installed and logged in there (Settings → Engines)."
+      Some
+        "Check that it is installed and logged in there (Settings → Engines)."
     | _, Some _ -> Some "Check that it is installed there (Settings → Engines)."
   in
   let message =

@@ -726,7 +726,7 @@ let%expect_test
   in
   H.names h ~selector:".model-chip";
   [%expect
-    {| button "Model: Codex \194\183 loading models\226\128\166" -- Codex · loading models…: models, reasoning and access (Ctrl+L) |}];
+    {| button "Model: Codex \194\183 loading models\226\128\166, Default" -- Codex · loading models…, reasoning Default: models, reasoning and access (Ctrl+L) |}];
   set_state
     ~status:
       {|{"state":"failed","problem":"not_logged_in","summary":"not logged in on desktop","message":"Codex on desktop could not list its models: Codex is not logged in. Check that it is installed and logged in there (Settings → Engines).","fixes":[{"kind":"engines"},{"kind":"retry"}]}|}
@@ -736,23 +736,26 @@ let%expect_test
   H.names h ~selector:".model-chip.trouble";
   [%expect
     {|
-    button "Model: Codex: not logged in on desktop" -- Codex: not logged in on desktop: models, reasoning and access (Ctrl+L)
+    button "Model: Codex: not logged in on desktop, Default" -- Codex: not logged in on desktop, reasoning Default: models, reasoning and access (Ctrl+L)
     (Codex: not logged in on desktop)
-    button "Model: Codex: not logged in on desktop" -- Codex: not logged in on desktop: models, reasoning and access (Ctrl+L)
+    button "Model: Codex: not logged in on desktop, Default" -- Codex: not logged in on desktop, reasoning Default: models, reasoning and access (Ctrl+L)
     |}];
   H.quiet h (fun () -> H.click h ~selector:".model-chip");
   H.text h ~selector:".model-trouble";
   H.names h ~selector:".model-trouble-fix";
   [%expect
     {|
+    (Open_chip Model)
     Codex on desktop could not list its models: Codex is not logged in. Check that it is installed and logged in there (Settings → Engines).
-    Settings → Engines
-    Retry
-    button "Settings → Engines" -- /adapters refresh
+    (Settings → Engines) (Retry)
+    button "Settings \226\134\146 Engines" -- /adapters refresh
     button "Retry" -- /adapters retry
     |}];
   H.click h ~selector:".model-trouble-fix" ~nth:1;
-  [%expect {| (Rpc (method_ retry_models) (params ()) (tag Show_error)) |}];
+  [%expect {|
+    (Run "/adapters retry")
+    (Rpc (method_ retry_models) (params ()) (tag Show_error))
+    |}];
   (* Asked again, it lists them: the chip names the model. *)
   set_state ~status:{|{"state":"loading"}|} placeholder;
   H.text h ~selector:".model-chip";

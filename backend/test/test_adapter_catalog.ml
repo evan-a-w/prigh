@@ -374,32 +374,32 @@ let with_server
           ~f:(fun status ->
             let line =
               sprintf
-              "event: state, harness_models %s"
-              (match string_at [ "state" ] status with
-               | Some "failed" ->
-                 let text key =
-                   String.substr_replace_all
-                     (Option.value_exn (string_at [ key ] status))
-                     ~pattern:(Machine_name.get ())
-                     ~with_:"<machine>"
-                 in
-                 sprintf
-                   "failed %s %S fixes=[%s]\n  %s"
-                   (Option.value_exn (string_at [ "problem" ] status))
-                   (text "summary")
-                   (match member [ "fixes" ] status with
-                    | Some (`Array fixes) ->
-                      String.concat
-                        ~sep:" "
-                        (List.map fixes ~f:(fun f ->
-                           Option.value_exn (string_at [ "kind" ] f)
-                           ^ Option.value_map
-                               (string_at [ "provider" ] f)
-                               ~default:""
-                               ~f:(fun p -> ":" ^ p)))
-                    | _ -> "?")
-                   (text "message")
-               | state -> Option.value state ~default:"?")
+                "event: state, harness_models %s"
+                (match string_at [ "state" ] status with
+                 | Some "failed" ->
+                   let text key =
+                     String.substr_replace_all
+                       (Option.value_exn (string_at [ key ] status))
+                       ~pattern:(Machine_name.get ())
+                       ~with_:"<machine>"
+                   in
+                   sprintf
+                     "failed %s %S fixes=[%s]\n  %s"
+                     (Option.value_exn (string_at [ "problem" ] status))
+                     (text "summary")
+                     (match member [ "fixes" ] status with
+                      | Some (`Array fixes) ->
+                        String.concat
+                          ~sep:" "
+                          (List.map fixes ~f:(fun f ->
+                             Option.value_exn (string_at [ "kind" ] f)
+                             ^ Option.value_map
+                                 (string_at [ "provider" ] f)
+                                 ~default:""
+                                 ~f:(fun p -> ":" ^ p)))
+                      | _ -> "?")
+                     (text "message")
+                 | state -> Option.value state ~default:"?")
             in
             if not ([%equal: string option] !last_harness_models (Some line))
             then (

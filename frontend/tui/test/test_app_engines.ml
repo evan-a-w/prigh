@@ -320,12 +320,29 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    /work  Codex: not logged in on srv  think:off  mode:auto  ctx:0.1%  $0.01
+    /work  Codex: not logged in on srv  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    Model: Codex: not logged in on srv  (2)
+    / ▏
+    ▸  Settings → Engines  /adapters refresh  Codex on srv could not list its model…
+       Retry               /adapters retry  Codex on srv could not list its models:…
+    ────────────────────────────────────────────────────────────────────────────────
+    >
+    Codex: not logged in on srv  Enter selects · Esc closes · Ctrl+N logged-in only
     |}];
   (* The second fix: Retry. *)
   H.key h (Key.plain Down);
   H.enter h;
   command h "/adapters retry";
-  [%expect {| |}]
+  [%expect {|
+    (Rpc (method_ retry_models) (params ()) (tag Show_error))
+    (Rpc (method_ retry_models) (params ()) (tag Show_error))
+    |}]
 ;;

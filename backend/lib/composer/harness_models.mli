@@ -10,7 +10,8 @@ module Problem : sig
   type t =
     | Not_installed
     | Not_logged_in (** on its own login on the host *)
-    | Login_refused (** prigh's login it runs on was refused, or gave no token *)
+    | Login_refused
+    (** prigh's login it runs on was refused, or gave no token *)
     | Unreachable (** the tool host is not connected *)
     | Failed
   [@@deriving sexp_of, equal]
@@ -20,7 +21,8 @@ end
 module Fix : sig
   type t =
     | Login of { provider : string } (** [/login PROVIDER] *)
-    | Engines (** Settings → Engines: install hints, importing or checking its login *)
+    | Engines
+    (** Settings → Engines: install hints, importing or checking its login *)
     | Retry (** ask again *)
   [@@deriving sexp_of, equal]
 end

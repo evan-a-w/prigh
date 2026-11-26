@@ -1539,8 +1539,7 @@ let ensure_catalog ?force ?(max_age = 1800.) t agent =
              adapters_changed t ~hosts:(hosts t)
            | Acp _ | Codex | Claude | Prigh -> ());
        if
-         (not was_asking)
-         && Adapter_catalog.asking t.catalogs ~host ~login name
+         (not was_asking) && Adapter_catalog.asking t.catalogs ~host ~login name
        then send_harness_models t agent)
   | _ -> ()
 ;;
