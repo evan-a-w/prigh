@@ -14,6 +14,8 @@ module Subagent : sig
     { agent_id : string
     ; task : string
     ; model : string
+    ; host : string option [@sexp.option]
+    ; engine : string option [@sexp.option]
     ; forked : bool (** it started from its caller's conversation *)
     ; chat : chat (** its own transcript, from its events *)
     ; turns : int

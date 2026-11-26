@@ -12,6 +12,11 @@ type t =
   ; request_timeout : Time_float.Span.t option
   ; steer_poll : Time_float.Span.t
   ; host : unit -> string
+  ; host_id : string option
+  ; home : (unit -> string option) option
+  ; depth : int
+  ; agent_id : string option
+  ; wake : unit -> Message.t list
   ; mutable live : live option
   ; mutable live_host : string option
   ; mutable live_login : Account_ref.t option
@@ -61,6 +66,11 @@ let create
       ?(on_thread = ignore)
       ?(on_start = fun _ _ -> ())
       ?(host = fun () -> "local")
+      ?host_id
+      ?home
+      ?(depth = 0)
+      ?agent_id
+      ?(wake = fun () -> [])
       ?handoff_from
       ?checkpoint
       ?(catalog = fun () -> None)
@@ -75,6 +85,11 @@ let create
   ; request_timeout
   ; steer_poll
   ; host
+  ; host_id
+  ; home
+  ; depth
+  ; agent_id
+  ; wake
   ; live = None
   ; live_host = None
   ; live_login = None
@@ -120,6 +135,7 @@ let close t =
 ;;
 
 let context
+      t
       (s : Engine_intf.Services.t)
       ~cancel
       ?(cwd = s.cwd)
@@ -127,11 +143,20 @@ let context
       ?agent_id
       ()
   =
+  let agent_id =
+    match t.agent_id, agent_id with
+    | None, p -> p
+    | Some a, None -> Some a
+    | Some a, Some p -> Some (a ^ "/" ^ p)
+  in
   Tool.Context.create
     ~cancel
     ~execute:s.execute
     ~call_id
+    ~depth:t.depth
     ?agent_id
+    ?host:t.host_id
+    ?home:t.home
     ~tools:s.tools
     ~emit:s.emit
     ~background:s.background
@@ -160,7 +185,7 @@ let injected t (s : Engine_intf.Services.t) =
         incr mcp_calls;
         let run_cancel = t.run_cancel in
         let ctx =
-          context s ~cancel:t.cancel ~call_id:(sprintf "mcp-%d" !mcp_calls) ()
+          context t s ~cancel:t.cancel ~call_id:(sprintf "mcp-%d" !mcp_calls) ()
         in
         (match s.approve ctx tool args with
          | Some refused -> refused
@@ -995,6 +1020,7 @@ and run_turn'
                    in
                    let ctx =
                      context
+                       t
                        s
                        ~cancel:c
                        ?cwd
@@ -1069,6 +1095,11 @@ and run_turn'
           | Some Done when not (Cancellation.is_cancelled cancel) ->
             let next = Queue.to_list leftover @ s.steer () in
             Queue.clear leftover;
+            let next =
+              if List.is_empty next && Option.is_none (s.halt ())
+              then t.wake ()
+              else next
+            in
             if (not (List.is_empty next)) && Option.is_none (s.halt ())
             then (
               List.iter next ~f:(Composer_recorder.user_message recorder);

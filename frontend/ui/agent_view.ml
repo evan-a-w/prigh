@@ -19,6 +19,7 @@ type t =
   ; name : string option
   ; model : string
   ; host : string option
+  ; engine : string option [@sexp.option]
   ; status : Status.t
   ; turns : int
   ; transcript : Transcript.t
@@ -26,13 +27,14 @@ type t =
   }
 [@@deriving sexp_of]
 
-let create ?name ?host ~call_id ~agent_id ~task ~model () =
+let create ?name ?host ?engine ~call_id ~agent_id ~task ~model () =
   { id = agent_id
   ; call_id
   ; task
   ; name
   ; model
   ; host
+  ; engine
   ; status = Running
   ; turns = 0
   ; transcript = Transcript.empty
@@ -54,7 +56,7 @@ let replace agents id f =
 
 (* An agent already listed (from the state, before its start event, or one
    continued after running out of turns) keeps its place and transcript. *)
-let start ?name ?host agents ~call_id ~agent_id ~task ~model =
+let start ?name ?host ?engine agents ~call_id ~agent_id ~task ~model =
   match find agents agent_id with
   | Some _ ->
     replace agents agent_id (fun a ->
@@ -64,9 +66,11 @@ let start ?name ?host agents ~call_id ~agent_id ~task ~model =
       ; name = Option.first_some name a.name
       ; model
       ; host = Option.first_some host a.host
+      ; engine = Option.first_some engine a.engine
       ; status = Running
       })
-  | None -> agents @ [ create ?name ?host ~call_id ~agent_id ~task ~model () ]
+  | None ->
+    agents @ [ create ?name ?host ?engine ~call_id ~agent_id ~task ~model () ]
 ;;
 
 let status_of_result ~turns ~cost_usd (result : P.Event.Subagent_result.t)
@@ -117,11 +121,13 @@ let rec apply (t : t) (event : P.Event.t) : t =
     else if String.equal agent_id t.id
     then apply t inner
     else t
-  | P.Event.Subagent_start { call_id; agent_id; task; name; model; host; _ } ->
+  | P.Event.Subagent_start
+      { call_id; agent_id; task; name; model; host; engine; _ } ->
     if is_descendant t agent_id
     then
       { t with
-        children = start ?name ?host t.children ~call_id ~agent_id ~task ~model
+        children =
+          start ?name ?host ?engine t.children ~call_id ~agent_id ~task ~model
       ; transcript = Transcript.apply t.transcript event
       }
     else t
@@ -147,8 +153,9 @@ let rec apply (t : t) (event : P.Event.t) : t =
     the depth-1 agents, [Subagent] routes to the matching one. *)
 let apply_all agents (event : P.Event.t) =
   match event with
-  | P.Event.Subagent_start { call_id; agent_id; task; name; model; host; _ } ->
-    start ?name ?host agents ~call_id ~agent_id ~task ~model
+  | P.Event.Subagent_start
+      { call_id; agent_id; task; name; model; host; engine; _ } ->
+    start ?name ?host ?engine agents ~call_id ~agent_id ~task ~model
   | P.Event.Subagent { agent_id; event = inner; _ } ->
     (match find agents agent_id with
      | None -> agents

@@ -372,3 +372,39 @@ let%expect_test
     textarea "Message"
     |}]
 ;;
+
+let%expect_test
+    "a subagent on another engine and host shows both on its card and in its \
+     chat"
+  =
+  let h = H.create () in
+  H.quiet h (fun () ->
+    events
+      h
+      [ {|{"event":"agent_start"}|}
+      ; call
+          ~id:"s1"
+          ~name:"subagent"
+          {|{"task":"Audit parser","engine":"codex","host":"laptop","model":"gpt-5"}|}
+      ; tool_start
+          ~id:"s1"
+          ~name:"subagent"
+          {|{"task":"Audit parser","engine":"codex","host":"laptop","model":"gpt-5"}|}
+      ; {|{"event":"subagent_start","call_id":"s1","agent_id":"a1","task":"Audit parser","name":"Audit parser","model":"codex/gpt-5","tools":[],"host":"laptop","engine":"codex","cwd":"/home/me","forked":false,"continued":false}|}
+      ; tool_end
+          ~id:"s1"
+          ~name:"subagent"
+          "started agent a1 on Codex, laptop (Audit parser); its result will \
+           be delivered to you when it finishes"
+      ; {|{"event":"agent_end","messages":[]}|}
+      ]);
+  H.text h ~selector:".tool-subagent";
+  H.quiet h (fun () -> H.act h (Open_subagent_chat "a1"));
+  H.names h ~selector:".composer-controls button";
+  [%expect
+    {|
+    subagent Audit parser (Open its chat)
+    button "The subagent's tool host: laptop, disconnected" -- Tools wait for laptop to reconnect: run prigh tool-host -connect (or a TUI) there, or /host picks another
+    button "The subagent's model: Codex \194\183 gpt-5, Default" -- Codex · gpt-5, reasoning Default: the subagent's own, set when it started
+    |}]
+;;

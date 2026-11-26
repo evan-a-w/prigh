@@ -1371,6 +1371,24 @@ let active_host_label agent =
     if String.is_empty name then id else name
 ;;
 
+(* The harness on [host] (named [host_name]), in [launch.cwd]. *)
+let host_spawn_on agent ~sw ~host ~host_name (launch : Adapter.Launch.t) =
+  Host_transport.spawn
+    ~sw
+    ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
+      Agent.host_call_on
+        agent
+        ~stdin
+        ~cancel
+        ~on_output
+        ~host
+        ~cwd:launch.cwd
+        ~name
+        args)
+    ~host:host_name
+    launch
+;;
+
 (* The harness on the session's active tool host, in its cwd. *)
 let host_spawn t agent launch =
   Host_transport.spawn
@@ -1381,29 +1399,33 @@ let host_spawn t agent launch =
     launch
 ;;
 
-(* [adapter]'s harness failed to start on the session's host: what was
-   known of it there is checked again, and the frontends told. *)
-let recheck_adapter t agent adapter =
-  let host = Agent.active_host agent in
+(* [adapter]'s harness failed to start on [host]: what was known of it there
+   is checked again, and the frontends told. *)
+let recheck_adapter_on t agent ~host ~host_name ~cwd adapter =
   Adapter_health.Cache.forget t.adapter_health ~host adapter;
   Codex_sandbox.Cache.forget_host t.codex_sandbox ~host;
   Fiber.fork ~sw:t.sw (fun () ->
     let statuses =
       Adapter_health.probe
         ~exec:(fun ~name arguments ->
-          Agent.host_call_on
-            agent
-            ~host
-            ~cwd:(Session.cwd (Agent.session agent))
-            ~name
-            arguments)
+          Agent.host_call_on agent ~host ~cwd ~name arguments)
         [ adapter ]
         ~host
-        ~host_name:(active_host_label agent)
+        ~host_name
         ~now:(t.now ())
     in
     Adapter_health.Cache.set t.adapter_health statuses;
     adapters_changed t ~hosts:(Agent.state agent).hosts)
+;;
+
+let recheck_adapter t agent adapter =
+  recheck_adapter_on
+    t
+    agent
+    ~host:(Agent.active_host agent)
+    ~host_name:(active_host_label agent)
+    ~cwd:(Session.cwd (Agent.session agent))
+    adapter
 ;;
 
 (* The harness [adapter] said its catalog on [host], on the login [login]:
@@ -1554,15 +1576,19 @@ let ensure_catalog ?force ?(max_age = 1800.) t agent =
   | _ -> ()
 ;;
 
-(* The session's harness's catalog, as asked on its tool host on its
-   login. *)
-let find_catalog t agent (a : Adapter_id.t) =
+let catalog_on t ~host (a : Adapter_id.t) =
   let adapter = Adapter_id.to_string a in
   Adapter_catalog.find
     t.catalogs
-    ~host:(Agent.active_host agent)
+    ~host
     ~login:(catalog_login t ~adapter)
     adapter
+;;
+
+(* The session's harness's catalog, as asked on its tool host on its
+   login. *)
+let find_catalog t agent (a : Adapter_id.t) =
+  catalog_on t ~host:(Agent.active_host agent) a
 ;;
 
 (* The session's harness listed no models when asked last (Goose): it
@@ -1764,11 +1790,54 @@ let attach_engine t agent =
   | _ -> ()
 ;;
 
+let subagent_engines t agent =
+  Composer_subagent.create
+    ~engines:t.engines
+    ~current:(fun () -> Agent.engine_choice agent)
+    ~harness_model:(fun () -> Agent.harness_model agent)
+    ~external_models:(fun ~host adapter ->
+      let same_host = String.equal host (Agent.active_host agent) in
+      let same_adapter =
+        match Agent.engine_choice agent with
+        | { engine = Composer; adapter = Some a } -> Adapter_id.equal a adapter
+        | _ -> false
+      in
+      match
+        if same_host && same_adapter then Agent.external_models agent else None
+      with
+      | Some (_ :: _ as models) -> Some models
+      | Some [] | None ->
+        Option.map (catalog_on t ~host adapter) ~f:(fun c -> c.models))
+    ~parent_messages:(fun () -> Agent.messages agent)
+    ~approval_mode:(fun () -> (Agent.state agent).approval_mode)
+    ~plan_mode:(fun () -> (Agent.state agent).plan_mode)
+    ~add_spend:(Agent.add_spend agent)
+    ~notice:(Agent.notice agent)
+    ~spawn:(fun ~sw ~host ~host_name ~adapter launch ->
+      let spawned =
+        match t.spawn_external with
+        | Some spawn -> spawn agent ~host launch
+        | None -> host_spawn_on agent ~sw ~host ~host_name launch
+      in
+      if Result.is_error spawned
+      then recheck_adapter_on t agent ~host ~host_name ~cwd:launch.cwd adapter;
+      spawned)
+    ~on_start:(fun ~host ~adapter (start : Adapter.Start.t) result ->
+      if Option.is_none start.login && note_seen t ~host adapter result
+      then adapters_changed t ~hosts:(hosts t))
+    ~login:(fun ~adapter -> cli_credential t agent ~adapter)
+    ~no_sandbox:(fun ~host ~host_name ~cwd adapter ->
+      no_sandbox t agent ~host ~host_name ~cwd adapter)
+    ~catalog:(fun ~host adapter -> catalog_on t ~host adapter)
+    ()
+;;
+
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
 let register t agent =
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
+  Agent.set_subagent_engines agent (Some (subagent_engines t agent));
   Agent.set_hosts agent (hosts t) ~returning:(returning t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);

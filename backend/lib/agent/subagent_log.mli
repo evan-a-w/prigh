@@ -35,6 +35,8 @@ module Summary : sig
     ; host : string option
       (** the tool host it ran on (its name), when not the session's active
           one *)
+    ; engine : string option
+      (** the engine/adapter key it ran on, when not the session's own *)
     ; thinking : string option
       (** its reasoning level; [None] in logs written before it was kept *)
     ; cwd : string option

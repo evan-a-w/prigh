@@ -237,6 +237,7 @@ let start_call t (c : Call.t) =
            ; thinking = Thinking.default
            ; tools = []
            ; host = None
+           ; engine = None
            ; cwd = t.cwd
            ; worktree = None
            ; forked = false

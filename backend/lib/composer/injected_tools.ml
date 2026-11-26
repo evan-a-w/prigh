@@ -16,7 +16,9 @@ let default_names ~native_questions =
   ; Tool_worktree.name
   ; Tool_review_reply.name
   ; Goal.tool_name
+  ; Tool_subagent.name
   ]
+  @ List.map Tool_subagent.control_tools ~f:Tool.name
   @ if native_questions then [] else [ Tool_ask_user.name ]
 ;;
 
@@ -108,7 +110,9 @@ let initialize params =
       , `String
           "prigh's tools for the user's session: components shown in the chat, \
            the user's memory, other sessions, pull requests, issues and CI \
-           through the user's sign-in, and worktrees." )
+           through the user's sign-in, worktrees, and prigh subagents (for \
+           delegating work to another host or engine when the user explicitly \
+           asks; defaults to this session's engine and host)." )
     ]
 ;;
 

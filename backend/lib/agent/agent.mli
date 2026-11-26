@@ -1154,6 +1154,25 @@ val hosts : t -> Host.t list
 (** [hosts] as [on_host] lists them. *)
 val tool_hosts : t -> Tool_on_host.Host.t list
 
+(** How [subagent] runs on the backend's deployed engines (set by
+    [Rpc_server] when the session is registered). *)
+val set_subagent_engines : t -> Tool_subagent.External.t option -> unit
+
+val subagent_engines : t -> Tool_subagent.External.t option
+
+(** The session's prigh harness model (kept even while the session runs on
+    an external composer adapter). *)
+val harness_model : t -> Model.t
+
+(** Records spend reported outside the harness's messages (e.g. a composer
+    subagent's reported cost). *)
+val add_spend : t -> usage:Usage.t -> cost_usd:float -> unit
+
+(** Whether [agent_id] is a background subagent managed by this agent's
+    {!Background_tasks} (running or parked), and so can be steered even on
+    a composer session. *)
+val has_managed_subagent : t -> agent_id:string -> bool
+
 val active_host : t -> string
 
 (** The active host's name, for messages. *)

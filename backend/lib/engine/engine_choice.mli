@@ -20,3 +20,15 @@ val of_strings : engine:string -> adapter:string option -> t Or_error.t
 
 (** [harness], [composer (Codex)]. *)
 val label : t -> string
+
+(** The single key naming this choice: ["harness"], ["codex"], ["claude"],
+    ["acp:antigravity"]. Matches [Deployed_engines.Choice.key] on the
+    frontends. *)
+val key : t -> string
+
+(** ["prigh harness"], ["Codex"], ["Claude Code"], ["Antigravity"]. *)
+val display_name : t -> string
+
+(** Names the user may write in a message to explicitly ask for this engine
+    or adapter (matched as whole words, case-insensitively). *)
+val names : t -> string list

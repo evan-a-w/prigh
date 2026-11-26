@@ -24,6 +24,7 @@ module Summary = struct
     ; name : string option
     ; model : string
     ; host : string option
+    ; engine : string option
     ; thinking : string option
     ; cwd : string option
     ; worktree : Agent_worktree.t option
@@ -50,6 +51,7 @@ module Entry = struct
     ; name : string option
     ; model : string
     ; host : string option
+    ; engine : string option
     ; thinking : string option
     ; cwd : string option
     ; worktree : Agent_worktree.t option
@@ -94,6 +96,7 @@ module Line = struct
         ; name : string option [@jsonaf.option]
         ; model : string
         ; host : string option [@jsonaf.option]
+        ; engine : string option [@jsonaf.option]
         ; thinking : string option [@jsonaf.option]
         ; cwd : string option [@jsonaf.option]
         ; worktree : Agent_worktree.t option [@jsonaf.option]
@@ -167,6 +170,7 @@ let start
       ~name
       ~model
       ~host
+      ~engine
       ~thinking
       ~cwd
       ~worktree
@@ -180,6 +184,7 @@ let start
     ; name
     ; model
     ; host
+    ; engine
     ; thinking
     ; cwd
     ; worktree
@@ -243,8 +248,18 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
       reopen e ~at:now;
       write t (Continue { id = agent_id; at = now; run = t.runs }))
   | Subagent_start
-      { call_id; agent_id; task; name; model; host; thinking; cwd; worktree; _ }
-    ->
+      { call_id
+      ; agent_id
+      ; task
+      ; name
+      ; model
+      ; host
+      ; engine
+      ; thinking
+      ; cwd
+      ; worktree
+      ; _
+      } ->
     let name = Some name in
     let thinking = Some (Thinking.to_string thinking) in
     let cwd = Some cwd in
@@ -257,6 +272,7 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
       ~name
       ~model
       ~host
+      ~engine
       ~thinking
       ~cwd
       ~worktree
@@ -271,6 +287,7 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
          ; name
          ; model
          ; host
+         ; engine
          ; thinking
          ; cwd
          ; worktree
@@ -321,6 +338,7 @@ let replay t (line : Line.t) =
       ; name
       ; model
       ; host
+      ; engine
       ; thinking
       ; cwd
       ; worktree
@@ -337,6 +355,7 @@ let replay t (line : Line.t) =
       ~name
       ~model
       ~host
+      ~engine
       ~thinking
       ~cwd
       ~worktree
@@ -416,6 +435,7 @@ let summary t (e : Entry.t) =
   ; task = e.task
   ; name = e.name
   ; host = e.host
+  ; engine = e.engine
   ; thinking = e.thinking
   ; cwd = e.cwd
   ; worktree = e.worktree
@@ -503,6 +523,7 @@ let save_all t =
          ; task = e.task
          ; name = e.name
          ; host = e.host
+         ; engine = e.engine
          ; model = e.model
          ; thinking = e.thinking
          ; cwd = e.cwd

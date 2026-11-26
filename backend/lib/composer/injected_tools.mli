@@ -20,7 +20,9 @@ val server_name : string
 (** The names of the tools injected by default, in order: [render_ui],
     [memory], [custom_instructions], [sessions], [ask_session],
     [answer_session], [pull_request], [issue], [repo], [worktree],
-    [reply_to_comment], and [ask_user] only when the harness has no
+    [reply_to_comment], [goal_complete], [subagent] and its control tools
+    ([subagent_status], [subagent_cancel], [subagent_message],
+    [subagent_continue]), and [ask_user] only when the harness has no
     questions of its own ([native_questions] false; Codex and Claude Code
     have them). Never the file and process tools ([bash], [read], [edit],
     ...): the harness has its own. *)

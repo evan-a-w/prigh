@@ -161,6 +161,7 @@ let start ~call_id agent_id : Agent_event.t =
     ; thinking = Thinking.default
     ; tools = []
     ; host = None
+    ; engine = None
     ; cwd = "/w"
     ; worktree = None
     ; forked = false

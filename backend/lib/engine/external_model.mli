@@ -64,3 +64,14 @@ val restore : adapter:string -> models:Model.t list -> string -> Model.t option
     lowercased with [claude-] dropped, or one is the other with a date or a
     bracketed note added ([sonnet-4] is not [sonnet-4-5]). *)
 val same_model : string -> string -> bool
+
+(** Resolves a model query (id, [adapter/id], display name, or unambiguous
+    prefix) against [adapter]'s known [models]. When [models] is [None] or
+    has only placeholders (the harness has not listed its models yet, or
+    lists none), the trimmed query (with any [adapter/] prefix stripped) is
+    passed through as-is. *)
+val resolve
+  :  adapter:string
+  -> models:Model.t list option
+  -> string
+  -> string Or_error.t
