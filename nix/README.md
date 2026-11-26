@@ -120,3 +120,13 @@ nix eval --raw .#lib.x86_64-linux \
 
 and commit the resulting JSON, then build the scope with
 `materializedDefsToScope`. Do this after the pins are final.
+
+## `nixpkgs-agents`
+
+A second nixos-unstable input, for the coding-agent CLIs only (the flake's
+`agentClis`: codex, claude, antigravity, opencode, with unfree allowed for
+Claude Code and Antigravity alone). The Docker image bakes them in, and
+`packages.antigravity-cli` is the Home Manager module's default when the
+system's nixpkgs has none at least 1.5.0. `nix flake update
+nixpkgs-agents` updates them without moving the OxCaml toolchain's
+`nixpkgs`.

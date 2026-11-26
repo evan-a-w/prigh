@@ -26,6 +26,11 @@
       url = "github:oxcaml/opam-repository";
       flake = false;
     };
+
+    # The coding-agent CLIs baked into the Docker image (`agentClis`
+    # below), locked apart from nixpkgs so they can follow nixos-unstable
+    # (`nix flake update nixpkgs-agents`) without moving the toolchain.
+    nixpkgs-agents.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs =
@@ -36,6 +41,7 @@
       opam-nix,
       opam-repository,
       ox-opam-repository,
+      nixpkgs-agents,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -186,9 +192,29 @@
         prighDesktopUnwrapped = desktop.unwrapped;
         prighDesktop = desktop.wrapped;
         prighComputer = desktop.computer;
+
+        # The agent CLIs baked into the Docker image (DOCKER.md, "Engines"),
+        # by the names its AGENT_CLIS build argument takes. Unfree ones are
+        # allowed by name.
+        agentPkgs = import nixpkgs-agents {
+          inherit system;
+          config.allowUnfreePredicate =
+            p:
+            builtins.elem (lib.getName p) [
+              "claude-code"
+              "antigravity-cli"
+            ];
+        };
+        agentClis = {
+          inherit (agentPkgs) codex opencode;
+          claude = agentPkgs.claude-code;
+          antigravity = agentPkgs.antigravity-cli;
+        };
       in
       {
         legacyPackages = frontendScope;
+
+        inherit agentClis;
 
         packages = {
           default = prigh;
@@ -196,6 +222,11 @@
           backend = prighBackend;
           prigh-desktop = prighDesktop;
           prigh-desktop-unwrapped = prighDesktopUnwrapped;
+        }
+        # The Home Manager module's default when the system's nixpkgs has
+        # none at least 1.5.0.
+        // lib.optionalAttrs (lib.meta.availableOn pkgs.stdenv.hostPlatform agentClis.antigravity) {
+          antigravity-cli = agentClis.antigravity;
         }
         // lib.optionalAttrs isLinux {
           prigh-computer = prighComputer;
@@ -521,6 +552,8 @@
                 agents.antigravityPackage = agy "1.2.3";
               };
             };
+            # the pinned nixpkgs has antigravity-cli 1.2.3: the flake's
+            defaultAgy = eval { programs.prigh.enable = true; };
             noAgy = eval {
               programs.prigh = {
                 enable = true;
@@ -584,9 +617,15 @@
             test "${lib.concatMapStringsSep " " (p: p.pname or p.name) others.home.packages}" = "prigh codex claude-code opencode goose-cli${lib.optionalString pkgs.stdenv.hostPlatform.isLinux " bubblewrap"} my-agent"
             test -z ${lib.escapeShellArg (failing cli + failing others)}
             # antigravity (on by default) needs agy acp, antigravity-cli >= 1.5.0
-            echo ${lib.escapeShellArg (failing oldAgy)} | grep -q "has antigravity-cli 1.2.3, and prigh needs"
+            test -z ${lib.escapeShellArg (failing defaultAgy)}
+            test "${
+              lib.concatMapStringsSep " " (p: p.name) (
+                lib.filter (p: lib.hasPrefix "antigravity" p.name) defaultAgy.home.packages
+              )
+            }" = "${agentClis.antigravity.name}"
+            echo ${lib.escapeShellArg (failing oldAgy)} | grep -q "antigravityPackage is antigravity-cli 1.2.3, and prigh needs"
             echo ${lib.escapeShellArg (failing oldAgy)} | grep -q "agents.antigravityPackage ="
-            echo ${lib.escapeShellArg (failing noAgy)} | grep -q "has no antigravity-cli,"
+            echo ${lib.escapeShellArg (failing noAgy)} | grep -q "antigravityPackage is null (none for ${system}),"
             test "${names noAgy}" = "prigh ${pkgs.codex.name} ${pkgs.claude-code.name} ${pkgs.opencode.name}${lib.optionalString pkgs.stdenv.hostPlatform.isLinux " ${pkgs.bubblewrap.name}"}"
             test -z ${lib.escapeShellArg (failing desktop)}
             echo ${lib.escapeShellArg (failing secret)} | grep -q 'programs.prigh.desktop.extraArgs has -token=sekrit:'

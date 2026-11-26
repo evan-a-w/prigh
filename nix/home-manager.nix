@@ -5,8 +5,9 @@
 #   programs.prigh.desktop.enable = true;  # and the desktop app in the menus
 #   programs.prigh.desktop.ui = "local";   # prigh-web from this prigh (default: the backend's)
 #   programs.prigh.desktop.computerUse = true;  # the agent may drive this desktop
-#   # The composer's agent CLIs: codex, claudeCode, antigravity (agy >= 1.5.0;
-#   # it and claudeCode are unfree) and opencode by default; goose when asked for.
+#   # The composer's agent CLIs: codex, claudeCode (unfree), antigravity (agy >=
+#   # 1.5.0: prigh's own when your nixpkgs' is older) and opencode by default;
+#   # goose when asked for.
 #   programs.prigh.agents.goose = true;
 self:
 {
@@ -95,7 +96,8 @@ in
           Install the Antigravity CLI (`agy`, antigravityPackage), an ACP
           agent the composer drives (`-adapters acp:antigravity`, which runs
           `agy acp`, added in antigravity-cli 1.5.0). It is unfree: your
-          nixpkgs must allow it. Log in with `agy acp --login`, or in prigh
+          nixpkgs must allow it, unless it is older than 1.5.0 and so the
+          default is prigh's (see antigravityPackage). Log in with `agy acp --login`, or in prigh
           with `/adapters import antigravity` or `/login google-antigravity`.
           (pkgs.antigravity is the IDE, not this CLI.)
         '';
@@ -103,13 +105,17 @@ in
 
       antigravityPackage = mkOption {
         type = types.nullOr types.package;
-        default = pkgs.antigravity-cli or null;
-        defaultText = lib.literalExpression "pkgs.antigravity-cli or null";
+        default =
+          if lib.versionAtLeast (pkgs.antigravity-cli.version or "0") "1.5.0" then
+            pkgs.antigravity-cli
+          else
+            self.packages.${system}.antigravity-cli or null;
+        defaultText = lib.literalMD "`pkgs.antigravity-cli` if 1.5.0 or later, else the prigh flake's `packages.\${system}.antigravity-cli` (nixos-unstable's, unfree allowed for it alone)";
         example = lib.literalExpression "(import inputs.nixpkgs-unstable { inherit system; config.allowUnfree = true; }).antigravity-cli";
         description = ''
           The Antigravity CLI installed with antigravity. It must be 1.5.0
-          or later (`agy acp`): if your nixpkgs has an older one, use
-          nixos-unstable's (with unfree allowed).
+          or later (`agy acp`); the default takes prigh's when your
+          nixpkgs has an older one.
         '';
       };
 
@@ -299,13 +305,12 @@ in
       {
         assertion = !cfg.agents.antigravity || lib.versionAtLeast antigravityVersion "1.5.0";
         message = ''
-          programs.prigh.agents.antigravity (on by default): your nixpkgs has ${
-            if antigravity == null then "no antigravity-cli" else "antigravity-cli ${antigravityVersion}"
+          programs.prigh.agents.antigravity (on by default): antigravityPackage is ${
+            if antigravity == null then "null (none for ${system})" else "antigravity-cli ${antigravityVersion}"
           }, and prigh needs
-          1.5.0 or later (`agy acp`). Take nixos-unstable's (it is unfree, so allow that):
+          1.5.0 or later (`agy acp`). Drop the override to take prigh's (nixos-unstable's), or set one:
             programs.prigh.agents.antigravityPackage =
               (import inputs.nixpkgs-unstable { inherit system; config.allowUnfree = true; }).antigravity-cli;
-          (or inputs.nixpkgs-unstable.legacyPackages.''${system}.antigravity-cli where unfree is allowed),
           or turn it off: programs.prigh.agents.antigravity = false;
         '';
       }
