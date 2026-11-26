@@ -823,8 +823,10 @@ let rec event ?now ?(resync = false) (e : Agent.Event.t) =
            ; task
            ; name
            ; model
+           ; thinking = level
            ; tools
            ; host
+           ; cwd
            ; worktree
            ; forked
            ; continued
@@ -835,6 +837,8 @@ let rec event ?now ?(resync = false) (e : Agent.Event.t) =
       ; "task", str task
       ; "name", str name
       ; "model", str model
+      ; "thinking", thinking level
+      ; "cwd", str cwd
       ; "tools", `Array (List.map tools ~f:str)
       ]
       @ Option.value_map host ~default:[] ~f:(fun host -> [ "host", str host ])
@@ -931,6 +935,11 @@ let subagent_summary (s : Subagent_log.Summary.t) =
      ; "model", str s.model
      ]
      @ Option.value_map s.host ~default:[] ~f:(fun host -> [ "host", str host ])
+     @ Option.value_map s.thinking ~default:[] ~f:(fun t ->
+       [ "thinking", str t ])
+     @ Option.value_map s.cwd ~default:[] ~f:(fun cwd -> [ "cwd", str cwd ])
+     @ Option.value_map s.worktree ~default:[] ~f:(fun w ->
+       [ "worktree", agent_worktree w ])
      @ [ "state", str (Subagent_log.State.to_string s.state)
        ; "started_at_ms", ms s.started_at
        ; "updated_at_ms", ms s.updated_at

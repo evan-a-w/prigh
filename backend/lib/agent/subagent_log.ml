@@ -24,6 +24,9 @@ module Summary = struct
     ; name : string option
     ; model : string
     ; host : string option
+    ; thinking : string option
+    ; cwd : string option
+    ; worktree : Agent_worktree.t option
     ; state : State.t
     ; started_at : float
     ; updated_at : float
@@ -47,6 +50,9 @@ module Entry = struct
     ; name : string option
     ; model : string
     ; host : string option
+    ; thinking : string option
+    ; cwd : string option
+    ; worktree : Agent_worktree.t option
     ; started_at : float
     ; mutable updated_at : float
     ; mutable ended : (float * int) option (** time, run it ended in *)
@@ -88,6 +94,9 @@ module Line = struct
         ; name : string option [@jsonaf.option]
         ; model : string
         ; host : string option [@jsonaf.option]
+        ; thinking : string option [@jsonaf.option]
+        ; cwd : string option [@jsonaf.option]
+        ; worktree : Agent_worktree.t option [@jsonaf.option]
         ; at : float
         ; run : int
         }
@@ -149,7 +158,20 @@ let write t (line : Line.t) =
       append ())
 ;;
 
-let start t ~id ~call_id ~parent ~task ~name ~model ~host ~at =
+let start
+      t
+      ~id
+      ~call_id
+      ~parent
+      ~task
+      ~name
+      ~model
+      ~host
+      ~thinking
+      ~cwd
+      ~worktree
+      ~at
+  =
   let entry =
     { Entry.id
     ; call_id
@@ -158,6 +180,9 @@ let start t ~id ~call_id ~parent ~task ~name ~model ~host ~at =
     ; name
     ; model
     ; host
+    ; thinking
+    ; cwd
+    ; worktree
     ; started_at = at
     ; updated_at = at
     ; ended = None
@@ -217,9 +242,25 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
     touch agent_id (fun e ->
       reopen e ~at:now;
       write t (Continue { id = agent_id; at = now; run = t.runs }))
-  | Subagent_start { call_id; agent_id; task; name; model; host; _ } ->
+  | Subagent_start
+      { call_id; agent_id; task; name; model; host; thinking; cwd; worktree; _ }
+    ->
     let name = Some name in
-    start t ~id:agent_id ~call_id ~parent ~task ~name ~model ~host ~at:now;
+    let thinking = Some (Thinking.to_string thinking) in
+    let cwd = Some cwd in
+    start
+      t
+      ~id:agent_id
+      ~call_id
+      ~parent
+      ~task
+      ~name
+      ~model
+      ~host
+      ~thinking
+      ~cwd
+      ~worktree
+      ~at:now;
     write
       t
       (Start
@@ -230,6 +271,9 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
          ; name
          ; model
          ; host
+         ; thinking
+         ; cwd
+         ; worktree
          ; at = now
          ; run = t.runs
          })
@@ -269,9 +313,34 @@ let replay t (line : Line.t) =
   let with_entry id f = Option.iter (Hashtbl.find t.by_id id) ~f in
   match line with
   | Run { run } -> t.runs <- Int.max t.runs run
-  | Start { id; call_id; parent; task; name; model; host; at; run } ->
+  | Start
+      { id
+      ; call_id
+      ; parent
+      ; task
+      ; name
+      ; model
+      ; host
+      ; thinking
+      ; cwd
+      ; worktree
+      ; at
+      ; run
+      } ->
     t.runs <- Int.max t.runs run;
-    start t ~id ~call_id ~parent ~task ~name ~model ~host ~at
+    start
+      t
+      ~id
+      ~call_id
+      ~parent
+      ~task
+      ~name
+      ~model
+      ~host
+      ~thinking
+      ~cwd
+      ~worktree
+      ~at
   | Continue { id; at; run } ->
     t.runs <- Int.max t.runs run;
     with_entry id (reopen ~at)
@@ -347,6 +416,9 @@ let summary t (e : Entry.t) =
   ; task = e.task
   ; name = e.name
   ; host = e.host
+  ; thinking = e.thinking
+  ; cwd = e.cwd
+  ; worktree = e.worktree
   ; model = e.model
   ; state =
       (match e.result with
@@ -432,6 +504,9 @@ let save_all t =
          ; name = e.name
          ; host = e.host
          ; model = e.model
+         ; thinking = e.thinking
+         ; cwd = e.cwd
+         ; worktree = e.worktree
          ; at = e.started_at
          ; run = t.runs
          });

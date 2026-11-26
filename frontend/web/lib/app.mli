@@ -778,6 +778,8 @@ module Action : sig
         transcript, live, and the composer writes to it *)
     | Close_subagent_chat (** back to the session's own chat *)
     | Subagent_back
+    | Subagent_fixed of Subagent_state.Fixed.t
+    (** a subagent's chip or folder: says why it cannot change *)
     (** from a subagent's chat to its parent's (the session's for a
         top-level one) *)
     | Answer_confirm of
@@ -1155,6 +1157,18 @@ module Model : sig
   (** Who the composer writes to: the subagent whose chat is on show, else
       the main agent. *)
   val recipient : t -> Recipient.t
+
+  (** The subagent whose chat is on show. *)
+  val shown_subagent : t -> Agents.Agent.t option
+
+  (** The state of the chat on show: the session's, or in a subagent's chat
+      the subagent's ({!Subagent_state}), which the chrome around the chat
+      shows. *)
+  val shown_state : t -> State.t option
+
+  (** The transcript on show: the session's, or the subagent's (empty until
+      it is fetched). *)
+  val shown_chat : t -> Chat.t
 
   (** How messages' times read: in [utc_offset], relative to [now]'s day. *)
   val message_time : t -> Message_time.t

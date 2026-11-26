@@ -521,8 +521,10 @@ let run_once
        ; task = p.task
        ; name = p.name
        ; model = p.model.id
+       ; thinking = p.thinking
        ; tools = List.map p.tools ~f:Tool.name
        ; host = Option.map p.host ~f:(fun h -> h.name)
+       ; cwd = p.cwd
        ; worktree = state.worktree
        ; forked = Option.is_some p.fork
        ; continued

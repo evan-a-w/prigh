@@ -3,7 +3,7 @@ open! Import
 open Html
 
 let reason (m : App.Model.t) =
-  match m.connection, m.state with
+  match m.connection, App.Model.shown_state m with
   | Connected, Some s when not s.chat_mode -> s.no_host
   | _ -> None
 ;;

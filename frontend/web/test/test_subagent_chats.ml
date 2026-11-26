@@ -263,3 +263,112 @@ let%expect_test "switching sessions leaves the subagent's chat" =
   print_s [%sexp ((H.model h).subagent_chat : string option)];
   [%expect {| (a1) |}]
 ;;
+
+(* Everything around a subagent's chat is the subagent's: the host and model
+   chips, the folder and branch under the composer, the context ring; none
+   of them changes it (the backend keeps what it started with), and saying
+   so leaves the session alone. Back in the session, the session's. *)
+let%expect_test
+    "a subagent's chat shows its own host, model, folder, branch and context"
+  =
+  let hosts =
+    {|[{"id":"backend","name":"server-laptop","cwd":"/home/lloyd","home":"/home/lloyd"},
+       {"id":"c7","name":"desktop","cwd":"/home/me","home":"/home/me"}]|}
+  in
+  let h =
+    H.create
+      ~state:
+        (H.state_json
+           ~fields:
+             [ "hosts", Jsonaf.of_string hosts
+             ; "cwd", `String "/home/lloyd/projects/prigh"
+             ; "thinking", `String "high"
+             ; "message_count", `Number "2"
+             ; "context_tokens", `Number "50000"
+             ; "cost_usd", `Number "1.5"
+             ]
+           ())
+      ()
+  in
+  let worktree =
+    {|{"agent":"a1","task":"Fix the ACP login status","path":"/home/me/.prigh/worktrees/prigh/fix-acp-login-status","branch":"fix/acp-login-status","root":"/home/me/projects/prigh","host":"desktop"}|}
+  in
+  H.quiet h (fun () ->
+    events
+      h
+      [ {|{"event":"agent_start"}|}
+      ; call ~id:"s1" ~name:"subagent" {|{"task":"Fix the ACP login status"}|}
+      ; sprintf
+          {|{"event":"subagent_start","call_id":"s1","agent_id":"a1","task":"Fix the ACP login status","name":"ACP login status","model":"claude-sonnet-5","tools":["bash"],"host":"desktop","worktree":%s}|}
+          worktree
+      ; in_a1
+          {|{"event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Looking."}],"stop_reason":{"type":"tool_use"},"usage":{"input":20000,"output":1000,"cache_read":0},"model":"claude-sonnet-5"}}|}
+      ];
+    H.reply
+      h
+      "list_subagents"
+      (sprintf
+         {|[{"id":"a1","call_id":"s1","parent":null,"task":"Fix the ACP login status","name":"ACP login status","model":"claude-sonnet-5","host":"desktop","thinking":"low","cwd":"/home/me/.prigh/worktrees/prigh/fix-acp-login-status","worktree":%s,"state":"running","started_at_ms":1791187201000,"updated_at_ms":0,"ended_at_ms":null,"turns":1,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":1,"stale":false,"result":null}]|}
+         worktree));
+  let chrome () =
+    H.names h ~selector:".composer-controls button";
+    H.names h ~selector:".composer-where button";
+    H.names h ~selector:".context-ring";
+    H.names h ~selector:".composer .editor"
+  in
+  chrome ();
+  [%expect
+    {|
+    button "server-laptop" -- Tools run on server-laptop, in /home/lloyd (/host switches)
+    button "Model: Claude Opus 5.5, High" -- Claude Opus 5.5, reasoning High: models, reasoning and access (Ctrl+L)
+    button "Folder: ~/projects/prigh. Change it" -- ~/projects/prigh. Start in another folder (/cd)
+    button "Branch: main. Change it" -- Work in another worktree (/worktree)
+    button "Context 25% full, $1.50: details"
+    textarea "Message"
+    |}];
+  H.quiet h (fun () -> H.act h (Open_subagent_chat "a1"));
+  chrome ();
+  [%expect
+    {|
+    button "The subagent's tool host: desktop" -- The subagent's tools run on desktop, set when it started
+    button "The subagent's model: Claude Sonnet 5, Low" -- Claude Sonnet 5, reasoning Low: the subagent's own, set when it started
+    button "The subagent's folder: ~/.prigh/worktrees/prigh/fix-acp-login-status" -- ~/.prigh/worktrees/prigh/fix-acp-login-status: the subagent's folder
+    button "The subagent's branch: fix/acp-login-status" -- fix/acp-login-status: the subagent's branch
+    button "Context 11% full, $0.07: details"
+    textarea "Message"
+    |}];
+  (* Its chips and folder say why they do not change; nor do the commands. *)
+  H.click h ~selector:".model-chip";
+  H.click h ~selector:".where-branch";
+  H.type_ h "/model gpt-6";
+  H.key h "Enter";
+  H.text h ~selector:".toast";
+  print_endline (H.model h).draft;
+  [%expect
+    {|
+    (Open_chip Model)
+    (Expire_toast (id 0) (after_ms 6000))
+    (Subagent_fixed Branch)
+    (Expire_toast (id 1) (after_ms 6000))
+    (Complete_accept (run true))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/model openai/gpt-6") (max 500)))
+     (tag Ignore))
+    ACP login status keeps the worktree and branch it started with (a subagent's cannot change): back to the main agent (Esc) to change the session's.
+    ACP login status keeps the model and reasoning it started with (a subagent's cannot change): back to the main agent (Esc) to change the session's. (Dismiss)
+    /model openai/gpt-6
+    |}];
+  H.key h "Escape";
+  chrome ();
+  [%expect
+    {|
+    Subagent_back
+    (Focus editor)
+    button "server-laptop" -- Tools run on server-laptop, in /home/lloyd (/host switches)
+    button "Model: Claude Opus 5.5, High" -- Claude Opus 5.5, reasoning High: models, reasoning and access (Ctrl+L)
+    button "Folder: ~/projects/prigh. Change it" -- ~/projects/prigh. Start in another folder (/cd)
+    button "Branch: main. Change it" -- Work in another worktree (/worktree)
+    button "Context 25% full, $1.50: details"
+    textarea "Message"
+    |}]
+;;
