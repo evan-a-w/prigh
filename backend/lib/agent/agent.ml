@@ -294,6 +294,7 @@ type t =
   ; background : Background_tasks.t
   ; questions : Session_questions.t option
   ; subagent_log : Subagent_log.t
+  ; mutable subagent_engines : Tool_subagent.External.t option
   ; mcp : Mcp_hub.t option
   ; mcp_settings : Mcp_settings.t option
   ; mcp_auth : Mcp_auth.t option
@@ -1992,9 +1993,10 @@ module Check = struct
   type t =
     { decide : unit -> Approval.Decision.t
     ; elsewhere : bool
+    ; other_engine : bool
     ; held : unit -> string option
-      (** why a call elsewhere asks whatever the mode: the user has not
-        permitted its host *)
+      (** why a call elsewhere or on another engine asks whatever the mode:
+          the user has not permitted its host or engine *)
     ; name : string (** as the user sees it: [on_host] for a call elsewhere *)
     ; summary : string
     ; input : Approval_judge.Input.t Lazy.t
@@ -2027,6 +2029,42 @@ let host_permitted t ~id ~name =
     String.equal a.call.host id && String.equal a.by Allowed_call.you)
 ;;
 
+(* The other engine a [subagent] call asks to run on, when it differs from
+   the session's own; an unknown one is the tool's to report. *)
+let other_engine t tool args =
+  if String.equal (Tool.name tool) Tool_subagent.name
+  then (
+    match Tool_subagent.wanted_engine args, t.subagent_engines with
+    | Some raw, Some ext ->
+      (match Engines.resolve ext.deployed raw with
+       | Ok choice when not (Engine_choice.equal choice (engine_choice t)) ->
+         Some choice
+       | Ok _ | Error _ -> None)
+    | _ -> None)
+  else None
+;;
+
+(* Whether the user has explicitly asked for [choice] in this session: one
+   of their messages names it, or they let a subagent call on it run. *)
+let engine_permitted t (choice : Engine_choice.t) =
+  List.exists
+    (Approval_judge.user_messages (Session.messages_since_forget_all t.session))
+    ~f:(Approval.names_host ~names:(Engine_choice.names choice))
+  || Hashtbl.exists t.allowed_calls ~f:(fun (a : Allowed_call.t) ->
+    String.equal a.by Allowed_call.you
+    && String.equal a.call.tool Tool_subagent.name
+    &&
+    match Json.parse a.call.arguments, t.subagent_engines with
+    | Ok args, Some ext ->
+      (match Tool_subagent.wanted_engine args with
+       | Some raw ->
+         (match Engines.resolve ext.deployed raw with
+          | Ok c -> Engine_choice.equal c choice
+          | Error _ -> false)
+       | None -> false)
+    | _ -> false)
+;;
+
 (* A call [on_host] runs on another host ([context.host]) asks (or, in smart
    mode, is judged) until the user permits that host ([host_permitted]),
    read-only or not and in every mode; then it follows the mode, but no
@@ -2057,14 +2095,29 @@ let check t (context : Tool.Context.t) tool args : Check.t =
   let host_name =
     Option.value_map host ~default:host_id ~f:(fun (h : Host.t) -> h.name)
   in
+  let diff_engine = other_engine t tool args in
   let held () =
-    match elsewhere with
-    | Some id when not (host_permitted t ~id ~name:host_name) ->
-      Some
-        (sprintf
-           "runs on %s, which you haven't named in this session"
-           host_name)
-    | Some _ | None -> None
+    let host_reason =
+      match elsewhere with
+      | Some id when not (host_permitted t ~id ~name:host_name) ->
+        Some
+          (sprintf
+             "runs on %s, which you haven't named in this session"
+             host_name)
+      | Some _ | None -> None
+    in
+    let engine_reason =
+      match diff_engine with
+      | Some choice when not (engine_permitted t choice) ->
+        Some
+          (sprintf
+             "runs on %s, which you haven't asked for in this session"
+             (Engine_choice.display_name choice))
+      | Some _ | None -> None
+    in
+    match List.filter_opt [ host_reason; engine_reason ] with
+    | [] -> None
+    | reasons -> Some (String.concat ~sep:"; " reasons)
   in
   let decide () =
     Approval.decide
@@ -2093,6 +2146,16 @@ let check t (context : Tool.Context.t) tool args : Check.t =
       , (match Computer_action.of_json args with
          | Ok action -> "first: " ^ Computer_action.describe action
          | Error _ -> "") )
+    | None when Option.is_some diff_engine ->
+      let task =
+        match Json.member "task" args with
+        | Some (`String s) -> String.strip s
+        | _ -> ""
+      in
+      ( name
+      , if String.is_empty task
+        then ""
+        else sprintf "%S" (String.prefix task 80) )
     | None -> name, Agent_loop.tool_summary ~name args
   in
   let task =
@@ -2109,6 +2172,7 @@ let check t (context : Tool.Context.t) tool args : Check.t =
   in
   { decide
   ; elsewhere = Option.is_some elsewhere
+  ; other_engine = Option.is_some diff_engine
   ; held
   ; name = shown_name
   ; summary
@@ -2171,13 +2235,16 @@ let judge_turn t (context : Tool.Context.t) ~model =
 
 let approve_on_host t : Tool.approver =
   fun context tool args ->
-  let ({ decide; elsewhere; held; name; summary; input; call } : Check.t) =
+  let ({ decide; elsewhere; other_engine; held; name; summary; input; call }
+        : Check.t)
+    =
     check t context tool args
   in
   let ask ?(kind = Confirm_kind.Tool) rules =
     let summary =
       match kind, held () with
-      | Tool, Some why -> sprintf "%s (%s)" summary why
+      | Tool, Some why ->
+        if String.is_empty summary then why else sprintf "%s (%s)" summary why
       | (Tool | Judged _ | Computer_use _), _ -> summary
     in
     let recheck () =
@@ -2185,7 +2252,7 @@ let approve_on_host t : Tool.approver =
       | Allow -> true
       | Ask _ | Judge _ | Deny _ -> false
     in
-    let rules = if elsewhere then [] else rules in
+    let rules = if elsewhere || other_engine then [] else rules in
     match confirm t context ~kind ~name ~summary ~rules ~recheck with
     | None -> Some (Tool.Result.error "[cancelled]")
     | Some (Error _) -> assert false (* no timeout *)
@@ -2195,8 +2262,9 @@ let approve_on_host t : Tool.approver =
       (match decide () with
        | Deny text -> Some (Tool.Result.error text)
        | Allow | Ask _ | Judge _ ->
-         (* which permits its host ([host_permitted]) *)
-         if elsewhere
+         (* which permits its host ([host_permitted]) or engine
+            ([engine_permitted]) *)
+         if elsewhere || other_engine
          then
            remember_allowed
              t
@@ -2318,6 +2386,15 @@ let other_host t tool args =
   else None
 ;;
 
+let wants_external_engine t args =
+  match Tool_subagent.wanted_engine args, t.subagent_engines with
+  | Some raw, Some ext ->
+    (match Engines.resolve ext.deployed raw with
+     | Ok { engine = Composer; adapter = Some (Codex | Claude | Acp _) } -> true
+     | Ok _ | Error _ -> false)
+  | _ -> false
+;;
+
 (* Chat mode refuses what needs a machine before anything is asked. *)
 let approve t : Tool.approver =
   fun context tool args ->
@@ -2327,14 +2404,15 @@ let approve t : Tool.approver =
     && ((not (Chat_mode.allowed name))
         || (String.equal name Tool_subagent.name
             && (Tool_subagent.wants_worktree args
-                || Option.is_some (Json.member "host" args))))
+                || Option.is_some (Json.member "host" args)
+                || wants_external_engine t args)))
   then
     Some
       (Tool.Result.error
          (if Chat_mode.allowed name
           then
-            "a subagent cannot have a worktree or a tool host in chat mode, \
-             which has no machine: start it without them"
+            "a subagent cannot have an external engine, a worktree or a tool \
+             host in chat mode, which has no machine: start it without them"
           else Chat_mode.refusal name))
   else (
     (* Starting work on another host is approved as a call there: held
@@ -4672,6 +4750,7 @@ let create
           ~first_job_id:(last_job_number (path_messages session) + 1)
           ()
     ; subagent_log = Subagent_log.create ()
+    ; subagent_engines = None
     ; mcp
     ; mcp_tools = []
     ; mcp_listing = Mcp_tools.Listing.empty
@@ -4895,20 +4974,39 @@ let has_running_subagents t =
 let has_running_background t = Background_tasks.has_running t.background
 let running_background t = Background_tasks.running_count t.background
 
+let has_managed_subagent t ~agent_id =
+  Result.is_ok (Background_tasks.find t.background ~kind:Subagent agent_id)
+  || Background_tasks.is_parked t.background agent_id
+;;
+
+let set_subagent_engines t engines = t.subagent_engines <- engines
+let subagent_engines t = t.subagent_engines
+let harness_model t = t.harness_model
+
+let add_spend t ~usage ~cost_usd =
+  ignore (Session.add_spend t.session ~usage ~cost_usd : Session.Entry.t)
+;;
+
 let steer_subagent t ~agent_id ~kind text =
-  let%bind.Or_error () = require t Steer_subagent in
+  let%bind.Or_error () =
+    if has_managed_subagent t ~agent_id then Ok () else require t Steer_subagent
+  in
   Background_tasks.send t.background ~id:agent_id kind ~from:User text
 ;;
 
 let dequeue_subagent t ~agent_id =
-  let%bind.Or_error () = require t Steer_subagent in
+  let%bind.Or_error () =
+    if has_managed_subagent t ~agent_id then Ok () else require t Steer_subagent
+  in
   Or_error.map
     (Background_tasks.inbox_of t.background agent_id)
     ~f:Subagent_inbox.pop_last
 ;;
 
 let remove_subagent_queued t ~agent_id ~queue ~index ~text =
-  let%bind.Or_error () = require t Steer_subagent in
+  let%bind.Or_error () =
+    if has_managed_subagent t ~agent_id then Ok () else require t Steer_subagent
+  in
   Or_error.bind
     (Background_tasks.inbox_of t.background agent_id)
     ~f:(fun inbox -> Subagent_inbox.remove inbox queue ~index ~text)

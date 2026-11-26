@@ -60,6 +60,18 @@ val create
   -> ?on_thread:(string -> unit)
   -> ?on_start:(Adapter.Start.t -> unit Or_error.t -> unit)
   -> ?host:(unit -> string)
+  -> ?host_id:string
+       (** [Tool.Context.host] for approvals and injected MCP tools, when this
+           runner works on another host than the session's active one (a
+           subagent) *)
+  -> ?home:(unit -> string option)
+       (** [Tool.Context.home] for approvals and injected MCP tools *)
+  -> ?depth:int (** nesting depth (default [0]; [>= 1] for a subagent) *)
+  -> ?agent_id:string
+       (** owning subagent's id, prefixed onto approvals and injected calls *)
+  -> ?wake:(unit -> Message.t list)
+       (** called when a turn finishes normally with no pending steers: any
+           messages returned run as the next turn on the same live process *)
   -> ?handoff_from:Engine_choice.t
   -> ?checkpoint:(Json.t -> Tool.Result.t)
   -> ?catalog:(unit -> Adapter.Catalog.t option)

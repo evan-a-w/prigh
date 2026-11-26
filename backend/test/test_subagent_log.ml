@@ -15,6 +15,7 @@ let start ?(call_id = "p1") agent_id task : Agent_event.t =
     ; thinking = Thinking.default
     ; tools = [ "ls" ]
     ; host = None
+    ; engine = None
     ; cwd = "/w"
     ; worktree = None
     ; forked = false
@@ -61,14 +62,15 @@ let%expect_test "statuses, activity and transcripts of nested subagents" =
   [%expect
     {|
     ((id a1) (call_id p1) (parent ()) (task "look around") (name ("Look around"))
-     (model faux) (host ()) (thinking (default)) (cwd (/w)) (worktree ())
-     (state Running) (started_at 2) (updated_at 5) (ended_at ()) (turns 1)
-     (tool_calls 1) (current_tool ((ls 5))) (message_count 1) (stale false)
-     (result ()))
+     (model faux) (host ()) (engine ()) (thinking (default)) (cwd (/w))
+     (worktree ()) (state Running) (started_at 2) (updated_at 5) (ended_at ())
+     (turns 1) (tool_calls 1) (current_tool ((ls 5))) (message_count 1)
+     (stale false) (result ()))
     ((id a1/c2) (call_id c2) (parent (a1)) (task dig) (name (Dig)) (model faux)
-     (host ()) (thinking (default)) (cwd (/w)) (worktree ()) (state Running)
-     (started_at 6) (updated_at 8) (ended_at ()) (turns 0) (tool_calls 1)
-     (current_tool ((ls 8))) (message_count 1) (stale false) (result ()))
+     (host ()) (engine ()) (thinking (default)) (cwd (/w)) (worktree ())
+     (state Running) (started_at 6) (updated_at 8) (ended_at ()) (turns 0)
+     (tool_calls 1) (current_tool ((ls 8))) (message_count 1) (stale false)
+     (result ()))
     |}];
   record (inside "a1" (finish ~is_error:true "a1/c2" "boom"));
   record
@@ -89,14 +91,14 @@ let%expect_test "statuses, activity and transcripts of nested subagents" =
   [%expect
     {|
     ((id a1) (call_id p1) (parent ()) (task "look around") (name ("Look around"))
-     (model faux) (host ()) (thinking (default)) (cwd (/w)) (worktree ())
-     (state Complete) (started_at 2) (updated_at 11) (ended_at (11)) (turns 1)
-     (tool_calls 1) (current_tool ()) (message_count 1) (stale false)
-     (result (((text report) (is_error false)))))
+     (model faux) (host ()) (engine ()) (thinking (default)) (cwd (/w))
+     (worktree ()) (state Complete) (started_at 2) (updated_at 11)
+     (ended_at (11)) (turns 1) (tool_calls 1) (current_tool ()) (message_count 1)
+     (stale false) (result (((text report) (is_error false)))))
     ((id a1/c2) (call_id c2) (parent (a1)) (task dig) (name (Dig)) (model faux)
-     (host ()) (thinking (default)) (cwd (/w)) (worktree ()) (state Failed)
-     (started_at 6) (updated_at 9) (ended_at (9)) (turns 0) (tool_calls 1)
-     (current_tool ()) (message_count 1) (stale false)
+     (host ()) (engine ()) (thinking (default)) (cwd (/w)) (worktree ())
+     (state Failed) (started_at 6) (updated_at 9) (ended_at (9)) (turns 0)
+     (tool_calls 1) (current_tool ()) (message_count 1) (stale false)
      (result (((text boom) (is_error true)))))
     |}];
   let stale () =
@@ -219,6 +221,7 @@ let%expect_test "a continued subagent reopens its entry, also when reloaded" =
       ; thinking = Thinking.default
       ; tools = [ "ls" ]
       ; host = None
+      ; engine = None
       ; cwd = "/w"
       ; worktree = None
       ; forked = true

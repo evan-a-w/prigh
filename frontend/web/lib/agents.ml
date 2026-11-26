@@ -33,6 +33,7 @@ module Agent = struct
     ; name : string option
     ; model : string
     ; host : string option
+    ; engine : string option [@sexp.option]
     ; thinking : string option
     ; cwd : string option
     ; worktree : Agent_worktree.t option
@@ -60,6 +61,7 @@ module Agent = struct
     let%bind name = Json.string_opt_field json "name" in
     let%bind model = Json.string_field json "model" in
     let%bind host = Json.string_opt_field json "host" in
+    let%bind engine = Json.string_opt_field json "engine" in
     let%bind thinking = Json.string_opt_field json "thinking" in
     let%bind cwd = Json.string_opt_field json "cwd" in
     let%bind worktree =
@@ -86,6 +88,7 @@ module Agent = struct
       ; name
       ; model
       ; host
+      ; engine
       ; thinking
       ; cwd
       ; worktree
@@ -195,7 +198,17 @@ let update_agent t id ~f =
 let rec record_in t ~now ~parent (event : Event.t) =
   match event with
   | Subagent_start
-      { call_id; agent_id; task; name; model; host; worktree; continued; _ } ->
+      { call_id
+      ; agent_id
+      ; task
+      ; name
+      ; model
+      ; host
+      ; engine
+      ; worktree
+      ; continued
+      ; _
+      } ->
     if Option.is_some (find_agent t agent_id)
     then
       if continued
@@ -220,6 +233,7 @@ let rec record_in t ~now ~parent (event : Event.t) =
               ; name
               ; model
               ; host
+              ; engine
               ; thinking = None
               ; cwd = Option.map worktree ~f:(fun w -> w.path)
               ; worktree

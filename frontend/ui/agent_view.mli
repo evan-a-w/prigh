@@ -23,6 +23,8 @@ type t =
   ; host : string option
     (** the tool host it works on (its name), when not the session's
         active one *)
+  ; engine : string option [@sexp.option]
+    (** the engine/adapter key it runs on, when not the session's own *)
   ; status : Status.t
   ; turns : int
   ; transcript : Transcript.t
@@ -33,6 +35,7 @@ type t =
 val create
   :  ?name:string
   -> ?host:string
+  -> ?engine:string
   -> call_id:string
   -> agent_id:string
   -> task:string
@@ -49,6 +52,7 @@ val replace : t list -> string -> (t -> t) -> t list
 val start
   :  ?name:string
   -> ?host:string
+  -> ?engine:string
   -> t list
   -> call_id:string
   -> agent_id:string

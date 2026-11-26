@@ -99,6 +99,9 @@ type t =
       ; host : string option
         (** the tool host its tools run on (its name), when not the
             session's active one ([subagent]'s [host]) *)
+      ; engine : string option
+        (** the engine/adapter key ([harness], [codex], [claude], [acp:NAME])
+            it runs on, when not the session's own ([subagent]'s [engine]) *)
       ; cwd : string (** where it works, on that host *)
       ; worktree : Agent_worktree.t option
         (** the worktree it works in, made for it ([subagent]'s

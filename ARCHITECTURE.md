@@ -378,12 +378,14 @@ The composer (`composer/`), from the bottom up:
 ### Subagents and background work
 
 - `Tool_subagent` (`tools/`): `subagent {task, tools?, model?, thinking?,
-  cwd?, max_turns?, context?, name?, fork?, worktree?, host?}` runs a nested
-  `Agent_loop` in process with the parent's provider. At depth 0 it runs in
-  the background and returns an id (`a<n>`); deeper calls block and return
-  the report. `fork` starts from the caller's conversation
-  (`Subagent_fork`, `Conversation`); `worktree` gives it a git worktree;
-  `host` runs its tools on another host.
+  cwd?, max_turns?, context?, name?, fork?, worktree?, host?, engine?}`
+  defaults to the caller's engine and host, running a nested `Agent_loop`
+  on the harness or an external CLI via `Composer_subagent` (`composer/`).
+  At depth 0 it runs in the background and returns an id (`a<n>`); deeper
+  calls block and return the report. `fork` starts from the caller's
+  conversation (`Subagent_fork`, `Conversation`, or `Handoff`); `worktree`
+  gives it a git worktree; `host` and `engine` (held for explicit user
+  approval if not asked for) run it on another host or deployed engine.
 - `subagent_status`, `subagent_cancel`, `subagent_message`,
   `subagent_continue` act on running or finished subagents;
   `Subagent_inbox` delivers messages to a running one.

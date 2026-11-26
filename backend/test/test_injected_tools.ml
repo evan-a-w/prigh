@@ -55,9 +55,10 @@ let%expect_test "default set" =
   [%expect
     {|
     (render_ui memory custom_instructions sessions ask_session answer_session
-     pull_request issue repo worktree reply_to_comment goal_complete)
+     pull_request issue repo worktree reply_to_comment goal_complete subagent)
     (render_ui memory custom_instructions sessions ask_session answer_session
-     pull_request issue repo worktree reply_to_comment goal_complete ask_user)
+     pull_request issue repo worktree reply_to_comment goal_complete subagent
+     ask_user)
     |}];
   let canonical server tool =
     print_s
@@ -124,7 +125,7 @@ let%expect_test "initialize and list" =
   [%expect
     {|
     > {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"codex","version":"0.166.0"}}}
-    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, and worktrees."}}
+    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and prigh subagents (for delegating work to another host or engine when the user explicitly asks; defaults to this session's engine and host)."}}
     > {"jsonrpc":"2.0","method":"notifications/initialized"}
     < (nothing)
     > {"jsonrpc":"2.0","id":"p","method":"ping"}
@@ -137,7 +138,7 @@ let%expect_test "initialize and list" =
   [%expect
     {|
     > {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}
-    < {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, and worktrees."}}
+    < {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and prigh subagents (for delegating work to another host or engine when the user explicitly asks; defaults to this session's engine and host)."}}
     |}];
   (match
      Injected_tools.handle
@@ -181,6 +182,7 @@ let%expect_test "initialize and list" =
     worktree: the worktree tool
     reply_to_comment: the reply_to_comment tool
     goal_complete: the goal_complete tool
+    subagent: the subagent tool
     |}]
 ;;
 
@@ -231,7 +233,7 @@ let%expect_test "errors" =
   [%expect
     {|
     > {"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"bash","arguments":{"command":"ls"}}}
-    < {"jsonrpc":"2.0","id":7,"error":{"code":-32602,"message":"unknown tool bash: prigh offers render_ui, memory, custom_instructions, sessions, ask_session, answer_session, pull_request, issue, repo, worktree, reply_to_comment, goal_complete"}}
+    < {"jsonrpc":"2.0","id":7,"error":{"code":-32602,"message":"unknown tool bash: prigh offers render_ui, memory, custom_instructions, sessions, ask_session, answer_session, pull_request, issue, repo, worktree, reply_to_comment, goal_complete, subagent"}}
     > {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"memory","arguments":"recall"}}
     < {"jsonrpc":"2.0","id":8,"error":{"code":-32602,"message":"arguments must be an object"}}
     > {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{}}

@@ -987,7 +987,8 @@ let model_items m ~logged_in_only =
            ~sep:"  "
            ([ model.key ^ scoped_mark ]
             @ (if model.context_window > 0
-               then [ "ctx " ^ format_tokens (Float.of_int model.context_window) ]
+               then
+                 [ "ctx " ^ format_tokens (Float.of_int model.context_window) ]
                else [])
             @ [ format_price model.cost ]
             @ if logged then [] else [ "not logged in" ]))
@@ -1022,10 +1023,7 @@ let model_picker_value m ~logged_in_only ~query =
         (P.Session_engine.model_label s.engine ~model:s.model.name)
     | _ -> title
   in
-  Picker.create
-    ~query
-    ~title
-    (harness_fixes m @ model_items m ~logged_in_only)
+  Picker.create ~query ~title (harness_fixes m @ model_items m ~logged_in_only)
 ;;
 
 let model_picker ?(logged_in_only = false) m ~query =
@@ -2056,9 +2054,15 @@ let agents_picker m =
           ~id:a.id
           ~detail:
             (sprintf
-               "%s  %s  %s%s"
+               "%s  %s%s  %s%s"
                a.id
                (agent_status_text a)
+               (Option.value_map a.engine ~default:"" ~f:(fun key ->
+                  sprintf
+                    "  %s"
+                    (if String.equal key "harness"
+                     then "prigh harness"
+                     else P.Session_engine.adapter_label key)))
                a.model
                (Option.value_map a.host ~default:"" ~f:(sprintf "  on %s")))
           ~marked:

@@ -273,6 +273,7 @@ let common_params =
       let subagent =
         Tool_subagent.create
           ~hosts:tool_hosts
+          ~engines:(fun () -> Option.bind !agent_ref ~f:Agent.subagent_engines)
           ?name_task:(Option.some_if auto_describe name_task)
           ~models
           ~worktrees_dir

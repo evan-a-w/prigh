@@ -26,6 +26,8 @@ module Agent : sig
     ; host : string option
       (** the tool host it works on (its name), when not the session's
           active one *)
+    ; engine : string option [@sexp.option]
+      (** the engine/adapter key it runs on, when not the session's own *)
     ; thinking : string option
       (** its reasoning level; [None] until [list_subagents] says, and from
           older backends *)

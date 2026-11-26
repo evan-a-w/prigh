@@ -1,27 +1,53 @@
 open! Core
 open! Import
 
-let model ~models ~(current : Llm.t) id =
-  let named = List.filter models ~f:(fun (m : Llm.t) -> String.equal m.id id) in
-  match
-    List.find named ~f:(fun (m : Llm.t) ->
-      String.equal m.provider current.provider)
-  with
-  | Some m -> m
+let engine_of (s : State.t) (a : Agents.Agent.t) =
+  match a.engine with
+  | None -> s.engine
+  | Some "harness" -> Session_engine.harness
+  | Some adapter ->
+    { Session_engine.harness with engine = "composer"; adapter = Some adapter }
+;;
+
+let model_for ~models ~(current : Llm.t) ~(engine : Session_engine.t) id =
+  match engine.adapter with
+  | Some adapter ->
+    let short =
+      Option.value (String.chop_prefix id ~prefix:(adapter ^ "/")) ~default:id
+    in
+    { current with
+      id = short
+    ; provider = adapter
+    ; key = adapter ^ "/" ^ short
+    ; name = short
+    ; context_window = 0
+    ; thinking_options = []
+    ; thinking_default = None
+    ; cost = { input = 0.; output = 0.; cache_read = 0. }
+    }
   | None ->
-    (match named with
-     | m :: _ -> m
-     | [] when String.equal current.id id -> current
-     | [] ->
-       { current with
-         id
-       ; key = id
-       ; name = id
-       ; context_window = 0
-       ; thinking_options = []
-       ; thinking_default = None
-       ; cost = { input = 0.; output = 0.; cache_read = 0. }
-       })
+    let named =
+      List.filter models ~f:(fun (m : Llm.t) -> String.equal m.id id)
+    in
+    (match
+       List.find named ~f:(fun (m : Llm.t) ->
+         String.equal m.provider current.provider)
+     with
+     | Some m -> m
+     | None ->
+       (match named with
+        | m :: _ -> m
+        | [] when String.equal current.id id -> current
+        | [] ->
+          { current with
+            id
+          ; key = id
+          ; name = id
+          ; context_window = 0
+          ; thinking_options = []
+          ; thinking_default = None
+          ; cost = { input = 0.; output = 0.; cache_read = 0. }
+          }))
 ;;
 
 let usd_of (model : Llm.t) (usage : Usage.t) =
@@ -48,8 +74,13 @@ let host (s : State.t) (a : Agents.Agent.t) =
      | None -> name, Some name)
 ;;
 
+let model ~models ~(current : Llm.t) id =
+  model_for ~models ~current ~engine:Session_engine.harness id
+;;
+
 let of_agent (s : State.t) ~models (a : Agents.Agent.t) ~transcript ~cost_usd =
-  let model = model ~models ~current:s.model a.model in
+  let engine = engine_of s a in
+  let model = model_for ~models ~current:s.model ~engine a.model in
   let cwd = Option.value a.cwd ~default:s.cwd in
   let git_branch =
     match a.worktree with
@@ -70,6 +101,7 @@ let of_agent (s : State.t) ~models (a : Agents.Agent.t) ~transcript ~cost_usd =
     cwd
   ; home = None
   ; git_branch
+  ; engine
   ; model
   ; thinking = Option.value a.thinking ~default:"default"
   ; running = Agents.Status.equal a.status Running
