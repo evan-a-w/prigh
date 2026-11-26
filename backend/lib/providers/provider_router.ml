@@ -87,6 +87,11 @@ let builtin_provider
             ?timeout
             ~endpoint:(Codex { access_token = auth.token; account_id })
             ()))
+  | Google_antigravity ->
+    Or_error.error_string
+      "an Antigravity (Google) login runs Antigravity sessions \
+       (acp:antigravity), not prigh's own model requests: pick another model, \
+       or switch the session's engine to Antigravity"
   | Custom _ -> assert false
 ;;
 
@@ -221,7 +226,7 @@ let create
                in
                { message with stop_reason = Error (sprintf "%s (%s)" e hint) }
              | _ -> message)))
-    | Anthropic | Openai | Openai_codex | Deepseek ->
+    | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity ->
       (match resolve () with
        | Error e -> fail ("auth: " ^ Error.to_string_hum e)
        | Ok None -> fail (not_configured_message provider)

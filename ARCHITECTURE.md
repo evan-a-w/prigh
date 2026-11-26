@@ -256,6 +256,14 @@ refreshed tokens, and pushes new ones before a turn when they near expiry;
 a Codex refusing the mode keeps its own login and the session gets a
 notice. `set_adapter_login` changes the choice; a live process on another
 login is restarted on the same thread at the next turn.
+`Antigravity_login` (`acp/`) runs agy through a bash wrapper that writes the
+access token (from the process's secret descriptor) into a private
+`--gemini-dir` linking the rest of `~/.gemini`, removed at exit, with D-Bus
+pointed nowhere so agy reads the file; `Acp_adapter` asks for a renewal
+(`Login_renewal`) when the token nears expiry or a turn is refused.
+`Oauth_antigravity` (`auth/`) holds Google's client (found in agy's binary
+by hash, never shipped) and refreshes; `Subscription_usage` reads Code
+Assist's `loadCodeAssist` and `retrieveUserQuotaSummary`.
 
 `Engine_gate` (`rpc/`) refuses, before dispatch, the methods the attached
 session's engine lacks (`Capabilities.method_feature`: fork, rewind, trim

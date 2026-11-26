@@ -9,6 +9,9 @@ type t =
   | Openai
   | Openai_codex
   | Deepseek
+  | Google_antigravity
+  (** Antigravity (agy)'s Google login: runs [acp:antigravity] sessions,
+          not prigh's own model requests *)
   | Custom of string
 [@@deriving sexp, equal, compare]
 

@@ -19,6 +19,9 @@ module Found : sig
     ; host : string (** the host's name, for messages and the label *)
     ; path : string (** the credentials file on the host *)
     ; credential : Credential.Oauth.t
+    ; keyring : bool (** Antigravity's, in the Linux keyring, not [path] *)
+    ; client : Oauth_antigravity.Client.t option
+      (** Antigravity's OAuth client, found in the host's agy *)
     }
   [@@deriving sexp_of]
 

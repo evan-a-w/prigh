@@ -23,6 +23,8 @@ let label provider t =
   | Openai_codex, Api_key -> "ChatGPT API key"
   | Deepseek, Api_key -> "DeepSeek API key"
   | Deepseek, Oauth -> "DeepSeek OAuth"
+  | Google_antigravity, Oauth -> "Antigravity (Google account)"
+  | Google_antigravity, Api_key -> "Antigravity API key"
   | Custom name, Api_key -> name ^ " API key"
   | Custom name, Oauth -> name ^ " OAuth"
 ;;

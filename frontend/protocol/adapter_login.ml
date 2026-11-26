@@ -48,6 +48,7 @@ let provider_name t =
   match t.provider with
   | "openai-codex" -> "ChatGPT"
   | "anthropic" -> "Claude Pro/Max"
+  | "google-antigravity" -> "Antigravity (Google)"
   | p -> p
 ;;
 
@@ -129,11 +130,12 @@ module Import = struct
 
   let done_ t =
     sprintf
-      "%s runs on %S from its next turn: %s's file is now %s.moved-to-prigh%s"
+      "%s runs on %S from its next turn: %s%s"
       (Session_engine.adapter_label t.adapter)
       t.label
-      t.host
-      t.path
+      (if String.equal t.path "keyring"
+       then sprintf "its login is cleared from %s's keyring" t.host
+       else sprintf "%s's file is now %s.moved-to-prigh" t.host t.path)
       (Option.value_map t.note ~default:"" ~f:(fun n -> " (" ^ n ^ ")"))
   ;;
 end

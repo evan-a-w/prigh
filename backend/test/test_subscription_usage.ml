@@ -153,18 +153,21 @@ let%expect_test "odd answers" =
 let fake_http answers =
   let requests = ref [] in
   let http : Subscription_usage.Http.t =
-    fun ~url ~headers () ->
-    requests := (url, headers) :: !requests;
+    fun ~url ~headers ?body () ->
+    requests := (url, headers, body) :: !requests;
     match List.Assoc.find answers ~equal:String.equal url with
     | Some answer -> answer
     | None -> Error "no answer"
   in
   let print () =
     List.iter
-      (List.sort !requests ~compare:[%compare: string * (string * string) list])
-      ~f:(fun (url, headers) ->
-        printf "GET %s\n" url;
-        List.iter headers ~f:(fun (k, v) -> printf "  %s: %s\n" k v));
+      (List.sort
+         !requests
+         ~compare:[%compare: string * (string * string) list * string option])
+      ~f:(fun (url, headers, body) ->
+        printf "%s %s\n" (if Option.is_some body then "POST" else "GET") url;
+        List.iter headers ~f:(fun (k, v) -> printf "  %s: %s\n" k v);
+        Option.iter body ~f:(printf "  %s\n"));
     requests := []
   in
   http, print
@@ -236,6 +239,7 @@ let%expect_test "nobody signed in, or with API keys" =
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: not signed in
     ChatGPT: not signed in
+    Antigravity: not signed in
     |}];
   fetch ~store_with:[ Anthropic, Api_key "sk-ant-api" ] ();
   [%expect
@@ -243,6 +247,7 @@ let%expect_test "nobody signed in, or with API keys" =
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: API key
     ChatGPT: not signed in
+    Antigravity: not signed in
     |}];
   (* A Claude subscription token from the environment is a login. *)
   fetch
@@ -262,6 +267,7 @@ let%expect_test "nobody signed in, or with API keys" =
     Claude: plan: -
       5-hour session               [five_hour]                          7.0%  resets -
     ChatGPT: not signed in
+    Antigravity: not signed in
     |}]
 ;;
 
@@ -300,6 +306,7 @@ let%expect_test "both signed in" =
       GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
       Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
       Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
+    Antigravity: not signed in
     |}]
 ;;
 
@@ -329,6 +336,7 @@ let%expect_test "expired tokens are refreshed first" =
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: plan: -
     ChatGPT: plan: -
+    Antigravity: not signed in
     |}]
 ;;
 
@@ -363,6 +371,7 @@ let%expect_test "failures say what to do" =
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: error: Claude did not accept the sign-in (HTTP 403: OAuth token does not meet scope requirement user:profile): sign in again with /login anthropic
     ChatGPT: error: ChatGPT did not accept the sign-in (HTTP 401: Could not parse your authentication token.): sign in again with /login openai-codex
+    Antigravity: not signed in
     |}];
   run
     (Ok
@@ -386,6 +395,7 @@ let%expect_test "failures say what to do" =
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: error: Claude is limiting how often usage is read (HTTP 429): Refresh in 95 s
     ChatGPT: error: ChatGPT's usage endpoint answered HTTP 502: Refresh later
+    Antigravity: not signed in
     |}];
   run (Ok (429, [], "")) (Error "connection refused");
   [%expect
@@ -403,6 +413,7 @@ let%expect_test "failures say what to do" =
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: error: Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
     ChatGPT: error: Could not reach ChatGPT's usage endpoint (connection refused): check the backend's network and Refresh
+    Antigravity: not signed in
     |}]
 ;;
 
@@ -413,6 +424,7 @@ let%expect_test "a ChatGPT login without an account id, or whose refresh fails" 
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: not signed in
     ChatGPT: error: The ChatGPT sign-in has no account id: sign in again with /login openai-codex
+    Antigravity: not signed in
     |}];
   with_sandbox
   @@ fun t ->
@@ -432,6 +444,7 @@ let%expect_test "a ChatGPT login without an account id, or whose refresh fails" 
   [%expect
     {|
     error: invalid_grant: sign in again with /login anthropic
+    not signed in
     not signed in
     |}]
 ;;
@@ -500,6 +513,7 @@ let%expect_test "rpc: usage_limits" =
     fetched_at_ms is a number: true
     {"provider":"anthropic","name":"Claude","status":"limits","plan":null,"windows":[{"id":"five_hour","label":"5-hour session","used_percent":33,"resets_at_ms":1795183200445},{"id":"seven_day","label":"Weekly · all models","used_percent":13,"resets_at_ms":1795510800000},{"id":"seven_day_opus","label":"Weekly · Opus","used_percent":1,"resets_at_ms":null},{"id":"cinder_cove","label":"Cinder cove","used_percent":5,"resets_at_ms":1795700000000}],"accounts":[{"ref":"anthropic/main","id":"main","label":"Anthropic (Claude Pro/Max)","default":true,"status":"limits","plan":null,"windows":[{"id":"five_hour","label":"5-hour session","used_percent":33,"resets_at_ms":1795183200445},{"id":"seven_day","label":"Weekly · all models","used_percent":13,"resets_at_ms":1795510800000},{"id":"seven_day_opus","label":"Weekly · Opus","used_percent":1,"resets_at_ms":null},{"id":"cinder_cove","label":"Cinder cove","used_percent":5,"resets_at_ms":1795700000000}]}]}
     {"provider":"openai-codex","name":"ChatGPT","status":"not_signed_in","accounts":[]}
+    {"provider":"google-antigravity","name":"Antigravity","status":"not_signed_in","accounts":[]}
     |}]
 ;;
 
@@ -530,6 +544,7 @@ let%expect_test "PRIGH_USAGE_ORIGIN stands in for both origins" =
     fetched at 2026-11-26T05:13:20.000000Z
     Claude: plan: -
     ChatGPT: plan: -
+    Antigravity: not signed in
     |}]
 ;;
 
@@ -575,6 +590,7 @@ let%expect_test "each account's usage; the provider's is the default's" =
       Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
       Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
       account no-id (No id): error: The ChatGPT sign-in has no account id: sign in again with /login openai-codex
+    Antigravity: not signed in
     |}]
 ;;
 
@@ -628,7 +644,7 @@ let%expect_test "logins shared with the user: asked with the owner's token" =
   (match Subscription_usage.to_json usage with
    | `Object fields ->
      (match List.Assoc.find fields ~equal:String.equal "providers" with
-      | Some (`Array [ _; `Object codex ]) ->
+      | Some (`Array [ _; `Object codex; _ ]) ->
         (match List.Assoc.find codex ~equal:String.equal "accounts" with
          | Some (`Array (`Object first :: _)) ->
            List.iter [ "ref"; "id"; "shared_by" ] ~f:(fun k ->
@@ -661,8 +677,121 @@ let%expect_test "logins shared with the user: asked with the owner's token" =
       Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
       Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
       carol's Work: error: carol does not share the login with you (any more)
+    Antigravity: not signed in
     ref: "~alice/openai-codex/work"
     id: "~alice/work"
     shared_by: "alice"
+    |}]
+;;
+
+let antigravity_load_url =
+  "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
+;;
+
+let antigravity_quota_url =
+  "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"
+;;
+
+(* As agy's /usage reads them (synthesised from agy-auth's fixtures). *)
+let antigravity_summary =
+  {|{"description":"Within each group, models share a weekly limit and a 5-hour limit.",
+     "groups":[
+      {"displayName":"Gemini Models","description":"Models within this group: Gemini Flash, Gemini Pro",
+       "buckets":[
+        {"bucketId":"gemini-weekly","displayName":"Weekly Limit Remaining","window":"weekly","remainingFraction":0.58,"resetTime":"2026-11-28T02:39:46Z"},
+        {"bucketId":"gemini-5h","displayName":"Five Hour Limit Remaining","window":"5h","remainingFraction":1,"resetTime":"2026-11-26T08:32:29Z"}]},
+      {"displayName":"Claude and GPT models",
+       "buckets":[
+        {"bucketId":"3p-weekly","window":"weekly","remainingFraction":0.1,"resetTime":"2026-12-01T17:32:29Z"},
+        {"bucketId":"3p-odd","window":"monthly_pool","remainingFraction":"0.75"},
+        {"bucketId":"no-fraction","window":"5h"}]}]}|}
+;;
+
+let%expect_test "Antigravity: plan from loadCodeAssist, limits per model group" =
+  fetch
+    ~labelled:[ Google_antigravity, "imported from laptop", oauth "ya29.a" ]
+    ~answers:
+      [ ( antigravity_load_url
+        , Ok
+            ( 200
+            , []
+            , {|{"currentTier":{"id":"free-tier"},"paidTier":{"id":"g1-pro-tier","name":"Google AI Pro"},"cloudaicompanionProject":"proj-1"}|}
+            ) )
+      ; antigravity_quota_url, Ok (200, [], antigravity_summary)
+      ]
+    ~store_with:[]
+    ();
+  [%expect
+    {|
+    POST https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist
+      Authorization: Bearer ya29.a
+      Content-Type: application/json
+      Accept: application/json
+      User-Agent: antigravity/cli/1.5.13 (prigh/0.1.0; os_type=linux; arch=amd64; auth_method=consumer)
+      {"cloudaicompanionProject":"default-cli-project","metadata":{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI","duetProject":"default-cli-project"}}
+    POST https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary
+      Authorization: Bearer ya29.a
+      Content-Type: application/json
+      Accept: application/json
+      User-Agent: antigravity/cli/1.5.13 (prigh/0.1.0; os_type=linux; arch=amd64; auth_method=consumer)
+      {"project":"proj-1"}
+    fetched at 2026-11-26T05:13:20.000000Z
+    Claude: not signed in
+    ChatGPT: not signed in
+    Antigravity: plan: Pro
+      Weekly · Gemini Models      [gemini-weekly]                     42.0%  resets 2026-11-28T02:39:46.000000Z
+      5-hour · Gemini Models      [gemini-5h]                          0.0%  resets 2026-11-26T08:32:29.000000Z
+      Weekly · Claude and GPT models [3p-weekly]                         90.0%  resets 2026-12-01T17:32:29.000000Z
+      Monthly pool · Claude and GPT models [3p-odd]                            25.0%  resets -
+    |}];
+  (* Refused, and an endpoint without the summary. *)
+  fetch
+    ~labelled:[ Google_antigravity, "work", oauth "ya29.a" ]
+    ~answers:
+      [ ( antigravity_load_url
+        , Ok
+            ( 401
+            , []
+            , {|{"error":{"message":"Request had invalid authentication credentials."}}|}
+            ) )
+      ]
+    ~store_with:[]
+    ();
+  fetch
+    ~labelled:[ Google_antigravity, "work", oauth "ya29.a" ]
+    ~answers:
+      [ antigravity_load_url, Ok (200, [], {|{}|})
+      ; antigravity_quota_url, Ok (404, [], "Not Found")
+      ]
+    ~store_with:[]
+    ();
+  [%expect
+    {|
+    POST https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist
+      Authorization: Bearer ya29.a
+      Content-Type: application/json
+      Accept: application/json
+      User-Agent: antigravity/cli/1.5.13 (prigh/0.1.0; os_type=linux; arch=amd64; auth_method=consumer)
+      {"cloudaicompanionProject":"default-cli-project","metadata":{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI","duetProject":"default-cli-project"}}
+    fetched at 2026-11-26T05:13:20.000000Z
+    Claude: not signed in
+    ChatGPT: not signed in
+    Antigravity: error: Antigravity did not accept the sign-in (HTTP 401: Request had invalid authentication credentials.): sign in again with /login google-antigravity
+    POST https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist
+      Authorization: Bearer ya29.a
+      Content-Type: application/json
+      Accept: application/json
+      User-Agent: antigravity/cli/1.5.13 (prigh/0.1.0; os_type=linux; arch=amd64; auth_method=consumer)
+      {"cloudaicompanionProject":"default-cli-project","metadata":{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI","duetProject":"default-cli-project"}}
+    POST https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary
+      Authorization: Bearer ya29.a
+      Content-Type: application/json
+      Accept: application/json
+      User-Agent: antigravity/cli/1.5.13 (prigh/0.1.0; os_type=linux; arch=amd64; auth_method=consumer)
+      {"project":"default-cli-project"}
+    fetched at 2026-11-26T05:13:20.000000Z
+    Claude: not signed in
+    ChatGPT: not signed in
+    Antigravity: error: Google does not give this login's quota summary (HTTP 404): agy's /usage, on a tool host, shows it
     |}]
 ;;

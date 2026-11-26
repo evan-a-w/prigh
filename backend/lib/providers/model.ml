@@ -895,6 +895,7 @@ let default_for : Provider_id.t -> t option = function
   | Openai -> Some (find_exn "openai/gpt-5.5")
   | Openai_codex -> Some (find_exn "openai-codex/gpt-6.1-sol")
   | Deepseek -> Some default
+  | Google_antigravity -> None
   | Custom _ -> None
 ;;
 
@@ -1020,7 +1021,7 @@ let binds_thinking_to_prefix t =
       ]
       ~f:(fun family ->
         String.equal t.id family || String.is_prefix t.id ~prefix:(family ^ "-"))
-  | Openai | Openai_codex | Deepseek | Custom _ -> false
+  | Openai | Openai_codex | Deepseek | Google_antigravity | Custom _ -> false
 ;;
 
 let supports_thinking t = not (List.is_empty t.thinking_levels)

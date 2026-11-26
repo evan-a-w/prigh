@@ -11,6 +11,11 @@ open! Import
       [{utilization, resets_at}] or [null]) and, lately, [limits]: the
       server's own rows ([{kind, group, percent, resets_at, scope}]), which
       are shown instead when present.
+    - Antigravity (a [google-antigravity] login): [POST
+      https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist]
+      for the plan and project, then [:retrieveUserQuotaSummary] ([{groups:
+      [{displayName, buckets: [{bucketId, window, remainingFraction,
+      resetTime}]}]}]), as agy's [/usage] does, with an agy User-Agent.
     - ChatGPT (an [openai-codex] login): [GET
       https://chatgpt.com/backend-api/wham/usage] with the access token and
       [chatgpt-account-id], as the Codex CLI's [/status] does: [plan_type],
@@ -85,7 +90,8 @@ end
     [error]; a window is [{id, label, used_percent, resets_at_ms}]. *)
 val to_json : ?harnesses:Harness_usage.t list -> t -> Json.t
 
-(** The providers with subscription limits: [anthropic], [openai-codex]. *)
+(** The providers with subscription limits: [anthropic], [openai-codex],
+    [google-antigravity]. *)
 val providers : Provider_id.t list
 
 (** ["Claude"], ["ChatGPT"]. *)
@@ -97,10 +103,11 @@ module Http : sig
   type t =
     url:string
     -> headers:(string * string) list
+    -> ?body:string (** a POST of it; none: a GET *)
     -> unit
     -> (int * (string * string) list * string, string) Result.t
 
-  (** {!Http_client.get}, with a 20 second timeout. *)
+  (** {!Http_client.get} or [post], with a 20 second timeout. *)
   val real : env:Env.t -> t
 end
 
@@ -109,6 +116,10 @@ end
 val parse_anthropic : string -> Status.t
 
 val parse_codex : now:float -> string -> Status.t
+
+(** Antigravity's: its plan from [loadCodeAssist]'s answer, and its
+    limits from [retrieveUserQuotaSummary]'s. *)
+val parse_antigravity : load:string -> string -> Status.t
 
 (** A login another user shares with this one: its usage is asked for with
     the owner's credential ([resolve]), never shown. *)

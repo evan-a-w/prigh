@@ -69,14 +69,15 @@ let default ~adapter =
 let of_adapter ~adapter (m : Model.t) =
   match m.provider with
   | Custom a -> String.equal a adapter
-  | Anthropic | Openai | Openai_codex | Deepseek -> false
+  | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity -> false
 ;;
 
 let native_id (m : Model.t) =
   match m.provider with
   | Custom a when is_adapter a && not (String.equal m.id default_id) ->
     Some m.id
-  | Custom _ | Anthropic | Openai | Openai_codex | Deepseek -> None
+  | Custom _ | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity
+    -> None
 ;;
 
 let restore ~adapter ~models key =

@@ -3,6 +3,13 @@ open! Import
 
 type exec = name:string -> Json.t -> Tool.Result.t
 
+let cli_name = function
+  | "codex" -> "Codex"
+  | "claude" -> "Claude Code"
+  | "acp:antigravity" -> "Antigravity"
+  | a -> a
+;;
+
 module Found = struct
   type t =
     { adapter : string
@@ -10,27 +17,41 @@ module Found = struct
     ; host : string
     ; path : string
     ; credential : (Credential.Oauth.t[@sexp.opaque])
+    ; keyring : bool
+    ; client : Oauth_antigravity.Client.t option
     }
   [@@deriving sexp_of]
 
   let label t = "imported from " ^ t.host
-
-  let cli t =
-    match t.adapter with
-    | "codex" -> "Codex"
-    | "claude" -> "Claude Code"
-    | a -> a
-  ;;
+  let cli t = cli_name t.adapter
 
   let warning t =
-    sprintf
-      "%s on %s will stop being logged in: prigh takes its login from %s \
-       (renamed to %s.moved-to-prigh) and refreshes it, which retires the copy \
-       there. Its sessions there then run on prigh's login."
-      (cli t)
-      t.host
-      t.path
-      t.path
+    match t.provider, t.keyring with
+    | Google_antigravity, true ->
+      sprintf
+        "Antigravity on %s will stop being logged in: prigh takes its Google \
+         login from the keyring (service gemini, username antigravity) and \
+         clears it there, as Google does not retire other copies when prigh \
+         refreshes it. Its sessions there then run on prigh's login."
+        t.host
+    | Google_antigravity, false ->
+      sprintf
+        "Antigravity on %s will stop being logged in: prigh takes its Google \
+         login from %s (renamed to %s.moved-to-prigh, its tokens blanked, as \
+         Google does not retire other copies when prigh refreshes it). Its \
+         sessions there then run on prigh's login."
+        t.host
+        t.path
+        t.path
+    | _ ->
+      sprintf
+        "%s on %s will stop being logged in: prigh takes its login from %s \
+         (renamed to %s.moved-to-prigh) and refreshes it, which retires the \
+         copy there. Its sessions there then run on prigh's login."
+        (cli t)
+        t.host
+        t.path
+        t.path
   ;;
 end
 
@@ -44,6 +65,16 @@ let locate_script = function
     Some
       {|p="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
 if [ "$(uname)" = Darwin ] && security find-generic-password -s 'Claude Code-credentials' >/dev/null 2>&1; then k=keychain; fi|}
+  | "acp:antigravity" ->
+    Some
+      (sprintf
+         {|p="$HOME/.gemini/antigravity-cli/antigravity-oauth-token"
+if [ ! -f "$p" ]; then
+  if [ "$(uname)" = Darwin ] && security find-generic-password -s gemini -a antigravity >/dev/null 2>&1; then k=keychain
+  elif command -v secret-tool >/dev/null 2>&1 && secret-tool lookup service gemini username antigravity >/dev/null 2>&1; then k=keyring; fi
+fi
+c=$(%s)|}
+         Oauth_antigravity.Client.find_script)
   | _ -> None
 ;;
 
@@ -52,8 +83,12 @@ let script body =
   ^ {|
 printf '%s\n' "$p"
 if [ -f "$p" ]; then echo file; else echo none; fi
-echo "${k:-}"|}
+echo "${k:-}"
+printf '%s' "${c:-}"|}
 ;;
+
+let keyring_lookup = "secret-tool lookup service gemini username antigravity"
+let keyring_clear = "secret-tool clear service gemini username antigravity"
 
 let result_text (r : Tool.Result.t) =
   if r.is_error then Or_error.error_string r.text else Ok r.text
@@ -79,45 +114,78 @@ let oauth ~access ~refresh ~account_id =
   { Credential.Oauth.access; refresh; expires_ms = 0; account_id }
 ;;
 
+let parse_antigravity ~host ~where text =
+  let open Or_error.Let_syntax in
+  let%bind (token : Oauth_antigravity.Agy_token.t) =
+    Oauth_antigravity.Agy_token.parse text
+    |> Result.map_error ~f:(fun e ->
+      Error.createf "%s on %s: %s" where host (Error.to_string_hum e))
+  in
+  match token with
+  | { auth_method = Some m; _ } when not (String.equal m "consumer") ->
+    Or_error.errorf
+      "Antigravity on %s signs in with %S, not a personal Google login, which \
+       is the one prigh takes: sign agy in with Google there, or use /login \
+       google-antigravity"
+      host
+      m
+  | { access; refresh = Some refresh; _ } ->
+    Ok
+      (oauth
+         ~access:(Option.value access ~default:"")
+         ~refresh
+         ~account_id:None)
+  | { refresh = None; _ } ->
+    Or_error.errorf
+      "%s on %s has no refresh token (agy is not signed in there): /login \
+       google-antigravity logs prigh in"
+      where
+      host
+;;
+
 let parse ~adapter ~host ~path text =
   let open Or_error.Let_syntax in
-  let%bind json =
-    Json.parse text
-    |> Result.map_error ~f:(fun _ ->
-      Error.createf "%s on %s is not JSON: nothing imported" path host)
-  in
-  match adapter with
-  | "codex" ->
-    let tokens = Option.value (obj json "tokens") ~default:`Null in
-    (match str tokens "access_token", str tokens "refresh_token" with
-     | Some access, Some refresh ->
-       Ok (oauth ~access ~refresh ~account_id:(str tokens "account_id"))
-     | _ ->
-       if Option.is_some (str json "OPENAI_API_KEY")
-       then
+  if String.equal adapter "acp:antigravity"
+  then parse_antigravity ~host ~where:path text
+  else (
+    let%bind json =
+      Json.parse text
+      |> Result.map_error ~f:(fun _ ->
+        Error.createf "%s on %s is not JSON: nothing imported" path host)
+    in
+    match adapter with
+    | "codex" ->
+      let tokens = Option.value (obj json "tokens") ~default:`Null in
+      (match str tokens "access_token", str tokens "refresh_token" with
+       | Some access, Some refresh ->
+         Ok (oauth ~access ~refresh ~account_id:(str tokens "account_id"))
+       | _ ->
+         if Option.is_some (str json "OPENAI_API_KEY")
+         then
+           Or_error.errorf
+             "Codex on %s is logged in with an API key, not ChatGPT: add the \
+              key in prigh (/login openai) instead"
+             host
+         else
+           Or_error.errorf
+             "%s on %s has no ChatGPT login: /login openai-codex logs prigh in"
+             path
+             host)
+    | _ ->
+      let o = Option.value (obj json "claudeAiOauth") ~default:`Null in
+      (match str o "accessToken", str o "refreshToken" with
+       | Some access, Some refresh ->
+         Ok (oauth ~access ~refresh ~account_id:None)
+       | Some _, None ->
          Or_error.errorf
-           "Codex on %s is logged in with an API key, not ChatGPT: add the key \
-            in prigh (/login openai) instead"
+           "Claude Code on %s has a long-lived token (claude setup-token), \
+            which cannot be refreshed or moved: /login anthropic logs prigh in"
            host
-       else
+       | None, _ ->
          Or_error.errorf
-           "%s on %s has no ChatGPT login: /login openai-codex logs prigh in"
+           "%s on %s has no Claude login: /login anthropic logs prigh in"
            path
-           host)
-  | _ ->
-    let o = Option.value (obj json "claudeAiOauth") ~default:`Null in
-    (match str o "accessToken", str o "refreshToken" with
-     | Some access, Some refresh -> Ok (oauth ~access ~refresh ~account_id:None)
-     | Some _, None ->
-       Or_error.errorf
-         "Claude Code on %s has a long-lived token (claude setup-token), which \
-          cannot be refreshed or moved: /login anthropic logs prigh in"
-         host
-     | None, _ ->
-       Or_error.errorf
-         "%s on %s has no Claude login: /login anthropic logs prigh in"
-         path
-         host)
+           host))
 ;;
 
 let read ~exec ~path =
@@ -153,18 +221,44 @@ let find ~exec ~adapter ~host =
     |> Result.map_error ~f:(fun e ->
       Error.tag e ~tag:(sprintf "can't look for %s's login on %s" adapter host))
   in
-  let%bind path, exists, keychain =
+  let%bind path, exists, keychain, keyring, client =
     match String.split_lines out with
     | path :: exists :: rest ->
       Ok
         ( path
         , String.equal exists "file"
-        , List.exists rest ~f:(String.equal "keychain") )
+        , List.exists rest ~f:(String.equal "keychain")
+        , List.exists rest ~f:(String.equal "keyring")
+        , Oauth_antigravity.Client.of_candidates
+            (List.filter_map rest ~f:(String.chop_prefix ~prefix:"client ")) )
     | _ -> Or_error.errorf "bad reply from %s: %S" host out
   in
-  if not exists
+  if (not exists) && keyring
+  then (
+    let%bind text =
+      exec ~name:"bash" (`Object [ "command", `String keyring_lookup ])
+      |> result_text
+    in
+    let%map credential =
+      parse_antigravity ~host ~where:"The keyring's Antigravity login" text
+    in
+    { Found.adapter
+    ; provider
+    ; host
+    ; path = "keyring"
+    ; credential
+    ; keyring = true
+    ; client
+    })
+  else if not exists
   then
-    if keychain
+    if keychain && Provider_id.equal provider Google_antigravity
+    then
+      Or_error.errorf
+        "Antigravity on %s keeps its login in the macOS keychain, which prigh \
+         does not read: /login google-antigravity logs prigh in instead"
+        host
+    else if keychain
     then
       Or_error.errorf
         "Claude Code on %s keeps its login in the macOS keychain, which prigh \
@@ -173,14 +267,14 @@ let find ~exec ~adapter ~host =
     else
       Or_error.errorf
         "%s is not logged in on %s (no %s): log prigh in with /login %s"
-        adapter
+        (cli_name adapter)
         host
         path
         (Provider_id.to_string provider)
   else (
     let%bind text = read ~exec ~path in
     let%map credential = parse ~adapter ~host ~path text in
-    { Found.adapter; provider; host; path; credential })
+    { Found.adapter; provider; host; path; credential; keyring = false; client })
 ;;
 
 let take ~exec ~refresh store (found : Found.t) =
@@ -209,25 +303,58 @@ let take ~exec ~refresh store (found : Found.t) =
       found.provider
       (Oauth fresh)
   in
-  let (renamed : Tool.Result.t) =
-    exec
-      ~name:Host_files.rename_op
-      (`Object
-          [ "from", `String found.path
-          ; "to", `String (found.path ^ suffix)
-          ; "overwrite", `True
-          ])
+  let bash command =
+    exec ~name:"bash" (`Object [ "command", `String command ])
+  in
+  let (moved : Tool.Result.t) =
+    match found.provider, found.keyring with
+    | Google_antigravity, true -> bash keyring_clear
+    | Google_antigravity, false ->
+      (* Google's refresh tokens do not rotate: the renamed copy keeps a
+         note, not the tokens. *)
+      let target = found.path ^ suffix in
+      bash
+        (sprintf
+           "mv -f %s %s && printf '%%s\\n' %s > %s"
+           (Filename.quote found.path)
+           (Filename.quote target)
+           (Filename.quote {|{"moved_to_prigh":true}|})
+           (Filename.quote target))
+    | _ ->
+      exec
+        ~name:Host_files.rename_op
+        (`Object
+            [ "from", `String found.path
+            ; "to", `String (found.path ^ suffix)
+            ; "overwrite", `True
+            ])
   in
   ( id
-  , if renamed.is_error
+  , if moved.is_error
     then
       Some
-        (sprintf
-           "%s on %s could not be renamed (%s): delete it there, it no longer \
-            works"
-           found.path
-           found.host
-           renamed.text)
+        (match found.provider, found.keyring with
+         | Google_antigravity, true ->
+           sprintf
+             "the keyring on %s could not be cleared (%s): run `%s` there, as \
+              that copy still works"
+             found.host
+             moved.text
+             keyring_clear
+         | Google_antigravity, false ->
+           sprintf
+             "%s on %s could not be moved (%s): delete it there, as that copy \
+              still works"
+             found.path
+             found.host
+             moved.text
+         | _ ->
+           sprintf
+             "%s on %s could not be renamed (%s): delete it there, it no \
+              longer works"
+             found.path
+             found.host
+             moved.text)
     else None )
 ;;
 
