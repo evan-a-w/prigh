@@ -12,7 +12,7 @@ let assistant ?(text = "") calls =
     { content =
         (if String.is_empty text then [] else [ Content.Text text ])
         @ List.map calls ~f:(fun (id, name, arguments) ->
-          Content.Tool_call { id; name; arguments })
+          Content.Tool_call { id; name; arguments; extra = None })
     ; stop_reason = (if List.is_empty calls then End_turn else Tool_use)
     ; usage = Usage.zero
     ; model = "codex/gpt-5"

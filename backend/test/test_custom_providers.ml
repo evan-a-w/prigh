@@ -1357,6 +1357,7 @@ let%expect_test "chat completions: Gemini thought signatures" =
     ; stop_reason = Tool_use
     ; usage = Usage.zero
     ; model = "anthropic/claude-sonnet-4-5"
+    ; account = None
     }
   in
   let request ?(model = model) () =
@@ -1375,6 +1376,7 @@ let%expect_test "chat completions: Gemini thought signatures" =
     ; thinking = Off
     ; max_tokens = None
     ; cache_key = None
+    ; account = None
     }
   in
   (* Gemini's own step goes back verbatim (only its first call is signed);

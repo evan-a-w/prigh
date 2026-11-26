@@ -312,6 +312,7 @@ let tool_start t ~id ~kind ~native_name ~input ~parent =
     { Content.Tool_call.id
     ; name = canonical.name
     ; arguments = Json.to_string canonical.arguments
+    ; extra = None
     }
   in
   let parent =
