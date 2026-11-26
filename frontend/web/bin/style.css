@@ -1428,3 +1428,12 @@ kbd {
 .model-access-item > .icon { width: 14px; height: 14px; color: var(--muted-foreground); flex: none; }
 .model-access-item .menu-text { flex: 1; min-width: 0; }
 @media (hover: hover) { .model-access-item:hover { background: var(--accent); } }
+
+/* The session's agent CLI could not list its models: the chip says why,
+   the model menu what to do. */
+.composer-controls .model-chip.trouble, .model-chip.trouble .provider-mark { color: var(--destructive); }
+.model-trouble { margin: 8px 12px 4px; padding: 8px 10px; border: 1px solid color-mix(in oklab, var(--destructive) 45%, transparent); border-radius: var(--r-control); font-size: 13px; }
+.model-trouble-text { color: var(--foreground); overflow-wrap: anywhere; }
+.model-trouble-fixes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.model-trouble-fix { min-height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-control); background: transparent; color: var(--foreground); font-size: 13px; cursor: pointer; }
+.model-trouble-fix:hover { background: var(--accent); }

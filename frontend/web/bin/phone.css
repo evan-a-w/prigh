@@ -482,3 +482,5 @@
 .app.narrow .mcp-pair-add { min-height: var(--tap); }
 .app.narrow .mcp-field .text-input:not(textarea) { min-height: var(--tap); }
 .app.narrow .mcp-tools-toggle { min-height: 0; padding: 6px 0; margin: -6px 0; }
+
+.app.narrow .model-trouble-fix { min-height: 44px; padding: 0 14px; }

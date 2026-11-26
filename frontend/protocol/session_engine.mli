@@ -68,6 +68,10 @@ type t =
   ; login : string option
     (** the label of prigh's login its agent CLI runs on ([adapter_login]);
         [None]: the CLI's own *)
+  ; models : Harness_models.t option
+    (** where its agent CLI is with listing its models, while the model is
+        still its placeholder ([harness_models]); [None] once it is a real
+        one *)
   }
 [@@deriving sexp_of, equal]
 
@@ -91,7 +95,8 @@ val engine_label : string -> string
 val who : t -> string
 
 (** The model as the status line and the model chip show it: harness
-    sessions the model alone, others "Codex · MODEL". *)
+    sessions the model alone, others "Codex · MODEL"; while its CLI cannot
+    list its models, why ("Antigravity: not logged in on desktop"). *)
 val model_label : t -> model:string -> string
 
 (** What a request can need of the session's engine (the backend's

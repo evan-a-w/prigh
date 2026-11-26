@@ -3,7 +3,8 @@ open! Import
 
 (** [/adapters]: whether the composer engine's agent CLIs (Codex, Claude
     Code, ACP agents) are installed and logged in on each connected tool
-    host ([list_adapters]); [/adapters refresh] checks again. prigh only
+    host ([list_adapters]); [/adapters refresh] checks again; [/adapters retry] asks the session's CLI
+    for its models again after it could not list them. prigh only
     checks: what is missing says what to run on that host.
 
     [/adapters login ADAPTER [LOGIN|own]]: which login the CLI runs the
@@ -19,6 +20,9 @@ val usage : string
 module Action : sig
   type t =
     | List of { refresh : bool }
+    | Retry
+    (** the session's agent CLI, which could not list its models, asked
+        again *)
     | Login of
         { adapter : string option (** [None]: the only one there is *)
         ; login : string option (** [None]: pick; ["own"]: its own *)

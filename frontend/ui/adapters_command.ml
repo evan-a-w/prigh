@@ -2,13 +2,14 @@ open! Core
 open! Import
 
 let usage =
-  "/adapters [refresh] | /adapters login [ADAPTER] [LOGIN|own] | /adapters \
+  "/adapters [refresh | retry] | /adapters login [ADAPTER] [LOGIN|own] | /adapters \
    import ADAPTER [HOST]"
 ;;
 
 module Action = struct
   type t =
     | List of { refresh : bool }
+    | Retry
     | Login of
         { adapter : string option
         ; login : string option
@@ -34,6 +35,7 @@ let parse rest =
   with
   | [] -> Ok (Action.List { refresh = false })
   | [ "refresh" ] -> Ok (List { refresh = true })
+  | [ "retry" ] -> Ok Retry
   | [ "login" ] -> Ok (Login { adapter = None; login = None })
   | [ "login"; adapter ] ->
     Ok (Login { adapter = Some (canonical adapter); login = None })

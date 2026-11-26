@@ -998,9 +998,34 @@ let model_items m ~logged_in_only =
       model.name)
 ;;
 
+(* The session's agent CLI could not list its models: what to do about it,
+   as commands, above the models. *)
+let harness_fixes m =
+  match m.state with
+  | Some { engine = { models = Some (Failed { message; fixes; _ }); _ }; _ } ->
+    List.map fixes ~f:(fun fix ->
+      Picker.Item.create
+        ~id:(P.Harness_models.Fix.command fix)
+        ~detail:(P.Harness_models.Fix.command fix ^ "  " ^ message)
+        (P.Harness_models.Fix.label fix))
+  | _ -> []
+;;
+
 let model_picker_value m ~logged_in_only ~query =
   let title = if logged_in_only then "Model (logged in)" else "Model" in
-  Picker.create ~query ~title (model_items m ~logged_in_only)
+  let title =
+    match m.state with
+    | Some ({ engine = { models = Some (Failed _); _ }; _ } as s) ->
+      sprintf
+        "%s: %s"
+        title
+        (P.Session_engine.model_label s.engine ~model:s.model.name)
+    | _ -> title
+  in
+  Picker.create
+    ~query
+    ~title
+    (harness_fixes m @ model_items m ~logged_in_only)
 ;;
 
 let model_picker ?(logged_in_only = false) m ~query =
@@ -4317,6 +4342,8 @@ let adapters_command m rest =
   | Ok (List { refresh }) ->
     ( notice m "checking the agent CLIs on the tool hosts…"
     , [ call (List_adapters { refresh }) ~tag:Adapters_shown ] )
+  | Ok Retry ->
+    notice m "asking the agent CLI for its models again…", [ call Retry_models ]
   | Ok (Login { adapter; login = None }) ->
     ( notice m "reading the logins…"
     , [ call
@@ -6111,6 +6138,11 @@ let rec editing m (intent : Intent.t) =
 let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   let m = { m with mode = Editing } in
   match kind with
+  | Models _ when String.is_prefix item.id ~prefix:"/" ->
+    (* One of [harness_fixes]. *)
+    (match Commands.parse item.id with
+     | Some cmd -> run_command m cmd
+     | None -> m, [])
   | Models _ -> m, [ set_model_keeping m item.id ]
   | Scoped_models | Transcript_filter -> m, []
   | Thinking -> m, [ rpc "set_thinking" ~params:[ "thinking", str item.id ] ]
@@ -8517,7 +8549,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          match m.mode with
          | Picker { kind = Models { logged_in_only } as kind; picker } ->
            let picker =
-             Picker.set_items picker (model_items m ~logged_in_only)
+             Picker.set_items
+               picker
+               (harness_fixes m @ model_items m ~logged_in_only)
            in
            { m with mode = Picker { kind; picker } }, []
          | _ -> m, [])

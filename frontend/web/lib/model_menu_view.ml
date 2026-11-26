@@ -416,6 +416,30 @@ let engine (m : App.Model.t) ~inject =
       ]
 ;;
 
+(* Why the session's agent CLI could not list its models, and a button per
+   thing to do about it. *)
+let harness_trouble (m : App.Model.t) ~inject =
+  match m.state with
+  | Some { engine = { models = Some (Failed { message; fixes; _ }); _ }; _ } ->
+    Node.div
+      ~attrs:[ Attr.class_ "model-trouble"; Attr.role "alert" ]
+      [ div ~cls:"model-trouble-text" [ Node.text message ]
+      ; div
+          ~cls:"model-trouble-fixes"
+          (List.map fixes ~f:(fun fix ->
+             Node.button
+               ~attrs:
+                 [ Attr.class_ "model-trouble-fix"
+                 ; Attr.type_ "button"
+                 ; Attr.title (Harness_models.Fix.command fix)
+                 ; Attr.on_click (fun _ ->
+                     inject (Action.Run (Harness_models.Fix.command fix)))
+                 ]
+               [ Node.text (Harness_models.Fix.label fix) ]))
+      ]
+  | _ -> Node.none
+;;
+
 let view (m : App.Model.t) (p : Picker.t) ~inject =
   let offered = App.offered_models m in
   let visible = Picker.visible p in
@@ -485,6 +509,7 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
                       ]
                     ()
                 ]
+            ; harness_trouble m ~inject
             ; div ~cls:"model-list-head" [ Node.text heading ]
             ; (match empty with
                | Some text -> div ~cls:"popover-empty" [ Node.text text ]

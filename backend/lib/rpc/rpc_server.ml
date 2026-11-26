@@ -929,7 +929,6 @@ let maybe_evict t agent =
   then (
     Hashtbl.remove t.agents (session_id agent);
     Hashtbl.remove t.listed (session_id agent);
-    Hashtbl.remove t.catalog_keys (session_id agent);
     Agent.stop_engine agent;
     let session = Agent.session agent in
     if Session.persisted session && not (Session.gone session)
@@ -1103,17 +1102,86 @@ let cli_credential t agent ~adapter =
         ())
 ;;
 
-(* A session's state, with the label of prigh's login its CLI runs on. *)
+(* Where a composer session's harness is with listing its models while the
+   session's model is a placeholder: being asked, or why it could not. *)
+let harness_models t (s : Agent.State.t) =
+  match s.engine with
+  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) }
+    when External_model.is_placeholder s.model ->
+    let adapter = Adapter_id.to_string a in
+    let host = s.active_host in
+    let login = catalog_login t ~adapter in
+    (match
+       ( Adapter_catalog.asking t.catalogs ~host ~login adapter
+       , Adapter_catalog.failure t.catalogs ~host ~login adapter
+       , Adapter_catalog.find t.catalogs ~host ~login adapter )
+     with
+     | true, _, _ -> Some Harness_models.Loading
+     | false, Some why, _ ->
+       let host_name =
+         match
+           List.find s.hosts ~f:(fun (h : Agent.Host.t) ->
+             String.equal h.id host)
+         with
+         | Some h when not (String.is_empty h.name) -> h.name
+         | _ ->
+           (match s.active_host_name with
+            | Some name when not (String.is_empty name) -> name
+            | _ -> host)
+       in
+       Some
+         (Harness_models.failed
+            ~label:(Adapter_id.label a)
+            ~host_name
+            ~prigh_login:
+              (Option.map (adapter_login t ~adapter) ~f:(fun (provider, _) ->
+                 Provider_id.to_string provider))
+            ~install:
+              (Option.map
+                 (Adapter_health.Cache.find t.adapter_health ~host a)
+                 ~f:(fun (h : Adapter_health.Status.t) -> h.install))
+            why)
+     (* It listed none: it picks its own. *)
+     | false, None, Some { models = []; _ } -> None
+     | false, None, (Some { models = _ :: _; _ } | None) ->
+       Some Harness_models.Loading)
+  | _ -> None
+;;
+
+(* A session's state, with the label of prigh's login its CLI runs on and
+   where its harness is with listing its models. *)
 let state_json t (s : Agent.State.t) =
   let json = Rpc_json.state s in
   match s.engine, json with
   | { engine = Composer; adapter = Some a }, `Object fields ->
-    (match adapter_login t ~adapter:(Adapter_id.to_string a) with
-     | Some (provider, ref_) ->
-       `Object
-         (fields @ [ "adapter_login", `String (login_label t provider ref_) ])
-     | None -> json)
+    `Object
+      (fields
+       @ (match adapter_login t ~adapter:(Adapter_id.to_string a) with
+          | Some (provider, ref_) ->
+            [ "adapter_login", `String (login_label t provider ref_) ]
+          | None -> [])
+       @
+       match harness_models t s with
+       | Some status -> [ "harness_models", Harness_models.to_json status ]
+       | None -> [])
   | _ -> json
+;;
+
+(* Tells the session's clients its state when its harness's listing of its
+   models moved on (asked, failed) while its model is a placeholder: the
+   agent itself has nothing to say then. *)
+let send_harness_models t agent =
+  let s = Agent.state agent in
+  if Option.is_some (harness_models t s)
+  then (
+    let json =
+      `Object
+        [ "type", `String "event"
+        ; "event", `String "state"
+        ; "state", state_json t s
+        ]
+    in
+    List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json))
 ;;
 
 (* The session's model list changed: its clients ask for it again. *)
@@ -1122,7 +1190,8 @@ let models_changed t agent =
   let json =
     `Object [ "type", `String "event"; "event", `String "models_changed" ]
   in
-  List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json)
+  List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json);
+  send_harness_models t agent
 ;;
 
 (* A composer session's harness lists its models on its tool host, on the
@@ -1433,7 +1502,7 @@ let fetch_catalog
 (* Asks, in the background, the catalog of a Codex, Claude Code or ACP
    session's harness on its tool host, on the login it runs on, unless one
    younger than [max_age] seconds is kept. *)
-let ensure_catalog ?(max_age = 1800.) t agent =
+let ensure_catalog ?force ?(max_age = 1800.) t agent =
   match Agent.engine_choice agent with
   | { engine = Composer
     ; adapter = Some ((Codex | Claude | Acp _) as adapter_id)
@@ -1444,7 +1513,9 @@ let ensure_catalog ?(max_age = 1800.) t agent =
        let host = Agent.active_host agent in
        let name = Adapter_id.to_string adapter_id in
        let login = catalog_login t ~adapter:name in
+       let was_asking = Adapter_catalog.asking t.catalogs ~host ~login name in
        Adapter_catalog.refresh
+         ?force
          t.catalogs
          ~sw:t.sw
          ~host
@@ -1466,35 +1537,12 @@ let ensure_catalog ?(max_age = 1800.) t agent =
            match adapter_id with
            | Acp _ when Option.is_none login ->
              adapters_changed t ~hosts:(hosts t)
-           | Acp _ | Codex | Claude | Prigh -> ()))
+           | Acp _ | Codex | Claude | Prigh -> ());
+       if
+         (not was_asking)
+         && Adapter_catalog.asking t.catalogs ~host ~login name
+       then send_harness_models t agent)
   | _ -> ()
-;;
-
-(* Why a composer session's harness could not say its models, and what to
-   do. *)
-let catalog_failure t agent =
-  match Agent.engine_choice agent with
-  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) } ->
-    let adapter = Adapter_id.to_string a in
-    let login = catalog_login t ~adapter in
-    Option.map
-      (Adapter_catalog.failure
-         t.catalogs
-         ~host:(Agent.active_host agent)
-         ~login
-         adapter)
-      ~f:(fun e ->
-        sprintf
-          "%s on %s could not list its models: %s. %s"
-          (Adapter_id.label a)
-          (active_host_label agent)
-          (Error.to_string_hum e)
-          (match login with
-           | None ->
-             "Check that it is installed and logged in there (Settings → \
-              Engines)."
-           | Some _ -> "Check that it is installed there (Settings → Engines)."))
-  | _ -> None
 ;;
 
 (* The session's harness's catalog, as asked on its tool host on its
@@ -4823,6 +4871,13 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "pr_checkout" -> Some (checkout_pull t client params)
   | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
+  | "retry_models" ->
+    (* The session's harness, which could not list its models, asked again
+       now: its clients hear of it as for any asking. *)
+    let agent = client.agent in
+    Hashtbl.remove t.catalog_keys (session_id agent);
+    ensure_catalog ~force:true t agent;
+    Some (ok (`Object []))
   | "list_models" ->
     let agent = client.agent in
     (match external_models t agent with
@@ -4834,10 +4889,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
          List.length models <= 1
          && (not (Agent.external_live agent))
          && not (lists_no_models t agent)
-       then (
-         ensure_catalog t agent;
-         Option.iter (catalog_failure t agent) ~f:(fun why ->
-           tell_problems client [ why ]));
+       then ensure_catalog t agent;
        Some (ok (`Array (List.map models ~f:Rpc_json.model)))
      | None ->
        let models = Login_manager.models t.login in

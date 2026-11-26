@@ -248,11 +248,20 @@ let model_chip (m : App.Model.t) (state : State.t) ~fixed ~inject =
        names it. *)
     let login = Prigh_ui.Provider_logins.beside_model m.auth state in
     let at login = Option.value_map login ~default:"" ~f:(fun l -> "@" ^ l) in
+    (* Its agent CLI could not list its models: why, in place of the
+       placeholder; the menu says what to do. *)
+    let trouble =
+      match state.engine.models with
+      | Some (Failed _ as status) -> Some (Harness_models.chip status)
+      | Some Loading | None -> None
+    in
     button
       ~cls:
-        (if fixed
-         then "chip-button model-chip subagent-own"
-         else "chip-button model-chip")
+        (String.concat
+           ~sep:" "
+           ([ "chip-button model-chip" ]
+            @ (if fixed then [ "subagent-own" ] else [])
+            @ if Option.is_some trouble then [ "trouble" ] else []))
       ~title:
         (sprintf
            (if fixed
@@ -283,8 +292,13 @@ let model_chip (m : App.Model.t) (state : State.t) ~fixed ~inject =
               ~attrs:[ Attr.class_ "chip-label" ]
               [ Node.span
                   ~attrs:[ Attr.class_ "chip-engine max-[359px]:hidden" ]
-                  [ Node.text (Session_engine.who state.engine ^ " · ") ]
-              ; Node.text (Model_menu.short_name state.model.name)
+                  [ Node.text
+                      (Session_engine.who state.engine
+                       ^ if Option.is_some trouble then ": " else " · ")
+                  ]
+              ; Node.text
+                  (Option.value_or_thunk trouble ~default:(fun () ->
+                     Model_menu.short_name state.model.name))
               ])
        ]
        @ Option.value_map login ~default:[] ~f:(fun l ->

@@ -696,3 +696,72 @@ let%expect_test "an agent CLI's reply names its model in the footer" =
     acp:antigravity/gone 1.2k in 30 out
     |}]
 ;;
+
+let%expect_test
+    "a CLI that cannot list its models: the chip says why, the menu what to do"
+  =
+  let codex ~id ~name =
+    Jsonaf.of_string (H.model_json ~provider:"codex" ~id ~name ())
+  in
+  let state ?status model =
+    H.state_json
+      ~fields:
+        (codex_fields ()
+         @ [ "model", model ]
+         @ Option.value_map status ~default:[] ~f:(fun s ->
+           [ "harness_models", Jsonaf.of_string s ]))
+      ()
+  in
+  let placeholder = codex ~id:"default" ~name:"loading models…" in
+  let h =
+    H.create ~state:(state ~status:{|{"state":"loading"}|} placeholder) ()
+  in
+  H.quiet h (fun () -> hello h);
+  let set_state ?status model =
+    H.event
+      h
+      (sprintf
+         {|{"type":"event","event":"state","state":%s}|}
+         (state ?status model))
+  in
+  H.names h ~selector:".model-chip";
+  [%expect
+    {| button "Model: Codex \194\183 loading models\226\128\166" -- Codex · loading models…: models, reasoning and access (Ctrl+L) |}];
+  set_state
+    ~status:
+      {|{"state":"failed","problem":"not_logged_in","summary":"not logged in on desktop","message":"Codex on desktop could not list its models: Codex is not logged in. Check that it is installed and logged in there (Settings → Engines).","fixes":[{"kind":"engines"},{"kind":"retry"}]}|}
+    placeholder;
+  H.names h ~selector:".model-chip";
+  H.text h ~selector:".model-chip";
+  H.names h ~selector:".model-chip.trouble";
+  [%expect
+    {|
+    button "Model: Codex: not logged in on desktop" -- Codex: not logged in on desktop: models, reasoning and access (Ctrl+L)
+    (Codex: not logged in on desktop)
+    button "Model: Codex: not logged in on desktop" -- Codex: not logged in on desktop: models, reasoning and access (Ctrl+L)
+    |}];
+  H.quiet h (fun () -> H.click h ~selector:".model-chip");
+  H.text h ~selector:".model-trouble";
+  H.names h ~selector:".model-trouble-fix";
+  [%expect
+    {|
+    Codex on desktop could not list its models: Codex is not logged in. Check that it is installed and logged in there (Settings → Engines).
+    Settings → Engines
+    Retry
+    button "Settings → Engines" -- /adapters refresh
+    button "Retry" -- /adapters retry
+    |}];
+  H.click h ~selector:".model-trouble-fix" ~nth:1;
+  [%expect {| (Rpc (method_ retry_models) (params ()) (tag Show_error)) |}];
+  (* Asked again, it lists them: the chip names the model. *)
+  set_state ~status:{|{"state":"loading"}|} placeholder;
+  H.text h ~selector:".model-chip";
+  set_state (codex ~id:"gpt-6.2-sol" ~name:"GPT-6.2-Sol");
+  H.text h ~selector:".model-chip";
+  H.names h ~selector:".model-trouble";
+  [%expect
+    {|
+    (Codex · loading models…)
+    (Codex · GPT-6.2-Sol)
+    |}]
+;;

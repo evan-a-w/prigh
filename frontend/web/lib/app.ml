@@ -4960,6 +4960,7 @@ let set_adapter_login (m : Model.t) ~adapter login =
 let adapters_command (m : Model.t) rest =
   match Prigh_ui.Adapters_command.parse rest with
   | Error e -> error m (String.capitalize (Error.to_string_hum e))
+  | Ok Retry -> m, [ call Retry_models ]
   | Ok (List { refresh }) ->
     let m, cmds = open_settings ~section:Engines m in
     if refresh

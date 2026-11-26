@@ -219,6 +219,9 @@ module Method : sig
     (** {!Adapter_status.list_of_json}: the composer's agent CLIs on each
         connected host; [refresh] checks again rather than answering from
         what was checked in the last minute *)
+    | Retry_models
+    (** asks the session's agent CLI for its models again, after it could not
+        list them ([state]'s [harness_models]) *)
     | Set_adapter of { adapter : string }
     | Set_adapter_login of
         { adapter : string

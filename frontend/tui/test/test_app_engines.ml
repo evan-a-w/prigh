@@ -296,3 +296,36 @@ let%expect_test
     Codex · deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
     |}]
 ;;
+
+let%expect_test
+    "a CLI that cannot list its models: the status line says why, /model what \
+     to do"
+  =
+  let h = connected () in
+  H.reply
+    ~quiet:true
+    h
+    Initial_state
+    (String.chop_suffix_exn
+       (state_json
+          ~model:(model_json ~provider:"codex" "default" "loading models…")
+          ())
+       ~suffix:"}"
+     ^ codex_engine
+     ^ {|,"harness_models":{"state":"failed","problem":"not_logged_in","summary":"not logged in on srv","message":"Codex on srv could not list its models: Codex is not logged in. Check that it is installed and logged in there (Settings → Engines).","fixes":[{"kind":"engines"},{"kind":"retry"}]}}|}
+    );
+  status h;
+  command h "/model";
+  H.reply ~quiet:true h (Models_for_picker "") "[]";
+  H.show h;
+  [%expect
+    {|
+    /work  Codex: not logged in on srv  think:off  mode:auto  ctx:0.1%  $0.01
+    (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
+    |}];
+  (* The second fix: Retry. *)
+  H.key h (Key.plain Down);
+  H.enter h;
+  command h "/adapters retry";
+  [%expect {| |}]
+;;

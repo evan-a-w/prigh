@@ -349,6 +349,7 @@ let with_server
       ()
   in
   let note_changed = ref None in
+  let last_harness_models = ref None in
   let next_change () =
     let changed, note = Eio.Promise.create () in
     note_changed := Some note;
@@ -366,6 +367,44 @@ let with_server
              ~pattern:(Machine_name.get ())
              ~with_:"<machine>"
            |> String.substr_replace_all ~pattern:t.dir ~with_:"$DIR")
+      | Some "state" ->
+        (* Where the harness is with listing its models, when it says. *)
+        Option.iter
+          (member [ "state"; "harness_models" ] json)
+          ~f:(fun status ->
+            let line =
+              sprintf
+              "event: state, harness_models %s"
+              (match string_at [ "state" ] status with
+               | Some "failed" ->
+                 let text key =
+                   String.substr_replace_all
+                     (Option.value_exn (string_at [ key ] status))
+                     ~pattern:(Machine_name.get ())
+                     ~with_:"<machine>"
+                 in
+                 sprintf
+                   "failed %s %S fixes=[%s]\n  %s"
+                   (Option.value_exn (string_at [ "problem" ] status))
+                   (text "summary")
+                   (match member [ "fixes" ] status with
+                    | Some (`Array fixes) ->
+                      String.concat
+                        ~sep:" "
+                        (List.map fixes ~f:(fun f ->
+                           Option.value_exn (string_at [ "kind" ] f)
+                           ^ Option.value_map
+                               (string_at [ "provider" ] f)
+                               ~default:""
+                               ~f:(fun p -> ":" ^ p)))
+                    | _ -> "?")
+                   (text "message")
+               | state -> Option.value state ~default:"?")
+            in
+            if not ([%equal: string option] !last_harness_models (Some line))
+            then (
+              last_harness_models := Some line;
+              print_endline line))
       | Some "models_changed" ->
         print_endline "event: models_changed";
         Option.iter !note_changed ~f:(fun u ->
@@ -490,6 +529,7 @@ let%expect_test "codex: the picker lists Codex's models before the first turn" =
   chip ();
   [%expect
     {|
+    event: state, harness_models loading
     chip: codex/default (loading models…)
     list_models, before Codex said:
     spawn codex on backend
@@ -531,6 +571,7 @@ let%expect_test "claude: its models and plan limits from its own login" =
   chip ();
   [%expect
     {|
+    event: state, harness_models loading
     spawn claude on backend
     claude got initialize
     claude got get_usage
@@ -559,6 +600,7 @@ let%expect_test
   usage ();
   [%expect
     {|
+    event: state, harness_models loading
     spawn codex on backend
     codex got initialize
     codex got model/list
@@ -591,6 +633,7 @@ let%expect_test
   chip ();
   [%expect
     {|
+    event: state, harness_models loading
     list_models, before Antigravity said:
     spawn agy on backend
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
@@ -659,6 +702,7 @@ let%expect_test
   in
   [%expect
     {|
+    event: state, harness_models loading
     spawn agy on backend
     agy got initialize
     agy got session/new
@@ -686,7 +730,7 @@ let%expect_test
 ;;
 
 let%expect_test
-    "a harness that cannot list its models: only its default, and why, once"
+    "a harness that cannot list its models: the chip says why, retry asks again"
   =
   with_server
   @@ fun ~call
@@ -699,17 +743,24 @@ let%expect_test
        ~save_login:_ ->
   ignore (call ~params:{|{"adapter": "acp:grok"}|} "new_session" : Json.t);
   models ();
-  (* The fetch failed at once: asked again, the picker says why, once. *)
+  (* The fetch failed at once: asked again within the minute, it is not
+     run again. *)
   models ();
   models ();
+  (* Retry asks again at once. *)
+  ignore (call "retry_models" : Json.t);
   [%expect
     {|
+    event: state, harness_models loading
     spawn grok on backend
     event: models_changed
-    notice: Grok Build on <machine> could not list its models: grok: command not found. Check that it is installed and logged in there (Settings → Engines).
+    event: state, harness_models failed not_installed "not installed on <machine>" fixes=[engines retry]
+      Grok Build on <machine> could not list its models: grok: command not found. Install it there (prigh never installs it), then retry; Settings → Engines says what is missing.
       acp:grok/default "loading models\226\128\166" thinking=[off]
       acp:grok/default "loading models\226\128\166" thinking=[off]
       acp:grok/default "loading models\226\128\166" thinking=[off]
+    spawn grok on backend
+    event: models_changed
     |}]
 ;;
 
@@ -740,12 +791,14 @@ let%expect_test
   models ();
   [%expect
     {|
+    event: state, harness_models loading
     spawn agy on backend
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
-    notice: Antigravity on <machine> could not list its models: Antigravity is not logged in on this host: run `agy acp --login` there. Check that it is installed and logged in there (Settings → Engines).
+    event: state, harness_models failed not_logged_in "not logged in on <machine>" fixes=[engines retry]
+      Antigravity on <machine> could not list its models: Antigravity is not logged in on this host: run `agy acp --login` there. Check that it is installed and logged in there (Settings → Engines).
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
     |}];
   let changed = next_change () in
@@ -758,6 +811,7 @@ let%expect_test
   [%expect
     {|
     notice: tools now run on desktop in $DIR
+    event: state, harness_models loading
     event: models_changed
     spawn agy on host-desktop
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
@@ -797,6 +851,7 @@ let%expect_test
   models ();
   [%expect
     {|
+    event: state, harness_models loading
     spawn agy on backend with prigh's token in $PRIGH_AGY_TOKEN_FD
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
@@ -884,12 +939,14 @@ let%expect_test "prigh's login refused: what to do is about that login" =
   models ();
   [%expect
     {|
+    event: state, harness_models loading
     spawn agy on backend with prigh's token in $PRIGH_AGY_TOKEN_FD
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
-    notice: Antigravity on <machine> could not list its models: it was refused prigh's google-antigravity login "Work", or could not use it: /login google-antigravity logs in again, or Settings → Engines runs Antigravity on its own login. Check that it is installed there (Settings → Engines).
+    event: state, harness_models failed login_refused "login refused" fixes=[login:google-antigravity engines retry]
+      Antigravity on <machine> could not list its models: it was refused prigh's google-antigravity login "Work", or could not use it: /login google-antigravity logs in again, or Settings → Engines runs Antigravity on its own login.
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
     |}]
 ;;

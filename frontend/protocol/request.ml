@@ -172,6 +172,7 @@ module Method = struct
         }
     | Generate_cancel of { gen_id : string }
     | List_adapters of { refresh : bool }
+    | Retry_models
     | Set_adapter of { adapter : string }
     | Set_adapter_login of
         { adapter : string
@@ -282,6 +283,7 @@ module Method = struct
     | Generate_text _ -> "generate_text"
     | Generate_cancel _ -> "generate_cancel"
     | List_adapters _ -> "list_adapters"
+    | Retry_models -> "retry_models"
     | Set_adapter _ -> "set_adapter"
     | Set_adapter_login _ -> "set_adapter_login"
     | Import_adapter_login _ -> "import_adapter_login"
@@ -341,6 +343,7 @@ module Method = struct
     | Nix_store_gc { delete_generations = None } -> []
     | List_adapters { refresh = false } -> []
     | List_adapters { refresh = true } -> [ "refresh", Json.bool true ]
+    | Retry_models -> []
     | Set_adapter { adapter } -> [ "adapter", Json.str adapter ]
     | Set_adapter_login { adapter; login } ->
       [ "adapter", Json.str adapter
