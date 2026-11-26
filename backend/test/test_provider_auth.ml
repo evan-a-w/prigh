@@ -37,6 +37,7 @@ let%expect_test "methods, env vars and labels per provider" =
     openai        methods=api_key(OpenAI API key) env=OPENAI_API_KEY
     openai-codex  methods=oauth(ChatGPT Plus/Pro) env=
     deepseek      methods=api_key(DeepSeek API key) env=DEEPSEEK_API_KEY
+    google-antigravity methods=oauth(Antigravity (Google account)) env=
     |}]
 ;;
 
@@ -78,7 +79,7 @@ let%expect_test "resolve: stored credential wins over env; env only as fallback"
     {|
     (Ok
      ((Anthropic ((Api_key ANTHROPIC_API_KEY))) (Openai ()) (Openai_codex ())
-      (Deepseek ((Api_key "stored api key")))))
+      (Deepseek ((Api_key "stored api key"))) (Google_antigravity ())))
     |}]
 ;;
 
@@ -275,7 +276,9 @@ let%expect_test
     {|
     {"type":"event","event":"auth","kind":"logged_out","provider":"deepseek"}
     (Ok ())
-    (Ok ((Anthropic ()) (Openai ()) (Openai_codex ()) (Deepseek ())))
+    (Ok
+     ((Anthropic ()) (Openai ()) (Openai_codex ()) (Deepseek ())
+      (Google_antigravity ())))
     |}]
 ;;
 
@@ -285,22 +288,25 @@ let%expect_test "provider router: unauthenticated request fails with a hint" =
   let provider =
     Provider_router.create ~env:t.env ~getenv:no_env ~store:(store t) ()
   in
-  List.iter Provider_id.builtins ~f:(fun p ->
-    let message =
-      provider.stream
-        { model = Option.value_exn (Model.default_for p)
-        ; system = None
-        ; messages = [ Message.user "hi" ]
-        ; tools = []
-        ; thinking = Off
-        ; max_tokens = None
-        ; cache_key = None
-        ; account = None
-        }
-        ~cancel:Cancellation.never
-        ~on_event:ignore
-    in
-    print_s [%sexp (message.stop_reason : Stop_reason.t)]);
+  (* Antigravity's login has no prigh models. *)
+  List.iter
+    (List.filter_map Provider_id.builtins ~f:Model.default_for)
+    ~f:(fun model ->
+      let message =
+        provider.stream
+          { model
+          ; system = None
+          ; messages = [ Message.user "hi" ]
+          ; tools = []
+          ; thinking = Off
+          ; max_tokens = None
+          ; cache_key = None
+          ; account = None
+          }
+          ~cancel:Cancellation.never
+          ~on_event:ignore
+      in
+      print_s [%sexp (message.stop_reason : Stop_reason.t)]);
   [%expect
     {|
     (Error

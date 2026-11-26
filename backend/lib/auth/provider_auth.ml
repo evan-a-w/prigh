@@ -5,14 +5,14 @@ module Method = Login_method
 let methods : Provider_id.t -> Method.t list = function
   | Anthropic -> [ Oauth; Api_key ]
   | Openai -> [ Api_key ]
-  | Openai_codex -> [ Oauth ]
+  | Openai_codex | Google_antigravity -> [ Oauth ]
   | Deepseek | Custom _ -> [ Api_key ]
 ;;
 
 let env_vars : Provider_id.t -> string list = function
   | Anthropic -> [ "ANTHROPIC_OAUTH_TOKEN"; "ANTHROPIC_API_KEY" ]
   | Openai -> [ "OPENAI_API_KEY" ]
-  | Openai_codex -> []
+  | Openai_codex | Google_antigravity -> []
   | Deepseek -> [ "DEEPSEEK_API_KEY" ]
   | Custom name -> [ Custom_provider.env_var name ]
 ;;
@@ -62,8 +62,13 @@ let env_value ~getenv provider =
     | _ -> None)
 ;;
 
-let refresh_oauth ~env ~cancel provider ~refresh_token =
+let refresh_oauth ~env ~cancel ~store provider ~refresh_token =
   match (provider : Provider_id.t) with
+  | Google_antigravity ->
+    (match Oauth_antigravity.Client.load store with
+     | None -> Or_error.error_string Oauth_antigravity.Client.missing
+     | Some client ->
+       Oauth_antigravity.refresh ~env ~cancel ~client ~refresh_token ())
   | Anthropic -> Oauth_anthropic.refresh ~env ~cancel ~refresh_token ()
   | Openai_codex -> Oauth_openai_codex.refresh ~env ~cancel ~refresh_token ()
   | Openai | Deepseek | Custom _ ->
@@ -120,13 +125,18 @@ let resolve
       ~env
       ?(cancel = Cancellation.never)
       ?(getenv = Sys.getenv)
-      ?(refresh = refresh_oauth ~env ~cancel)
+      ?refresh
       ?refused
       ?valid_for_ms
       ?account
       store
       provider
   =
+  let refresh =
+    match refresh with
+    | Some f -> f
+    | None -> refresh_oauth ~env ~cancel ~store
+  in
   let open Or_error.Let_syntax in
   let%bind accounts = Provider_accounts.list store provider in
   let%bind chosen =
@@ -289,6 +299,10 @@ let login ~env ?account ?label store provider (method_ : Method.t) interaction =
       | Api_key, _ -> login_api_key provider interaction
       | Oauth, Anthropic -> Oauth_anthropic.login ~env interaction
       | Oauth, Openai_codex -> Oauth_openai_codex.login ~env interaction
+      | Oauth, Google_antigravity ->
+        (match Oauth_antigravity.Client.load store with
+         | None -> Or_error.error_string Oauth_antigravity.Client.missing
+         | Some client -> Oauth_antigravity.login ~env ~client interaction)
       | Oauth, (Openai | Deepseek | Custom _) -> assert false)
   in
   Provider_accounts.save_login ?account ?label store provider credential

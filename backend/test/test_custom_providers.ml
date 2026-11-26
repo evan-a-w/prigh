@@ -536,6 +536,7 @@ let%expect_test "auth: stored key, environment, keyless; status" =
     {"provider":"openai","name":"OpenAI API","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null,"accounts":[]}
     {"provider":"openai-codex","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":null,"expires_ms":null,"accounts":[]}
     {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"google-antigravity","name":"Antigravity (Google)","methods":[{"method":"oauth","label":"Antigravity (Google account)"}],"configured":null,"expires_ms":null,"accounts":[]}
     {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"accounts":[{"ref":"aiproxy/main","id":"main","label":"aiproxy API key","method":"api_key","source":"stored api key","default":true,"fallback":false}],"custom":{"base_url":"http://localhost:3000/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     {"provider":"ollama","name":"ollama","methods":[{"method":"api_key","label":"ollama API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"accounts":[],"custom":{"base_url":"http://localhost:11434/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     |}]
@@ -1655,7 +1656,7 @@ let%expect_test
     {"type":"event","event":"auth","kind":"logged_out","provider":"aiproxy"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     ()
-    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"aiproxy\" (one of: anthropic, openai, openai-codex, deepseek; or custom to add an OpenAI-compatible endpoint)"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"aiproxy\" (one of: anthropic, openai, openai-codex, deepseek, google-antigravity; or custom to add an OpenAI-compatible endpoint)"}
     |}]
 ;;
 

@@ -582,8 +582,8 @@ let%expect_test "Codex on one of prigh's ChatGPT logins: chosen, listed, shown" 
       (In_channel.read_all (Filename.concat t.dir ".prigh/config.json")));
   [%expect
     {|
-    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]}]
-    [{"adapter":"codex","provider":"openai-codex","login":"main","label":"Work","choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]}]
+    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]},{"adapter":"acp:antigravity","provider":"google-antigravity","login":null,"label":null,"choices":[]}]
+    [{"adapter":"codex","provider":"openai-codex","login":"main","label":"Work","choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]},{"adapter":"acp:antigravity","provider":"google-antigravity","login":null,"label":null,"choices":[]}]
     {
       "adapters": {
         "codex": {
@@ -594,8 +594,8 @@ let%expect_test "Codex on one of prigh's ChatGPT logins: chosen, listed, shown" 
     (adapter_login ())
     (adapter_login ("\"Work\""))
     {"type":"response","id":"r","ok":false,"error":"ChatGPT has no account \"home\": it has Work (main)"}
-    {"type":"response","id":"r","ok":false,"error":"gemini runs only on its own login (prigh can hand one of its logins to: codex, claude)"}
-    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]}]
+    {"type":"response","id":"r","ok":false,"error":"gemini runs only on its own login (prigh can hand one of its logins to: codex, claude, acp:antigravity)"}
+    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]},{"adapter":"acp:antigravity","provider":"google-antigravity","login":null,"label":null,"choices":[]}]
     {"type":"response","id":"r","ok":false,"error":"no tool host \"nowhere\" is connected (connected: <host>)"}
     (adapter_login ())
     {}

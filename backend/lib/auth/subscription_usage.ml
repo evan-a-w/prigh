@@ -531,6 +531,7 @@ let of_resolved ?getenv ~(http : Http.t) ~now provider resolved =
                  ; "User-Agent", "prigh/" ^ Version.to_string
                  ]
                ()))
+     | Google_antigravity -> Not_signed_in
      | Openai | Deepseek | Custom _ -> Not_signed_in)
 ;;
 

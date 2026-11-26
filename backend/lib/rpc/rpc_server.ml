@@ -3981,10 +3981,20 @@ let import_adapter_login t (client : Client.t) agent params =
   then Ok (`Object (("confirmed", `False) :: found_json))
   else (
     let env = Agent.env agent in
+    let store = Login_manager.store t.login in
+    let%bind () =
+      match found.client with
+      | Some client -> Oauth_antigravity.Client.save store client
+      | None -> Ok ()
+    in
     let%bind id, note =
       Cli_import.take
         ~exec
-        ~refresh:(Provider_auth.refresh_oauth ~env ~cancel:Cancellation.never)
+        ~refresh:
+          (Provider_auth.refresh_oauth
+             ~env
+             ~cancel:Cancellation.never
+             ~store:(Login_manager.store t.login))
         (Login_manager.store t.login)
         found
     in

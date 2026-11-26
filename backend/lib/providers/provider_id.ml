@@ -6,16 +6,18 @@ type t =
   | Openai
   | Openai_codex
   | Deepseek
+  | Google_antigravity
   | Custom of string
 [@@deriving sexp, equal, compare]
 
-let builtins = [ Anthropic; Openai; Openai_codex; Deepseek ]
+let builtins = [ Anthropic; Openai; Openai_codex; Deepseek; Google_antigravity ]
 
 let to_string = function
   | Anthropic -> "anthropic"
   | Openai -> "openai"
   | Openai_codex -> "openai-codex"
   | Deepseek -> "deepseek"
+  | Google_antigravity -> "google-antigravity"
   | Custom name -> name
 ;;
 
@@ -28,10 +30,11 @@ let display_name = function
   | Openai -> "OpenAI API"
   | Openai_codex -> "ChatGPT"
   | Deepseek -> "DeepSeek"
+  | Google_antigravity -> "Antigravity (Google)"
   | Custom name -> name
 ;;
 
 let is_custom = function
   | Custom _ -> true
-  | Anthropic | Openai | Openai_codex | Deepseek -> false
+  | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity -> false
 ;;

@@ -9,11 +9,16 @@ module Host = struct
   type t =
     { files : string String.Table.t
     ; mutable keychain : bool
+    ; mutable keyring : string option
     ; mutable calls : string list
     }
 
   let create files =
-    { files = String.Table.of_alist_exn files; keychain = false; calls = [] }
+    { files = String.Table.of_alist_exn files
+    ; keychain = false
+    ; keyring = None
+    ; calls = []
+    }
   ;;
 
   let field json key =
@@ -33,17 +38,48 @@ module Host = struct
     match name with
     | "bash" ->
       let command = str args "command" in
-      let path =
-        if String.is_substring command ~substring:"CODEX_HOME"
-        then "/home/u/.codex/auth.json"
-        else "/home/u/.claude/.credentials.json"
-      in
-      Tool.Result.ok
-        (sprintf
-           "%s\n%s\n%s\n"
-           path
-           (if Hashtbl.mem t.files path then "file" else "none")
-           (if t.keychain then "keychain" else ""))
+      let has substring = String.is_substring command ~substring in
+      if String.is_prefix command ~prefix:"secret-tool lookup"
+      then (
+        match t.keyring with
+        | Some s -> Tool.Result.ok s
+        | None -> Tool.Result.error "exit 1")
+      else if String.is_prefix command ~prefix:"secret-tool clear"
+      then (
+        t.keyring <- None;
+        Tool.Result.ok "")
+      else if String.is_prefix command ~prefix:"mv -f"
+      then (
+        let from = "/home/u/.gemini/antigravity-cli/antigravity-oauth-token" in
+        match Hashtbl.find_and_remove t.files from with
+        | None -> Tool.Result.error "mv: cannot stat: No such file or directory"
+        | Some _ ->
+          Hashtbl.set
+            t.files
+            ~key:(from ^ ".moved-to-prigh")
+            ~data:"{\"moved_to_prigh\":true}";
+          Tool.Result.ok "")
+      else (
+        let path =
+          if has "antigravity-oauth-token"
+          then "/home/u/.gemini/antigravity-cli/antigravity-oauth-token"
+          else if has "CODEX_HOME"
+          then "/home/u/.codex/auth.json"
+          else "/home/u/.claude/.credentials.json"
+        in
+        Tool.Result.ok
+          (sprintf
+             "%s\n%s\n%s\n"
+             path
+             (if Hashtbl.mem t.files path then "file" else "none")
+             (if t.keychain
+              then "keychain"
+              else if Option.is_some t.keyring
+              then
+                "keyring\n\
+                 client 1-bogus.apps.googleusercontent.com\n\
+                 client GOCSPX-bogus"
+              else "")))
     | "$fs_read" ->
       (match Hashtbl.find t.files (str args "path") with
        | None -> Tool.Result.error "No such file or directory"
@@ -119,10 +155,12 @@ let%expect_test "finding a host's login reads it and changes nothing" =
   [%expect
     {|
     ((adapter codex) (provider Openai_codex) (host laptop)
-     (path /home/u/.codex/auth.json) (credential <opaque>))
+     (path /home/u/.codex/auth.json) (credential <opaque>) (keyring false)
+     (client ()))
     Codex on laptop will stop being logged in: prigh takes its login from /home/u/.codex/auth.json (renamed to /home/u/.codex/auth.json.moved-to-prigh) and refreshes it, which retires the copy there. Its sessions there then run on prigh's login.
     ((adapter claude) (provider Anthropic) (host laptop)
-     (path /home/u/.claude/.credentials.json) (credential <opaque>))
+     (path /home/u/.claude/.credentials.json) (credential <opaque>)
+     (keyring false) (client ()))
     Claude Code on laptop will stop being logged in: prigh takes its login from /home/u/.claude/.credentials.json (renamed to /home/u/.claude/.credentials.json.moved-to-prigh) and refreshes it, which retires the copy there. Its sessions there then run on prigh's login.
     (/home/u/.claude/.credentials.json /home/u/.codex/auth.json)
     |}]
@@ -146,9 +184,9 @@ let%expect_test "what a host without a movable login is told" =
   show_find host "claude";
   [%expect
     {|
-    codex is not logged in on laptop (no /home/u/.codex/auth.json): log prigh in with /login openai-codex
+    Codex is not logged in on laptop (no /home/u/.codex/auth.json): log prigh in with /login openai-codex
     Claude Code on laptop keeps its login in the macOS keychain, which prigh does not read: /login anthropic logs prigh in instead
-    prigh imports only the logins of: codex, claude
+    prigh imports only the logins of: codex, claude, acp:antigravity
     Codex on laptop is logged in with an API key, not ChatGPT: add the key in prigh (/login openai) instead
     Claude Code on laptop has a long-lived token (claude setup-token), which cannot be refreshed or moved: /login anthropic logs prigh in
     |}]
@@ -279,5 +317,84 @@ let%expect_test "the locate command respects CODEX_HOME and CLAUDE_CONFIG_DIR" =
 
     $DIR/c/.credentials.json
     none
+    |}]
+;;
+
+let agy_file =
+  {|{"token":{"access_token":"ya29.host","token_type":"Bearer","refresh_token":"1//host-refresh","expiry":"2026-11-26T05:00:00Z"},"auth_method":"consumer"}|}
+;;
+
+let%expect_test "Antigravity: from its token file or the keyring, with consent" =
+  with_store (fun store ->
+    refreshed := [];
+    let take host =
+      match
+        Cli_import.find
+          ~exec:(Host.exec host)
+          ~adapter:"acp:antigravity"
+          ~host:"laptop"
+      with
+      | Error e -> print_s [%sexp (e : Error.t)]
+      | Ok found ->
+        print_endline (Cli_import.Found.warning found);
+        print_s
+          [%sexp
+            (found.keyring : bool)
+          , (found.client : Oauth_antigravity.Client.t option)];
+        print_s
+          [%sexp
+            (Cli_import.take ~exec:(Host.exec host) ~refresh store found
+             : (Account_id.t * string option) Or_error.t)]
+    in
+    let file_host =
+      Host.create
+        [ "/home/u/.gemini/antigravity-cli/antigravity-oauth-token", agy_file ]
+    in
+    take file_host;
+    Host.show file_host;
+    print_s
+      [%sexp
+        (Hashtbl.find
+           file_host.files
+           "/home/u/.gemini/antigravity-cli/antigravity-oauth-token.moved-to-prigh"
+         : string option)];
+    let keyring_host = Host.create [] in
+    keyring_host.keyring <- Some agy_file;
+    take keyring_host;
+    print_s [%sexp (keyring_host.keyring : string option)];
+    print_s [%sexp (List.rev !refreshed : (Provider_id.t * string) list)];
+    print_s
+      [%sexp
+        (List.map
+           (Provider_accounts.list store Google_antigravity |> Or_error.ok_exn)
+           ~f:(fun a -> a.id, a.label)
+         : (Account_id.t * string) list)];
+    (* Not signed in, a work login, and the macOS keychain. *)
+    take (Host.create []);
+    take
+      (Host.create
+         [ ( "/home/u/.gemini/antigravity-cli/antigravity-oauth-token"
+           , {|{"token":{"access_token":"a","refresh_token":"r"},"auth_method":"gcp"}|}
+           )
+         ]);
+    let mac = Host.create [] in
+    mac.keychain <- true;
+    take mac);
+  [%expect
+    {|
+    Antigravity on laptop will stop being logged in: prigh takes its Google login from /home/u/.gemini/antigravity-cli/antigravity-oauth-token (renamed to /home/u/.gemini/antigravity-cli/antigravity-oauth-token.moved-to-prigh, its tokens blanked, as Google does not retire other copies when prigh refreshes it). Its sessions there then run on prigh's login.
+    (false ())
+    (Ok (main ()))
+    (/home/u/.gemini/antigravity-cli/antigravity-oauth-token.moved-to-prigh)
+    ("{\"moved_to_prigh\":true}")
+    Antigravity on laptop will stop being logged in: prigh takes its Google login from the keyring (service gemini, username antigravity) and clears it there, as Google does not retire other copies when prigh refreshes it. Its sessions there then run on prigh's login.
+    (true ())
+    (Ok (main ()))
+    ()
+    ((Google_antigravity 1//host-refresh) (Google_antigravity 1//host-refresh))
+    ((main "imported from laptop"))
+    "Antigravity is not logged in on laptop (no /home/u/.gemini/antigravity-cli/antigravity-oauth-token): log prigh in with /login google-antigravity"
+    "Antigravity on laptop signs in with \"gcp\", not a personal Google login, which is the one prigh takes: sign agy in with Google there, or use /login google-antigravity"
+    "Antigravity on laptop keeps its login in the macOS keychain, which prigh does not read: /login google-antigravity logs prigh in instead"
     |}]
 ;;

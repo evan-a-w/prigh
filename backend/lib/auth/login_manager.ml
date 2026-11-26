@@ -179,7 +179,7 @@ let start t ?account ?label (provider : Provider_id.t) method_ =
   else (
     match provider with
     | Custom name -> start_custom t ~name ()
-    | Anthropic | Openai | Openai_codex | Deepseek ->
+    | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity ->
       run_flow
         t
         ~run:(fun interaction ->
@@ -243,7 +243,8 @@ let logout t ?account (provider : Provider_id.t) =
             t
             (Failed
                { provider = name; error = "logout: " ^ Error.to_string_hum e }))
-  | Anthropic | Openai | Openai_codex | Deepseek | Custom _ ->
+  | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity | Custom _
+    ->
     Or_error.map (Provider_auth.logout ?account t.store provider) ~f:(fun () ->
       emit t (Logged_out { provider; account }))
 ;;

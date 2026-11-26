@@ -55,6 +55,7 @@ val env_vars : Provider_id.t -> string list
 val refresh_oauth
   :  env:Env.t
   -> cancel:Cancellation.t
+  -> store:Auth_store.t (** where Antigravity's client is kept *)
   -> Provider_id.t
   -> refresh_token:string
   -> Credential.Oauth.t Or_error.t
