@@ -70,10 +70,16 @@ if [ "$(uname)" = Darwin ] && security find-generic-password -s 'Claude Code-cre
       (sprintf
          {|p="$HOME/.gemini/antigravity-cli/antigravity-oauth-token"
 if [ ! -f "$p" ]; then
-  if [ "$(uname)" = Darwin ] && security find-generic-password -s gemini -a antigravity >/dev/null 2>&1; then k=keychain
-  elif command -v secret-tool >/dev/null 2>&1 && secret-tool lookup service gemini username antigravity >/dev/null 2>&1; then k=keyring; fi
+  if [ "$(uname)" = Darwin ]; then
+    if security find-generic-password -s gemini -a antigravity >/dev/null 2>&1; then k=keychain; fi
+  else
+    k=$(
+%s
+)
+  fi
 fi
 c=$(%s)|}
+         Agy_keyring.script
          Oauth_antigravity.Client.find_script)
   | _ -> None
 ;;
@@ -86,9 +92,6 @@ if [ -f "$p" ]; then echo file; else echo none; fi
 echo "${k:-}"
 printf '%s' "${c:-}"|}
 ;;
-
-let keyring_lookup = "secret-tool lookup service gemini username antigravity"
-let keyring_clear = "secret-tool clear service gemini username antigravity"
 
 let result_text (r : Tool.Result.t) =
   if r.is_error then Or_error.error_string r.text else Ok r.text
@@ -205,7 +208,91 @@ let read ~exec ~path =
      | Error _ -> Or_error.error_string "bad reply from the tool host")
 ;;
 
-let find ~exec ~adapter ~host =
+let login_google = "log prigh in with /login google-antigravity"
+
+(* Antigravity's login is not in its token file: the keyring, maybe.
+   [logged_in]: agy started a session on its own login there lately. *)
+let find_in_keyring ~exec ~host ~path ~logged_in ~client probe =
+  let open Or_error.Let_syntax in
+  let couldnt_read (why : Agy_keyring.Unreachable.t) =
+    let advice = Agy_keyring.Unreachable.advice why in
+    let why = Agy_keyring.Unreachable.to_string why ~host in
+    if logged_in
+    then
+      Or_error.errorf
+        "Antigravity is logged in on %s, but prigh couldn't read its login \
+         there: %s. To import it, %s; or %s"
+        host
+        why
+        advice
+        login_google
+    else
+      Or_error.errorf
+        "prigh couldn't tell whether Antigravity is logged in on %s: its login \
+         isn't in %s, and %s. To import it, %s; or %s"
+        host
+        path
+        why
+        advice
+        login_google
+  in
+  match (probe : Agy_keyring.Probe.t) with
+  | Found { readable = true } ->
+    let%bind text =
+      match
+        exec ~name:"bash" (`Object [ "command", `String Agy_keyring.lookup ])
+      with
+      | { Tool.Result.is_error = false; text; _ }
+        when not (String.is_empty (String.strip text)) -> Ok text
+      | { text; _ } ->
+        couldnt_read
+          (Secret_tool
+             (let text = String.strip text in
+              if String.is_empty text then "it printed nothing" else text))
+    in
+    let%map credential =
+      parse_antigravity ~host ~where:"The keyring's Antigravity login" text
+    in
+    { Found.adapter = "acp:antigravity"
+    ; provider = Google_antigravity
+    ; host
+    ; path = "keyring"
+    ; credential
+    ; keyring = true
+    ; client
+    }
+  | Found { readable = false } ->
+    Or_error.errorf
+      "Antigravity's login on %s is in the keyring, but prigh needs \
+       secret-tool to read it and %s has neither secret-tool nor nix: install \
+       libsecret there and Import again, or %s"
+      host
+      host
+      login_google
+  | Locked ->
+    Or_error.errorf
+      "Antigravity's login on %s is in a locked keyring: unlock it (log in to \
+       the desktop session there) and Import again, or %s"
+      host
+      login_google
+  | Empty when logged_in ->
+    Or_error.errorf
+      "Antigravity is logged in on %s, but not with a Google login prigh can \
+       find (none in the keyring or %s; an API key or gcloud credentials?): %s"
+      host
+      path
+      login_google
+  | Empty ->
+    Or_error.errorf
+      "Antigravity on %s has no login in the keyring or %s: run `agy acp \
+       --login` there, or %s"
+      host
+      path
+      login_google
+  | Unreachable why -> couldnt_read why
+;;
+
+let find ?(logged_in = false) ~exec ~adapter ~host () =
   let open Or_error.Let_syntax in
   let%bind provider, body =
     match Cli_login.provider ~adapter, locate_script adapter with
@@ -221,37 +308,25 @@ let find ~exec ~adapter ~host =
     |> Result.map_error ~f:(fun e ->
       Error.tag e ~tag:(sprintf "can't look for %s's login on %s" adapter host))
   in
-  let%bind path, exists, keychain, keyring, client =
+  let%bind path, exists, rest =
     match String.split_lines out with
-    | path :: exists :: rest ->
-      Ok
-        ( path
-        , String.equal exists "file"
-        , List.exists rest ~f:(String.equal "keychain")
-        , List.exists rest ~f:(String.equal "keyring")
-        , Oauth_antigravity.Client.of_candidates
-            (List.filter_map rest ~f:(String.chop_prefix ~prefix:"client ")) )
+    | path :: exists :: rest -> Ok (path, String.equal exists "file", rest)
     | _ -> Or_error.errorf "bad reply from %s: %S" host out
   in
-  if (not exists) && keyring
-  then (
-    let%bind text =
-      exec ~name:"bash" (`Object [ "command", `String keyring_lookup ])
-      |> result_text
-    in
-    let%map credential =
-      parse_antigravity ~host ~where:"The keyring's Antigravity login" text
-    in
-    { Found.adapter
-    ; provider
-    ; host
-    ; path = "keyring"
-    ; credential
-    ; keyring = true
-    ; client
-    })
-  else if not exists
-  then
+  let keychain = List.exists rest ~f:(String.equal "keychain") in
+  let keyring = List.find_map rest ~f:Agy_keyring.Probe.of_line in
+  let client =
+    Oauth_antigravity.Client.of_candidates
+      (List.filter_map rest ~f:(String.chop_prefix ~prefix:"client "))
+  in
+  match exists, keyring with
+  | true, _ ->
+    let%bind text = read ~exec ~path in
+    let%map credential = parse ~adapter ~host ~path text in
+    { Found.adapter; provider; host; path; credential; keyring = false; client }
+  | false, Some probe ->
+    find_in_keyring ~exec ~host ~path ~logged_in ~client probe
+  | false, None ->
     if keychain && Provider_id.equal provider Google_antigravity
     then
       Or_error.errorf
@@ -264,6 +339,24 @@ let find ~exec ~adapter ~host =
         "Claude Code on %s keeps its login in the macOS keychain, which prigh \
          does not read: /login anthropic logs prigh in instead"
         host
+    else if Provider_id.equal provider Google_antigravity
+    then
+      (* macOS without a keychain item, or a host that did not say *)
+      if logged_in
+      then
+        Or_error.errorf
+          "Antigravity is logged in on %s, but prigh couldn't find its login \
+           there (not in %s): %s"
+          host
+          path
+          login_google
+      else
+        Or_error.errorf
+          "Antigravity on %s has no login in %s: run `agy acp --login` there, \
+           or %s"
+          host
+          path
+          login_google
     else
       Or_error.errorf
         "%s is not logged in on %s (no %s): log prigh in with /login %s"
@@ -271,10 +364,6 @@ let find ~exec ~adapter ~host =
         host
         path
         (Provider_id.to_string provider)
-  else (
-    let%bind text = read ~exec ~path in
-    let%map credential = parse ~adapter ~host ~path text in
-    { Found.adapter; provider; host; path; credential; keyring = false; client })
 ;;
 
 let take ~exec ~refresh store (found : Found.t) =
@@ -308,7 +397,7 @@ let take ~exec ~refresh store (found : Found.t) =
   in
   let (moved : Tool.Result.t) =
     match found.provider, found.keyring with
-    | Google_antigravity, true -> bash keyring_clear
+    | Google_antigravity, true -> bash Agy_keyring.clear
     | Google_antigravity, false ->
       (* Google's refresh tokens do not rotate: the renamed copy keeps a
          note, not the tokens. *)
@@ -340,7 +429,7 @@ let take ~exec ~refresh store (found : Found.t) =
               that copy still works"
              found.host
              moved.text
-             keyring_clear
+             Agy_keyring.clear_by_hand
          | Google_antigravity, false ->
            sprintf
              "%s on %s could not be moved (%s): delete it there, as that copy \

@@ -13,6 +13,9 @@ type t =
   ; loading : bool (** asked, no answer yet (the last one stays shown) *)
   ; logins : Adapter_login.t list
     (** the login each CLI that can take one of prigh's runs on *)
+  ; importing : string option
+    (** the CLI whose host login [/adapters import] is looking for: its
+        Import button is busy, and another import waits for the answer *)
   }
 [@@deriving sexp_of, equal]
 
@@ -26,6 +29,9 @@ val loaded
 
 (** [set_adapter_login]'s answer. *)
 val logins_changed : t -> Adapter_login.t list -> t
+
+(** An import started looking for [adapter]'s login ([Some]), or heard back. *)
+val importing : t -> string option -> t
 
 (** [adapters_changed]: the backend's statuses as they are now. *)
 val changed : t -> Adapter_status.t list -> t

@@ -3967,7 +3967,7 @@ let import_adapter_login t (client : Client.t) agent params =
     Agent.host_call_on agent ~host:host.id ~cwd:host.cwd ~name arguments
   in
   let host_name = if String.is_empty host.name then host.id else host.name in
-  let%bind found = Cli_import.find ~exec ~adapter ~host:host_name in
+  let%bind found = Cli_import.find ~exec ~adapter ~host:host_name () in
   let found_json =
     [ "adapter", `String adapter
     ; "provider", `String (Provider_id.to_string found.provider)

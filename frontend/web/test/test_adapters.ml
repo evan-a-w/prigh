@@ -419,3 +419,37 @@ let%expect_test "Engines: Antigravity's login, on a shared Google login" =
      (tag Adapter_import_found))
     |}]
 ;;
+
+let%expect_test
+    "Engines: Import is busy while it looks, so a second click is not a second \
+     import"
+  =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (hello ~features:[ "engines" ]));
+  H.quiet h (fun () -> H.act h (Settings_section Engines));
+  H.reply
+    h
+    "list_adapters"
+    {|{"adapters":[],"adapter_logins":[{"adapter":"acp:antigravity","provider":"google-antigravity","login":null,"label":null,"choices":[]}]}|};
+  H.click h ~selector:".adapter-login-acp-antigravity .adapter-login-import";
+  H.text h ~selector:".adapter-login-import";
+  H.click h ~selector:".adapter-login-acp-antigravity .adapter-login-import";
+  H.act h (Run "/adapters import acp:antigravity");
+  H.fail
+    h
+    "import_adapter_login"
+    "Antigravity on desktop has no login in the keyring or \
+     ~/.gemini/antigravity-cli/antigravity-oauth-token: run `agy acp --login` \
+     there, or log prigh in with /login google-antigravity";
+  H.text h ~selector:".toast";
+  H.text h ~selector:".adapter-login-import";
+  [%expect
+    {|
+    (Run "/adapters import acp:antigravity")
+    (Rpc (method_ import_adapter_login) (params ((adapter acp:antigravity)))
+     (tag Adapter_import_found))
+    (Looking…)
+    Antigravity on desktop has no login in the keyring or ~/.gemini/…antigravity-oauth-token: run `agy acp --login` there, or log prigh in with /login google-antigravity (Dismiss)
+    (Import)
+    |}]
+;;

@@ -33,9 +33,18 @@ module Found : sig
 end
 
 (** Finds and reads [adapter]'s login on the host ([CODEX_HOME],
-    [CLAUDE_CONFIG_DIR] respected), saying what to do when there is none,
-    it is an API key or (macOS) only the keychain has it. *)
-val find : exec:exec -> adapter:string -> host:string -> Found.t Or_error.t
+    [CLAUDE_CONFIG_DIR] respected; Antigravity's in its token file or the
+    Linux keyring, {!Agy_keyring}), saying what to do when there is none, it
+    is an API key, (macOS) only the keychain has it or the keyring cannot be
+    read. [logged_in]: the CLI started a session on its own login on that
+    host lately, so a login prigh cannot find is not called missing. *)
+val find
+  :  ?logged_in:bool
+  -> exec:exec
+  -> adapter:string
+  -> host:string
+  -> unit
+  -> Found.t Or_error.t
 
 (** Takes the login: refreshes it ([refresh]: the provider's token
     endpoint), stores it as a new login labelled {!Found.label} (or the

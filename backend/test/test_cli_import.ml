@@ -10,6 +10,9 @@ module Host = struct
     { files : string String.Table.t
     ; mutable keychain : bool
     ; mutable keyring : string option
+    ; mutable keyring_line : string option
+      (** what the keyring probe says, when not derived from [keyring] *)
+    ; mutable lookup_error : string option
     ; mutable calls : string list
     }
 
@@ -17,6 +20,8 @@ module Host = struct
     { files = String.Table.of_alist_exn files
     ; keychain = false
     ; keyring = None
+    ; keyring_line = None
+    ; lookup_error = None
     ; calls = []
     }
   ;;
@@ -39,12 +44,18 @@ module Host = struct
     | "bash" ->
       let command = str args "command" in
       let has substring = String.is_substring command ~substring in
-      if String.is_prefix command ~prefix:"secret-tool lookup"
+      let locate =
+        has "antigravity-oauth-token"
+        || has "auth.json"
+        || has ".credentials.json"
+      in
+      if (not locate) && has "st lookup service gemini username antigravity"
       then (
-        match t.keyring with
-        | Some s -> Tool.Result.ok s
-        | None -> Tool.Result.error "exit 1")
-      else if String.is_prefix command ~prefix:"secret-tool clear"
+        match t.lookup_error, t.keyring with
+        | Some e, _ -> Tool.Result.error e
+        | None, Some s -> Tool.Result.ok s
+        | None, None -> Tool.Result.error "exit 1")
+      else if (not locate) && has "st clear service gemini username antigravity"
       then (
         t.keyring <- None;
         Tool.Result.ok "")
@@ -74,12 +85,16 @@ module Host = struct
              (if Hashtbl.mem t.files path then "file" else "none")
              (if t.keychain
               then "keychain"
-              else if Option.is_some t.keyring
-              then
-                "keyring\n\
-                 client 1-bogus.apps.googleusercontent.com\n\
-                 client GOCSPX-bogus"
-              else "")))
+              else if not (has "antigravity-oauth-token")
+              then ""
+              else (
+                match t.keyring_line, t.keyring with
+                | Some line, _ -> line
+                | None, Some _ ->
+                  "keyring secret-tool\n\
+                   client 1-bogus.apps.googleusercontent.com\n\
+                   client GOCSPX-bogus"
+                | None, None -> "keyring-empty"))))
     | "$fs_read" ->
       (match Hashtbl.find t.files (str args "path") with
        | None -> Tool.Result.error "No such file or directory"
@@ -135,7 +150,7 @@ let with_store f =
 ;;
 
 let show_find host adapter =
-  match Cli_import.find ~exec:(Host.exec host) ~adapter ~host:"laptop" with
+  match Cli_import.find ~exec:(Host.exec host) ~adapter ~host:"laptop" () with
   | Ok found ->
     print_s [%sexp (found : Cli_import.Found.t)];
     print_endline (Cli_import.Found.warning found)
@@ -202,7 +217,7 @@ let%expect_test "taking a login refreshes it, stores it and renames the file" =
     in
     List.iter [ "codex"; "claude" ] ~f:(fun adapter ->
       let found =
-        Cli_import.find ~exec:(Host.exec host) ~adapter ~host:"laptop"
+        Cli_import.find ~exec:(Host.exec host) ~adapter ~host:"laptop" ()
         |> Or_error.ok_exn
       in
       let id, note =
@@ -225,6 +240,7 @@ let%expect_test "taking a login refreshes it, stores it and renames the file" =
                 (Host.create [ "/home/u/.codex/auth.json", codex_file ]))
            ~adapter:"codex"
            ~host:"laptop"
+           ()
          |> Or_error.ok_exn)
         with
         path = "/home/u/gone.json"
@@ -263,7 +279,7 @@ let%expect_test "a refused refresh moves nothing" =
   with_store (fun store ->
     let host = Host.create [ "/home/u/.codex/auth.json", codex_file ] in
     let found =
-      Cli_import.find ~exec:(Host.exec host) ~adapter:"codex" ~host:"laptop"
+      Cli_import.find ~exec:(Host.exec host) ~adapter:"codex" ~host:"laptop" ()
       |> Or_error.ok_exn
     in
     print_s
@@ -333,6 +349,7 @@ let%expect_test "Antigravity: from its token file or the keyring, with consent" 
           ~exec:(Host.exec host)
           ~adapter:"acp:antigravity"
           ~host:"laptop"
+          ()
       with
       | Error e -> print_s [%sexp (e : Error.t)]
       | Ok found ->
@@ -393,9 +410,172 @@ let%expect_test "Antigravity: from its token file or the keyring, with consent" 
     ()
     ((Google_antigravity 1//host-refresh) (Google_antigravity 1//host-refresh))
     ((main "imported from laptop"))
-    "Antigravity is not logged in on laptop (no /home/u/.gemini/antigravity-cli/antigravity-oauth-token): log prigh in with /login google-antigravity"
+    "Antigravity on laptop has no login in the keyring or /home/u/.gemini/antigravity-cli/antigravity-oauth-token: run `agy acp --login` there, or log prigh in with /login google-antigravity"
     "Antigravity on laptop signs in with \"gcp\", not a personal Google login, which is the one prigh takes: sign agy in with Google there, or use /login google-antigravity"
     "Antigravity on laptop keeps its login in the macOS keychain, which prigh does not read: /login google-antigravity logs prigh in instead"
+    |}]
+;;
+
+let%expect_test "Antigravity: what the keyring said, logged in or not" =
+  let find ?logged_in ?line ?lookup_error ?keyring () =
+    let host = Host.create [] in
+    host.keyring <- keyring;
+    host.keyring_line <- line;
+    host.lookup_error <- lookup_error;
+    match
+      Cli_import.find
+        ?logged_in
+        ~exec:(Host.exec host)
+        ~adapter:"acp:antigravity"
+        ~host:"desktop"
+        ()
+    with
+    | Ok found -> print_s [%sexp (found.path : string), (found.keyring : bool)]
+    | Error e -> print_endline (Error.to_string_hum e)
+  in
+  (* Read with secret-tool, or with it through nix. *)
+  find ~keyring:agy_file ();
+  find ~line:"keyring nix" ~keyring:agy_file ();
+  (* busctl found it, but nothing here reads it. *)
+  find ~line:"keyring -" ();
+  find ~line:"keyring-locked" ();
+  find ~line:"keyring-empty" ();
+  find ~logged_in:true ~line:"keyring-empty" ();
+  find ~line:"keyring-error nobus" ();
+  find ~line:"keyring-error none" ();
+  find
+    ~line:
+      "keyring-error busctl Call failed: The name org.freedesktop.secrets was \
+       not provided by any .service files"
+    ();
+  find
+    ~logged_in:true
+    ~line:
+      "keyring-error busctl Call failed: The name org.freedesktop.secrets was \
+       not provided by any .service files"
+    ();
+  find
+    ~line:
+      "keyring-error secret-tool Cannot autolaunch D-Bus without X11 $DISPLAY"
+    ();
+  (* Found, then refused when read. *)
+  find ~logged_in:true ~keyring:agy_file ~lookup_error:"secret-tool: locked" ();
+  [%expect {|
+    (keyring true)
+    (keyring true)
+    Antigravity's login on desktop is in the keyring, but prigh needs secret-tool to read it and desktop has neither secret-tool nor nix: install libsecret there and Import again, or log prigh in with /login google-antigravity
+    Antigravity's login on desktop is in a locked keyring: unlock it (log in to the desktop session there) and Import again, or log prigh in with /login google-antigravity
+    Antigravity on desktop has no login in the keyring or /home/u/.gemini/antigravity-cli/antigravity-oauth-token: run `agy acp --login` there, or log prigh in with /login google-antigravity
+    Antigravity is logged in on desktop, but not with a Google login prigh can find (none in the keyring or /home/u/.gemini/antigravity-cli/antigravity-oauth-token; an API key or gcloud credentials?): log prigh in with /login google-antigravity
+    prigh couldn't tell whether Antigravity is logged in on desktop: its login isn't in /home/u/.gemini/antigravity-cli/antigravity-oauth-token, and prigh's tool host on desktop has no D-Bus session bus to reach the keyring (DBUS_SESSION_BUS_ADDRESS is unset and /run/user/UID/bus is missing). To import it, run prigh's tool host from the desktop session there (or log in to it) and Import again; or log prigh in with /login google-antigravity
+    prigh couldn't tell whether Antigravity is logged in on desktop: its login isn't in /home/u/.gemini/antigravity-cli/antigravity-oauth-token, and neither secret-tool (libsecret) nor busctl is installed on desktop to read the keyring. To import it, install libsecret (secret-tool) there and Import again; or log prigh in with /login google-antigravity
+    prigh couldn't tell whether Antigravity is logged in on desktop: its login isn't in /home/u/.gemini/antigravity-cli/antigravity-oauth-token, and secret-tool isn't installed on desktop and busctl couldn't reach the Secret Service (Call failed: The name org.freedesktop.secrets was not provided by any .service files). To import it, install libsecret (secret-tool) there, check that a keyring (GNOME Keyring, KWallet) runs, and Import again; or log prigh in with /login google-antigravity
+    Antigravity is logged in on desktop, but prigh couldn't read its login there: secret-tool isn't installed on desktop and busctl couldn't reach the Secret Service (Call failed: The name org.freedesktop.secrets was not provided by any .service files). To import it, install libsecret (secret-tool) there, check that a keyring (GNOME Keyring, KWallet) runs, and Import again; or log prigh in with /login google-antigravity
+    prigh couldn't tell whether Antigravity is logged in on desktop: its login isn't in /home/u/.gemini/antigravity-cli/antigravity-oauth-token, and secret-tool couldn't read the keyring on desktop (Cannot autolaunch D-Bus without X11 $DISPLAY). To import it, check that the keyring runs and is unlocked there, and Import again; or log prigh in with /login google-antigravity
+    Antigravity is logged in on desktop, but prigh couldn't read its login there: secret-tool couldn't read the keyring on desktop (secret-tool: locked). To import it, check that the keyring runs and is unlocked there, and Import again; or log prigh in with /login google-antigravity
+    |}]
+;;
+
+(* The real probe, in bash, with stand-ins for secret-tool, busctl and id. *)
+let%expect_test "the keyring probe in bash: the bus, busctl, secret-tool" =
+  let dir = Filename_unix.temp_dir "prigh-keyring" "" in
+  let script =
+    String.substr_replace_all
+      Agy_keyring.script
+      ~pattern:"/run/user/$(id -u)"
+      ~with_:dir
+  in
+  let case ~name ?(bus = true) ?(tools = []) stubs =
+    let stubs =
+      sprintf
+        {|have() { case " %s " in *" $1 "*) return 0;; *) return 1;; esac; }
+%s|}
+        (String.concat ~sep:" " tools)
+        stubs
+    in
+    (* The prelude's [have] is replaced by the stand-in's. *)
+    let script =
+      String.substr_replace_first
+        script
+        ~pattern:{|have() { command -v "$1" >/dev/null 2>&1; }|}
+        ~with_:stubs
+    in
+    if bus
+    then Out_channel.write_all (dir ^/ "bus") ~data:""
+    else (
+      try Core_unix.unlink (dir ^/ "bus") with
+      | _ -> ());
+    let ic =
+      Core_unix.open_process_in
+        (sprintf
+           "env -u DBUS_SESSION_BUS_ADDRESS bash -c %s"
+           (Filename.quote
+              (script ^ "\necho \"bus=${DBUS_SESSION_BUS_ADDRESS:-}\"")))
+    in
+    let out = In_channel.input_all ic in
+    ignore (Core_unix.close_process_in ic : Core_unix.Exit_or_signal.t);
+    printf
+      "%s: %s"
+      name
+      (String.substr_replace_all out ~pattern:dir ~with_:"$RUN")
+  in
+  let search answer =
+    sprintf {|busctl() { case "$*" in *SearchItems*) %s;; esac; }|} answer
+  in
+  case ~name:"no bus" ~bus:false ~tools:[ "busctl" ] "";
+  case
+    ~name:"busctl finds it, secret-tool reads"
+    ~tools:[ "busctl"; "secret-tool" ]
+    (search {|echo 'ao ao 1 "/org/freedesktop/secrets/collection/login/5" 0'|});
+  case
+    ~name:"busctl finds it, nothing reads"
+    ~tools:[ "busctl" ]
+    (search {|echo 'ao ao 1 "/org/freedesktop/secrets/collection/login/5" 0'|});
+  case
+    ~name:"locked"
+    ~tools:[ "busctl" ]
+    (search {|echo 'ao ao 0 1 "/org/freedesktop/secrets/collection/login/5"'|});
+  case ~name:"empty" ~tools:[ "busctl" ] (search {|echo 'ao ao 0 0'|});
+  case
+    ~name:"no Secret Service"
+    ~tools:[ "busctl" ]
+    (search
+       {|echo "Call failed: The name org.freedesktop.secrets was not provided"; return 1|});
+  case
+    ~name:"secret-tool finds it"
+    ~tools:[ "secret-tool" ]
+    {|secret-tool() { echo secret; }|};
+  case
+    ~name:"secret-tool: none"
+    ~tools:[ "secret-tool" ]
+    {|secret-tool() { return 1; }|};
+  case
+    ~name:"secret-tool fails"
+    ~tools:[ "secret-tool" ]
+    {|secret-tool() { echo "Cannot autolaunch D-Bus" >&2; return 1; }|};
+  case ~name:"no tools" "";
+  ignore (Sys_unix.command ("rm -rf " ^ dir) : int);
+  [%expect {|
+    no bus: keyring-error nobus
+    bus=
+    busctl finds it, secret-tool reads: keyring secret-tool
+    bus=unix:path=$RUN/bus
+    busctl finds it, nothing reads: keyring -
+    bus=unix:path=$RUN/bus
+    locked: keyring-locked
+    bus=unix:path=$RUN/bus
+    empty: keyring-empty
+    bus=unix:path=$RUN/bus
+    no Secret Service: keyring-error busctl Call failed: The name org.freedesktop.secrets was not provided
+    bus=unix:path=$RUN/bus
+    secret-tool finds it: keyring secret-tool
+    bus=unix:path=$RUN/bus
+    secret-tool: none: keyring-empty
+    bus=unix:path=$RUN/bus
+    secret-tool fails: keyring-error secret-tool Cannot autolaunch D-Bus
+    bus=unix:path=$RUN/bus
+    no tools: keyring-error none
+    bus=unix:path=$RUN/bus
     |}]
 ;;
 

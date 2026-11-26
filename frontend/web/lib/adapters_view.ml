@@ -105,7 +105,7 @@ let refresh_row (m : App.Model.t) ~inject =
     ]
 ;;
 
-let login_row ~inject (l : Adapter_login.t) =
+let login_row ~inject ~importing (l : Adapter_login.t) =
   let who = Session_engine.adapter_label l.adapter in
   let current =
     match l.login with
@@ -135,16 +135,26 @@ let login_row ~inject (l : Adapter_login.t) =
         ~label:(sprintf "%s login: %s" who current)
         ~on_click:(inject (Action.Run ("/adapters login " ^ l.adapter)))
         current
-    ; button
-        ~cls:"small adapter-login-import"
-        ~title:
-          (sprintf
-             "Move %s's own login on the session's tool host into prigh \
-              (/adapters import %s)"
-             who
-             l.adapter)
-        ~on_click:(inject (Action.Run ("/adapters import " ^ l.adapter)))
-        [ Node.text "Import" ]
+    ; (if Option.equal String.equal importing (Some l.adapter)
+       then
+         button
+           ~cls:"small adapter-login-import"
+           ~disabled:true
+           ~attrs:[ Attr.create "aria-busy" "true" ]
+           ~on_click:Effect.Ignore
+           [ Html.lamp (); Node.text "Looking…" ]
+       else
+         button
+           ~cls:"small adapter-login-import"
+           ~disabled:(Option.is_some importing)
+           ~title:
+             (sprintf
+                "Move %s's own login on the session's tool host into prigh \
+                 (/adapters import %s)"
+                who
+                l.adapter)
+           ~on_click:(inject (Action.Run ("/adapters import " ^ l.adapter)))
+           [ Node.text "Import" ])
     ]
 ;;
 
@@ -154,7 +164,12 @@ let groups (m : App.Model.t) ~inject =
    (match m.adapters.logins with
     | [] -> []
     | logins ->
-      [ group ~title:"Logins" (List.map logins ~f:(login_row ~inject)) ]))
+      [ group
+          ~title:"Logins"
+          (List.map
+             logins
+             ~f:(login_row ~inject ~importing:m.adapters.importing))
+      ]))
   @
   match m.adapters.statuses with
   | None | Some (Error _) -> []

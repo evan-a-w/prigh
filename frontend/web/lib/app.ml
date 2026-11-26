@@ -4905,8 +4905,12 @@ let adapters_command (m : Model.t) rest =
       let m, more = fetch_adapters ~refresh m in
       m, cmds @ more)
     else m, cmds
+  | Ok (Import _) when Option.is_some m.adapters.importing ->
+    (* Still looking for the last one: a second click is not a second
+       import. *)
+    m, []
   | Ok (Import { adapter; host }) ->
-    ( m
+    ( { m with adapters = Adapters_page.importing m.adapters (Some adapter) }
     , [ call
           (Import_adapter_login { adapter; host; confirm = false })
           ~tag:Adapter_import_found
@@ -9925,6 +9929,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       | Some l -> toast m (Prigh_ui.Adapters_command.changed l)
       | None -> m, [])
   | Adapter_import_found, Ok json ->
+    let m = { m with adapters = Adapters_page.importing m.adapters None } in
     decode m json Adapter_login.Import.of_json ~f:(fun import ->
       let back =
         match m.dialog with
@@ -9960,8 +9965,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          }
        , [] )
      | _ -> error m (String.capitalize e))
-  | ( (Adapter_logins_loaded _ | Adapter_login_saved _ | Adapter_import_found)
-    , Error e ) -> error m (String.capitalize e)
+  | Adapter_import_found, Error e ->
+    error
+      { m with adapters = Adapters_page.importing m.adapters None }
+      (String.capitalize e)
+  | (Adapter_logins_loaded _ | Adapter_login_saved _), Error e ->
+    error m (String.capitalize e)
   | Usage_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
