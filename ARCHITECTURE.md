@@ -243,7 +243,12 @@ a minute, forgets a host's when it (re)connects (`adapters_changed`), and
 answers `list_adapters {refresh?}` (every connected host, the session's
 first), each with the `problem` to show ("Claude Code on laptop is not
 logged in: run `claude auth login` there"); prigh never installs a CLI or
-logs in. prigh-web shows them in Settings → Engines (composer deployed
+logs in. ACP agents have no login-status command: their login is what
+starting them showed (`session/new` in the model-list check or a session:
+opened, or `-32000 Authentication required`), the prigh login they run on,
+or Antigravity's token file; with none of that the row says "Login not
+checked yet", and opening the page or Refresh/Check runs the model-list
+check. prigh-web shows them in Settings → Engines (composer deployed
 only), the TUI with `/adapters`.
 
 Codex can run on one of prigh's ChatGPT logins (`Cli_login`: the user's
