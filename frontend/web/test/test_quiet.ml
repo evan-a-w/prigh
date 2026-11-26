@@ -466,3 +466,84 @@ let%expect_test "web searches and code searches are counted apart" =
   [%expect
     {| ✓ Worked for 6s · searched the web 3 times, searched the code, used Looking things up |}]
 ;;
+
+(* An agent CLI (Antigravity over ACP) says nothing for a while after it is
+   asked and after a step's calls end: "Waiting for …" shows then, and only
+   then; once it thinks, writes or calls, the run says what it does. *)
+let%expect_test "an agent CLI's waiting row and its run never show together" =
+  let waiting =
+    ev {|"event":"agent_waiting","agent":"Antigravity","starting":false|}
+  in
+  let thought text =
+    ev
+      (sprintf
+         {|"event":"message_update","partial":%s,"delta":{"type":"thinking_delta","text":%s}|}
+         (message [ thinking text ])
+         (json text))
+  in
+  let message_start =
+    ev (sprintf {|"event":"message_start","message":%s|} (message []))
+  in
+  let both chat =
+    text ~selector:".entries" chat;
+    Chat_harness.text ~fold:Fold.default ~selector:".entries" chat
+  in
+  let chat =
+    Chat_harness.chat
+      ~running:true
+      [ user 0 "fix the bug"
+      ; ev {|"event":"turn_start"|}
+      ; waiting
+      ; message_start
+      ]
+  in
+  both chat;
+  [%expect
+    {|
+    fix the bug 15:00 Waiting for Antigravity… Esc to stop
+    fix the bug 15:00 Waiting for Antigravity… Esc to stop
+    |}];
+  let chat = Chat_harness.apply chat (thought "Let me look") in
+  both chat;
+  [%expect
+    {|
+    fix the bug 15:00 Thinking
+    fix the bug 15:00 Thinking… Let me look
+    |}];
+  let chat =
+    List.fold
+      ~init:chat
+      ~f:Chat_harness.apply
+      [ assistant ~s:2 [ thinking "Let me look"; call "c1" "bash" bash ]
+      ; start "c1" "bash" bash
+      ; finish ~s:3 "c1" "bash" bash "ok"
+      ]
+  in
+  both chat;
+  [%expect
+    {|
+    fix the bug 15:00 Thinking
+    fix the bug 15:00 Thought Let me look Let me look ✓ bash make
+    |}];
+  (* The step's calls ended: silent again. *)
+  let chat = Chat_harness.apply chat waiting in
+  both chat;
+  [%expect
+    {|
+    fix the bug 15:00 ✓ Worked for 3s · ran a command Waiting for Antigravity… Esc to stop
+    fix the bug 15:00 Thought Let me look Let me look ✓ bash make Waiting for Antigravity… Esc to stop
+    |}];
+  (* It thinks on: the run takes the thought, the waiting row goes. *)
+  let chat =
+    List.fold
+      ~init:chat
+      ~f:Chat_harness.apply
+      [ ev {|"event":"turn_start"|}; waiting; message_start; thought "Now b" ]
+  in
+  both chat;
+  [%expect
+    {|
+    fix the bug 15:00 Thinking
+    fix the bug 15:00 Thought Let me look Let me look ✓ bash make Thinking… Now b
+    |}]
+;;

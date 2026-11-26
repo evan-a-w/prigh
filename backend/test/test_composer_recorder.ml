@@ -643,3 +643,69 @@ let%expect_test
     agent_end (6 new messages)
     |}]
 ;;
+
+let%expect_test
+    "an ACP agent's thought chunks, then text: no waiting once it thinks"
+  =
+  let recorder =
+    Composer_recorder.create
+      ~adapter:"acp:antigravity"
+      ~model:None
+      ~cwd:"/work"
+      ~emit:(fun e ->
+        match e with
+        | Message_start (User _) | Message_end (User _) -> ()
+        | e -> print_endline (Test_agent_loop.show_event e))
+      ~notice:(fun n -> print_endline ("notice: " ^ n))
+      ~prompts:[ Message.user "do it" ]
+  in
+  let feed = Composer_recorder.feed recorder in
+  Composer_recorder.waiting recorder;
+  (* As [Acp_client_codec] reports [agent_thought_chunk]s and
+     [agent_message_chunk]s of messages [g1] and [g2]: the thought ends when
+     the text starts. *)
+  List.iter
+    ~f:feed
+    [ E.Turn_started { turn_id = "t1" }
+    ; Thinking_delta { item = "g1"; text = "Reading " }
+    ; Thinking_delta { item = "g1"; text = "the code." }
+    ; Thinking_done { item = "g1"; text = "Reading the code." }
+    ; Text_delta { item = "g2"; text = "Let me list it." }
+    ; Text_done { item = "g2"; text = "Let me list it." }
+    ; tool ~native_name:"execute" "c1" (`Object [ "command", `String "ls" ])
+    ; Tool_end { id = "c1"; ok = true; output = "a"; changes = []; images = [] }
+    ; Thinking_delta { item = "g3"; text = "One file." }
+    ; Thinking_done { item = "g3"; text = "One file." }
+    ; Text_delta { item = "g4"; text = "Done." }
+    ; Turn_end { turn_id = None; stop = Done }
+    ];
+  ignore (Composer_recorder.finish recorder : Message.t list);
+  [%expect
+    {|
+    agent_start
+    agent_waiting Antigravity
+    turn_start
+    agent_waiting Antigravity
+    message_start assistant
+      update (Thinking_delta"Reading ")
+      update (Thinking_delta"the code.")
+      update (Text_delta"Let me list it.")
+      update (Tool_call_start(index 0)(id c1)(name bash))
+      update (Tool_call_delta(index 0)(arguments"{\"command\":\"ls\"}"))
+    message_end assistant "Let me list it."
+    tool_start bash {"command":"ls"}
+    tool_end "a"
+    message_start tool_result c1
+    message_end
+    turn_end stop=Tool_use tool_results=1
+    agent_waiting Antigravity
+    turn_start
+    agent_waiting Antigravity
+    message_start assistant
+      update (Thinking_delta"One file.")
+      update (Text_delta Done.)
+    message_end assistant "Done."
+    turn_end stop=End_turn tool_results=0
+    agent_end (4 new messages)
+    |}]
+;;

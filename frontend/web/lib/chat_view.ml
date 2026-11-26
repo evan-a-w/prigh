@@ -447,12 +447,22 @@ let hidden ?(deleting = Int.Set.empty) ~fold chat =
         sum + List.count (parts e) ~f:(fun kind -> not (Fold.shows fold kind)))
 ;;
 
+(* An agent CLI was asked and is silent: nothing of it streams. *)
+let agent_waiting chat =
+  Chat.running chat
+  &&
+  match Chat.activity chat with
+  | Starting _ | Waiting_for _ -> true
+  | _ -> false
+;;
+
 module Quiet_deps = struct
   type t =
     { segments : Activity_runs.Segment.t list
     ; continues : bool
     ; tail : bool (** a box here is still taking steps *)
     ; chat_running : bool
+    ; agent_waiting : bool
     }
 
   let equal a b =
@@ -460,6 +470,7 @@ module Quiet_deps = struct
     && Bool.equal a.continues b.continues
     && Bool.equal a.tail b.tail
     && Bool.equal a.chat_running b.chat_running
+    && Bool.equal a.agent_waiting b.agent_waiting
   ;;
 end
 
@@ -593,7 +604,8 @@ and assistant
      the model is failing. *)
   let in_box =
     match quiet, Chat.activity chat with
-    | _, (Retrying _ | Waiting (Some _)) | None, _ -> false
+    | _, (Retrying _ | Waiting (Some _) | Starting _ | Waiting_for _) | None, _
+      -> false
     | Some runs, _ -> Activity_runs.continues runs n
   in
   let pending =
@@ -686,7 +698,11 @@ and activity ~ui ~names ~fold times chat runs (box : Activity_runs.Box.t) =
     let current =
       List.rev statuses |> List.find ~f:(fun (_, status) -> busy status)
     in
-    let running = Option.is_some current || (chat_running && tail) in
+    (* An agent CLI gone silent: the waiting row says so, not the box. *)
+    let running =
+      Option.is_some current
+      || (chat_running && tail && not (agent_waiting chat))
+    in
     let failed =
       List.count statuses ~f:(fun (_, status) ->
         match status with
@@ -946,6 +962,7 @@ and entry
           ; continues = Activity_runs.continues runs n
           ; tail
           ; chat_running = tail && Chat.running chat
+          ; agent_waiting = tail && agent_waiting chat
           }
       , boxes )
   in
@@ -1207,8 +1224,8 @@ and entries_view ?menu ?index ~ui ~names ~deleting ~dividers ~fold times chat =
   (* An agent CLI asked for a reply has said nothing yet: no message of it
      streams, as the model's does from its asking. *)
   let rev_nodes =
-    match Chat.activity chat, Chat.streaming chat with
-    | (Starting _ | Waiting_for _), None when Chat.running chat ->
+    match Chat.streaming chat with
+    | None when agent_waiting chat ->
       keyed "waiting" (div "msg assistant streaming" [ pending chat ])
       :: rev_nodes
     | _ -> rev_nodes
