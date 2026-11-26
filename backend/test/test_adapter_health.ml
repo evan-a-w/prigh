@@ -873,7 +873,7 @@ let%expect_test "ACP agents' logins: checked by starting them, on Refresh" =
          ())
   in
   let spawned = ref [] in
-  let spawn_external ~sw _agent (launch : Adapter.Launch.t) =
+  let spawn_external ~sw _agent ~host:_ (launch : Adapter.Launch.t) =
     let program = List.hd_exn launch.argv in
     spawned := program :: !spawned;
     Ok

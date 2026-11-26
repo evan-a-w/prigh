@@ -499,7 +499,14 @@ type t =
   ; catalogs : Adapter_catalog.t
     (** the composer's CLIs' models and usage limits, by host *)
   ; spawn_external :
-      (Agent.t -> Adapter.Launch.t -> Line_transport.t Or_error.t) option
+      (Agent.t
+       -> host:string
+       -> Adapter.Launch.t
+       -> Line_transport.t Or_error.t)
+        option
+  ; catalog_keys : (string * string option) String.Table.t
+    (** the host and login each composer session's models were last asked
+        for, by session id: when either changes, its clients ask again *)
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
@@ -673,6 +680,7 @@ let end_temporary t agent ~notify =
   then (
     Hashtbl.remove t.agents id;
     Hashtbl.remove t.listed id;
+    Hashtbl.remove t.catalog_keys id;
     Hashtbl.remove t.temporaries id;
     Fiber.fork ~sw:t.sw (fun () ->
       Guarded.run ~what:"ending a temporary session" (fun () ->
@@ -921,6 +929,7 @@ let maybe_evict t agent =
   then (
     Hashtbl.remove t.agents (session_id agent);
     Hashtbl.remove t.listed (session_id agent);
+    Hashtbl.remove t.catalog_keys (session_id agent);
     Agent.stop_engine agent;
     let session = Agent.session agent in
     if Session.persisted session && not (Session.gone session)
@@ -1052,6 +1061,13 @@ let adapter_login t ~adapter =
   | _ -> None
 ;;
 
+(* What {!Adapter_catalog} keeps [adapter]'s catalog under for the login it
+   runs on: [None] for its own. *)
+let catalog_login t ~adapter =
+  Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
+    Provider_id.to_string provider ^ "/" ^ Account_ref.to_string ref_)
+;;
+
 let login_label t provider ref_ =
   match
     Login_choice.find
@@ -1098,6 +1114,36 @@ let state_json t (s : Agent.State.t) =
          (fields @ [ "adapter_login", `String (login_label t provider ref_) ])
      | None -> json)
   | _ -> json
+;;
+
+(* The session's model list changed: its clients ask for it again. *)
+let models_changed t agent =
+  let json =
+    `Object [ "type", `String "event"; "event", `String "models_changed" ]
+  in
+  List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json)
+;;
+
+(* A composer session's harness lists its models on its tool host, on the
+   login it runs on: when the session moves to another host (as a new chat
+   does when the host the user picked connects) or the harness to another
+   login, its clients ask its models again, which asks them there. *)
+let note_catalog_key t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) } ->
+    let key =
+      Agent.active_host agent, catalog_login t ~adapter:(Adapter_id.to_string a)
+    in
+    let id = session_id agent in
+    (match Hashtbl.find t.catalog_keys id with
+     | Some old
+       when [%equal: string * string option] old key
+            || Agent.external_live agent -> ()
+     | Some _ ->
+       Hashtbl.set t.catalog_keys ~key:id ~data:key;
+       models_changed t agent
+     | None -> Hashtbl.set t.catalog_keys ~key:id ~data:key)
+  | _ -> ()
 ;;
 
 let route t agent (event : Agent.Event.t) =
@@ -1149,6 +1195,7 @@ let route t agent (event : Agent.Event.t) =
    | _ -> ());
   match event with
   | State_changed { running; _ } ->
+    note_catalog_key t agent;
     if not running then maybe_evict t agent;
     (* A host's session name may have changed; [set_hosts] is a no-op when
        nothing did, so this does not loop. *)
@@ -1179,7 +1226,8 @@ let with_evidence t (s : Adapter_health.Status.t) =
       (Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
          login_label t provider ref_))
     ~seen:(Adapter_health.Seen.Table.find t.login_seen ~host:s.host s.adapter)
-    ~checking:(Adapter_catalog.asking t.catalogs ~host:s.host adapter)
+    ~checking:
+      (Adapter_catalog.asking t.catalogs ~host:s.host ~login:None adapter)
 ;;
 
 (* The statuses of the deployed adapters on [hosts], in that order. *)
@@ -1278,45 +1326,75 @@ let recheck_adapter t agent adapter =
     adapters_changed t ~hosts:(Agent.state agent).hosts)
 ;;
 
-(* The session's model list changed: its clients ask for it again. *)
-let models_changed t agent =
-  let json =
-    `Object [ "type", `String "event"; "event", `String "models_changed" ]
-  in
-  List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json)
+(* The harness [adapter] said its catalog on [host], on the login [login]:
+   the sessions it runs there, on that login, show its models. *)
+let catalog_changed t ~host ~login adapter =
+  if [%equal: string option] login (catalog_login t ~adapter)
+  then
+    Hashtbl.iter t.agents ~f:(fun agent ->
+      match Agent.engine_choice agent with
+      | { engine = Composer; adapter = Some a }
+        when String.equal (Adapter_id.to_string a) adapter
+             && String.equal (Agent.active_host agent) host ->
+        models_changed t agent
+      | _ -> ())
 ;;
 
-(* The harness [adapter] said its catalog on [host]: the sessions it runs
-   there show its models. *)
-let catalog_changed t ~host adapter =
-  Hashtbl.iter t.agents ~f:(fun agent ->
-    match Agent.engine_choice agent with
-    | { engine = Composer; adapter = Some a }
-      when String.equal (Adapter_id.to_string a) adapter
-           && String.equal (Agent.active_host agent) host ->
-      models_changed t agent
-    | _ -> ())
+(* Why [adapter_id]'s harness, handed prigh's login [credential], did not
+   say its catalog: a refused login is that login's problem, not the
+   harness's own login on the host. *)
+let catalog_login_error (adapter_id : Adapter_id.t) credential e =
+  let label = Cli_credential.label credential in
+  let provider = Provider_id.to_string (Cli_credential.provider credential) in
+  let what_next =
+    sprintf
+      "/login %s logs in again, or Settings → Engines runs %s on its own login"
+      provider
+      (Adapter_id.label adapter_id)
+  in
+  let refused =
+    Acp_adapter.is_not_logged_in e
+    || String.is_substring (Error.to_string_hum e) ~substring:"refused prigh's"
+  in
+  match Cli_credential.last credential with
+  | Some (Error why) ->
+    Error.createf
+      "prigh's %s login %S gave it no token (%s): %s"
+      provider
+      label
+      (Error.to_string_hum why)
+      what_next
+  | (Some (Ok _) | None) when refused ->
+    Error.createf
+      "it was refused prigh's %s login %S, or could not use it: %s"
+      provider
+      label
+      what_next
+  | Some (Ok _) | None -> e
 ;;
 
 (* Runs [adapter]'s harness on the tool host [host] (named [host_name]), in
-   [cwd], only to ask its catalog ({!Adapter.S.catalog}), on its own login:
-   what that shows of the login is noted. *)
+   [cwd], only to ask its catalog ({!Adapter.S.catalog}), on prigh's login
+   [login] (else its own: then what that shows of its own login is
+   noted). *)
 let fetch_catalog
       t
       agent
       ~host
       ~host_name
       ~cwd
+      ~login
       adapter_id
       (module A : Adapter.S)
       ()
   =
-  let start = Adapter.Start.default ~cwd in
+  let login = force login in
+  let start = { (Adapter.Start.default ~cwd) with login } in
   let launch = A.launch start in
   let result =
     let%bind.Or_error transport =
       match t.spawn_external with
-      | Some spawn -> spawn agent launch
+      | Some spawn -> spawn agent ~host launch
       | None ->
         Host_transport.spawn
           ~sw:t.sw
@@ -1343,13 +1421,17 @@ let fetch_catalog
             transport
             start))
   in
-  ignore (note_seen t ~host adapter_id result : bool);
-  result
+  match login with
+  | None ->
+    ignore (note_seen t ~host adapter_id result : bool);
+    result
+  | Some credential ->
+    Result.map_error result ~f:(catalog_login_error adapter_id credential)
 ;;
 
 (* Asks, in the background, the catalog of a Codex, Claude Code or ACP
-   session's harness on its tool host, unless one younger than [max_age]
-   seconds is kept. *)
+   session's harness on its tool host, on the login it runs on, unless one
+   younger than [max_age] seconds is kept. *)
 let ensure_catalog ?(max_age = 1800.) t agent =
   match Agent.engine_choice agent with
   | { engine = Composer
@@ -1360,10 +1442,12 @@ let ensure_catalog ?(max_age = 1800.) t agent =
      | Ok adapter ->
        let host = Agent.active_host agent in
        let name = Adapter_id.to_string adapter_id in
+       let login = catalog_login t ~adapter:name in
        Adapter_catalog.refresh
          t.catalogs
          ~sw:t.sw
          ~host
+         ~login
          name
          ~max_age
          ~fetch:
@@ -1373,13 +1457,15 @@ let ensure_catalog ?(max_age = 1800.) t agent =
               ~host
               ~host_name:(active_host_label agent)
               ~cwd:(Session.cwd (Agent.session agent))
+              ~login:(lazy (cli_credential t agent ~adapter:name))
               adapter_id
               adapter)
          ~on_done:(fun () ->
-           catalog_changed t ~host name;
+           catalog_changed t ~host ~login name;
            match adapter_id with
-           | Acp _ -> adapters_changed t ~hosts:(hosts t)
-           | Codex | Claude | Prigh -> ()))
+           | Acp _ when Option.is_none login ->
+             adapters_changed t ~hosts:(hosts t)
+           | Acp _ | Codex | Claude | Prigh -> ()))
   | _ -> ()
 ;;
 
@@ -1388,18 +1474,38 @@ let ensure_catalog ?(max_age = 1800.) t agent =
 let catalog_failure t agent =
   match Agent.engine_choice agent with
   | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) } ->
-    let host = Agent.active_host agent in
+    let adapter = Adapter_id.to_string a in
+    let login = catalog_login t ~adapter in
     Option.map
-      (Adapter_catalog.failure t.catalogs ~host (Adapter_id.to_string a))
+      (Adapter_catalog.failure
+         t.catalogs
+         ~host:(Agent.active_host agent)
+         ~login
+         adapter)
       ~f:(fun e ->
         sprintf
           "%s on %s did not list its models, so the picker shows only its \
-           default: %s. Check that it is installed and logged in there \
-           (Settings → Engines)."
+           default: %s. %s"
           (Adapter_id.label a)
-          host
-          (Error.to_string_hum e))
+          (active_host_label agent)
+          (Error.to_string_hum e)
+          (match login with
+           | None ->
+             "Check that it is installed and logged in there (Settings → \
+              Engines)."
+           | Some _ -> "Check that it is installed there (Settings → Engines)."))
   | _ -> None
+;;
+
+(* The session's harness's catalog, as asked on its tool host on its
+   login. *)
+let find_catalog t agent (a : Adapter_id.t) =
+  let adapter = Adapter_id.to_string a in
+  Adapter_catalog.find
+    t.catalogs
+    ~host:(Agent.active_host agent)
+    ~login:(catalog_login t ~adapter)
+    adapter
 ;;
 
 (* The session's harness listed no models when asked last (Goose): it has
@@ -1407,12 +1513,7 @@ let catalog_failure t agent =
 let lists_no_models t agent =
   match Agent.engine_choice agent with
   | { engine = Composer; adapter = Some a } ->
-    (match
-       Adapter_catalog.find
-         t.catalogs
-         ~host:(Agent.active_host agent)
-         (Adapter_id.to_string a)
-     with
+    (match find_catalog t agent a with
      | Some { models = []; _ } -> true
      | Some _ | None -> false)
   | _ -> false
@@ -1425,13 +1526,11 @@ let external_models t agent =
   | Some models, _ -> Some models
   | None, { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) }
     ->
-    let adapter = Adapter_id.to_string a in
     Some
-      (match
-         Adapter_catalog.find t.catalogs ~host:(Agent.active_host agent) adapter
-       with
+      (match find_catalog t agent a with
        | Some { models = _ :: _ as models; _ } -> models
-       | Some _ | None -> [ External_model.default ~adapter ])
+       | Some _ | None ->
+         [ External_model.default ~adapter:(Adapter_id.to_string a) ])
   | None, _ -> None
 ;;
 
@@ -1444,18 +1543,33 @@ let harness_usage t agent : Subscription_usage.Harness_usage.t list =
     let name = Adapter_id.to_string adapter_id in
     ensure_catalog ~max_age:60. t agent;
     if Option.is_none (Agent.external_limits agent)
-    then Adapter_catalog.await t.catalogs ~host name;
+    then
+      Adapter_catalog.await
+        t.catalogs
+        ~host
+        ~login:(catalog_login t ~adapter:name)
+        name;
     let label = Adapter_id.label adapter_id in
     let status : Subscription_usage.Status.t =
       match Agent.external_limits agent with
       | Some status -> status
       | None ->
         Failed
-          (sprintf
-             "%s on %s did not say: check that it is installed and logged in \
-              there (Settings → Engines)"
-             label
-             (active_host_label agent))
+          (match adapter_login t ~adapter:name with
+           | None ->
+             sprintf
+               "%s on %s did not say: check that it is installed and logged in \
+                there (Settings → Engines)"
+               label
+               (active_host_label agent)
+           | Some (provider, ref_) ->
+             sprintf
+               "%s on %s did not say, on prigh's %s login %S: check that it is \
+                installed there and that the login works (Settings → Engines)"
+               label
+               (active_host_label agent)
+               (Provider_id.to_string provider)
+               (login_label t provider ref_))
     in
     [ { adapter = name; name = label; status } ]
   | _ -> []
@@ -1520,7 +1634,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
          ~spawn:(fun launch ->
            let spawned =
              match t.spawn_external with
-             | Some spawn -> spawn agent launch
+             | Some spawn -> spawn agent ~host:(Agent.active_host agent) launch
              | None -> host_spawn t agent launch
            in
            if Result.is_error spawned then recheck_adapter t agent adapter_id;
@@ -1537,11 +1651,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
            Agent.host_call agent ~name:Checkpoint.op args)
          ~host:(fun () -> Agent.active_host agent)
          ?handoff_from
-         ~catalog:(fun () ->
-           Adapter_catalog.find
-             t.catalogs
-             ~host:(Agent.active_host agent)
-             adapter_name)
+         ~catalog:(fun () -> find_catalog t agent adapter_id)
          ~on_change:(fun () -> models_changed t agent)
          ())
 ;;
@@ -1782,6 +1892,7 @@ let create
           ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
           ()
     ; spawn_external
+    ; catalog_keys = String.Table.create ()
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
     ; client_seq = 0
@@ -3099,6 +3210,7 @@ let delete_saved ?leaving t client (summary : Session.Summary.t) =
       let agent = Hashtbl.find t.agents summary.id in
       Hashtbl.remove t.agents summary.id;
       Hashtbl.remove t.listed summary.id;
+      Hashtbl.remove t.catalog_keys summary.id;
       Option.iter agent ~f:(fun agent ->
         if Agent.resume_pending agent
         then ignore (Agent.cancel_resume agent : unit Or_error.t);
@@ -3958,6 +4070,7 @@ let check_logins t agent ~force (host : Agent.Host.t) =
         t.catalogs
         ~sw:t.sw
         ~host:host.id
+        ~login:None
         name
         ~max_age:0.
         ~fetch:
@@ -3967,10 +4080,11 @@ let check_logins t agent ~force (host : Agent.Host.t) =
              ~host:host.id
              ~host_name:host.name
              ~cwd:host.cwd
+             ~login:(lazy None)
              adapter_id
              adapter)
         ~on_done:(fun () ->
-          catalog_changed t ~host:host.id name;
+          catalog_changed t ~host:host.id ~login:None name;
           adapters_changed t ~hosts:(hosts t));
       Some (host.id, name)
     | _ -> None)
@@ -4046,7 +4160,7 @@ let list_adapters t (client : Client.t) params =
   if refresh
   then
     List.iter checks ~f:(fun (host, name) ->
-      Adapter_catalog.await t.catalogs ~host name);
+      Adapter_catalog.await t.catalogs ~host ~login:None name);
   `Object
     [ "adapters", adapters_json t (adapter_statuses t hosts)
     ; "adapter_logins", adapter_logins_json t

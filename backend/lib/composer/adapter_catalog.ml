@@ -2,7 +2,12 @@ open! Core
 open! Import
 
 module Key = struct
-  type t = string * string [@@deriving sexp, compare, hash]
+  type t =
+    { host : string
+    ; login : string option
+    ; adapter : string
+    }
+  [@@deriving sexp, compare, hash]
 end
 
 module Entry = struct
@@ -27,23 +32,28 @@ let create ~now () =
   }
 ;;
 
-let find t ~host adapter =
-  Hashtbl.find t.entries (host, adapter)
+let find t ~host ~login adapter =
+  Hashtbl.find t.entries { Key.host; login; adapter }
   |> Option.map ~f:(fun (e : Entry.t) -> e.catalog)
 ;;
 
-let age t ~host adapter =
-  Hashtbl.find t.entries (host, adapter)
+let age t ~host ~login adapter =
+  Hashtbl.find t.entries { Key.host; login; adapter }
   |> Option.map ~f:(fun (e : Entry.t) -> t.now () -. e.at)
 ;;
 
 let retry_after = 60.
-let asking t ~host adapter = Hashtbl.mem t.asking (host, adapter)
 
-let refresh ?(force = false) t ~sw ~host adapter ~max_age ~fetch ~on_done =
-  let key = host, adapter in
+let asking t ~host ~login adapter =
+  Hashtbl.mem t.asking { Key.host; login; adapter }
+;;
+
+let refresh ?(force = false) t ~sw ~host ~login adapter ~max_age ~fetch ~on_done
+  =
+  let key = { Key.host; login; adapter } in
   let fresh =
-    Option.exists (age t ~host adapter) ~f:(fun age -> Float.( < ) age max_age)
+    Option.exists (age t ~host ~login adapter) ~f:(fun age ->
+      Float.( < ) age max_age)
   in
   let failed_lately =
     Option.exists (Hashtbl.find t.failed key) ~f:(fun (at, _) ->
@@ -65,7 +75,7 @@ let refresh ?(force = false) t ~sw ~host adapter ~max_age ~fetch ~on_done =
         Hashtbl.remove t.failed key;
         (* A harness that listed nothing keeps what it listed before. *)
         let catalog =
-          match catalog.models, find t ~host adapter with
+          match catalog.models, find t ~host ~login adapter with
           | [], Some old -> { catalog with models = old.models }
           | _ -> catalog
         in
@@ -78,10 +88,12 @@ let refresh ?(force = false) t ~sw ~host adapter ~max_age ~fetch ~on_done =
         on_done ()))
 ;;
 
-let failure t ~host adapter =
-  Option.map (Hashtbl.find t.failed (host, adapter)) ~f:snd
+let failure t ~host ~login adapter =
+  Option.map (Hashtbl.find t.failed { Key.host; login; adapter }) ~f:snd
 ;;
 
-let await t ~host adapter =
-  Option.iter (Hashtbl.find t.asking (host, adapter)) ~f:Promise.await
+let await t ~host ~login adapter =
+  Option.iter
+    (Hashtbl.find t.asking { Key.host; login; adapter })
+    ~f:Promise.await
 ;;

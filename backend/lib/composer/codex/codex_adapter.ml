@@ -326,6 +326,8 @@ let catalog ~sw ?request_timeout transport (start : Adapter.Start.t) =
   let%map.Or_error t =
     open_process ~sw ?request_timeout transport ~cwd:start.cwd
   in
+  Option.iter start.login ~f:(fun login ->
+    hand_login t (Codex_login.create login));
   let models = list_models t.driver t.codec in
   let limits = read_limits t in
   { Adapter.Catalog.models; limits }

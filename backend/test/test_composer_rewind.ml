@@ -248,7 +248,7 @@ let with_server ?(git = true) f =
   in
   let mask = mask t in
   let turns = ref 0 in
-  let spawn_external _agent (launch : Adapter.Launch.t) =
+  let spawn_external _agent ~host:_ (launch : Adapter.Launch.t) =
     printf "spawn %s\n" (String.concat ~sep:" " launch.argv |> mask);
     Ok
       (Line_transport.Peer.spawn

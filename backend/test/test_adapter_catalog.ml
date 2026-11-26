@@ -66,6 +66,11 @@ let fake_codex ~logged_in (p : Line_transport.Peer.t) =
                      ] )
                ; "nextCursor", `Null
                ])
+       | "account/login/start" ->
+         printf
+           "codex was handed token %s\n"
+           (Option.value (string_at [ "params"; "accessToken" ] j) ~default:"?");
+         reply j (`Object [])
        | "account/rateLimits/read" when not logged_in ->
          write
            p
@@ -206,7 +211,7 @@ let fake_claude (p : Line_transport.Peer.t) =
 ;;
 
 (* Antigravity: its models through the session model API. *)
-let fake_agy (p : Line_transport.Peer.t) =
+let fake_agy ~logged_in (p : Line_transport.Peer.t) =
   let reply j result =
     write
       p
@@ -225,6 +230,18 @@ let fake_agy (p : Line_transport.Peer.t) =
       (match meth with
        | "initialize" ->
          reply j {|{"protocolVersion":1,"agentCapabilities":{}}|}
+       | "session/new" when not logged_in ->
+         write
+           p
+           (`Object
+               [ "jsonrpc", `String "2.0"
+               ; "id", Option.value_exn (Json.member "id" j)
+               ; ( "error"
+                 , `Object
+                     [ "code", `Number "-32000"
+                     ; "message", `String "Authentication required"
+                     ] )
+               ])
        | "session/new" ->
          reply
            j
@@ -245,7 +262,12 @@ let composer =
        ())
 ;;
 
-let with_server ?(logged_in = true) f =
+let with_server
+      ?(logged_in = true)
+      ?(agy_logged_out = Fn.const false)
+      ?(home = false)
+      f
+  =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -270,17 +292,28 @@ let with_server ?(logged_in = true) f =
     latest := Some agent;
     agent
   in
-  let spawn_external _agent (launch : Adapter.Launch.t) =
-    printf "spawn %s\n" (List.hd_exn launch.argv);
-    match launch.argv with
-    | "grok" :: _ -> Or_error.error_string "grok: command not found"
-    | argv ->
+  let spawn_external _agent ~host (launch : Adapter.Launch.t) =
+    (* Antigravity on a login of prigh's runs in a wrapper. *)
+    let program =
+      List.find_exn launch.argv ~f:(fun a ->
+        List.mem [ "codex"; "claude"; "agy"; "grok" ] a ~equal:String.equal)
+    in
+    printf
+      "spawn %s on %s%s\n"
+      program
+      host
+      (match launch.secret with
+       | Some s -> sprintf " with prigh's token in $%s" s.fd_env
+       | None -> "");
+    match program with
+    | "grok" -> Or_error.error_string "grok: command not found"
+    | _ ->
       Ok
         (Line_transport.Peer.spawn
            ~sw
-           (match argv with
-            | "codex" :: _ -> fake_codex ~logged_in
-            | "agy" :: _ -> fake_agy
+           (match program with
+            | "codex" -> fake_codex ~logged_in
+            | "agy" -> fake_agy ~logged_in:(not (agy_logged_out host))
             | _ -> fake_claude))
   in
   let server =
@@ -299,6 +332,7 @@ let with_server ?(logged_in = true) f =
       ~engines:composer
       ~spawn_external
       ~new_agent
+      ?home:(Option.some_if home t.dir)
       ()
   in
   let note_changed = ref None in
@@ -312,7 +346,13 @@ let with_server ?(logged_in = true) f =
     Rpc_server.connect server ~send:(fun json ->
       match string_at [ "event" ] json with
       | Some "notice" ->
-        printf "notice: %s\n" (Option.value_exn (string_at [ "text" ] json))
+        printf
+          "notice: %s\n"
+          (String.substr_replace_all
+             (Option.value_exn (string_at [ "text" ] json))
+             ~pattern:(Machine_name.get ())
+             ~with_:"<machine>"
+           |> String.substr_replace_all ~pattern:t.dir ~with_:"$DIR")
       | Some "models_changed" ->
         print_endline "event: models_changed";
         Option.iter !note_changed ~f:(fun u ->
@@ -384,13 +424,49 @@ let with_server ?(logged_in = true) f =
                ~f:(sprintf " %S")))
     | _ -> print_endline "usage: ?"
   in
-  f ~call ~models ~chip ~usage ~changed ~next_change;
+  let connect_host ~id ~name =
+    let host = Rpc_server.connect server ~send:ignore in
+    ignore
+      (Rpc_server.handle
+         server
+         host
+         (Json.of_string
+            (sprintf
+               {|{"id": 1, "method": "hello", "params": {"name": "%s", "tools": true, "host_id": "%s", "cwd": "%s"}}|}
+               name
+               id
+               t.dir))
+       : Json.t)
+  in
+  let save_login provider =
+    ignore
+      (Or_error.ok_exn
+         (Provider_accounts.save_login
+            ~label:"Work"
+            (Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+            provider
+            (Oauth
+               { access = "tok-" ^ Provider_id.to_string provider
+               ; refresh = "r"
+               ; expires_ms = Int.max_value
+               ; account_id = Some "acct"
+               }))
+       : Account_id.t)
+  in
+  f ~call ~models ~chip ~usage ~changed ~next_change ~connect_host ~save_login;
   Rpc_server.shutdown server
 ;;
 
 let%expect_test "codex: the picker lists Codex's models before the first turn" =
   with_server
-  @@ fun ~call ~models ~chip ~usage ~changed ~next_change:_ ->
+  @@ fun ~call
+       ~models
+       ~chip
+       ~usage
+       ~changed
+       ~next_change:_
+       ~connect_host:_
+       ~save_login:_ ->
   ignore (call ~params:{|{"adapter": "codex"}|} "new_session" : Json.t);
   chip ();
   print_endline "list_models, before Codex said:";
@@ -403,7 +479,7 @@ let%expect_test "codex: the picker lists Codex's models before the first turn" =
     {|
     chip: codex/default (Default)
     list_models, before Codex said:
-    spawn codex
+    spawn codex on backend
       codex/default "Default" thinking=[default low medium high]
     codex got initialize
     codex got model/list
@@ -427,7 +503,14 @@ let%expect_test "codex: the picker lists Codex's models before the first turn" =
 
 let%expect_test "claude: its models and plan limits from its own login" =
   with_server
-  @@ fun ~call ~models ~chip ~usage ~changed ~next_change:_ ->
+  @@ fun ~call
+       ~models
+       ~chip
+       ~usage
+       ~changed
+       ~next_change:_
+       ~connect_host:_
+       ~save_login:_ ->
   ignore (call ~params:{|{"adapter": "claude"}|} "new_session" : Json.t);
   usage ();
   Eio.Promise.await changed;
@@ -435,7 +518,7 @@ let%expect_test "claude: its models and plan limits from its own login" =
   chip ();
   [%expect
     {|
-    spawn claude
+    spawn claude on backend
     claude got initialize
     claude got get_usage
     event: models_changed
@@ -451,12 +534,19 @@ let%expect_test
     "codex logged out: its models still, and what it said of its limits"
   =
   with_server ~logged_in:false
-  @@ fun ~call ~models:_ ~chip:_ ~usage ~changed:_ ~next_change:_ ->
+  @@ fun ~call
+       ~models:_
+       ~chip:_
+       ~usage
+       ~changed:_
+       ~next_change:_
+       ~connect_host:_
+       ~save_login:_ ->
   ignore (call ~params:{|{"adapter": "codex"}|} "new_session" : Json.t);
   usage ();
   [%expect
     {|
-    spawn codex
+    spawn codex on backend
     codex got initialize
     codex got model/list
     codex got account/rateLimits/read
@@ -470,7 +560,14 @@ let%expect_test
      Codex's"
   =
   with_server
-  @@ fun ~call ~models ~chip ~usage:_ ~changed ~next_change ->
+  @@ fun ~call
+       ~models
+       ~chip
+       ~usage:_
+       ~changed
+       ~next_change
+       ~connect_host:_
+       ~save_login:_ ->
   ignore
     (call ~params:{|{"adapter": "acp:antigravity"}|} "new_session" : Json.t);
   print_endline "list_models, before Antigravity said:";
@@ -482,7 +579,7 @@ let%expect_test
   [%expect
     {|
     list_models, before Antigravity said:
-    spawn agy
+    spawn agy on backend
       acp:antigravity/default "Default" thinking=[off]
     agy got initialize
     agy got session/new
@@ -505,7 +602,7 @@ let%expect_test
     {|
     event: models_changed
     list_models, on Codex:
-    spawn codex
+    spawn codex on backend
       codex/default "Default" thinking=[default low medium high]
     codex got initialize
     codex got model/list
@@ -522,7 +619,14 @@ let%expect_test
      it last ran with there"
   =
   with_server
-  @@ fun ~call ~models:_ ~chip ~usage:_ ~changed ~next_change ->
+  @@ fun ~call
+       ~models:_
+       ~chip
+       ~usage:_
+       ~changed
+       ~next_change
+       ~connect_host:_
+       ~save_login:_ ->
   ignore
     (call ~params:{|{"adapter": "acp:antigravity"}|} "new_session" : Json.t);
   (* Asking its models has prigh ask Antigravity. *)
@@ -542,7 +646,7 @@ let%expect_test
   in
   [%expect
     {|
-    spawn agy
+    spawn agy on backend
     agy got initialize
     agy got session/new
     event: models_changed
@@ -566,7 +670,14 @@ let%expect_test
     "a harness that cannot list its models: only its default, and why, once"
   =
   with_server
-  @@ fun ~call ~models ~chip:_ ~usage:_ ~changed:_ ~next_change:_ ->
+  @@ fun ~call
+       ~models
+       ~chip:_
+       ~usage:_
+       ~changed:_
+       ~next_change:_
+       ~connect_host:_
+       ~save_login:_ ->
   ignore (call ~params:{|{"adapter": "acp:grok"}|} "new_session" : Json.t);
   models ();
   (* The fetch failed at once: asked again, the picker says why, once. *)
@@ -574,11 +685,192 @@ let%expect_test
   models ();
   [%expect
     {|
-    spawn grok
+    spawn grok on backend
     event: models_changed
-    notice: Grok Build on backend did not list its models, so the picker shows only its default: grok: command not found. Check that it is installed and logged in there (Settings → Engines).
+    notice: Grok Build on <machine> did not list its models, so the picker shows only its default: grok: command not found. Check that it is installed and logged in there (Settings → Engines).
       acp:grok/default "Default" thinking=[off]
       acp:grok/default "Default" thinking=[off]
       acp:grok/default "Default" thinking=[off]
+    |}]
+;;
+
+let%expect_test
+    "a new chat moving to the host the user picked asks its models there"
+  =
+  with_server ~agy_logged_out:(String.equal "backend")
+  @@ fun ~call
+       ~models
+       ~chip:_
+       ~usage:_
+       ~changed
+       ~next_change
+       ~connect_host
+       ~save_login:_ ->
+  (* A page whose machine's tool host has not connected yet: the chat
+     starts on the backend, where agy is not logged in; it lists its models
+     on the desktop. *)
+  ignore
+    (call
+       ~params:{|{"name": "prigh-web", "prefer_host": "host-desktop"}|}
+       "hello"
+     : Json.t);
+  ignore
+    (call ~params:{|{"adapter": "acp:antigravity"}|} "new_session" : Json.t);
+  models ();
+  Eio.Promise.await changed;
+  models ();
+  [%expect
+    {|
+    spawn agy on backend
+      acp:antigravity/default "Default" thinking=[off]
+    agy got initialize
+    agy got session/new
+    event: models_changed
+    notice: Antigravity on <machine> did not list its models, so the picker shows only its default: Antigravity is not logged in on this host: run `agy acp --login` there. Check that it is installed and logged in there (Settings → Engines).
+      acp:antigravity/default "Default" thinking=[off]
+    |}];
+  let changed = next_change () in
+  connect_host ~id:"host-desktop" ~name:"desktop";
+  Eio.Promise.await changed;
+  let changed = next_change () in
+  models ();
+  Eio.Promise.await changed;
+  models ();
+  [%expect
+    {|
+    notice: tools now run on desktop in $DIR
+    event: models_changed
+    spawn agy on host-desktop
+      acp:antigravity/default "Default" thinking=[off]
+    agy got initialize
+    agy got session/new
+    event: models_changed
+      acp:antigravity/default "Gemini 3.8 Flash" thinking=[off]
+      acp:antigravity/gpt-oss "GPT-OSS 120B (Medium)" thinking=[off]
+    |}]
+;;
+
+let%expect_test
+    "on prigh's login: the catalog is asked on it, and again on another"
+  =
+  with_server ~home:true
+  @@ fun ~call
+       ~models
+       ~chip:_
+       ~usage:_
+       ~changed
+       ~next_change
+       ~connect_host:_
+       ~save_login ->
+  save_login Google_antigravity;
+  save_login Openai_codex;
+  save_login Anthropic;
+  List.iter [ "acp:antigravity"; "codex"; "claude" ] ~f:(fun adapter ->
+    ignore
+      (call
+         ~params:(sprintf {|{"adapter":"%s","login":"work"}|} adapter)
+         "set_adapter_login"
+       : Json.t));
+  ignore
+    (call ~params:{|{"adapter": "acp:antigravity"}|} "new_session" : Json.t);
+  models ();
+  Eio.Promise.await changed;
+  models ();
+  [%expect
+    {|
+    spawn agy on backend with prigh's token in $PRIGH_AGY_TOKEN_FD
+      acp:antigravity/default "Default" thinking=[off]
+    agy got initialize
+    agy got session/new
+    event: models_changed
+      acp:antigravity/default "Gemini 3.8 Flash" thinking=[off]
+      acp:antigravity/gpt-oss "GPT-OSS 120B (Medium)" thinking=[off]
+    |}];
+  (* Back on agy's own login: asked again, on it. *)
+  let changed = next_change () in
+  ignore
+    (call
+       ~params:{|{"adapter":"acp:antigravity","login":"own"}|}
+       "set_adapter_login"
+     : Json.t);
+  Eio.Promise.await changed;
+  let changed = next_change () in
+  models ();
+  Eio.Promise.await changed;
+  [%expect
+    {|
+    event: models_changed
+    spawn agy on backend
+      acp:antigravity/default "Default" thinking=[off]
+    agy got initialize
+    agy got session/new
+    event: models_changed
+    |}];
+  (* Not [usage]: it would also ask prigh's logins' usage, over the
+     network. *)
+  let switch adapter =
+    let changed = next_change () in
+    ignore
+      (call ~params:(sprintf {|{"adapter": "%s"}|} adapter) "set_adapter"
+       : Json.t);
+    Eio.Promise.await changed;
+    let changed = next_change () in
+    models ();
+    Eio.Promise.await changed
+  in
+  switch "codex";
+  switch "claude";
+  [%expect
+    {|
+    event: models_changed
+    event: models_changed
+    spawn codex on backend
+      codex/default "Default" thinking=[default low medium high]
+    codex got initialize
+    codex got account/login/start
+    codex was handed token tok-openai-codex
+    codex got model/list
+    codex got account/rateLimits/read
+    event: models_changed
+    event: models_changed
+    event: models_changed
+    spawn claude on backend with prigh's token in $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
+      claude/default "Default" thinking=[off default low medium high max]
+    claude got initialize
+    claude got get_usage
+    event: models_changed
+    |}]
+;;
+
+let%expect_test "prigh's login refused: what to do is about that login" =
+  with_server ~home:true ~agy_logged_out:(Fn.const true)
+  @@ fun ~call
+       ~models
+       ~chip:_
+       ~usage:_
+       ~changed
+       ~next_change:_
+       ~connect_host:_
+       ~save_login ->
+  save_login Google_antigravity;
+  ignore
+    (call
+       ~params:{|{"adapter":"acp:antigravity","login":"work"}|}
+       "set_adapter_login"
+     : Json.t);
+  ignore
+    (call ~params:{|{"adapter": "acp:antigravity"}|} "new_session" : Json.t);
+  models ();
+  Eio.Promise.await changed;
+  models ();
+  [%expect
+    {|
+    spawn agy on backend with prigh's token in $PRIGH_AGY_TOKEN_FD
+      acp:antigravity/default "Default" thinking=[off]
+    agy got initialize
+    agy got session/new
+    event: models_changed
+    notice: Antigravity on <machine> did not list its models, so the picker shows only its default: it was refused prigh's google-antigravity login "Work", or could not use it: /login google-antigravity logs in again, or Settings → Engines runs Antigravity on its own login. Check that it is installed there (Settings → Engines).
+      acp:antigravity/default "Default" thinking=[off]
     |}]
 ;;

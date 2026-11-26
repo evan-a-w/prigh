@@ -123,9 +123,12 @@ val create
            [adapter]; a session on one not deployed can be read but not run
            ([state]'s [unavailable]). *)
   -> ?spawn_external:
-       (Agent.t -> Adapter.Launch.t -> Line_transport.t Or_error.t)
-       (** starts a composer session's harness (default: on the session's
-           active tool host, with [$process]) *)
+       (Agent.t
+        -> host:string
+        -> Adapter.Launch.t
+        -> Line_transport.t Or_error.t)
+       (** starts a composer session's harness on the tool host [host]
+           (default: there, with [$process]) *)
   -> new_agent:(?session:Session.t -> cwd:string -> unit -> Agent.t)
   -> ?default_agent:Agent.t
   -> unit
