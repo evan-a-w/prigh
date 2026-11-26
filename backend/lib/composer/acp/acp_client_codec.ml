@@ -256,6 +256,7 @@ module Tool = struct
     ; mutable output : string
     ; mutable changes : Adapter_event.Change.t list
     ; mutable images : Image.t list
+    ; mutable running : bool (* said to be [in_progress] *)
     ; mutable ended : bool
     }
 end
@@ -967,15 +968,181 @@ let block_image block : Image.t option =
   | _ -> None
 ;;
 
-let tool_kind ~acp_kind ~name : Adapter_event.Tool_kind.t =
-  match acp_kind with
-  | "read" -> Read
-  | "edit" | "delete" | "move" -> File_change
-  | "search" -> Search
-  | "execute" -> Command
-  | "fetch" -> Web_search
-  | "think" | "switch_mode" -> Other acp_kind
-  | _ -> Other (Option.value name ~default:"other")
+(* ACP's [search] kind covers web searches as well as searches of the
+   code, so the agent's tool name (its [name], in its [_meta] or in its
+   title, e.g. Antigravity's "Running search_web") and its input decide
+   which a call is. *)
+module Tool_class = struct
+  type t =
+    | Web_search
+    | Web_fetch
+    | Code_search
+
+  let normalise s =
+    String.lowercase s
+    |> String.map ~f:(function
+      | '-' -> '_'
+      | c -> c)
+  ;;
+
+  let names =
+    [ ( Web_search
+      , [ "search_web"
+        ; "web_search"
+        ; "websearch"
+        ; "google_search"
+        ; "googlesearch"
+        ; "google_web_search"
+        ; "brave_search"
+        ; "bing_search"
+        ; "search_the_web"
+        ] )
+    ; ( Web_fetch
+      , [ "fetch"
+        ; "web_fetch"
+        ; "webfetch"
+        ; "fetch_url"
+        ; "url_fetch"
+        ; "read_url"
+        ; "read_url_content"
+        ; "open_url"
+        ; "browse_url"
+        ] )
+    ; ( Code_search
+      , [ "grep"
+        ; "glob"
+        ; "ripgrep"
+        ; "rg"
+        ; "find"
+        ; "grep_search"
+        ; "find_by_name"
+        ; "find_files"
+        ; "search_files"
+        ; "file_search"
+        ; "codebase_search"
+        ; "code_search"
+        ; "search_code"
+        ] )
+    ]
+  ;;
+
+  let of_name name =
+    let name = normalise name in
+    List.find_map names ~f:(fun (t, names) ->
+      Option.some_if (List.mem names name ~equal:String.equal) t)
+  ;;
+
+  (* The words of a title's label (before any [:], where a query or path
+     would follow), at most the first three. *)
+  let label_words title =
+    let label =
+      match String.lsplit2 title ~on:':' with
+      | Some (label, _) -> label
+      | None -> title
+    in
+    String.split_on_chars
+      (normalise label)
+      ~on:[ ' '; '\t'; '('; ')'; ','; '"'; '\''; '`' ]
+    |> List.filter ~f:(Fn.non String.is_empty)
+    |> Fn.flip List.take 3
+  ;;
+
+  (* The tool's own name: its [name], one in its [_meta], or a known one in
+     its title's label. *)
+  let tool_name ~name ~meta ~title =
+    let in_meta =
+      let from json =
+        List.find_map [ "toolName"; "tool_name" ] ~f:(fun key -> str key json)
+      in
+      match meta with
+      | Some (`Object fields as meta) ->
+        Option.first_some
+          (from meta)
+          (List.find_map fields ~f:(fun (_, v) -> from v))
+      | _ -> None
+    in
+    match Option.first_some name in_meta with
+    | Some name -> Some name
+    | None ->
+      List.find (label_words title) ~f:(fun w -> Option.is_some (of_name w))
+  ;;
+
+  let keys raw =
+    match raw with
+    | Some (`Object fields) ->
+      List.map fields ~f:(fun (k, _) -> String.lowercase k)
+    | _ -> []
+  ;;
+
+  let has keys names = List.exists names ~f:(List.mem keys ~equal:String.equal)
+
+  let of_input raw =
+    let keys = keys raw in
+    if has keys [ "url"; "uri" ]
+    then Some Web_fetch
+    else if
+      has
+        keys
+        [ "pattern"
+        ; "regex"
+        ; "glob"
+        ; "include"
+        ; "includes"
+        ; "path"
+        ; "paths"
+        ; "searchpath"
+        ; "searchdirectory"
+        ; "directory"
+        ; "dir"
+        ; "targetdirectories"
+        ]
+    then Some Code_search
+    else if has keys [ "query"; "q"; "search_query" ]
+    then Some Web_search
+    else None
+  ;;
+
+  let of_title title =
+    Option.some_if
+      (List.mem (label_words title) "web" ~equal:String.equal)
+      Web_search
+  ;;
+end
+
+(* What a call is, and the name it goes by: when not sure, [Other] with the
+   agent's own title, rather than a wrong prigh tool. *)
+let tool_kind ~acp_kind ~name ~meta ~title ~raw_input
+  : Adapter_event.Tool_kind.t * string
+  =
+  let tool_name = Tool_class.tool_name ~name ~meta ~title in
+  let native default = Option.value tool_name ~default in
+  let classified =
+    match acp_kind with
+    | "search" | "fetch" | "other" ->
+      let by_name = Option.bind tool_name ~f:Tool_class.of_name in
+      (match by_name, acp_kind with
+       | Some c, _ -> Some c
+       | None, "other" -> None
+       | None, _ ->
+         Option.first_some
+           (Tool_class.of_input raw_input)
+           (Option.first_some
+              (Tool_class.of_title title)
+              (Option.some_if
+                 (String.equal acp_kind "fetch")
+                 Tool_class.Web_fetch)))
+    | _ -> None
+  in
+  match classified, acp_kind with
+  | Some (Web_search | Web_fetch), _ -> Web_search, native acp_kind
+  | Some Code_search, _ -> Search, native acp_kind
+  | None, "read" -> Read, native acp_kind
+  | None, ("edit" | "delete" | "move") -> File_change, native acp_kind
+  | None, "execute" -> Command, native acp_kind
+  | None, ("think" | "switch_mode") -> Other acp_kind, native acp_kind
+  | None, _ ->
+    let native = native title in
+    Other native, native
 ;;
 
 let next_item (turn : Turn.t) prefix =
@@ -1132,6 +1299,16 @@ let apply_tool t id (tool : Tool.t) update =
         ]
       else []
   in
+  (* Said to run: it starts now, so that its time counts from here. *)
+  let running =
+    match str "status" update with
+    | Some "in_progress" when not (tool.running || tool.ended) ->
+      tool.running <- true;
+      if List.is_empty updates
+      then [ Output.Event (Tool_update { id; output = "" }) ]
+      else []
+    | _ -> []
+  in
   let ended =
     match str "status" update with
     | Some (("completed" | "failed") as status) when not tool.ended ->
@@ -1154,7 +1331,7 @@ let apply_tool t id (tool : Tool.t) update =
     | _ -> []
   in
   ignore t;
-  updates @ ended
+  running @ updates @ ended
 ;;
 
 (* The call [update] names, started (with [Tool_start]) if it is new. *)
@@ -1166,15 +1343,23 @@ let tool_of_update t update =
      | Some tool -> Some (id, tool, [])
      | None ->
        let acp_kind = Option.value (str "kind" update) ~default:"other" in
-       let name = str "name" update in
-       let kind = tool_kind ~acp_kind ~name in
        let title = Option.value (str "title" update) ~default:acp_kind in
+       let raw_input = field "rawInput" update in
+       let kind, native_name =
+         tool_kind
+           ~acp_kind
+           ~name:(str "name" update)
+           ~meta:(field "_meta" update)
+           ~title
+           ~raw_input
+       in
        let tool =
          { Tool.acp_kind
          ; kind
          ; output = ""
          ; changes = []
          ; images = []
+         ; running = false
          ; ended = false
          }
        in
@@ -1184,9 +1369,9 @@ let tool_of_update t update =
            (Tool_start
               { id
               ; kind
-              ; native_name = Option.value name ~default:acp_kind
+              ; native_name
               ; title
-              ; input = tool_input ~kind ~title (field "rawInput" update)
+              ; input = tool_input ~kind ~title raw_input
               ; parent = None
               })
        in

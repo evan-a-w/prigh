@@ -1266,6 +1266,20 @@ module Model = struct
     | _ -> None
   ;;
 
+  (* An agent CLI's models' names: its replies are by their keys. *)
+  let model_names t =
+    let external_ (model : Llm.t) =
+      String.equal model.provider "codex"
+      || String.equal model.provider "claude"
+      || String.is_prefix model.provider ~prefix:"acp:"
+    in
+    Option.to_list (Option.map t.state ~f:(fun (s : State.t) -> s.model))
+    @ t.models
+    |> List.filter ~f:external_
+    |> List.map ~f:(fun (model : Llm.t) -> model.key, model.name)
+    |> String.Map.of_alist_reduce ~f:(fun first _ -> first)
+  ;;
+
   let message_time t =
     Message_time.create
       ~now:(Option.value t.now ~default:Time_ns.epoch)

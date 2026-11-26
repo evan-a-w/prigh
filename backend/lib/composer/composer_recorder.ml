@@ -509,11 +509,13 @@ let feed t (event : Adapter_event.t) =
       if not c.ended
       then (
         ensure_started t c;
-        Buffer.add_string c.output output;
-        emit_in
-          t
-          ~parent:c.parent
-          (Tool_output { call_id = id; chunk = output })))
+        if not (String.is_empty output)
+        then (
+          Buffer.add_string c.output output;
+          emit_in
+            t
+            ~parent:c.parent
+            (Tool_output { call_id = id; chunk = output }))))
   | Tool_end { id; ok; output; changes; images } ->
     Option.iter (Hashtbl.find t.calls id) ~f:(fun c ->
       end_call t c ~ok ~output ~changes ~images)

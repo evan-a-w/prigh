@@ -375,14 +375,17 @@ let stopped (message : Message.Assistant.t) =
   | End_turn | Tool_use -> Node.none
 ;;
 
-(* A reply's model and tokens, and when it ended; a step that goes on with
-   tool calls has neither. *)
-let footer times (message : Message.Assistant.t) =
+(* A reply's model (by its name in [names], an agent CLI's model's key
+   being no name for people) and tokens, and when it ended; a step that goes
+   on with tool calls has neither. *)
+let footer ~names times (message : Message.Assistant.t) =
   let usage =
     match message.stop_reason with
     | End_turn when message.usage.output > 0 ->
       let { Usage.input; output; cache_read } = message.usage in
-      [ message.model; tokens (input + cache_read) ^ " in" ]
+      [ Option.value (Map.find names message.model) ~default:message.model
+      ; tokens (input + cache_read) ^ " in"
+      ]
       @ (if cache_read > 0 then [ tokens cache_read ^ " cached" ] else [])
       @ [ tokens output ^ " out" ]
     | _ -> []
@@ -466,6 +469,7 @@ module Deps = struct
     ; running : bool
     ; tools : Chat.Tool.t option list
     ; times : Message_time.t
+    ; names : string String.Map.t
     ; expanded : bool list (** the entry's folds *)
     ; nested : Fold.t option (** all of them, with subagents' transcripts *)
     ; more : More.t option
@@ -484,6 +488,7 @@ module Deps = struct
     && Bool.equal a.running b.running
     && List.equal (Option.equal phys_equal) a.tools b.tools
     && Message_time.equal a.times b.times
+    && Map.equal String.equal a.names b.names
     && List.equal Bool.equal a.expanded b.expanded
     && Option.equal Fold.equal a.nested b.nested
     && Option.equal Quiet_deps.equal a.quiet b.quiet
@@ -502,6 +507,7 @@ end
 module Chat_deps = struct
   type t =
     { times : Message_time.t
+    ; names : string String.Map.t
     ; fold : Fold.t
     ; menu : Menu.t option
     ; index : Message_index.t option
@@ -514,6 +520,7 @@ module Chat_deps = struct
   let equal a b =
     a.sessions = b.sessions
     && Message_time.equal a.times b.times
+    && Map.equal String.equal a.names b.names
     && Fold.equal a.fold b.fold
     && Option.equal Menu.equal a.menu b.menu
     && Option.equal phys_equal a.index b.index
@@ -534,12 +541,13 @@ let ui_sent chat =
 let entries : (Chat.Entry.t, Deps.t) View_cache.t = View_cache.create ()
 let chats : (Chat.t, Chat_deps.t) View_cache.t = View_cache.create ()
 
-let rec nested ~ui ~fold times (s : Chat.Subagent.t) =
-  view ~ui ~fold:(Fold.scoped fold s.agent_id) times s.chat
+let rec nested ~ui ~names ~fold times (s : Chat.Subagent.t) =
+  view ~ui ~names ~fold:(Fold.scoped fold s.agent_id) times s.chat
 
 and assistant
       ?quiet
       ~ui
+      ~names
       ~fold
       times
       chat
@@ -562,7 +570,7 @@ and assistant
       Tool_view.view
         ~ui
         ?started:message.at
-        ~nested:(nested ~ui ~fold times)
+        ~nested:(nested ~ui ~names ~fold times)
         ~fold
         ~streaming:(streaming && last)
         ~running:(Chat.running chat)
@@ -578,7 +586,7 @@ and assistant
       List.concat_map (Activity_runs.segments runs n) ~f:(function
         | Whole -> List.mapi message.content ~f:block
         | Blocks is -> List.map is ~f:(fun i -> block i content.(i))
-        | Box box -> [ activity ~ui ~fold times chat runs box ])
+        | Box box -> [ activity ~ui ~names ~fold times chat runs box ])
   in
   let blocks = present blocks in
   (* Quiet: the box of the run it goes on with says what it does, unless
@@ -638,13 +646,13 @@ and assistant
               || (List.is_empty blocks
                   && not (Transcript_filter.is_all (Fold.filter fold)))
             then Node.none
-            else footer times message)
+            else footer ~names times message)
          ])
 
 (* Quiet: a run of steps as one line saying what it is doing, or what it
    did and how long it took; the line opens the steps, each a line that
    opens its detail. Collapsed, the steps are not rendered at all. *)
-and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
+and activity ~ui ~names ~fold times chat runs (box : Activity_runs.Box.t) =
   let steps =
     List.filter (Activity_runs.Box.steps box) ~f:(fun step ->
       Fold.shows fold (Activity_runs.Step.kind step))
@@ -777,7 +785,7 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                   Tool_view.view
                     ~ui
                     ?started:at
-                    ~nested:(nested ~ui ~fold times)
+                    ~nested:(nested ~ui ~names ~fold times)
                     ~fold
                     ~streaming
                     ~running:chat_running
@@ -792,12 +800,18 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                     ~live
                     text
                 | Report { user; _ } ->
-                  render_entry ~ui ~fold times chat ~n:0 (Chat.Entry.User user))
-             )
+                  render_entry
+                    ~ui
+                    ~names
+                    ~fold
+                    times
+                    chat
+                    ~n:0
+                    (Chat.Entry.User user)))
          else Node.none)
       ])
 
-and render_entry ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
+and render_entry ?quiet ~ui ~names ~fold times chat ~n (entry : Chat.Entry.t) =
   let segments =
     Option.map quiet ~f:(fun runs -> runs, Activity_runs.segments runs n)
   in
@@ -806,7 +820,7 @@ and render_entry ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
     when not (Activity_runs.equal_segments segments [ Whole ]) ->
     (match
        List.filter_map segments ~f:(function
-         | Box box -> Some (activity ~ui ~fold times chat runs box)
+         | Box box -> Some (activity ~ui ~names ~fold times chat runs box)
          | Whole | Blocks _ -> None)
        |> present
      with
@@ -855,7 +869,7 @@ and render_entry ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
          "msg shell"
          [ Tool_view.view
              ~ui
-             ~nested:(nested ~ui ~fold times)
+             ~nested:(nested ~ui ~names ~fold times)
              ~fold
              ~streaming:false
              ~running:
@@ -866,11 +880,22 @@ and render_entry ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
          ]
      | Compaction summary -> compaction summary
      | Assistant { message; streaming } ->
-       assistant ?quiet ~ui ~fold times chat ~n message ~streaming)
+       assistant ?quiet ~ui ~names ~fold times chat ~n message ~streaming)
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
-and entry ?menu ?index ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
+and entry
+      ?menu
+      ?index
+      ?quiet
+      ~ui
+      ~names
+      ~fold
+      times
+      chat
+      ~n
+      (entry : Chat.Entry.t)
+  =
   let span = Option.bind index ~f:(fun index -> Message_index.span index n) in
   let more : More.t option =
     match span, entry with
@@ -949,6 +974,7 @@ and entry ?menu ?index ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
       ; running
       ; tools
       ; times
+      ; names
       ; expanded =
           List.concat_map ids ~f:(fun id ->
             [ Fold.expanded fold id
@@ -977,7 +1003,7 @@ and entry ?menu ?index ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
       }
     ~equal:Deps.equal
     ~f:(fun () ->
-      let node = render_entry ?quiet ~ui ~fold times chat ~n entry in
+      let node = render_entry ?quiet ~ui ~names ~fold times chat ~n entry in
       let places =
         (if Jump.landmark entry
          then [ Attr.create "data-entry" (Int.to_string n) ]
@@ -1025,6 +1051,7 @@ and view
       ?index
       ?(deleting = Int.Set.empty)
       ?(dividers = [])
+      ?(names = String.Map.empty)
       times
       chat
   =
@@ -1033,6 +1060,7 @@ and view
     chat
     ~deps:
       { Chat_deps.times
+      ; names
       ; fold
       ; menu
       ; index
@@ -1043,12 +1071,12 @@ and view
       }
     ~equal:Chat_deps.equal
     ~f:(fun () ->
-      entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat)
+      entries_view ?menu ?index ~ui ~names ~deleting ~dividers ~fold times chat)
 
 (* What a trim after a message keeps out of the context: a divider where it
    was, with Show (the messages below it, dimmed and read-only) or Hide, and
    Undo; the page's click listener turns them into actions. *)
-and divider ~ui ~fold times (d : Divider.t) =
+and divider ~ui ~names ~fold times (d : Divider.t) =
   let h = d.hidden in
   let label = Trim.label ~messages:h.messages ~tokens:h.tokens in
   let busy text =
@@ -1130,12 +1158,12 @@ and divider ~ui ~fold times (d : Divider.t) =
                    "trimmed-note"
                    "Kept in the transcript only; the model no longer sees them."
                ]
-           ; view ~ui ~fold times chat
+           ; view ~ui ~names ~fold times chat
            ]
        | Folded | Loading -> Node.none)
     ]
 
-and entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat =
+and entries_view ?menu ?index ~ui ~names ~deleting ~dividers ~fold times chat =
   let ui = { ui with Ui_context.Page.sent = ui_sent chat } in
   let quiet =
     if Fold.quiet fold then Some (Activity_runs.of_chat chat) else None
@@ -1144,7 +1172,7 @@ and entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat =
     List.filter_map dividers ~f:(fun (d : Divider.t) ->
       Option.some_if
         (d.after = n)
-        (keyed ("hidden-" ^ d.hidden.entry) (divider ~ui ~fold times d)))
+        (keyed ("hidden-" ^ d.hidden.entry) (divider ~ui ~names ~fold times d)))
   in
   let entry_time : Chat.Entry.t -> Time_ns.t option = function
     | User u -> u.at
@@ -1173,7 +1201,7 @@ and entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat =
               (dividers_after i)
               (keyed
                  (Int.to_string i)
-                 (entry ?menu ?index ?quiet ~ui ~fold times chat ~n:i e)
+                 (entry ?menu ?index ?quiet ~ui ~names ~fold times chat ~n:i e)
                :: rev_nodes) )))
   in
   div "entries" (List.rev rev_nodes)

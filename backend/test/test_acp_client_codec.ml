@@ -627,6 +627,7 @@ let%expect_test
     < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call","toolCallId":"c1","title":"sleep 100","kind":"execute","status":"in_progress"}}}
     (Tool_start (id c1) (kind Command) (native_name execute) (title "sleep 100")
      (input (Object ((command (String "sleep 100"))))) (parent ()))
+    (Tool_update (id c1) (output ""))
     < {"jsonrpc":"2.0","id":5,"method":"session/request_permission","params":{"sessionId":"ses_1","toolCall":{"toolCallId":"c2","title":"rm x","kind":"delete"},"options":[{"optionId":"y","name":"Yes","kind":"allow_once"}]}}
     (Tool_start (id c2) (kind File_change) (native_name delete) (title "rm x")
      (input (Object ())) (parent ()))
@@ -897,5 +898,139 @@ let%expect_test "the agent changes its model itself" =
             (((value flash) (name Flash) (description ()) (group ()))
              ((value pro) (name Pro) (description ()) (group ())))))))))))
     > {"jsonrpc":"2.0","id":2,"method":"session/set_model","params":{"sessionId":"ses_1","modelId":"flash"}}
+    |}]
+;;
+
+(* ACP's [search] kind is web searches as well as code searches: the
+   agent's tool name, input and title decide which prigh tool a call is
+   recorded as. Each line is labelled; under it, what the recorder makes of
+   it (no deltas), so that a call said to be [in_progress] starts (its
+   message ends) then, not when it completes. *)
+let%expect_test "Antigravity's web searches, a fetch and code searches" =
+  let t = started ~quirks:(quirks "antigravity") () in
+  ok (C.prompt t [ Text "does Ultra include API credits?" ]);
+  ignore ([%expect.output] : string);
+  let recorder =
+    Composer_recorder.create
+      ~adapter:"acp:antigravity"
+      ~model:None
+      ~emit:(fun e ->
+        match e with
+        | Message_update _
+        | Message_start (User _ | Tool_result _)
+        | Message_end (User _ | Tool_result _) -> ()
+        | e -> print_endline ("  " ^ Test_agent_loop.show_event e))
+      ~notice:(fun n -> print_endline ("  notice: " ^ n))
+      ~prompts:[]
+  in
+  let line label update =
+    print_endline label;
+    List.iter
+      (C.handle_line
+         t
+         (sprintf
+            {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":%s}}|}
+            update))
+      ~f:(function
+        | Event e -> Composer_recorder.feed recorder e
+        | o -> print_output o)
+  in
+  line
+    "search_web, pending"
+    {|{"sessionUpdate":"tool_call","toolCallId":"s1","title":"Running search_web","kind":"search","status":"pending","rawInput":{"query":"\"Google AI Ultra\" Gemini API usage credits included"}}|};
+  line
+    "search_web, in progress"
+    {|{"sessionUpdate":"tool_call_update","toolCallId":"s1","status":"in_progress"}|};
+  line
+    "search_web, completed"
+    {|{"sessionUpdate":"tool_call_update","toolCallId":"s1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"Gemini API pricing\nhttps://ai.google.dev/pricing"}}]}|};
+  line
+    "a search titled with its query, only completed"
+    {|{"sessionUpdate":"tool_call","toolCallId":"s2","title":"site:developers.google.com OR site:ai.google.dev Ultra API credits","kind":"search","status":"completed","rawInput":{"query":"site:developers.google.com OR site:ai.google.dev Ultra API credits","domain":""}}|};
+  line
+    "a fetch"
+    {|{"sessionUpdate":"tool_call","toolCallId":"f1","title":"Fetching https://ai.google.dev/pricing","kind":"fetch","status":"completed","rawInput":{"Url":"https://ai.google.dev/pricing"},"content":[{"type":"content","content":{"type":"text","text":"Pricing"}}]}|};
+  line
+    "grep_search"
+    {|{"sessionUpdate":"tool_call","toolCallId":"g1","title":"Running grep_search","kind":"search","status":"completed","rawInput":{"Query":"usage_limit","SearchPath":"/work/backend","CaseInsensitive":true},"content":[{"type":"content","content":{"type":"text","text":"lib/a.ml:3: usage_limit"}}]}|};
+  line
+    "find_by_name"
+    {|{"sessionUpdate":"tool_call","toolCallId":"g2","title":"Running find_by_name","kind":"search","status":"completed","rawInput":{"Pattern":"*.ml","SearchDirectory":"/work"}}|};
+  line
+    "a grep without a tool name"
+    {|{"sessionUpdate":"tool_call","toolCallId":"g3","title":"Search for TODO","kind":"search","status":"completed","rawInput":{"pattern":"TODO","path":"src"}}|};
+  line
+    "a search that says what it is nowhere"
+    {|{"sessionUpdate":"tool_call","toolCallId":"o1","title":"Looking things up","kind":"search","status":"completed"}|};
+  line
+    "a web search named in its _meta, of kind other"
+    {|{"sessionUpdate":"tool_call","toolCallId":"m1","title":"Searching","kind":"other","status":"completed","rawInput":{"q":"ocaml eio"},"_meta":{"agent":{"toolName":"google_web_search"}}}|};
+  Composer_recorder.feed recorder (Turn_end { turn_id = None; stop = Done });
+  ignore (Composer_recorder.finish recorder : Message.t list);
+  [%expect
+    {|
+      agent_start
+    search_web, pending
+      turn_start
+      message_start assistant
+    search_web, in progress
+      message_end assistant ""
+      tool_start web_search {"query":"\"Google AI Ultra\" Gemini API usage credits included"}
+    search_web, completed
+        tool_output "Gemini API pricing\nhttps://ai.google.dev/pricing"
+      tool_end "Gemini API pricing\nhttps://ai.google.dev/pricing"
+      turn_end stop=Tool_use tool_results=1
+    a search titled with its query, only completed
+      turn_start
+      message_start assistant
+      message_end assistant ""
+      tool_start web_search {"query":"site:developers.google.com OR site:ai.google.dev Ultra API credits"}
+      tool_end ""
+      turn_end stop=Tool_use tool_results=1
+    a fetch
+      turn_start
+      message_start assistant
+      message_end assistant ""
+      tool_start web_fetch {"url":"https://ai.google.dev/pricing"}
+        tool_output "Pricing"
+      tool_end "Pricing"
+      turn_end stop=Tool_use tool_results=1
+    grep_search
+      turn_start
+      message_start assistant
+      message_end assistant ""
+      tool_start grep {"pattern":"usage_limit","path":"/work/backend"}
+        tool_output "lib/a.ml:3: usage_limit"
+      tool_end "lib/a.ml:3: usage_limit"
+      turn_end stop=Tool_use tool_results=1
+    find_by_name
+      turn_start
+      message_start assistant
+      message_end assistant ""
+      tool_start find {"pattern":"*.ml","path":"/work"}
+      tool_end ""
+      turn_end stop=Tool_use tool_results=1
+    a grep without a tool name
+      turn_start
+      message_start assistant
+      message_end assistant ""
+      tool_start grep {"pattern":"TODO","path":"src"}
+      tool_end ""
+      turn_end stop=Tool_use tool_results=1
+    a search that says what it is nowhere
+      turn_start
+      message_start assistant
+      message_end assistant ""
+      tool_start Looking things up {}
+      tool_end ""
+      turn_end stop=Tool_use tool_results=1
+    a web search named in its _meta, of kind other
+      turn_start
+      message_start assistant
+      message_end assistant ""
+      tool_start web_search {"query":"ocaml eio"}
+      tool_end ""
+      turn_end stop=Tool_use tool_results=1
+      agent_end (16 new messages)
     |}]
 ;;

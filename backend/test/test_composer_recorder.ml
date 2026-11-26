@@ -289,6 +289,9 @@ let%expect_test "canonical tools" =
   show Search "Glob" {|{"pattern":"**/*.ml"}|};
   show Web_search "WebSearch" {|{"query":"ocaml"}|};
   show Web_search "WebFetch" {|{"url":"https://x.org","prompt":"p"}|};
+  show Web_search "webSearch" {|{"url":"https://x.org/a"}|};
+  show Search "grep_search" {|{"Query":"foo","SearchPath":"/w"}|};
+  show Search "find_by_name" {|{"Pattern":"*.ml","SearchDirectory":"/w"}|};
   show (Mcp { server = "prigh"; tool = "ask user" }) "mcp" {|{"q":1}|};
   show
     Todo
@@ -310,6 +313,9 @@ let%expect_test "canonical tools" =
     Glob             -> find {"pattern":"**/*.ml"}
     WebSearch        -> web_search {"query":"ocaml"}
     WebFetch         -> web_fetch {"url":"https://x.org"}
+    webSearch        -> web_fetch {"url":"https://x.org/a"}
+    grep_search      -> grep {"pattern":"foo","path":"/w"}
+    find_by_name     -> find {"pattern":"*.ml","path":"/w"}
     mcp              -> mcp__prigh__ask_user {"q":1}
     TodoWrite        -> update_plan {"plan":[{"step":"a","status":"completed"},{"step":"b","status":"in_progress"}]}
     Task             -> subagent {"task":"Find it","name":"look"}

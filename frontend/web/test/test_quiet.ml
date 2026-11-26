@@ -434,3 +434,35 @@ let%expect_test
     x
     |}]
 ;;
+
+(* An agent CLI's web searches are recorded as [web_search] calls (its code
+   searches as [grep]): the line counts each kind apart. *)
+let%expect_test "web searches and code searches are counted apart" =
+  let web q = sprintf {|{"query":%s}|} (json q) in
+  let grep = {|{"pattern":"usage_limit","path":"backend"}|} in
+  let chat =
+    Chat_harness.chat
+      [ user 0 "does Ultra include API credits?"
+      ; assistant
+          ~s:2
+          [ call
+              "w1"
+              "web_search"
+              (web "\"Google AI Ultra\" Gemini API credits")
+          ; call "w2" "web_search" (web "site:ai.google.dev Ultra credits")
+          ; call "w3" "web_search" (web "Gemini API free tier")
+          ; call "g1" "grep" grep
+          ; call "o1" "Looking things up" "{}"
+          ]
+      ; finish ~s:4 "w1" "web_search" (web "a") "results"
+      ; finish ~s:5 "w2" "web_search" (web "b") "results"
+      ; finish ~s:6 "w3" "web_search" (web "c") "results"
+      ; finish ~s:6 "g1" "grep" grep "a.ml:1"
+      ; finish ~s:6 "o1" "Looking things up" "{}" "done"
+      ; reply ~s:8 "No."
+      ]
+  in
+  text ~selector:".run" chat;
+  [%expect
+    {| ✓ Worked for 6s · searched the web 3 times, searched the code, used Looking things up |}]
+;;

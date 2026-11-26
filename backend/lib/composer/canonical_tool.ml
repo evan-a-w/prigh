@@ -8,9 +8,13 @@ type t =
   }
 [@@deriving sexp_of]
 
+(* [name], or failing that any field named so in another case ([Query]). *)
 let field (json : Json.t) name =
   match json with
-  | `Object fields -> List.Assoc.find fields ~equal:String.equal name
+  | `Object fields ->
+    (match List.Assoc.find fields ~equal:String.equal name with
+     | Some v -> Some v
+     | None -> List.Assoc.find fields ~equal:String.Caseless.equal name)
   | _ -> None
 ;;
 
@@ -318,11 +322,21 @@ let of_start ~(kind : Adapter_event.Tool_kind.t) ~native_name ~input =
      | None -> keep ())
   | Search ->
     let pattern = first_string input [ "pattern"; "query"; "regex" ] in
-    let path = first_string input [ "path"; "directory" ] in
+    let path =
+      first_string
+        input
+        [ "path"; "directory"; "searchpath"; "searchdirectory" ]
+    in
     (match pattern with
      | Some pattern ->
        let name =
-         if String.Caseless.equal native_name "glob" then "find" else "grep"
+         if
+           List.mem
+             [ "glob"; "find"; "find_by_name"; "find_files" ]
+             native_name
+             ~equal:String.Caseless.equal
+         then "find"
+         else "grep"
        in
        { name
        ; arguments =
@@ -334,7 +348,10 @@ let of_start ~(kind : Adapter_event.Tool_kind.t) ~native_name ~input =
        }
      | None -> keep ())
   | Web_search ->
-    (match string_field input "url", first_string input [ "query"; "q" ] with
+    (match
+       ( first_string input [ "url"; "uri" ]
+       , first_string input [ "query"; "q"; "search_query" ] )
+     with
      | Some url, _ ->
        { name = "web_fetch"
        ; arguments = `Object [ "url", str url ]

@@ -1791,7 +1791,8 @@ let%expect_test "sessions and ask_session: what they look into" =
     |}]
 ;;
 
-let%expect_test "a finished call shows how long it took, from its message's end"
+let%expect_test
+    "a finished call shows how long it took, from its message's end; not 0.0s"
   =
   let call id command =
     sprintf
@@ -1816,16 +1817,19 @@ let%expect_test "a finished call shows how long it took, from its message's end"
   let chat =
     Chat_harness.chat
       [ sprintf
-          {|{"event":"message_end","message":{"role":"assistant","content":[%s,%s,%s],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m","at":1791194280000}}|}
+          {|{"event":"message_end","message":{"role":"assistant","content":[%s,%s,%s,%s],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m","at":1791194280000}}|}
           (call "a" "true")
           (call "b" "make")
           (call "c" "./test")
+          (call "d" "ls")
       ; started "a" "true"
       ; started "b" "make"
       ; started "c" "./test"
       ; ended "a" "true" "1791194280120"
       ; ended "b" "make" "1791194321500"
       ; ended "c" "./test" "1791194342000"
+      ; started "d" "ls"
+      ; ended "d" "ls" "1791194280000"
       ]
   in
   Chat_harness.show ~selector:".tool-head" chat;
@@ -1877,6 +1881,21 @@ let%expect_test "a finished call shows how long it took, from its message's end"
       <span class="name"> bash </span>
       <span class="arg command"> ./test </span>
       <span data-took="1m 2s" title="Took 1m 2s" class="took"> </span>
+      <span class="chev">  </span>
+    </button>
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="d#open"
+            aria-expanded="true"
+            class="tool-head">
+      <span title="Done" role="img" aria-label="Done" class="done mark">
+        <icon class="check"> </icon>
+      </span>
+      <span aria-hidden="true" class="tool-icon">
+        <icon class="terminal"> </icon>
+      </span>
+      <span class="name"> bash </span>
+      <span class="arg command"> ls </span>
       <span class="chev">  </span>
     </button>
     |}]

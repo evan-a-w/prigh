@@ -1048,15 +1048,21 @@ let status_ok item =
   | Some _ -> false
 ;;
 
-let web_search_text item =
+(* A web search's title and input: opening a page is a fetch of its URL. *)
+let web_search_call item =
   let action = Option.value (field "action" item) ~default:`Null in
   let get name = Option.value (str name action) ~default:"" in
+  let query q = q, `Object [ "query", `String q ] in
   match str "type" action with
-  | Some ("openPage" | "open_page") -> get "url"
-  | Some ("findInPage" | "find_in_page") -> get "pattern" ^ " in " ^ get "url"
+  | Some ("openPage" | "open_page") ->
+    let url = get "url" in
+    url, `Object [ "url", `String url ]
+  | Some ("findInPage" | "find_in_page") ->
+    query (get "pattern" ^ " in " ^ get "url")
   | _ ->
     Option.first_some (str "query" action) (str "query" item)
     |> Option.value ~default:""
+    |> query
 ;;
 
 let end_subagent (sub : Subagent.t) ~ok =
@@ -1260,7 +1266,7 @@ let item_completed t params =
     [ tool_end ~id ~ok output ]
   | _, Some "imageView" -> [ tool_end ~id ~ok:true "" ]
   | _, Some "webSearch" ->
-    let query = web_search_text item in
+    let title, input = web_search_call item in
     let results =
       List.filter_map (list "results" item) ~f:(fun r ->
         match str "title" r, str "url" r with
@@ -1274,8 +1280,8 @@ let item_completed t params =
         ~id
         ~kind:Web_search
         ~native_name:"webSearch"
-        ~title:query
-        ~input:(`Object [ "query", `String query ])
+        ~title
+        ~input
     ; tool_end ~id ~ok:true results
     ]
   | _, Some "collabAgentToolCall" ->

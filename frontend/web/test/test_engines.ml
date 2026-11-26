@@ -639,3 +639,60 @@ let%expect_test "Alt+E with one engine says how to have more" =
     This backend runs one engine: start it with more (-engines, -adapters) to switch here; Settings → Engines shows them
     |}]
 ;;
+
+(* A reply's footer names its model as the chip does, not by the key the
+   agent CLI's replies carry; a model it does not know keeps its key. *)
+let%expect_test "an agent CLI's reply names its model in the footer" =
+  let h =
+    session
+      ~fields:
+        [ "adapter", `String "acp:antigravity"
+        ; ( "model"
+          , Jsonaf.of_string
+              (H.model_json
+                 ~thinking:false
+                 ~provider:"acp:antigravity"
+                 ~id:"default"
+                 ~name:"Gemini 3.8 Flash"
+                 ()) )
+        ]
+      ()
+  in
+  H.quiet h (fun () ->
+    H.event h {|{"type":"event","event":"models_changed"}|};
+    H.reply
+      h
+      "list_models"
+      (sprintf
+         "[%s,%s]"
+         (H.model_json
+            ~thinking:false
+            ~provider:"acp:antigravity"
+            ~id:"default"
+            ~name:"Gemini 3.8 Flash"
+            ())
+         (H.model_json
+            ~thinking:false
+            ~provider:"acp:antigravity"
+            ~id:"sonnet"
+            ~name:"Claude Sonnet 4.6 (Thinking)"
+            ())));
+  let reply model =
+    H.quiet h (fun () ->
+      H.event
+        h
+        (sprintf
+           {|{"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"No."}],"stop_reason":{"type":"end_turn"},"usage":{"input":1200,"output":30,"cache_read":0},"model":"%s"}}|}
+           model))
+  in
+  reply "acp:antigravity/default";
+  reply "acp:antigravity/sonnet";
+  reply "acp:antigravity/gone";
+  H.text h ~selector:".meta";
+  [%expect
+    {|
+    Gemini 3.8 Flash 1.2k in 30 out
+    Claude Sonnet 4.6 (Thinking) 1.2k in 30 out
+    acp:antigravity/gone 1.2k in 30 out
+    |}]
+;;

@@ -1186,6 +1186,10 @@ module Model : sig
       the main agent. *)
   val recipient : t -> Recipient.t
 
+  (** The names of the agent CLIs' models (the session's and those offered),
+      by key: their replies name them by key. *)
+  val model_names : t -> string String.Map.t
+
   (** How messages' times read: in [utc_offset], relative to [now]'s day. *)
   val message_time : t -> Message_time.t
 

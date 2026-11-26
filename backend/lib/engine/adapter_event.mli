@@ -120,7 +120,9 @@ type t =
       }
   | Tool_update of
       { id : string
-      ; output : string (** a chunk of streamed output *)
+      ; output : string
+        (** a chunk of streamed output; empty: the call is running (it
+            started, whether or not it has output yet) *)
       }
   | Tool_end of
       { id : string
