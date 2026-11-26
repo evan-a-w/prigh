@@ -5,9 +5,9 @@
 #   programs.prigh.desktop.enable = true;  # and the desktop app in the menus
 #   programs.prigh.desktop.ui = "local";   # prigh-web from this prigh (default: the backend's)
 #   programs.prigh.desktop.computerUse = true;  # the agent may drive this desktop
-#   # The composer's agent CLIs: codex, claudeCode and antigravity (agy >= 1.5.0)
-#   # by default (the last two are unfree); opencode and goose when asked for.
-#   programs.prigh.agents.opencode = true;
+#   # The composer's agent CLIs: codex, claudeCode, antigravity (agy >= 1.5.0;
+#   # it and claudeCode are unfree) and opencode by default; goose when asked for.
+#   programs.prigh.agents.goose = true;
 self:
 {
   config,
@@ -115,7 +115,7 @@ in
 
       opencode = mkOption {
         type = types.bool;
-        default = false;
+        default = true;
         description = ''
           Install OpenCode (`opencode`), an ACP agent the composer drives
           (`-adapters acp:opencode`). Log in with `opencode auth login`.

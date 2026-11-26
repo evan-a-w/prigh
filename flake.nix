@@ -489,6 +489,7 @@
                 pkgs.codex.name
                 pkgs.claude-code.name
                 "antigravity-cli-1.5.0"
+                pkgs.opencode.name
               ]
               ++ lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.bubblewrap.name
             );
@@ -499,6 +500,7 @@
                   codex = false;
                   claudeCode = false;
                   antigravity = false;
+                  opencode = false;
                   bubblewrap = false;
                 };
               };
@@ -508,7 +510,6 @@
                 enable = true;
                 agents = {
                   antigravity = false;
-                  opencode = true;
                   goose = true;
                   extraPackages = [ (pkgs.writeShellScriptBin "my-agent" "") ];
                 };
@@ -586,7 +587,7 @@
             echo ${lib.escapeShellArg (failing oldAgy)} | grep -q "has antigravity-cli 1.2.3, and prigh needs"
             echo ${lib.escapeShellArg (failing oldAgy)} | grep -q "agents.antigravityPackage ="
             echo ${lib.escapeShellArg (failing noAgy)} | grep -q "has no antigravity-cli,"
-            test "${names noAgy}" = "prigh ${pkgs.codex.name} ${pkgs.claude-code.name}${lib.optionalString pkgs.stdenv.hostPlatform.isLinux " ${pkgs.bubblewrap.name}"}"
+            test "${names noAgy}" = "prigh ${pkgs.codex.name} ${pkgs.claude-code.name} ${pkgs.opencode.name}${lib.optionalString pkgs.stdenv.hostPlatform.isLinux " ${pkgs.bubblewrap.name}"}"
             test -z ${lib.escapeShellArg (failing desktop)}
             echo ${lib.escapeShellArg (failing secret)} | grep -q 'programs.prigh.desktop.extraArgs has -token=sekrit:'
             # the desktop app was given the options

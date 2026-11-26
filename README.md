@@ -187,8 +187,8 @@ machine's tool host, so sessions run their tools here, as with a TUI.
 ```nix
 # Home Manager (flake input `prigh`):
 imports = [ prigh.homeManagerModules.default ];
-programs.prigh.enable = true;          # prigh, codex, claude, agy (>= 1.5.0), bwrap on PATH (unfree:
-                                       # allow it; agents.*: opencode, goose, extraPackages)
+programs.prigh.enable = true;          # prigh, codex, claude, agy (>= 1.5.0), opencode, bwrap on
+                                       # PATH (allow unfree; agents.*: goose, extraPackages)
 programs.prigh.desktop.enable = true;  # "prigh" in the application menu
 # also desktop.ui, .window, .browser (table below), .extraArgs,
 # .useSystemNixpkgs, .disableDmabuf (troubleshooting), .computerUse
@@ -327,10 +327,9 @@ hooks are not loaded. Settings → Engines in prigh-web, and `/adapters` in
 the TUI, show whether each CLI is installed and logged in on each tool host,
 and what to run there when not ("Claude Code on laptop is not logged in:
 run `claude auth login` there"); prigh never installs one or logs in for
-you. The Home Manager module installs Codex, Claude Code and Antigravity
-(`agy` 1.5.0 or later; it and Claude Code are unfree) by default, and
-OpenCode and Goose with `agents.opencode` and `agents.goose`; Grok Build is
-not in nixpkgs.
+you. The Home Manager module installs Codex, Claude Code, Antigravity
+(`agy` 1.5.0 or later; it and Claude Code are unfree) and OpenCode by
+default, and Goose with `agents.goose`; Grok Build is not in nixpkgs.
 
 ### Computer use
 
