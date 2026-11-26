@@ -43,6 +43,7 @@ end
 type t =
   { adapter : string
   ; mutable model : string
+  ; cwd : string (* the session's: where the harness's subagents work *)
   ; emit : Agent_event.t -> unit
   ; notice : string -> unit
   ; mutable added : Message.t list (* reversed *)
@@ -65,13 +66,14 @@ type t =
 
 let model_name = External_model.name
 
-let create ~adapter ~model ~emit ~notice ~prompts =
+let create ~adapter ~model ~cwd ~emit ~notice ~prompts =
   emit Agent_event.Agent_start;
   List.iter prompts ~f:(fun m ->
     emit (Agent_event.Message_start m);
     emit (Message_end m));
   { adapter
   ; model = model_name ~adapter model
+  ; cwd
   ; emit
   ; notice
   ; added = List.rev prompts
@@ -223,8 +225,10 @@ let start_call t (c : Call.t) =
            ; task
            ; name = c.canonical.native_name
            ; model = t.model
+           ; thinking = Thinking.default
            ; tools = []
            ; host = None
+           ; cwd = t.cwd
            ; worktree = None
            ; forked = false
            ; continued = false

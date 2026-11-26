@@ -140,7 +140,8 @@ Beyond the TUI it has:
 - panels: a terminal on the tool host (Ctrl+\`), a file browser with
   transfers (Ctrl+Shift+F), a code editor (Alt+E), the review page with
   line comments, commit, push and pull requests (Alt+R), and subagents
-  and jobs (Alt+1…9);
+  and jobs (Alt+1…9); a subagent's chat shows its own host, model,
+  folder, branch and context, and the composer writes to it;
 - a message menu (right-click) to copy, delete or trim the context, with
   undo; temporary sessions (Ctrl+Shift+O); a settings page whose
   preferences are kept per user on the backend;

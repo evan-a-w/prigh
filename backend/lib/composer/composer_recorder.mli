@@ -28,6 +28,7 @@ type t
 val create
   :  adapter:string
   -> model:string option
+  -> cwd:string
   -> emit:(Agent_event.t -> unit)
   -> notice:(string -> unit)
   -> prompts:Message.t list

@@ -5,6 +5,7 @@ open Html
 type t =
   { path : string
   ; branch : string option
+  ; fixed : bool (** a subagent's: it keeps them *)
   }
 
 (* Off the backend, [git_branch] is the backend's guess; the session's listed
@@ -21,14 +22,16 @@ let branch (m : App.Model.t) (s : State.t) =
 ;;
 
 let of_model (m : App.Model.t) =
-  match m.state with
+  let fixed = Option.is_some (App.Model.shown_subagent m) in
+  match App.Model.shown_state m with
   | None -> None
   | Some s when s.temporary || App.temporary_shown m || String.is_empty s.cwd ->
     None
   | Some s ->
     Some
       { path = Tilde.of_path ?host_home:(Tilde.active_host_home s) s.cwd
-      ; branch = branch m s
+      ; branch = (if fixed then s.git_branch else branch m s)
+      ; fixed
       }
 ;;
 
@@ -60,9 +63,19 @@ let view t ~inject =
       ]
     [ item
         ~cls:"where-path"
-        ~title:(t.path ^ ". Start in another folder (/cd)")
-        ~label:(sprintf "Folder: %s. Change it" where)
-        ~on_click:(inject (App.Action.Run "/cd"))
+        ~title:
+          (if t.fixed
+           then t.path ^ ": the subagent's folder"
+           else t.path ^ ". Start in another folder (/cd)")
+        ~label:
+          (if t.fixed
+           then sprintf "The subagent's folder: %s" where
+           else sprintf "Folder: %s. Change it" where)
+        ~on_click:
+          (inject
+             (if t.fixed
+              then App.Action.Subagent_fixed Folder
+              else App.Action.Run "/cd"))
         ~glyph:Folder
         (Node.span ~attrs:[ Attr.class_ "truncate" ] [ Node.text where ])
     ; (match t.branch with
@@ -70,9 +83,19 @@ let view t ~inject =
        | Some branch ->
          item
            ~cls:"where-branch ml-auto shrink-0"
-           ~title:"Work in another worktree (/worktree)"
-           ~label:(sprintf "Branch: %s. Change it" branch)
-           ~on_click:(inject (App.Action.Run "/worktree"))
+           ~title:
+             (if t.fixed
+              then branch ^ ": the subagent's branch"
+              else "Work in another worktree (/worktree)")
+           ~label:
+             (if t.fixed
+              then sprintf "The subagent's branch: %s" branch
+              else sprintf "Branch: %s. Change it" branch)
+           ~on_click:
+             (inject
+                (if t.fixed
+                 then App.Action.Subagent_fixed Branch
+                 else App.Action.Run "/worktree"))
            ~glyph:Branch
            (Node.span
               ~attrs:[ Attr.class_ "max-w-[24ch] truncate" ]

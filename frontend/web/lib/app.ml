@@ -643,6 +643,7 @@ module Action = struct
     | Open_subagent_chat of string
     | Close_subagent_chat
     | Subagent_back
+    | Subagent_fixed of Subagent_state.Fixed.t
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -1163,12 +1164,14 @@ module Model = struct
 
   let waiting t = not (List.is_empty t.confirms && List.is_empty t.questions)
 
-  let activity t =
+  let asking t chat =
     Prigh_ui.Activity.asking
-      (Chat.activity t.chat)
+      (Chat.activity chat)
       ~confirms:(not (List.is_empty t.confirms))
       ~questions:(not (List.is_empty t.questions))
   ;;
+
+  let activity t = asking t t.chat
 
   let active t =
     match t.state with
@@ -1212,6 +1215,36 @@ module Model = struct
     | Some id -> Agent id
     | None -> Main
   ;;
+
+  let shown_subagent t =
+    Option.bind t.subagent_chat ~f:(Agents.find_agent t.agents)
+  ;;
+
+  let shown_chat t =
+    match shown_subagent t with
+    | None -> t.chat
+    | Some a ->
+      Option.value_map
+        (Chat.find_subagent t.chat a.id)
+        ~default:Chat.empty
+        ~f:(fun s -> s.chat)
+  ;;
+
+  let shown_state t =
+    match t.state, shown_subagent t with
+    | Some s, Some a ->
+      let sub = Chat.find_subagent t.chat a.id in
+      Some
+        (Subagent_state.of_agent
+           s
+           ~models:t.models
+           a
+           ~transcript:(Option.map sub ~f:(fun s -> s.chat))
+           ~cost_usd:(Option.bind sub ~f:(fun s -> s.cost_usd)))
+    | state, _ -> state
+  ;;
+
+  let shown_activity t = asking t (shown_chat t)
 
   let fold t =
     Fold.create
@@ -1280,7 +1313,9 @@ module Model = struct
       || String.equal model.provider "claude"
       || String.is_prefix model.provider ~prefix:"acp:"
     in
-    Option.to_list (Option.map t.state ~f:(fun (s : State.t) -> s.model))
+    List.filter_map
+      [ t.state; shown_state t ]
+      ~f:(fun s -> Option.map s ~f:(fun (s : State.t) -> s.model))
     @ t.models
     |> List.filter ~f:external_
     |> List.map ~f:(fun (model : Llm.t) -> model.key, model.name)
@@ -3572,6 +3607,23 @@ let subagent_back (m : Model.t) =
   | None -> close_subagent_chat m
 ;;
 
+(* A subagent's chips and folder are its own and fixed: why, and the way
+   back. *)
+let subagent_fixed ?error (m : Model.t) what =
+  match Model.shown_subagent m with
+  | None -> m, []
+  | Some a ->
+    let parent =
+      match Option.bind a.parent ~f:(Agents.find_agent m.agents) with
+      | Some p -> Agents.Agent.title p
+      | None -> "the main agent"
+    in
+    toast
+      m
+      ?error
+      (Subagent_state.Fixed.explain what ~title:(Agents.Agent.title a) ~parent)
+;;
+
 (* The subagents of the chat on show: the session's top-level ones, or the
    subagent's own. *)
 let open_subagent_n (m : Model.t) n =
@@ -4192,6 +4244,14 @@ let open_chip (m : Model.t) (chip : Chip.t) =
   match m.dialog with
   | Some (Popover { chip = shown; _ }) when Chip.equal shown chip ->
     close_dialog m
+  | _
+    when Option.is_some (Model.shown_subagent m) && not (Chip.equal chip Attach)
+    ->
+    subagent_fixed
+      m
+      (match chip with
+       | Host -> Host
+       | Model | Attach -> Model)
   | _ ->
     current_state m ~f:(fun state ->
       let m =
@@ -7656,6 +7716,16 @@ let run_command_unchecked (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     String.split rest ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
   in
   match name, rest with
+  | ("model" | "thinking" | "host" | "cd" | "worktree"), _
+    when Option.is_some (Model.shown_subagent m) ->
+    subagent_fixed
+      m
+      ~error:true
+      (match name with
+       | "host" -> Host
+       | "cd" -> Folder
+       | "worktree" -> Branch
+       | _ -> Model)
   | "help", "" -> open_dialog m Help
   | "help", name -> help_command m name
   | "hotkeys", _ -> open_dialog m Hotkeys
@@ -12975,6 +13045,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_subagent_chat id -> open_subagent_chat m id
   | Close_subagent_chat -> close_subagent_chat m
   | Subagent_back -> subagent_back m
+  | Subagent_fixed what -> subagent_fixed m what
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
      | first :: _

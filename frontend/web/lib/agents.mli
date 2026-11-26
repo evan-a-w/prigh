@@ -26,6 +26,12 @@ module Agent : sig
     ; host : string option
       (** the tool host it works on (its name), when not the session's
           active one *)
+    ; thinking : string option
+      (** its reasoning level; [None] until [list_subagents] says, and from
+          older backends *)
+    ; cwd : string option
+      (** where it works, on that host; [None]: unknown (older backends) *)
+    ; worktree : Agent_worktree.t option (** a worktree made for it *)
     ; status : Status.t
     ; started_at : Time_ns.t
     ; ended_at : Time_ns.t option

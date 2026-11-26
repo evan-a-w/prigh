@@ -229,36 +229,46 @@ let menu_attrs = Session_chips_view.menu_attrs
 
 (* The provider's mark and the model's short name ("6.2 Sol"); the tooltip
    and the menu have the reasoning level. *)
-let model_chip (m : App.Model.t) (state : State.t) ~inject =
+let model_chip (m : App.Model.t) (state : State.t) ~fixed ~inject =
   match m.pending.model with
-  | Some key ->
+  | Some key when not fixed ->
     let name =
       List.find m.models ~f:(fun model -> String.equal model.key key)
       |> Option.value_map ~default:key ~f:(fun model -> model.name)
     in
     pending_chip ~cls:"model-chip" (Model_menu.short_name name)
-  | None ->
-    let thinking = Option.value m.pending.thinking ~default:state.thinking in
+  | Some _ | None ->
+    let thinking =
+      if fixed
+      then state.thinking
+      else Option.value m.pending.thinking ~default:state.thinking
+    in
     let level = Reasoning.chip_label state.model ~current:thinking in
     (* model@login when the provider has several logins; the title always
        names it. *)
     let login = Prigh_ui.Provider_logins.beside_model m.auth state in
     let at login = Option.value_map login ~default:"" ~f:(fun l -> "@" ^ l) in
     button
-      ~cls:"chip-button model-chip"
+      ~cls:
+        (if fixed
+         then "chip-button model-chip subagent-own"
+         else "chip-button model-chip")
       ~title:
         (sprintf
-           "%s%s%s: models, reasoning and access (Ctrl+L)"
+           (if fixed
+            then "%s%s%s: the subagent's own, set when it started"
+            else "%s%s%s: models, reasoning and access (Ctrl+L)")
            (Session_engine.model_label state.engine ~model:state.model.name)
            (at (Prigh_ui.Provider_logins.login_name m.auth state))
            (Option.value_map level ~default:"" ~f:(fun l -> ", reasoning " ^ l)))
       ~label:
         (sprintf
-           "Model: %s%s%s"
+           "%s: %s%s%s"
+           (if fixed then "The subagent's model" else "Model")
            (Session_engine.model_label state.engine ~model:state.model.name)
            (at login)
            (Option.value_map level ~default:"" ~f:(fun l -> ", " ^ l)))
-      ~attrs:(menu_attrs m Model)
+      ~attrs:(if fixed then [] else menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
       ([ Provider_mark.view
            (Provider_mark.of_model
@@ -287,7 +297,7 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
 (* Where tools run, always named, also while that host is disconnected (its
    server struck through, "offline" beside it); no host at all is lit. A
    chat uses none. *)
-let host_chip (m : App.Model.t) (state : State.t) ~inject =
+let host_chip (m : App.Model.t) (state : State.t) ~fixed ~inject =
   let cls, title, aria, content =
     match Active_host.of_state state with
     | _ when state.chat_mode ->
@@ -299,7 +309,10 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
       , [ icon Message; span ~cls:"chip-label" "no host" ] )
     | Connected h ->
       ( ""
-      , sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd
+      , (if fixed
+         then
+           sprintf "The subagent's tools run on %s, set when it started" h.name
+         else sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd)
       , Some h.name
       , [ icon Server; span ~cls:"chip-label" h.name ] )
     | Disconnected { name; _ } ->
@@ -322,10 +335,13 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
       , [ icon Server; span ~cls:"chip-label" "no host" ] )
   in
   button
-    ~cls:("chip-button host-chip" ^ cls)
+    ~cls:("chip-button host-chip" ^ cls ^ if fixed then " subagent-own" else "")
     ~title
-    ?label:aria
-    ~attrs:(menu_attrs m Host)
+    ?label:
+      (if fixed
+       then Option.map aria ~f:(fun a -> "The subagent's tool host: " ^ a)
+       else aria)
+    ~attrs:(if fixed then [] else menu_attrs m Host)
     ~on_click:(inject (Action.Open_chip Host))
     (content @ [ icon ~cls:"chevron" Chevron ])
 ;;
@@ -334,9 +350,10 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
    each opening its menu over itself; the model's has the reasoning level
    and the mode too. *)
 let chips (m : App.Model.t) ~inject =
-  match m.state with
+  match App.Model.shown_state m with
   | None -> Node.none
   | Some state ->
+    let fixed = Option.is_some (App.Model.shown_subagent m) in
     Node.div
       ~attrs:
         [ classes
@@ -345,8 +362,16 @@ let chips (m : App.Model.t) ~inject =
         ; Attr.role "group"
         ; Attr.create "aria-label" "Host and model"
         ]
-      [ Session_chips_view.anchor m Host (host_chip m state ~inject) ~inject
-      ; Session_chips_view.anchor m Model (model_chip m state ~inject) ~inject
+      [ Session_chips_view.anchor
+          m
+          Host
+          (host_chip m state ~fixed ~inject)
+          ~inject
+      ; Session_chips_view.anchor
+          m
+          Model
+          (model_chip m state ~fixed ~inject)
+          ~inject
       ]
 ;;
 
@@ -378,9 +403,7 @@ let plus (m : App.Model.t) ~inject =
 ;;
 
 (* The subagent whose chat is on show: the composer writes to it. *)
-let subagent (m : App.Model.t) =
-  Option.bind m.subagent_chat ~f:(Agents.find_agent m.agents)
-;;
+let subagent = App.Model.shown_subagent
 
 let subagent_running (a : Agents.Agent.t) =
   match a.status with

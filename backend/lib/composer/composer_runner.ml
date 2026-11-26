@@ -697,6 +697,7 @@ and run_turn'
     Composer_recorder.create
       ~adapter:A.id
       ~model:(Option.first_some input.model t.thread_model)
+      ~cwd:s.cwd
       ~emit:s.emit
       ~notice:s.notice
       ~prompts:input.prompts

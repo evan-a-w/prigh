@@ -11,6 +11,7 @@ let run ?(deltas = true) ?(approvals = []) ?model events =
     Composer_recorder.create
       ~adapter:"codex"
       ~model
+      ~cwd:"/work"
       ~emit:(fun e ->
         match e with
         | Message_update _ when not deltas -> ()
@@ -587,6 +588,7 @@ let%expect_test
     Composer_recorder.create
       ~adapter:"codex"
       ~model:None
+      ~cwd:"/work"
       ~emit:(fun e ->
         match e with
         | Message_update _ | Message_start (User _) | Message_end _ -> ()

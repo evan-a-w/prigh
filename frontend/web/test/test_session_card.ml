@@ -209,7 +209,7 @@ let%expect_test "a subagent's chat in the session's place; Esc goes back" =
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
-    <footer class="composer">
+    <footer class="busy composer">
     |}];
   H.key h "Escape" ~target:Page;
   H.elements h ~selector:".subagent-chat";

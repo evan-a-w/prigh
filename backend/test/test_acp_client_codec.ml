@@ -914,6 +914,7 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
     Composer_recorder.create
       ~adapter:"acp:antigravity"
       ~model:None
+      ~cwd:"/work"
       ~emit:(fun e ->
         match e with
         | Message_update _

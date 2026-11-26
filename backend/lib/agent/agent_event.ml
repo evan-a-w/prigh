@@ -94,10 +94,12 @@ type t =
       ; task : string
       ; name : string (** {!Subagent_name} *)
       ; model : string
+      ; thinking : Thinking.t
       ; tools : string list
       ; host : string option
         (** the tool host its tools run on (its name), when not the
             session's active one ([subagent]'s [host]) *)
+      ; cwd : string (** where it works, on that host *)
       ; worktree : Agent_worktree.t option
         (** the worktree it works in, made for it ([subagent]'s
             [worktree]) *)

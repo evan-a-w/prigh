@@ -32,7 +32,7 @@ let context_level percent =
 ;;
 
 let busy (m : App.Model.t) =
-  match m.state, m.connection with
+  match App.Model.shown_state m, m.connection with
   | Some state, Connected -> state.running || m.pending.sending > 0
   | None, Connected -> true
   (* Offline: nothing is at work here (the composer says it is offline). *)
@@ -47,7 +47,7 @@ type doing =
   | Offline of string
 
 let doing (m : App.Model.t) =
-  match m.state, m.connection with
+  match App.Model.shown_state m, m.connection with
   | None, Connected -> Connecting "Connecting…"
   | _, Reconnecting _ when App.Drops.gave_up m.drops ->
     Offline "Stopped reconnecting"
@@ -57,7 +57,7 @@ let doing (m : App.Model.t) =
     then Working "Sending…"
     else if state.running
     then (
-      let doing = App.Model.activity m in
+      let doing = App.Model.shown_activity m in
       let text =
         String.capitalize
           (Option.value (Prigh_ui.Activity.label doing) ~default:"working")
@@ -284,7 +284,7 @@ let plan_chip (plan : Plan.t) ~inject =
 ;;
 
 let modes (m : App.Model.t) ~inject =
-  [ (match Option.bind m.state ~f:(fun s -> s.plan) with
+  [ (match Option.bind (App.Model.shown_state m) ~f:(fun s -> s.plan) with
      | Some plan -> plan_chip plan ~inject
      | None -> Node.none)
   ]
