@@ -398,3 +398,59 @@ let%expect_test "Antigravity: from its token file or the keyring, with consent" 
     "Antigravity on laptop keeps its login in the macOS keychain, which prigh does not read: /login google-antigravity logs prigh in instead"
     |}]
 ;;
+
+let%expect_test "Oauth_antigravity: token answers, agy's document, the URL" =
+  let body =
+    Oauth_antigravity.For_testing.credential_of_body ~now_ms:1_000_000
+  in
+  List.iter
+    [ body
+        ~refresh_token:""
+        {|{"access_token":"ya29.a","expires_in":3599,"refresh_token":"1//r"}|}
+    ; (* Google answers a refresh without a refresh token: the old one stays *)
+      body
+        ~refresh_token:"1//old"
+        {|{"access_token":"ya29.b","expires_in":3599}|}
+    ; body ~refresh_token:"" {|{"access_token":"ya29.c"}|}
+    ; body ~refresh_token:"1//old" {|{"error":"invalid_grant"}|}
+    ]
+    ~f:(fun r ->
+      print_s
+        [%sexp
+          (Result.map r ~f:(fun (c : Credential.Oauth.t) ->
+             c.access, c.refresh, c.expires_ms)
+           : (string * string * int) Or_error.t)]);
+  let doc =
+    Oauth_antigravity.agy_token_document
+      ~access:"ya29.x"
+      ~expires_ms:1_800_000_000_000
+  in
+  print_endline doc;
+  print_s
+    [%sexp
+      (Oauth_antigravity.Agy_token.parse doc
+       |> Or_error.map ~f:(fun (t : Oauth_antigravity.Agy_token.t) ->
+         t.access, t.refresh, t.auth_method)
+       : (string option * string option * string option) Or_error.t)];
+  print_s
+    [%sexp
+      (Oauth_antigravity.Client.of_candidates
+         [ "123456-abc.apps.googleusercontent.com" ]
+       : Oauth_antigravity.Client.t option)];
+  print_endline
+    (Oauth_antigravity.For_testing.authorize_url
+       ~client:{ id = "id-1"; secret = "s" }
+       ~challenge:"ch"
+       ~state:"st");
+  [%expect
+    {|
+    (Ok (ya29.a 1//r 4599000))
+    (Ok (ya29.b 1//old 4599000))
+    (Error "Google's token answer has no refresh_token")
+    (Error "Google's token answer has no access_token")
+    {"token":{"access_token":"ya29.x","token_type":"Bearer","expiry":"2027-01-15T08:00:00.000000000Z"},"auth_method":"consumer"}
+    (Ok ((ya29.x) () (consumer)))
+    ()
+    https://accounts.google.com/o/oauth2/auth?client_id=id-1&response_type=code&redirect_uri=https://antigravity.google/oauth-callback&scope=https://www.googleapis.com/auth/cloud-platform%20https://www.googleapis.com/auth/userinfo.email%20https://www.googleapis.com/auth/userinfo.profile%20https://www.googleapis.com/auth/cclog%20https://www.googleapis.com/auth/experimentsandconfigs%20https://www.googleapis.com/auth/aicode%20openid&code_challenge=ch&code_challenge_method=S256&state=st&access_type=offline&prompt=consent
+    |}]
+;;
