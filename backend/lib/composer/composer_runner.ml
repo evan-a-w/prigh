@@ -334,7 +334,12 @@ let renew_login t (s : Engine_intf.Services.t) ~login =
   | Some _ | None -> ()
 ;;
 
-let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
+let live
+      t
+      (s : Engine_intf.Services.t)
+      (input : Engine_intf.Turn.Input.t)
+      ~starting
+  =
   let host = t.host () in
   (* The session moved to another tool host: its harness runs there now,
      on a thread of its own there. *)
@@ -366,6 +371,7 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
   match t.live with
   | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
   | _ ->
+    starting ();
     let (module A) = t.adapter in
     let resume = Option.first_some t.thread_id base.resume in
     let fork = base.fork && Option.is_none t.thread_id in
@@ -695,7 +701,10 @@ and run_turn'
       recorder
       (Turn_end { turn_id = None; stop = Failed { kind = Other; message } })
   in
-  (match Cancellation.protect cancel ~f:(fun () -> live t s input) with
+  (match
+     Cancellation.protect cancel ~f:(fun () ->
+       live t s input ~starting:(fun () -> Composer_recorder.starting recorder))
+   with
    | None ->
      Composer_recorder.feed
        recorder
@@ -726,6 +735,7 @@ and run_turn'
          { input with text = text ^ "\n\nThe user's message:\n\n" ^ input.text }
      in
      let rec turn ~first messages =
+       Composer_recorder.waiting recorder;
        let result =
          match input.kind with
          | Compact { instructions } when first ->

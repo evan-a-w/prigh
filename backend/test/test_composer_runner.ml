@@ -267,6 +267,64 @@ let%expect_test
     |}]
 ;;
 
+(* What the frontends' activity is made of: the CLI starting, waited for,
+   streaming, asking and running tools, and never the model's waits. *)
+let%expect_test "codex: a turn's activity, from starting to done" =
+  with_composer
+    ~approval:Ask
+    ~adapter:(module Codex_adapter)
+    ~peer:(fun _ -> codex_replay "tool_call_read_only_on_request")
+  @@ fun _ agent _ ->
+  let last = ref "" in
+  let show s =
+    if not (String.equal s !last) then print_endline ("  > " ^ s);
+    last := s
+  in
+  Agent.subscribe agent ~f:(function
+    | Loop (Agent_waiting { agent; starting }) ->
+      show (sprintf "agent_waiting %s starting=%b" agent starting)
+    | Loop Agent_start -> show "agent_start"
+    | Loop (Agent_end _) -> show "agent_end"
+    | Loop Turn_start -> show "turn_start"
+    | Loop (Turn_end _) -> show "turn_end"
+    | Loop (Message_start (Assistant _)) -> show "message_start assistant"
+    | Loop (Message_update { delta = Thinking_delta _; _ }) -> show "thinking"
+    | Loop (Message_update { delta = Text_delta _; _ }) -> show "text"
+    | Loop (Tool_confirm { call_id; _ }) ->
+      show "tool_confirm";
+      Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
+    | Loop (Tool_confirm_done _) -> show "tool_confirm_done"
+    | _ -> ());
+  prompt agent "run it";
+  [%expect
+    {|
+      > agent_start
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nrun it"
+      > agent_waiting Codex starting=true
+    spawn #1: codex app-server
+      > agent_waiting Codex starting=false
+      > turn_start
+      > agent_waiting Codex starting=false
+      > message_start assistant
+      > thinking
+      > text
+    assistant (codex/gpt-6-sol, Tool_use): "I\226\128\153ll write the exact text to the file with a local shell command."
+    tool_start bash {"command":"printf '%s' 'codex app-server approval fixture' > .codex-probe-write-action.txt"}
+      > tool_confirm
+      > tool_confirm_done
+    tool_end bash -> ""
+      > turn_end
+      > agent_waiting Codex starting=false
+      > turn_start
+      > agent_waiting Codex starting=false
+      > message_start assistant
+      > text
+    assistant (codex/gpt-6-sol, End_turn): "Created or overwrote `.codex-probe-write-action.txt` with exactly `codex app-server approval fixture`."
+      > turn_end
+      > agent_end
+    |}]
+;;
+
 let%expect_test "codex: its questions go to the user" =
   with_composer
     ~adapter:(module Codex_adapter)

@@ -367,7 +367,22 @@ module Model = struct
     Option.value_map t.state ~default:false ~f:(fun s -> s.running)
   ;;
 
-  let activity t = Activity.set_running t.activity (running t)
+  let activity t =
+    Activity.asking
+      (Activity.set_running t.activity (running t))
+      ~confirms:
+        ((not (List.is_empty t.pending_confirms))
+         ||
+         match t.mode with
+         | Confirm { action = Tool_confirm _; _ } -> true
+         | _ -> false)
+      ~questions:
+        ((not (List.is_empty t.pending_questions))
+         ||
+         match t.mode with
+         | Question _ -> true
+         | _ -> false)
+  ;;
 
   let agents_running t =
     List.exists t.agents ~f:(fun (a : Agent_view.t) ->
@@ -7457,6 +7472,7 @@ let apply_event m (e : P.Event.t) =
   | Message_update _
   | Message_end _
   | Retry _
+  | Agent_waiting _
   | Tool_start _
   | Tool_output _
   | Tool_end _

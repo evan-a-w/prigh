@@ -22,8 +22,10 @@ let age (m : App.Model.t) (s : Session_summary.t) =
 let current_activity (m : App.Model.t) =
   match m.state with
   | Some state when state.running ->
-    (match Chat.activity m.chat with
-     | Thinking | Waiting _ -> Some "thinking…"
+    (match App.Model.activity m with
+     | Thinking | Waiting _ | Waiting_for _ -> Some "thinking…"
+     | Starting _ -> Some "starting…"
+     | Approving | Answering -> Some "waiting for you…"
      | Retrying _ -> Some "retrying…"
      | Idle | Working | Writing | Running_tools -> Some "working…")
   | Some _ when m.pending.sending > 0 || Agents.running_agents m.agents > 0 ->

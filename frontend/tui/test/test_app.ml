@@ -10551,3 +10551,59 @@ let%expect_test
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
+
+let%expect_test
+    "what an agent CLI is doing: starting, waited for, writing, tools, waited \
+     for again, never the model"
+  =
+  let h = connected ~width:100 ~height:8 () in
+  let status () =
+    print_endline
+      (Option.value
+         (Prigh_ui.Activity.brief (App.Model.activity h.H.model))
+         ~default:"(idle)")
+  in
+  H.event h (State (state ~running:true ()));
+  H.event h Agent_start;
+  H.event h (Message_start (user "go"));
+  H.event h (Agent_waiting { agent = "Claude Code"; starting = true });
+  H.show h;
+  H.event h (Agent_waiting { agent = "Claude Code"; starting = false });
+  status ();
+  H.event h Turn_start;
+  H.event h (Agent_waiting { agent = "Claude Code"; starting = false });
+  H.event h (Message_start (Assistant partial));
+  status ();
+  H.event h (Message_update (unnumbered (Text_delta "Looking.")));
+  status ();
+  H.event h (Tool_start (tool_call "c1"));
+  status ();
+  H.event h (Agent_waiting { agent = "Claude Code"; starting = false });
+  H.show h;
+  H.event h (Agent_end []);
+  H.event h (State (state ()));
+  status ();
+  [%expect
+    {|
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ⠋ starting Claude Code · Esc aborts · Enter steers
+    waiting for Claude Code
+    waiting for Claude Code
+    writing
+    running tools
+      earlier answer
+
+    ▌ go
+      Looking.
+    … bash
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ waiting for Claude Code · Esc aborts · Enter steers
+    (idle)
+    |}]
+;;

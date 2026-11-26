@@ -32,6 +32,12 @@ type t =
   | Message_update of Stream_update.t
   | Message_end of Message.t
   | Retry of Retry.t
+  | Agent_waiting of
+      { agent : string (** "Codex", "Claude Code" *)
+      ; starting : bool (** its process is starting: not asked yet *)
+      }
+  (** The session's agent CLI (a composer session's) is starting, or was
+      asked and has said nothing since. *)
   | Tool_start of Tool_call.t
   | Tool_output of
       { call_id : string

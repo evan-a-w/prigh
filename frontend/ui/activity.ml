@@ -9,9 +9,21 @@ type t =
   | Thinking
   | Writing
   | Running_tools
+  | Starting of string
+  | Waiting_for of string
+  | Approving
+  | Answering
 [@@deriving sexp_of, equal]
 
 let of_running running = if running then Working else Idle
+
+let asking t ~confirms ~questions =
+  match t with
+  | Idle -> t
+  | _ when confirms -> Approving
+  | _ when questions -> Answering
+  | _ -> t
+;;
 
 let set_running t running =
   match t, running with
@@ -25,9 +37,12 @@ let apply t (event : P.Event.t) =
   | Agent_start | Turn_start -> Working
   | Agent_end _ -> Idle
   | Retry retry -> Retrying retry
+  | Agent_waiting { agent; starting } ->
+    if starting then Starting agent else Waiting_for agent
   | Message_start (Assistant _) ->
     (match t with
      | Retrying retry -> Waiting (Some retry)
+     | Starting _ | Waiting_for _ -> t
      | _ -> Waiting None)
   | Message_update { delta; _ } ->
     (match delta with
@@ -85,6 +100,10 @@ let label = function
   | Thinking -> Some "thinking"
   | Writing -> Some "writing"
   | Running_tools -> Some "running tools"
+  | Starting agent -> Some ("starting " ^ agent)
+  | Waiting_for agent -> Some ("waiting for " ^ agent)
+  | Approving -> Some "waiting for your approval"
+  | Answering -> Some "waiting for your answer"
 ;;
 
 let brief = function
@@ -98,5 +117,13 @@ let brief = function
 let retry = function
   | Waiting retry -> retry
   | Retrying retry -> Some retry
-  | Idle | Working | Thinking | Writing | Running_tools -> None
+  | Idle
+  | Working
+  | Thinking
+  | Writing
+  | Running_tools
+  | Starting _
+  | Waiting_for _
+  | Approving
+  | Answering -> None
 ;;

@@ -22,6 +22,8 @@ let rec show_event (e : Agent_event.t) =
   | Agent_start -> "agent_start"
   | Agent_end added -> sprintf "agent_end (%d new messages)" (List.length added)
   | Turn_start -> "turn_start"
+  | Agent_waiting { agent; starting } ->
+    sprintf "agent_waiting %s%s" agent (if starting then " (starting)" else "")
   | Retry { attempt; max_attempts; error; delay } ->
     sprintf "retry %d/%d in %gs after %S" attempt max_attempts delay error
   | Turn_end { assistant; tool_results } ->

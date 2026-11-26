@@ -65,6 +65,7 @@ let%expect_test "a text turn" =
     message_start user "do it"
     message_end
     turn_start
+    agent_waiting Codex
     message_start assistant
       update (Text_delta Hel)
       update (Text_delta lo)
@@ -104,6 +105,7 @@ let%expect_test "thinking, then a command with streamed output, then text" =
     message_start user "do it"
     message_end
     turn_start
+    agent_waiting Codex
     message_start assistant
       update (Thinking_delta"Let me look.")
       update (Text_delta Listing.)
@@ -117,7 +119,9 @@ let%expect_test "thinking, then a command with streamed output, then text" =
     message_start tool_result c1
     message_end
     turn_end stop=Tool_use tool_results=1
+    agent_waiting Codex
     turn_start
+    agent_waiting Codex
     message_start assistant
       update (Text_delta"Two files.")
     message_end assistant "Two files."
@@ -209,6 +213,7 @@ let%expect_test "file changes: one edit, then several files" =
     message_start user "do it"
     message_end
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant ""
     tool_start edit {"path":"hello.txt","edits":[{"old_text":"hi","new_text":"hello"}]}
@@ -217,6 +222,7 @@ let%expect_test "file changes: one edit, then several files" =
     message_end
     turn_end stop=Tool_use tool_results=1
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant ""
     tool_start apply_patch {"input":"*** Begin Patch\n*** Update File: hello.txt\n@@\n-hi\n+hello\n*** Add File: new.txt\n+fresh\n*** Delete File: old.txt\n*** End Patch\n"}
@@ -343,6 +349,7 @@ let%expect_test "a plan is an update_plan call" =
     message_start user "do it"
     message_end
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant ""
     tool_start update_plan {"plan":[{"step":"read","status":"completed"},{"step":"write","status":"in_progress"}]}
@@ -351,6 +358,7 @@ let%expect_test "a plan is an update_plan call" =
     message_end
     turn_end stop=Tool_use tool_results=1
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant "Working."
     turn_end stop=End_turn tool_results=0
@@ -395,6 +403,7 @@ let%expect_test "a usage limit fails the turn" =
     message_start user "do it"
     message_end
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant "Start"
     turn_end stop=(Error"You've hit your usage limit. (usage limit reached)") tool_results=0
@@ -442,6 +451,7 @@ let%expect_test "interrupted mid-command, and a denied call" =
     message_start user "do it"
     message_end
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant ""
     tool_start bash {"command":"rm -rf /"}
@@ -450,6 +460,7 @@ let%expect_test "interrupted mid-command, and a denied call" =
     message_end
     turn_end stop=Tool_use tool_results=1
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant ""
     tool_start bash {"command":"sleep 100"}
@@ -528,6 +539,7 @@ let%expect_test "a subagent's calls are nested under it" =
     message_start user "do it"
     message_end
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant "Delegating."
     tool_start subagent {"task":"Find X","name":"explore"}
@@ -543,6 +555,7 @@ let%expect_test "a subagent's calls are nested under it" =
     message_end
     turn_end stop=Tool_use tool_results=1
     turn_start
+    agent_waiting Codex
     message_start assistant
     message_end assistant "Found it."
     turn_end stop=End_turn tool_results=0
@@ -564,5 +577,67 @@ let%expect_test "a subagent's calls are nested under it" =
      ((content ((Text "Found it."))) (stop_reason End_turn)
       (usage ((input 0) (output 0) (cache_read 0))) (model codex/default)))
     ((stop (Done)) (thread ()) (cost_usd 0) (context (() ())))
+    |}]
+;;
+
+let%expect_test
+    "waits for the harness after a step and a steer, not after its turn"
+  =
+  let recorder =
+    Composer_recorder.create
+      ~adapter:"codex"
+      ~model:None
+      ~emit:(fun e ->
+        match e with
+        | Message_update _ | Message_start (User _) | Message_end _ -> ()
+        | e -> print_endline (Test_agent_loop.show_event e))
+      ~notice:(fun n -> print_endline ("notice: " ^ n))
+      ~prompts:[ Message.user "do it" ]
+  in
+  let feed = Composer_recorder.feed recorder in
+  Composer_recorder.starting recorder;
+  Composer_recorder.waiting recorder;
+  feed (Turn_started { turn_id = "t1" });
+  feed (Text_delta { item = "m1"; text = "Looking." });
+  print_endline "-- steer";
+  Composer_recorder.user_message recorder (Message.user "also this");
+  feed
+    (tool
+       ~native_name:"commandExecution"
+       "c1"
+       (`Object [ "command", `String "ls" ]));
+  print_endline "-- tool ends";
+  feed
+    (Tool_end { id = "c1"; ok = true; output = "a"; changes = []; images = [] });
+  feed (Text_delta { item = "m2"; text = "Done." });
+  print_endline "-- turn ends";
+  feed done_;
+  ignore (Composer_recorder.finish recorder : Message.t list);
+  [%expect
+    {|
+    agent_start
+    agent_waiting Codex (starting)
+    agent_waiting Codex
+    turn_start
+    agent_waiting Codex
+    message_start assistant
+    -- steer
+    turn_end stop=End_turn tool_results=0
+    agent_waiting Codex
+    turn_start
+    agent_waiting Codex
+    message_start assistant
+    -- tool ends
+    tool_start bash {"command":"ls"}
+    tool_end "a"
+    message_start tool_result c1
+    turn_end stop=Tool_use tool_results=1
+    agent_waiting Codex
+    turn_start
+    agent_waiting Codex
+    message_start assistant
+    -- turn ends
+    turn_end stop=End_turn tool_results=0
+    agent_end (6 new messages)
     |}]
 ;;

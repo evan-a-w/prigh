@@ -121,3 +121,127 @@ let%expect_test
     Writing
     |}]
 ;;
+
+(* A composer session's turn, on an agent CLI: it starts, is waited for
+   (with the model's look, naming the CLI), streams, asks to run a call,
+   runs it and is waited for again; nothing says "the model". *)
+let%expect_test "an agent CLI's turn: starting, waited for, asking, done" =
+  let h = H.create () in
+  let ring () =
+    H.text h ~selector:".context-ring-anchor .sr-only";
+    print_endline "---"
+  in
+  H.event
+    h
+    (event
+       (sprintf
+          {|"event":"state","state":%s|}
+          (H.state_json ~fields:[ "running", `True ] ())));
+  H.event h (event {|"event":"agent_start"|});
+  H.event
+    h
+    (event {|"event":"message_start","message":{"role":"user","text":"ls"}|});
+  H.event h (event {|"event":"agent_waiting","agent":"Codex","starting":true|});
+  H.show h ~selector:".msg.assistant.streaming";
+  ring ();
+  H.event h (event {|"event":"agent_waiting","agent":"Codex","starting":false|});
+  H.text h ~selector:".msg.assistant.streaming .label";
+  ring ();
+  H.event h (event {|"event":"turn_start"|});
+  H.event h (event {|"event":"agent_waiting","agent":"Codex","starting":false|});
+  H.event
+    h
+    (event (sprintf {|"event":"message_start","message":%s|} (assistant [])));
+  H.text h ~selector:".msg.assistant.streaming .label";
+  ring ();
+  H.event
+    h
+    (update
+       {|{"type":"text_delta","text":"Listing."}|}
+       [ {|{"type":"text","text":"Listing."}|} ]);
+  ring ();
+  H.event
+    h
+    (event
+       (sprintf
+          {|"event":"message_end","message":%s|}
+          (assistant
+             [ {|{"type":"text","text":"Listing."}|}
+             ; {|{"type":"tool_call","id":"c1","name":"bash","arguments":"{}"}|}
+             ])));
+  H.event
+    h
+    (event
+       {|"event":"tool_start","call":{"id":"c1","name":"bash","arguments":"{}"}|});
+  ring ();
+  H.event
+    h
+    (event
+       {|"event":"tool_confirm","call_id":"c1","agent_id":null,"name":"bash","summary":"ls","rules":[]|});
+  ring ();
+  H.event
+    h
+    (event {|"event":"tool_confirm_done","call_id":"c1","agent_id":null|});
+  ring ();
+  H.event
+    h
+    (event
+       {|"event":"tool_end","call":{"id":"c1","name":"bash","arguments":"{}"},"result":{"tool_call_id":"c1","tool_name":"bash","text":"a","is_error":false}|});
+  ring ();
+  H.event h (event {|"event":"agent_waiting","agent":"Codex","starting":false|});
+  H.text h ~selector:".msg.assistant.streaming .label";
+  ring ();
+  H.event h (event {|"event":"agent_end","messages":[]|});
+  H.event
+    h
+    (event
+       (sprintf
+          {|"event":"state","state":%s|}
+          (H.state_json ~fields:[ "running", `False ] ())));
+  H.text h ~selector:".msg.assistant.streaming .label";
+  ring ();
+  [%expect
+    {|
+    <div @key=waiting class="assistant msg streaming">
+      <div class="pending">
+        <span aria-hidden="true" class="lamp"> </span>
+        <span class="label"> Starting Codex… </span>
+        <span class="stop-hint">
+          <kbd data-slot="kbd"
+               class="[&_svg:not([class*='size-'])]:size-3 bg-muted dark:in-data-[slot=tooltip-content]:bg-background/10 font-medium font-sans gap-1 h-5 in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background inline-flex items-center justify-center min-w-5 pointer-events-none px-1 rounded-sm select-none text-muted-foreground text-xs w-fit"> Esc </kbd>
+           to stop
+        </span>
+      </div>
+    </div>
+    Starting Codex
+    ---
+    Waiting for Codex…
+    Waiting for Codex
+    ---
+    Waiting for Codex…
+    Waiting for Codex
+    ---
+    Writing
+    ---
+    Running tools
+    ---
+    (Focus confirm)
+    Waiting for your approval
+    ---
+    (Focus editor)
+    (Expire_toast (id 0) (after_ms 2740))
+    Running tools
+    ---
+    Running tools
+    ---
+    Waiting for Codex…
+    Waiting for Codex
+    ---
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
+    Ready
+    ---
+    |}]
+;;

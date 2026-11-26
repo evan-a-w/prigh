@@ -1174,6 +1174,11 @@ module Model : sig
   (** A tool confirmation or an [ask_user] question is showing: it owns the
       keyboard, above any dialog. *)
   val waiting : t -> bool
+
+  (** What the session's agent is doing ({!Chat.activity}), or that it
+      waits for the user to approve a call or answer. *)
+  val activity : t -> Prigh_ui.Activity.t
+
   (** The turn or background subagents or jobs run: the session is busy. *)
   val active : t -> bool
 

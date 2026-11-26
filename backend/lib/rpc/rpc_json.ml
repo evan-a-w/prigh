@@ -955,6 +955,11 @@ let rec event ?now ?(resync = false) (e : Agent.Event.t) =
       ; "error", str error
       ; "delay_ms", ms delay
       ]
+    | Loop (Agent_waiting { agent; starting }) ->
+      [ "event", str "agent_waiting"
+      ; "agent", str agent
+      ; "starting", bool starting
+      ]
     | Loop (Tool_start call) ->
       [ "event", str "tool_start"; "call", tool_call call ]
     | Loop (Tool_output { call_id; chunk }) ->

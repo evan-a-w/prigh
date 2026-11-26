@@ -715,6 +715,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Agent_queues _
   | P.Event.Temporary_ended _
   | P.Event.Adapters_changed _
+  | P.Event.Agent_waiting _
   | P.Event.Models_changed
   | P.Event.Mcp_auth_changed -> t
 ;;
