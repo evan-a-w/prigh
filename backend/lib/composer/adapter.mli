@@ -58,6 +58,12 @@ module Driver : sig
       its own, which nobody would answer (the default leaves it). *)
   val on_orphan_request : _ t -> (Adapter_event.t -> unit) -> unit
 
+  (** Called when the harness starts a turn of its own between prompts (e.g.
+      woken by a background task): instead of swallowing its events as an
+      orphan, the driver opens the turn ({!in_turn}), queues its events onto
+      {!next_event}, and invokes [f] so the session can drive the turn. *)
+  val on_autonomous : _ t -> (unit -> unit) -> unit
+
   val next_event : _ t -> Adapter_event.t
 
   (** Gives an answer to the first request waiting for one like it. *)

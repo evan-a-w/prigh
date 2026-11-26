@@ -209,6 +209,11 @@ module type S = sig
   (** [f] is called whenever {!models} or {!limits} change. *)
   val on_change : t -> (unit -> unit) -> unit
 
+  (** [f] is called when the harness starts a turn of its own between
+      prompts (e.g. woken by a background task), so the session can drive
+      and record it as a run. *)
+  val on_autonomous : t -> (unit -> unit) -> unit
+
   (** Runs the process [transport] runs only to ask its {!Catalog}: the
       handshake, its models and its login's limits, opening no thread
       (nothing is recorded with the harness); the caller stops the

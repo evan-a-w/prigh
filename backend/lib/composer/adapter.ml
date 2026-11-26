@@ -30,6 +30,7 @@ module Driver = struct
     ; mutable orphan : Orphan.t option
     ; idle : Eio.Condition.t (* the orphan turn ended, or the process *)
     ; mutable on_orphan_request : Adapter_event.t -> unit
+    ; mutable on_autonomous : (unit -> unit) option
     ; mutable exit : Line_transport.Exit.t option
     }
 
@@ -54,6 +55,7 @@ module Driver = struct
     ; orphan = None
     ; idle = Eio.Condition.create ()
     ; on_orphan_request = ignore
+    ; on_autonomous = None
     ; exit = None
     }
   ;;
@@ -61,6 +63,7 @@ module Driver = struct
   let alive t = t.alive && not t.stopping
   let write t line = if alive t then Line_transport.write_line t.transport line
   let on_orphan_request t f = t.on_orphan_request <- f
+  let on_autonomous t f = t.on_autonomous <- Some f
 
   (* Events that belong to no turn in particular go to whoever reads. *)
   let of_no_turn : Adapter_event.t -> bool = function
@@ -113,19 +116,26 @@ module Driver = struct
          ignored interrupt) ended late. *)
       Option.iter t.orphan ~f:(orphan_ended t)
     | _ ->
-      let orphan =
-        match t.orphan with
-        | Some o -> o
-        | None ->
-          let o = { Orphan.text = None } in
-          t.orphan <- Some o;
-          o
-      in
-      (match event with
-       | Text_done { text; _ } when not (String.is_empty (String.strip text)) ->
-         orphan.text <- Some text
-       | Approval_request _ | User_question _ -> t.on_orphan_request event
-       | _ -> ())
+      (match t.on_autonomous with
+       | Some wake when not t.stopping ->
+         t.in_turn <- true;
+         t.turns <- t.turns + 1;
+         Eio.Stream.add t.events event;
+         wake ()
+       | Some _ | None ->
+         let orphan =
+           match t.orphan with
+           | Some o -> o
+           | None ->
+             let o = { Orphan.text = None } in
+             t.orphan <- Some o;
+             o
+         in
+         (match event with
+          | Text_done { text; _ } when not (String.is_empty (String.strip text))
+            -> orphan.text <- Some text
+          | Approval_request _ | User_question _ -> t.on_orphan_request event
+          | _ -> ()))
   ;;
 
   let next_event t = Eio.Stream.take t.events

@@ -53,6 +53,11 @@ val create
   -> ?temporary_grace:float
        (** seconds a temporary session without a client waits for one
            before it ends (default: 120) *)
+  -> ?external_idle_grace:float
+       (** seconds an idle session with a live external harness waits without
+           clients before the harness is stopped and the session evicted
+           (default: 3600); keeps in-flight background tasks and autonomous
+           wakeups alive when frontends disconnect *)
   -> ?sleep:(float -> unit)
        (** how the grace periods are waited for (default: the clock) *)
   -> ?host_timeout:float

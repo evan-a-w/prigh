@@ -1339,3 +1339,400 @@ let%expect_test "start timings, as the trace says them" =
   [%expect
     {| login 0.0 s, process 3.2 s (spawn 0.4 s, handshake 2.8 s (initialize 0.1 s, session/resume 2.7 s)), send 0.0 s, first_output 1.8 s, checkpoint 0.6 s (alongside) |}]
 ;;
+
+let%expect_test
+    "ACP autonomous wakeup after end_turn: tool, approval, text, and settle"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let wake_peer, trigger_wake = Eio.Promise.create () in
+  let wake_ran, mark_wake_ran = Eio.Promise.create () in
+  let agent_ref = ref None in
+  let adapter =
+    Acp_adapter.create
+      ~load_quiet:(Time_float.Span.of_sec 0.2)
+      ~autonomous_quiet:(Time_float.Span.of_sec 0.03)
+      opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             P.new_session p "ses_1";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_1" "Started background task.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             Eio.Promise.await wake_peer;
+             (* Agent wakes autonomously after its background task finishes:
+                runs a tool needing approval, then reports the result. *)
+             P.update
+               p
+               "ses_1"
+               {|{"sessionUpdate":"tool_call","toolCallId":"bg1","title":"bash","kind":"execute","status":"in_progress","rawInput":{"command":"echo ok"}}|};
+             P.write
+               p
+               [ "jsonrpc", `String "2.0"
+               ; "id", `Number "99"
+               ; "method", `String "session/request_permission"
+               ; ( "params"
+                 , `Object
+                     [ "sessionId", `String "ses_1"
+                     ; ( "toolCall"
+                       , `Object
+                           [ "toolCallId", `String "bg1"
+                           ; "title", `String "echo ok"
+                           ; "kind", `String "execute"
+                           ] )
+                     ; ( "options"
+                       , `Array
+                           [ `Object
+                               [ "optionId", `String "allow"
+                               ; "name", `String "Allow"
+                               ; "kind", `String "allow_once"
+                               ]
+                           ] )
+                     ] )
+               ];
+             P.answer p;
+             P.update
+               p
+               "ses_1"
+               {|{"sessionUpdate":"tool_call_update","toolCallId":"bg1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"ok"}}]}|};
+             P.text p "ses_1" "Background task finished!";
+             Eio.Promise.resolve mark_wake_ran ();
+             ignore (P.read p : Json.t option))))
+      ~on_autonomous:(fun () -> Option.iter !agent_ref ~f:Agent.external_woke)
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  agent_ref := Some agent;
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.set_mode agent ~approval:Ask;
+  let auton_ended, mark_auton_ended = Eio.Promise.create () in
+  let seen_turns = ref 0 in
+  Agent.subscribe agent ~f:(fun e ->
+    print_event e;
+    match e with
+    | Loop (Tool_confirm { call_id; name; summary; _ }) ->
+      printf "confirm %s: %s\n" name summary;
+      Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
+    | Loop (Agent_end _) ->
+      incr seen_turns;
+      if !seen_turns = 2 then Eio.Promise.resolve mark_auton_ended ()
+    | _ -> ());
+  prompt agent "start work";
+  Eio.Promise.resolve trigger_wake ();
+  Eio.Promise.await wake_ran;
+  Eio.Promise.await auton_ended;
+  Agent.wait_idle agent;
+  Composer_runner.close composer;
+  printf "messages in session: %d\n" (List.length (Agent.messages agent));
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "start work"
+    assistant (acp:opencode/default, End_turn): "Started background task."
+    assistant (acp:opencode/default, Tool_use): ""
+    tool_start bash
+    confirm bash: echo ok
+    agent got answer {"outcome":{"outcome":"selected","optionId":"allow"}}
+    tool_end bash -> "ok"
+    assistant (acp:opencode/default, End_turn): "Background task finished!"
+    messages in session: 5
+    |}]
+;;
+
+let%expect_test "aborting an ACP autonomous turn ends it cleanly" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let wake_peer, trigger_wake = Eio.Promise.create () in
+  let tool_seen, mark_tool_seen = Eio.Promise.create () in
+  let agent_ref = ref None in
+  let adapter =
+    Acp_adapter.create
+      ~load_quiet:(Time_float.Span.of_sec 0.2)
+      ~autonomous_quiet:(Time_float.Span.of_sec 5.)
+      opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             P.new_session p "ses_1";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_1" "Waiting.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             Eio.Promise.await wake_peer;
+             P.update
+               p
+               "ses_1"
+               {|{"sessionUpdate":"tool_call","toolCallId":"bg2","title":"bash","kind":"execute","status":"in_progress","rawInput":{"command":"sleep 99"}}|};
+             ignore (P.expect p "session/cancel" : Json.t);
+             ignore (P.read p : Json.t option))))
+      ~on_autonomous:(fun () -> Option.iter !agent_ref ~f:Agent.external_woke)
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  agent_ref := Some agent;
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.subscribe agent ~f:(fun e ->
+    print_event e;
+    match e with
+    | Loop (Tool_start _) ->
+      ignore (Eio.Promise.try_resolve mark_tool_seen () : bool)
+    | _ -> ());
+  prompt agent "go";
+  Eio.Promise.resolve trigger_wake ();
+  Eio.Promise.await tool_seen;
+  ignore (Agent.abort agent : string list);
+  Agent.wait_idle agent;
+  Composer_runner.close composer;
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "go"
+    assistant (acp:opencode/default, End_turn): "Waiting."
+    assistant (acp:opencode/default, Tool_use): ""
+    tool_start bash
+    agent got session/cancel
+    tool_end bash -> ERROR "[failed]"
+    |}]
+;;
+
+let%expect_test
+    "Rpc_server keeps an idle external harness alive across disconnect for \
+     external_idle_grace and survives autonomous wakeups"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let sleeps = Queue.create () in
+  let sleep _seconds =
+    let p, r = Eio.Promise.create () in
+    Queue.enqueue sleeps r;
+    Eio.Promise.await p
+  in
+  let wake_peer, trigger_wake = Eio.Promise.create () in
+  let peer_stopped, mark_peer_stopped = Eio.Promise.create () in
+  let engines =
+    Or_error.ok_exn
+      (Engines.create ~engines:[ Harness; Composer ] ~adapters:[ Codex ] ())
+  in
+  let new_agent ?session ~cwd () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir
+      ~home:t.dir
+      ?session
+      ~cwd
+      ()
+  in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~external_idle_grace:1800.
+      ~sleep
+      ~login:
+        (Login_manager.create
+           ~env:t.env
+           ~sw
+           ~getenv:(fun _ -> None)
+           ~store:(Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+           ())
+      ~sessions_dir
+      ~cwd:t.dir
+      ~engines
+      ~spawn_external:(fun _agent ~host:_ _launch ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             let read () =
+               Option.map (Line_transport.Peer.read_line p) ~f:(fun line ->
+                 Json.parse line |> Or_error.ok_exn)
+             in
+             let reply j result =
+               Line_transport.Peer.write_line
+                 p
+                 (Json.to_string
+                    (`Object
+                        [ "id", Option.value_exn (Json.member "id" j)
+                        ; "result", result
+                        ]))
+             in
+             let rec wait_turn () =
+               match read () with
+               | None -> ()
+               | Some j ->
+                 (match Option.bind (Json.member "method" j) ~f:Json.string with
+                  | Some "initialize" ->
+                    reply j (`Object [ "userAgent", `String "codex/0.166.0" ]);
+                    wait_turn ()
+                  | Some "thread/start" ->
+                    reply
+                      j
+                      (`Object
+                          [ "thread", `Object [ "id", `String "th-1" ]
+                          ; "model", `String "gpt-5"
+                          ]);
+                    wait_turn ()
+                  | Some "turn/start" ->
+                    reply
+                      j
+                      (`Object
+                          [ ( "turn"
+                            , `Object
+                                [ "id", `String "tu-1"
+                                ; "status", `String "inProgress"
+                                ] )
+                          ])
+                  | Some _ when Option.is_some (Json.member "id" j) ->
+                    reply j (`Object []);
+                    wait_turn ()
+                  | _ -> wait_turn ())
+             in
+             wait_turn ();
+             List.iter
+               ~f:(Line_transport.Peer.write_line p)
+               [ {|{"method":"turn/started","params":{"threadId":"th-1","turn":{"id":"tu-1","items":[],"status":"inProgress"}}}|}
+               ; {|{"method":"item/completed","params":{"threadId":"th-1","turnId":"tu-1","item":{"type":"agentMessage","id":"m1","text":"first reply"}}}|}
+               ; {|{"method":"turn/completed","params":{"threadId":"th-1","turn":{"id":"tu-1","items":[],"status":"completed"}}}|}
+               ];
+             Eio.Promise.await wake_peer;
+             (* Autonomous turn while no clients are attached. *)
+             List.iter
+               ~f:(Line_transport.Peer.write_line p)
+               [ {|{"method":"turn/started","params":{"threadId":"th-1","turn":{"id":"tu-2","items":[],"status":"inProgress"}}}|}
+               ; {|{"method":"item/completed","params":{"threadId":"th-1","turnId":"tu-2","item":{"type":"agentMessage","id":"m2","text":"woke up while away"}}}|}
+               ; {|{"method":"turn/completed","params":{"threadId":"th-1","turn":{"id":"tu-2","items":[],"status":"completed"}}}|}
+               ];
+             let rec drain () =
+               match Line_transport.Peer.read_line p with
+               | Some _ -> drain ()
+               | None ->
+                 ignore (Eio.Promise.try_resolve mark_peer_stopped () : bool)
+             in
+             drain ())))
+      ~new_agent
+      ()
+  in
+  let client = Rpc_server.connect server ~send:ignore in
+  let call ?(params = "{}") meth =
+    ignore
+      (Rpc_server.handle
+         server
+         client
+         (Json.of_string
+            (sprintf {|{"id":"r","method":%S,"params":%s}|} meth params))
+       : Json.t)
+  in
+  call "hello";
+  call ~params:{|{"adapter":"codex"}|} "new_session";
+  let agent = Rpc_server.agent_of_client server client in
+  let seen = ref 0 in
+  let second_done, mark_second_done = Eio.Promise.create () in
+  Agent.subscribe agent ~f:(function
+    | Loop (Agent_end _) ->
+      incr seen;
+      if !seen = 2 then Eio.Promise.resolve mark_second_done ()
+    | _ -> ());
+  call ~params:{|{"text":"start"}|} "prompt";
+  Agent.wait_idle agent;
+  (* Disconnect the only client: live external harness must stay alive! *)
+  Rpc_server.disconnect server client;
+  Eio.Fiber.yield ();
+  printf
+    "after disconnect: live=%b stopped=%b timers=%d\n"
+    (Agent.external_live agent)
+    (Eio.Promise.is_resolved peer_stopped)
+    (Queue.length sleeps);
+  (* External harness wakes autonomously while disconnected. *)
+  Eio.Promise.resolve trigger_wake ();
+  Eio.Promise.await second_done;
+  Agent.wait_idle agent;
+  Eio.Fiber.yield ();
+  (* Firing the first timer (from before the wakeup) does NOT evict it. *)
+  Eio.Promise.resolve (Queue.dequeue_exn sleeps) ();
+  Eio.Fiber.yield ();
+  printf
+    "after wakeup + stale timer: live=%b stopped=%b messages=%d\n"
+    (Agent.external_live agent)
+    (Eio.Promise.is_resolved peer_stopped)
+    (List.length (Agent.messages agent));
+  (* Reconnecting a client cancels the pending eviction timer too. *)
+  let client2 = Rpc_server.connect server ~send:ignore in
+  ignore
+    (Rpc_server.handle
+       server
+       client2
+       (Json.of_string
+          (sprintf
+             {|{"id":"r2","method":"hello","params":{"session":%S}}|}
+             (Session.id (Agent.session agent))))
+     : Json.t);
+  Eio.Promise.resolve (Queue.dequeue_exn sleeps) ();
+  Eio.Fiber.yield ();
+  printf
+    "after reconnect + stale timer: live=%b stopped=%b\n"
+    (Agent.external_live agent)
+    (Eio.Promise.is_resolved peer_stopped);
+  (* Disconnecting again and letting the new grace period elapse evicts it. *)
+  Rpc_server.disconnect server client2;
+  Eio.Fiber.yield ();
+  Eio.Promise.resolve (Queue.dequeue_exn sleeps) ();
+  Eio.Promise.await peer_stopped;
+  printf
+    "after grace elapsed: live=%b stopped=%b\n"
+    (Agent.external_live agent)
+    (Eio.Promise.is_resolved peer_stopped);
+  Rpc_server.shutdown server;
+  [%expect
+    {|
+    after disconnect: live=true stopped=false timers=1
+    after wakeup + stale timer: live=true stopped=false messages=3
+    after reconnect + stale timer: live=true stopped=false
+    after grace elapsed: live=false stopped=true
+    |}]
+;;
