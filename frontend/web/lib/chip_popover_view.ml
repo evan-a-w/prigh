@@ -201,10 +201,8 @@ let session_sections (m : App.Model.t) ~inject =
                       ~cls:"session-of font-mono text-xs text-muted-foreground"
                       (sprintf
                          "%s / %s"
-                         (Status_view.tokens
-                            (Float.of_int state.context_tokens))
-                         (Status_view.tokens
-                            (Float.of_int state.model.context_window)))
+                         (Status_view.tokens (Float.of_int state.context_tokens))
+                         (Status_view.tokens (Float.of_int state.model.context_window)))
                   ]
               | None -> Node.none)
            ; Status_view.cost state ~inject

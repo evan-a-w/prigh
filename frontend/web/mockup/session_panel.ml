@@ -13,15 +13,13 @@ let row ?(class_ = "") ?right ?on_click icon label =
     ~attrs:
       ([ Attr.class_
            (Cn.cn
-              [ "group/row flex h-7 w-full items-center gap-2 rounded-md px-2 \
-                 text-left text-[12.5px] text-foreground/90 hover:bg-accent \
-                 [&_svg]:size-3.5 [&_svg]:shrink-0 \
-                 [&_svg]:text-muted-foreground"
+              [ "group/row flex h-7 w-full items-center gap-2 rounded-md px-2 text-left \
+                 text-[12.5px] text-foreground/90 hover:bg-accent [&_svg]:size-3.5 \
+                 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
               ; class_
               ])
        ]
-       @ Option.to_list
-           (Option.map on_click ~f:(fun e -> Attr.on_click (fun _ -> e))))
+       @ Option.to_list (Option.map on_click ~f:(fun e -> Attr.on_click (fun _ -> e))))
     [ icon
     ; span "min-w-0 flex-1 truncate" [ t label ]
     ; Option.value right ~default:Node.none
@@ -45,8 +43,7 @@ let section ~open_ ~toggle ~count icon label items =
         ~on_click:toggle
         ~right:
           (span
-             "flex items-center gap-1 text-[11px] tabular-nums \
-              text-muted-foreground"
+             "flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground"
              [ Node.textf "%d" count
              ; Icon.view
                  ~class_:
@@ -70,14 +67,9 @@ let subagent (a : Fake.Subagent.t) =
       ]
     [ span "min-w-0 truncate" [ t a.name ]
     ; Icons.view
-        ~class_:
-          "size-3 shrink-0 text-muted-foreground opacity-0 \
-           group-hover/sub:opacity-100"
+        ~class_:"size-3 shrink-0 text-muted-foreground opacity-0 group-hover/sub:opacity-100"
         Arrow_up_right
-    ; Activity.view
-        ~class_:"ml-auto shrink-0 text-[11px] text-muted-foreground"
-        a.status
-        ~age:a.age
+    ; Activity.view ~class_:"ml-auto shrink-0 text-[11px] text-muted-foreground" a.status ~age:a.age
     ]
 ;;
 
@@ -87,28 +79,20 @@ let worktree (w : Fake.Worktree.t) =
       [ Attr.href "#"
       ; Attr.title w.path
       ; Attr.class_
-          "flex h-7 items-center gap-2 rounded-md px-2 text-[12px] \
-           hover:bg-accent"
+          "flex h-7 items-center gap-2 rounded-md px-2 text-[12px] hover:bg-accent"
       ]
     [ span "min-w-0 truncate font-mono text-foreground/85" [ t w.branch ]
     ; div "ml-auto" [ counts ~added:w.added ~removed:w.removed ]
     ]
 ;;
 
-let view
-      ?(class_ = "")
-      ~subagents_open
-      ~worktrees_open
-      ~toggle_subagents
-      ~toggle_worktrees
-      ()
-  =
+let view ?(class_ = "") ~subagents_open ~worktrees_open ~toggle_subagents ~toggle_worktrees () =
   Node.aside
     ~attrs:
       [ Attr.class_
           (Cn.cn
-             [ "flex w-[208px] shrink-0 flex-col rounded-xl border bg-card \
-                p-1.5 text-card-foreground"
+             [ "flex w-[208px] shrink-0 flex-col rounded-xl border bg-card p-1.5 \
+                text-card-foreground"
              ; class_
              ])
       ]

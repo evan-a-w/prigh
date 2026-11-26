@@ -8,8 +8,7 @@ let%expect_test "focus reports are taken out of the input" =
     ~f:(fun input ->
       let rest, reports = Term_focus.split input in
       print_s [%sexp (input : string), (rest : string), (reports : bool list)]);
-  [%expect
-    {|
+  [%expect {|
     (abc abc ())
     ("\027[I" "" (true))
     ("x\027[Oy\027[Iz" xyz (false true))
@@ -20,9 +19,7 @@ let%expect_test "focus reports are taken out of the input" =
 ;;
 
 let%expect_test "the bell, OSC 9, OSC 777 and tmux passthrough" =
-  let n =
-    { Prigh_ui.Notify.title = "prigh: done in proj"; body = "a;b\027c" }
-  in
+  let n = { Prigh_ui.Notify.title = "prigh: done in proj"; body = "a;b\027c" } in
   List.iter
     [ Prigh_ui.Notify.Mode.Bell, Some "xterm-256color", false
     ; Desktop, Some "xterm-256color", false
@@ -38,8 +35,7 @@ let%expect_test "the bell, OSC 9, OSC 777 and tmux passthrough" =
         , (term : string option)
         , (tmux : bool)
         , (Term_notify.sequence mode ~term ~tmux n : string)]);
-  [%expect
-    {|
+  [%expect {|
     (Bell (xterm-256color) false "\007")
     (Desktop (xterm-256color) false "\027]9;prigh: done in proj: a;b c\007")
     (Desktop (foot) false "\027]777;notify;prigh: done in proj;a b c\027\\")

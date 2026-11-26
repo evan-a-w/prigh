@@ -37,8 +37,8 @@ let row ?(attrs = []) ?class_ ?(selected = false) children =
   part
     "tr"
     "table-row"
-    "hover:bg-muted/50 data-[state=selected]:bg-muted border-b \
-     transition-colors has-aria-expanded:bg-muted/50"
+    "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors \
+     has-aria-expanded:bg-muted/50"
     ~attrs:((if selected then [ data "state" "selected" ] else []) @ attrs)
     ?class_
     children
@@ -48,8 +48,8 @@ let head =
   part
     "th"
     "table-head"
-    "text-foreground h-10 px-2 text-left align-middle font-medium \
-     whitespace-nowrap [&:has([role=checkbox])]:pr-0"
+    "text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap \
+     [&:has([role=checkbox])]:pr-0"
 ;;
 
 let cell ?(attrs = []) ?class_ ?col_span children =

@@ -44,4 +44,6 @@ let progress t p =
   | None -> t
 ;;
 
-let finished t result = { t with collecting = None; outcome = Some result }
+let finished t result =
+  { t with collecting = None; outcome = Some result }
+;;

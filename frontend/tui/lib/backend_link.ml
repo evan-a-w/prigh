@@ -430,7 +430,9 @@ let reconnect t ~delay_ms ~session ~as_user =
      | Error e ->
        (* A switch abandons the attempt under way. *)
        return
-         (Option.value (superseded ()) ~default:(Error (Error.to_string_hum e)))
+         (Option.value
+            (superseded ())
+            ~default:(Error (Error.to_string_hum e)))
      | Ok () ->
        (match superseded () with
         | Some error -> return error

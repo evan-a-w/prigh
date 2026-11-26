@@ -100,8 +100,7 @@ let%expect_test "the bar: branch, upstream, counts; no boxes in the list" =
        [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
   show_bar h;
   H.elements h ~selector:".git-commit";
-  [%expect
-    {|
+  [%expect {|
     (Complete_accept (run true))
     feat/x ↑1 ↓0 origin/feat/x
     0 staged 1 unstaged 1 untracked
@@ -127,8 +126,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
   (* The row's ⋯ (or a right-click) opens its menu. *)
   H.click h ~selector:".review-file-more" ~nth:1;
   H.text h ~selector:".context-menu";
-  [%expect
-    {|
+  [%expect {|
     (Complete_accept (run true))
     (Open_menu
      ((target (Review_files (src/util.ml)))
@@ -145,8 +143,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     Copy path
     |}];
   H.click h ~selector:".context-menu [data-item=stage_files]";
-  [%expect
-    {|
+  [%expect {|
     (Picker_choose stage_files)
     (Rpc (method_ git_stage) (params ((paths (src/util.ml)))) (tag (Git Staged)))
     (Focus review-page)
@@ -157,8 +154,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     (status_json
        [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~index:"A" ]);
   H.text h ~selector:".review-files ul";
-  [%expect
-    {|
+  [%expect {|
     (✓ M src/ main.ml +2 −1) (More (right-click, Shift+F10))
     (○ A src/ util.ml staged +2 −0) (More (right-click, Shift+F10))
     |}];
@@ -166,8 +162,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
   H.click h ~selector:".review-file-more" ~nth:1;
   H.text h ~selector:".context-menu";
   H.click h ~selector:".context-menu [data-item=unstage_files]";
-  [%expect
-    {|
+  [%expect {|
     (Open_menu
      ((target (Review_files (src/util.ml)))
       (anchor (Element review-file-src-util-ml-more))))
@@ -197,8 +192,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
   H.key h "ArrowRight" ~target:Review;
   H.key h "X" ~shift:true ~target:Review;
   H.text h ~selector:".review-files";
-  [%expect
-    {|
+  [%expect {|
     (Review (Mark (path src/main.ml) (range false)))
     (Review (Step 1))
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/util.ml)))
@@ -212,8 +206,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     |}];
   H.key h "F10" ~shift:true ~target:Review;
   H.text h ~selector:".context-menu";
-  [%expect
-    {|
+  [%expect {|
     (Open_menu
      ((target (Review_files (src/main.ml src/util.ml)))
       (anchor (Element review-file-src-main-ml))))
@@ -229,8 +222,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     Copy paths
     |}];
   H.click h ~selector:".context-menu [data-item=approve_files]";
-  [%expect
-    {|
+  [%expect {|
     (Picker_choose approve_files)
     (Rpc (method_ review_approve)
      (params
@@ -242,8 +234,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
   (* Esc drops the selection before it closes the review. *)
   H.key h "Escape" ~target:Review;
   H.text h ~selector:".review-files";
-  [%expect
-    {|
+  [%expect {|
     (Review Unmark_all)
     (✓ M src/ main.ml +2 −1) (More (right-click, Shift+F10))
     (○ A src/ util.ml +2 −0) (More (right-click, Shift+F10))
@@ -263,8 +254,7 @@ let%expect_test
   (* Commit… (Shift+C) opens the commit with the approved files. *)
   H.click h ~selector:".git-compose";
   H.text h ~selector:".git-commit";
-  [%expect
-    {|
+  [%expect {|
     (Complete_accept (run true))
     Compose_commit
     (Focus git-message)
@@ -378,8 +368,7 @@ let%expect_test
   (* Amending without a message keeps the commit's. *)
   H.key h "C" ~shift:true ~target:Review;
   H.click h ~selector:".git-amend";
-  [%expect
-    {|
+  [%expect {|
     Compose_commit
     (Focus git-message)
     (Git Toggle_amend)

@@ -33,7 +33,8 @@ let button
   let look =
     match variant, size with
     | None, None -> String.strip ("btn " ^ cls)
-    | _ -> Loon.Button.classes ?variant ?size ~class_:cls ()
+    | _ ->
+      Loon.Button.classes ?variant ?size ~class_:cls ()
   in
   Node.button
     ~attrs:

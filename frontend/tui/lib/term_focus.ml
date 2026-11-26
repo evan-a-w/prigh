@@ -13,11 +13,10 @@ let split input =
     let rec go i =
       if i >= n
       then ()
-      else if
-        i + 2 < n
-        && Char.equal input.[i] '\027'
-        && Char.equal input.[i + 1] '['
-        && (Char.equal input.[i + 2] 'I' || Char.equal input.[i + 2] 'O')
+      else if i + 2 < n
+              && Char.equal input.[i] '\027'
+              && Char.equal input.[i + 1] '['
+              && (Char.equal input.[i + 2] 'I' || Char.equal input.[i + 2] 'O')
       then (
         reports := Char.equal input.[i + 2] 'I' :: !reports;
         go (i + 3))

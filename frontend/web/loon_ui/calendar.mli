@@ -66,11 +66,7 @@ val select
 
 (** The weeks shown for [month]'s month, from the week holding its first
     day to the one holding its last (six weeks with [fixed_weeks]). *)
-val weeks
-  :  ?week_starts_on:Day_of_week.t
-  -> ?fixed_weeks:bool
-  -> Date.t
-  -> Date.t list list
+val weeks : ?week_starts_on:Day_of_week.t -> ?fixed_weeks:bool -> Date.t -> Date.t list list
 
 (** The week of the year (weeks start on Sunday; week 1 holds 1 January). *)
 val week_number : Date.t -> int

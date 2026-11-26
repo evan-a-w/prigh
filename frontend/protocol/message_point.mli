@@ -12,8 +12,7 @@ module Role : sig
 end
 
 type t =
-  { message : string
-    (** the entry id, for {!Request.Delete}, {!Request.Trim_after} *)
+  { message : string (** the entry id, for {!Request.Delete}, {!Request.Trim_after} *)
   ; index : int (** its position, as {!Outline.Point.index} counts *)
   ; role : Role.t
   ; text : string (** its start: what was written, or the tool calls *)

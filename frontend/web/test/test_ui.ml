@@ -1683,8 +1683,7 @@ let%expect_test "after a reload, answered components show what was sent" =
   H.elements h ~selector:".ui-form [disabled]";
   H.show h ~selector:".ui-switch, .ui-group input";
   [%expect.unreachable]
-[@@expect.uncaught_exn
-  {|
+[@@expect.uncaught_exn {|
   ("Soup.Parse_error(\"expected tag name or '*'\")")
   Trailing output
   ---------------

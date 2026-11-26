@@ -27,12 +27,7 @@ val line : ?vertical:bool -> Curve.t -> point list -> string
 
 (** d3's [area().curve(curve)]: along [top], then back along [base] (given
     in the same order as [top]), closed. *)
-val area
-  :  ?vertical:bool
-  -> Curve.t
-  -> top:point list
-  -> base:point list
-  -> string
+val area : ?vertical:bool -> Curve.t -> top:point list -> base:point list -> string
 
 (** Recharts' [Rectangle] path; [radius] is all four corners, or
     top-left, top-right, bottom-right, bottom-left. *)

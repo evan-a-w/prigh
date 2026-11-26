@@ -981,7 +981,8 @@ let%expect_test
     let ac = Option.value_exn h.H.model.autocomplete in
     print_s
       [%sexp
-        (List.map (Autocomplete.items ac) ~f:(fun i -> i.id) : string list)]
+        (List.map (Autocomplete.items ac) ~f:(fun i -> i.id)
+         : string list)]
   in
   H.keys h "/review ";
   H.reply h (Worktrees_for_autocomplete key) listing_json;
@@ -997,8 +998,7 @@ let%expect_test
   H.keys h " --d";
   H.key h (Key.plain Tab);
   editor h;
-  [%expect
-    {|
+  [%expect {|
     (Rpc
       (method_ list_worktrees)
       (params ())

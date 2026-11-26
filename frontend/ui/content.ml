@@ -129,10 +129,9 @@ module Line = struct
     let rec go i =
       if i + needle_len > hay_len
       then None
-      else if
-        String.equal
-          (lower (String.sub haystack ~pos:i ~len:needle_len))
-          (lower needle)
+      else if String.equal
+                (lower (String.sub haystack ~pos:i ~len:needle_len))
+                (lower needle)
       then Some i
       else go (i + 1)
     in

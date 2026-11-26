@@ -25,9 +25,8 @@ let root ?(attrs = []) ?class_ ?(size = Size.Default) children =
      overflow-hidden rounded-xl py-(--card-spacing) text-sm ring-1 \
      [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 \
      has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] \
-     data-[size=sm]:has-data-[slot=card-footer]:pb-0 \
-     *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl \
-     group/card flex flex-col"
+     data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl \
+     *:[img:last-child]:rounded-b-xl group/card flex flex-col"
     ~attrs:(data "size" (Size.name size) :: attrs)
     ?class_
     children
@@ -42,13 +41,8 @@ let header =
      has-data-[slot=card-description]:grid-rows-[auto_auto]"
 ;;
 
-let title =
-  div
-    "card-title"
-    "text-base leading-snug font-medium group-data-[size=sm]/card:text-sm \
-     font-heading"
-;;
-
+let title = div "card-title" "text-base leading-snug font-medium \
+                              group-data-[size=sm]/card:text-sm font-heading"
 let description = div "card-description" "text-muted-foreground text-sm"
 
 let action =
@@ -58,9 +52,5 @@ let action =
 ;;
 
 let content = div "card-content" "px-(--card-spacing)"
-
-let footer =
-  div
-    "card-footer"
-    "bg-muted/50 rounded-b-xl border-t p-(--card-spacing) flex items-center"
-;;
+let footer = div "card-footer" "bg-muted/50 rounded-b-xl border-t p-(--card-spacing) \
+                                flex items-center"

@@ -35,8 +35,7 @@ let highlight ~query text =
 
 let footer_hints hints =
   div
-    "flex items-center gap-4 border-t px-3 py-2 text-[11px] \
-     text-muted-foreground"
+    "flex items-center gap-4 border-t px-3 py-2 text-[11px] text-muted-foreground"
     (List.map hints ~f:(fun (keys, label) ->
        span
          "flex items-center gap-1.5"

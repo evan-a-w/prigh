@@ -11,7 +11,10 @@
 
 (rule
  (target mockup.input.css)
- (deps ../loon_ui/palette.css ../loon_ui/loon.css mockup.css)
+ (deps
+  ../loon_ui/palette.css
+  ../loon_ui/loon.css
+  mockup.css)
  (action
   (with-stdout-to
    mockup.input.css

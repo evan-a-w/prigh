@@ -220,9 +220,4 @@ val of_name : string -> t option
 
 (** The icon. [class_] goes after [lucide lucide-NAME] (e.g. [size-4
     text-muted-foreground]); [stroke_width] is ["2"]. *)
-val view
-  :  ?attrs:Attr.t list
-  -> ?class_:string
-  -> ?stroke_width:string
-  -> t
-  -> Node.t
+val view : ?attrs:Attr.t list -> ?class_:string -> ?stroke_width:string -> t -> Node.t

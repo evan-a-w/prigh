@@ -65,13 +65,7 @@ val content
 val header : ?attrs:Attr.t list -> ?class_:string -> Node.t list -> Node.t
 val footer : ?attrs:Attr.t list -> ?class_:string -> Node.t list -> Node.t
 val title : ?attrs:Attr.t list -> ?class_:string -> t -> Node.t list -> Node.t
-
-val description
-  :  ?attrs:Attr.t list
-  -> ?class_:string
-  -> t
-  -> Node.t list
-  -> Node.t
+val description : ?attrs:Attr.t list -> ?class_:string -> t -> Node.t list -> Node.t
 
 (** An icon beside or above the title. *)
 val media : ?attrs:Attr.t list -> ?class_:string -> Node.t list -> Node.t

@@ -51,7 +51,7 @@ type t =
   ; mutable last_tap : (float * float * float) option (* time, x, y *)
   ; mutable mouse : bool (* the last pointer down was a mouse's *)
   ; mutable swipe : (float * float * float) option
-    (* A finger down on the image at fit: where and when (a swipe between
+  (* A finger down on the image at fit: where and when (a swipe between
      images, or down to close) *)
   ; restore : Dom_html.element Js.t option
   }
@@ -405,36 +405,19 @@ let swiped v ~dx ~dy =
   let style = v.img##.style in
   if Float.(dx = 0. && dy = 0.)
   then (
-    ignore
-      (meth
-         style
-         "removeProperty"
-         [| Js.Unsafe.inject (Js.string "translate") |]
-       : Js.Unsafe.any);
-    ignore
-      (meth
-         v.dialog##.style
-         "removeProperty"
-         [| Js.Unsafe.inject (Js.string "--swipe") |]
-       : Js.Unsafe.any))
+    ignore (meth style "removeProperty" [| Js.Unsafe.inject (Js.string "translate") |] : Js.Unsafe.any);
+    ignore (meth v.dialog##.style "removeProperty" [| Js.Unsafe.inject (Js.string "--swipe") |] : Js.Unsafe.any))
   else (
     ignore
-      (meth
-         style
-         "setProperty"
+      (meth style "setProperty"
          [| Js.Unsafe.inject (Js.string "translate")
-          ; Js.Unsafe.inject
-              (Js.string (sprintf "%.0fpx %.0fpx" dx (Float.max 0. dy)))
+          ; Js.Unsafe.inject (Js.string (sprintf "%.0fpx %.0fpx" dx (Float.max 0. dy)))
          |]
        : Js.Unsafe.any);
     ignore
-      (meth
-         v.dialog##.style
-         "setProperty"
+      (meth v.dialog##.style "setProperty"
          [| Js.Unsafe.inject (Js.string "--swipe")
-          ; Js.Unsafe.inject
-              (Js.string
-                 (sprintf "%.3f" (Float.min 1. (Float.max 0. dy /. 400.))))
+          ; Js.Unsafe.inject (Js.string (sprintf "%.3f" (Float.min 1. (Float.max 0. dy /. 400.))))
          |]
        : Js.Unsafe.any))
 ;;
@@ -484,28 +467,26 @@ let pointer_move v ev =
     p.px <- x;
     p.py <- y;
     v.moved <- v.moved +. Float.abs dx +. Float.abs dy;
-    (match v.swipe with
-     | Some (x0, y0, _) when Hashtbl.length v.pointers = 1 ->
-       let dx = x -. x0
-       and dy = y -. y0 in
-       (* Locked to the way it started: aside, or down. *)
-       if Float.(abs dx > abs dy)
-       then swiped v ~dx ~dy:0.
-       else swiped v ~dx:0. ~dy
-     | _ ->
-       (match before, distance v with
-        | Some (d0, (mx0, my0)), Some (d1, (mx1, my1)) ->
-          let d0 = Option.value v.pinch ~default:d0 in
-          v.pinch <- Some d1;
-          update v (fun z ->
-            Zoom.pan
-              (Zoom.zoom
-                 ~at:(at v ~x:mx1 ~y:my1)
-                 z
-                 ~factor:(d1 /. Float.max 1. d0))
-              ~dx:(mx1 -. mx0)
-              ~dy:(my1 -. my0))
-        | _ -> update v (fun z -> Zoom.pan z ~dx ~dy)))
+    match v.swipe with
+    | Some (x0, y0, _) when Hashtbl.length v.pointers = 1 ->
+      let dx = x -. x0
+      and dy = y -. y0 in
+      (* Locked to the way it started: aside, or down. *)
+      if Float.(abs dx > abs dy) then swiped v ~dx ~dy:0. else swiped v ~dx:0. ~dy
+    | _ ->
+    (match before, distance v with
+     | Some (d0, (mx0, my0)), Some (d1, (mx1, my1)) ->
+       let d0 = Option.value v.pinch ~default:d0 in
+       v.pinch <- Some d1;
+       update v (fun z ->
+         Zoom.pan
+           (Zoom.zoom
+              ~at:(at v ~x:mx1 ~y:my1)
+              z
+              ~factor:(d1 /. Float.max 1. d0))
+           ~dx:(mx1 -. mx0)
+           ~dy:(my1 -. my0))
+     | _ -> update v (fun z -> Zoom.pan z ~dx ~dy))
 ;;
 
 let pointer_up v ev =
@@ -525,25 +506,16 @@ let pointer_up v ev =
       let flung =
         match swipe with
         | Some (x0, y0, t0)
-          when not
-                 (String.equal (get ev "type" |> Js.to_string) "pointercancel")
-          ->
+          when not (String.equal (get ev "type" |> Js.to_string) "pointercancel") ->
           let dx = x -. x0
           and dy = y -. y0 in
           let speed d = Float.abs d /. Float.max 1. (now () -. t0) in
-          if
-            Float.(
-              abs dy > abs dx
-              && dy > 0.
-              && (dy > 120. || (dy > 30. && speed dy > 0.5)))
+          if Float.(abs dy > abs dx && dy > 0. && (dy > 120. || (dy > 30. && speed dy > 0.5)))
           then (
             close ();
             true)
-          else if
-            Float.(
-              abs dx > abs dy
-              && (abs dx > 70. || (abs dx > 30. && speed dx > 0.4)))
-            && Array.length v.items > 1
+          else if Float.(abs dx > abs dy && (abs dx > 70. || (abs dx > 30. && speed dx > 0.4)))
+                  && Array.length v.items > 1
           then (
             act v (if Float.(dx < 0.) then "next" else "prev");
             true)

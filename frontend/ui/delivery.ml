@@ -39,13 +39,12 @@ let job_header line =
   let%bind id, rest = String.lsplit2 rest ~on:' ' in
   let%bind digits = String.chop_prefix id ~prefix:"j" in
   let%bind status, command = String.lsplit2 rest ~on:']' in
-  if
-    String.is_empty digits
-    || (not (String.for_all digits ~f:Char.is_digit))
-    || not
-         (List.exists
-            [ "exited "; "killed"; "timed out"; "failed" ]
-            ~f:(fun prefix -> String.is_prefix status ~prefix))
+  if String.is_empty digits
+     || (not (String.for_all digits ~f:Char.is_digit))
+     || not
+          (List.exists
+             [ "exited "; "killed"; "timed out"; "failed" ]
+             ~f:(fun prefix -> String.is_prefix status ~prefix))
   then None
   else
     Some

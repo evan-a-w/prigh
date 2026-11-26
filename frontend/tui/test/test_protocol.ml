@@ -2402,8 +2402,7 @@ let%expect_test "MCP sign-ins: the listing, the event, an OAuth client" =
   in
   round_trip
     {|{"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}|};
-  [%expect
-    {|
+  [%expect {|
     (Http
       (url https://x.example/mcp)
       (headers ())

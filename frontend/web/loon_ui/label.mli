@@ -9,9 +9,4 @@
 open! Import
 
 (** A [<label>]; [for_] is the id of the control it labels. *)
-val view
-  :  ?attrs:Attr.t list
-  -> ?class_:string
-  -> ?for_:string
-  -> Node.t list
-  -> Node.t
+val view : ?attrs:Attr.t list -> ?class_:string -> ?for_:string -> Node.t list -> Node.t

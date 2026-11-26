@@ -16,8 +16,8 @@ let%expect_test "a reloaded subagent call fetches its transcript" =
     {"role":"assistant","content":[{"type":"tool_call","id":"s1","name":"subagent","arguments":"{\"task\":\"count files\"}"},{"type":"tool_call","id":"s2","name":"subagent","arguments":"{\"task\":\"old one\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},
     {"role":"tool_result","tool_call_id":"s1","tool_name":"subagent","text":"3 files","is_error":false},
     {"role":"tool_result","tool_call_id":"s2","tool_name":"subagent","text":"done","is_error":false}
-  ]|}
-           ) ));
+  ]|})
+       ));
   Harness.reply
     h
     "get_subagent"

@@ -51,11 +51,7 @@ end
 
 (** Recharts' [getNiceTickValues]: [count] round tick values covering
     [(min, max)], from which a number axis takes its domain. *)
-val nice_ticks
-  :  ?allow_decimals:bool
-  -> ?count:int
-  -> float * float
-  -> float list
+val nice_ticks : ?allow_decimals:bool -> ?count:int -> float * float -> float list
 
 (** Recharts' [getTickValuesFixedDomain]: ticks within a given domain. *)
 val fixed_domain_ticks

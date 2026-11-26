@@ -383,9 +383,7 @@ let footer times (message : Message.Assistant.t) =
     | End_turn when Float.(message.usage.output > 0.) ->
       let { Usage.input; output; cache_read } = message.usage in
       [ message.model; tokens (input +. cache_read) ^ " in" ]
-      @ (if Float.(cache_read > 0.)
-         then [ tokens cache_read ^ " cached" ]
-         else [])
+      @ (if Float.(cache_read > 0.) then [ tokens cache_read ^ " cached" ] else [])
       @ [ tokens output ^ " out" ]
     | _ -> []
   in

@@ -16,13 +16,10 @@ let osc777 term =
 ;;
 
 let tmux_passthrough s =
-  "\027Ptmux;"
-  ^ String.substr_replace_all s ~pattern:"\027" ~with_:"\027\027"
-  ^ "\027\\"
+  "\027Ptmux;" ^ String.substr_replace_all s ~pattern:"\027" ~with_:"\027\027" ^ "\027\\"
 ;;
 
-let sequence (mode : Prigh_ui.Notify.Mode.t) ~term ~tmux (n : Prigh_ui.Notify.t)
-  =
+let sequence (mode : Prigh_ui.Notify.Mode.t) ~term ~tmux (n : Prigh_ui.Notify.t) =
   match mode with
   | Off -> ""
   | Bell -> "\007"

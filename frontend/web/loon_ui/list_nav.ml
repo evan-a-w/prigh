@@ -54,11 +54,9 @@ let move ?(loop = true) ~equal ~items ~current (key : Dom_html.Keyboard_code.t) 
     let at i = Some (fst items.(i)) in
     match key, index with
     | ArrowDown, None -> at 0
-    | ArrowDown, Some i ->
-      if loop then at ((i + 1) % n) else at (Int.min (i + 1) (n - 1))
+    | ArrowDown, Some i -> if loop then at ((i + 1) % n) else at (Int.min (i + 1) (n - 1))
     | ArrowUp, None -> at (n - 1)
-    | ArrowUp, Some i ->
-      if loop then at ((i - 1 + n) % n) else at (Int.max (i - 1) 0)
+    | ArrowUp, Some i -> if loop then at ((i - 1 + n) % n) else at (Int.max (i - 1) 0)
     | Home, _ | PageUp, _ -> at 0
     | End, _ | PageDown, _ -> at (n - 1)
     | key, index ->

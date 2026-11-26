@@ -11,7 +11,5 @@ let view ?(class_ = "") (status : Fake.Status.t) ~age =
     | Working -> "thinking-shimmer text-foreground/80", "working…"
     | Idle -> "tabular-nums", age
   in
-  Node.span
-    ~attrs:[ Attr.class_ (Cn.cn [ "shrink-0"; cls; class_ ]) ]
-    [ Node.text text ]
+  Node.span ~attrs:[ Attr.class_ (Cn.cn [ "shrink-0"; cls; class_ ]) ] [ Node.text text ]
 ;;

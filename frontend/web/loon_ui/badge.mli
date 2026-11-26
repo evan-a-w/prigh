@@ -20,12 +20,7 @@ end
 val classes : ?variant:Variant.t -> ?class_:string -> unit -> string
 
 (** A [<span>]. *)
-val view
-  :  ?attrs:Attr.t list
-  -> ?class_:string
-  -> ?variant:Variant.t
-  -> Node.t list
-  -> Node.t
+val view : ?attrs:Attr.t list -> ?class_:string -> ?variant:Variant.t -> Node.t list -> Node.t
 
 (** An [<a>] that looks like a badge (and darkens on hover): shadcn's
     [<Badge asChild><a>]. *)

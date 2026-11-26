@@ -40,8 +40,7 @@ let%expect_test "call/response correlation, events, errors, close" =
   Transport.In_memory.Backend.send
     backend
     {|{"type":"response","id":99,"ok":true,"result":null}|};
-  let%bind a
-  and b in
+  let%bind a and b in
   print_s
     [%message
       (a : Prigh_protocol.Json.t Or_error.t)
@@ -84,9 +83,8 @@ let%expect_test "call/response correlation, events, errors, close" =
   return ()
 ;;
 
-let%expect_test
-    "reconnect: a fresh transport per attempt, shared attempts, failures \
-     reported"
+let%expect_test "reconnect: a fresh transport per attempt, shared attempts, \
+                 failures reported"
   =
   let backends = Queue.create () in
   let attempts = ref 0 in
@@ -120,8 +118,7 @@ let%expect_test
   (* Two concurrent attempts share one connection. *)
   let a = Client.connect client in
   let b = Client.connect client in
-  let%bind a
-  and b in
+  let%bind a and b in
   printf
     "attempts=%d a=%s b=%s connected=%b\n"
     !attempts
@@ -140,8 +137,7 @@ let%expect_test
     {|{"type":"response","id":1,"ok":true,"result":"pong"}|};
   let%bind reply in
   print_s [%sexp (reply : Prigh_protocol.Json.t Or_error.t)];
-  [%expect
-    {|
+  [%expect {|
     {"id":1,"method":"ping","params":{}}
     (Ok pong)
     |}];

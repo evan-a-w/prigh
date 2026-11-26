@@ -66,9 +66,7 @@ let rect_of (el : Dom_html.element Js.t) =
   }
 ;;
 
-let by_id id =
-  Js.Opt.to_option (Dom_html.document##getElementById (Js.string id))
-;;
+let by_id id = Js.Opt.to_option (Dom_html.document##getElementById (Js.string id))
 
 let anchor_rect : Anchor.t -> rect option = function
   | Element id -> Option.map (by_id id) ~f:rect_of
@@ -146,11 +144,8 @@ let set_style (el : Dom_html.element Js.t) name value =
 ;;
 
 let set_attr (el : Dom_html.element Js.t) name value =
-  let old =
-    Js.Opt.case (el##getAttribute (Js.string name)) (fun () -> "") Js.to_string
-  in
-  if not (String.equal old value)
-  then el##setAttribute (Js.string name) (Js.string value)
+  let old = Js.Opt.case (el##getAttribute (Js.string name)) (fun () -> "") Js.to_string in
+  if not (String.equal old value) then el##setAttribute (Js.string name) (Js.string value)
 ;;
 
 let first_child (el : Dom_html.element Js.t) : Dom_html.element Js.t option =
@@ -197,9 +192,7 @@ let position (p : Placement.t) (wrapper : Dom_html.element Js.t) =
     in
     let offset = p.side_offset +. arrow_h in
     let coords side ~w ~h =
-      let cross =
-        if Align.equal p.align End then -.p.align_offset else p.align_offset
-      in
+      let cross = if Align.equal p.align End then -.p.align_offset else p.align_offset in
       let along start length size =
         (match p.align with
          | Start -> start
@@ -240,9 +233,7 @@ let position (p : Placement.t) (wrapper : Dom_html.element Js.t) =
       | Right -> vh -. (2. *. pad), vw -. pad -. (a.left +. a.width +. offset)
       | Left -> vh -. (2. *. pad), a.left -. offset -. pad
     in
-    let var suffix value =
-      set_style wrapper (sprintf "--radix-%s-%s" p.name suffix) value
-    in
+    let var suffix value = set_style wrapper (sprintf "--radix-%s-%s" p.name suffix) value in
     var "content-available-height" (px (Float.max 0. available_height));
     var "content-available-width" (px (Float.max 0. available_width));
     var "trigger-width" (px a.width);
@@ -251,9 +242,7 @@ let position (p : Placement.t) (wrapper : Dom_html.element Js.t) =
     let w = Float.of_int wrapper##.offsetWidth
     and h = Float.of_int wrapper##.offsetHeight in
     let x, y = coords side ~w ~h in
-    let clamp v ~lo ~hi =
-      if Float.(hi < lo) then lo else Float.max lo (Float.min hi v)
-    in
+    let clamp v ~lo ~hi = if Float.(hi < lo) then lo else Float.max lo (Float.min hi v) in
     let x, y =
       if not p.avoid_collisions
       then x, y
@@ -292,19 +281,11 @@ let position (p : Placement.t) (wrapper : Dom_html.element Js.t) =
       set_style arrow base "0";
       (match side with
        | Top | Bottom ->
-         let ax =
-           clamp
-             (a.left +. (a.width /. 2.) -. x -. (arrow_w /. 2.))
-             ~lo:0.
-             ~hi:(w -. arrow_w)
-         in
+         let ax = clamp (a.left +. (a.width /. 2.) -. x -. (arrow_w /. 2.)) ~lo:0. ~hi:(w -. arrow_w) in
          set_style arrow "left" (px ax)
        | Left | Right ->
          let ay =
-           clamp
-             (a.top +. (a.height /. 2.) -. y -. (arrow_w /. 2.))
-             ~lo:0.
-             ~hi:(h -. arrow_w)
+           clamp (a.top +. (a.height /. 2.) -. y -. (arrow_w /. 2.)) ~lo:0. ~hi:(h -. arrow_w)
          in
          set_style arrow "top" (px ay));
       set_style
@@ -342,19 +323,12 @@ type item_aligned =
 let float_style (el : Dom_html.element Js.t) name =
   let v =
     Js.to_string
-      ((Dom_html.window##getComputedStyle el)##getPropertyValue
-         (Js.string name))
+      ((Dom_html.window##getComputedStyle el)##getPropertyValue (Js.string name))
   in
-  Option.value
-    (Float.of_string_opt (String.chop_suffix_if_exists v ~suffix:"px"))
-    ~default:0.
+  Option.value (Float.of_string_opt (String.chop_suffix_if_exists v ~suffix:"px")) ~default:0.
 ;;
 
-let position_item_aligned
-      (st : item_aligned)
-      ~anchor
-      (wrapper : Dom_html.element Js.t)
-  =
+let position_item_aligned (st : item_aligned) ~anchor (wrapper : Dom_html.element Js.t) =
   match by_id anchor, first_child wrapper with
   | None, _ | _, None -> ()
   | Some trigger, Some content ->
@@ -362,15 +336,9 @@ let position_item_aligned
     let available = vh -. (2. *. margin) in
     let t = rect_of trigger in
     let value =
-      Option.value_map
-        (query trigger "[data-slot=select-value]")
-        ~default:t
-        ~f:rect_of
+      Option.value_map (query trigger "[data-slot=select-value]") ~default:t ~f:rect_of
     in
-    let items =
-      Dom.list_of_nodeList
-        (content##querySelectorAll (Js.string "[role=option]"))
-    in
+    let items = Dom.list_of_nodeList (content##querySelectorAll (Js.string "[role=option]")) in
     let item =
       match query content "[role=option][data-state=checked]" with
       | Some item -> Some item
@@ -406,11 +374,7 @@ let position_item_aligned
        let vp_padding_bottom = float_style vp "padding-bottom" in
        let items_height = Float.of_int vp##.scrollHeight in
        let full =
-         border_top
-         +. padding_top
-         +. items_height
-         +. padding_bottom
-         +. border_bottom
+         border_top +. padding_top +. items_height +. padding_bottom +. border_bottom
        in
        let item_height = Float.of_int item##.offsetHeight in
        let min_height = Float.min (item_height *. 5.) full in
@@ -418,20 +382,15 @@ let position_item_aligned
        let trigger_middle_to_bottom = available -. top_to_trigger_middle in
        let half = item_height /. 2. in
        let item_middle = Float.of_int item##.offsetTop +. half in
-       let content_top_to_item_middle =
-         border_top +. padding_top +. item_middle
-       in
+       let content_top_to_item_middle = border_top +. padding_top +. item_middle in
        let item_middle_to_content_bottom = full -. content_top_to_item_middle in
        let vp_top = Float.of_int vp##.offsetTop in
        let height, top, scroll =
          if Float.(content_top_to_item_middle <= top_to_trigger_middle)
          then (
-           let is_last =
-             Option.equal phys_equal (List.last items) (Some item)
-           in
+           let is_last = Option.equal phys_equal (List.last items) (Some item) in
            let vp_offset_bottom =
-             Float.of_int
-               (content##.clientHeight - vp##.offsetTop - vp##.offsetHeight)
+             Float.of_int (content##.clientHeight - vp##.offsetTop - vp##.offsetHeight)
            in
            let below =
              Float.max
@@ -441,9 +400,7 @@ let position_item_aligned
                 +. vp_offset_bottom
                 +. border_bottom)
            in
-           let height =
-             Float.min available (content_top_to_item_middle +. below)
-           in
+           let height = Float.min available (content_top_to_item_middle +. below) in
            st.anchored_bottom <- true;
            height, margin +. available -. height, 0.)
          else (
@@ -451,18 +408,11 @@ let position_item_aligned
            let above =
              Float.max
                top_to_trigger_middle
-               (border_top
-                +. vp_top
-                +. (if is_first then vp_padding_top else 0.)
-                +. half)
+               (border_top +. vp_top +. (if is_first then vp_padding_top else 0.) +. half)
            in
-           let height =
-             Float.min available (above +. item_middle_to_content_bottom)
-           in
+           let height = Float.min available (above +. item_middle_to_content_bottom) in
            st.anchored_bottom <- false;
-           ( height
-           , margin
-           , content_top_to_item_middle -. top_to_trigger_middle +. vp_top ))
+           height, margin, content_top_to_item_middle -. top_to_trigger_middle +. vp_top)
        in
        let height = Float.max height min_height in
        st.min_height <- min_height;
@@ -494,9 +444,7 @@ let sync_scroll_buttons (content : Dom_html.element Js.t) =
     in
     let up = set "[data-slot=select-scroll-up-button]" Float.(top <= 0.) in
     let down =
-      set
-        "[data-slot=select-scroll-down-button]"
-        Float.(round_up top >= max_top)
+      set "[data-slot=select-scroll-down-button]" Float.(round_up top >= max_top)
     in
     up || down
 ;;
@@ -504,30 +452,27 @@ let sync_scroll_buttons (content : Dom_html.element Js.t) =
 (* Radix's [SelectViewport] onScroll: while the wrapper is shorter than the
    window allows, scrolling grows it instead (upwards when it is anchored at
    the bottom). *)
-let expand_on_scroll
-      (st : item_aligned)
-      (wrapper : Dom_html.element Js.t)
-      (vp : Dom_html.element Js.t)
+let expand_on_scroll (st : item_aligned) (wrapper : Dom_html.element Js.t) (vp : Dom_html.element Js.t)
   =
   let scroll = Js.to_float vp##.scrollTop in
   let delta = Float.abs (st.prev_scroll -. scroll) in
-  if st.expand && Float.(delta > 0.)
-  then (
-    let _, vh = viewport () in
-    let available = vh -. (2. *. margin) in
-    let height = (rect_of wrapper).height in
-    if Float.(height < available)
-    then (
-      let next = Float.max st.min_height height +. delta in
-      let clamped = Float.min available next in
-      let diff = next -. clamped in
-      set_style wrapper "height" (px clamped);
-      if st.anchored_bottom
-      then (
-        let top = (rect_of wrapper).top -. (clamped -. height) in
-        let _, oy = fixed_origin wrapper in
-        set_style wrapper "top" (px (top -. oy));
-        vp##.scrollTop := Js.float (if Float.(diff > 0.) then diff else 0.))));
+  (if st.expand && Float.(delta > 0.)
+   then (
+     let _, vh = viewport () in
+     let available = vh -. (2. *. margin) in
+     let height = (rect_of wrapper).height in
+     if Float.(height < available)
+     then (
+       let next = Float.max st.min_height height +. delta in
+       let clamped = Float.min available next in
+       let diff = next -. clamped in
+       set_style wrapper "height" (px clamped);
+       if st.anchored_bottom
+       then (
+         let top = (rect_of wrapper).top -. (clamped -. height) in
+         let _, oy = fixed_origin wrapper in
+         set_style wrapper "top" (px (top -. oy));
+         vp##.scrollTop := Js.float (if Float.(diff > 0.) then diff else 0.)))));
   st.prev_scroll <- Js.to_float vp##.scrollTop
 ;;
 
@@ -560,11 +505,7 @@ module Hook = Vdom.Attr.Hooks.Make (struct
       ; frame = None
       ; frames = 0
       ; item_aligned =
-          { anchored_bottom = false
-          ; min_height = 0.
-          ; prev_scroll = 0.
-          ; expand = false
-          }
+          { anchored_bottom = false; min_height = 0.; prev_scroll = 0.; expand = false }
       ; listener = None
       }
     ;;
@@ -630,13 +571,10 @@ module Hook = Vdom.Attr.Hooks.Make (struct
           tick state el ())
     ;;
 
-    let update ~old_input:_ ~new_input (state : State.t) _ =
-      state.mode <- new_input
-    ;;
+    let update ~old_input:_ ~new_input (state : State.t) _ = state.mode <- new_input
 
     let destroy _ (state : State.t) _ =
-      Option.iter state.frame ~f:(fun id ->
-        Dom_html.window##cancelAnimationFrame id);
+      Option.iter state.frame ~f:(fun id -> Dom_html.window##cancelAnimationFrame id);
       Option.iter state.listener ~f:Dom_html.removeEventListener;
       state.frame <- None
     ;;
@@ -645,32 +583,32 @@ module Hook = Vdom.Attr.Hooks.Make (struct
 let hook mode = Vdom.Attr.create_hook "loon-popper" (Hook.create mode)
 
 let wrapper
-      ?(side = Side.Bottom)
-      ?(side_offset = 0.)
-      ?(align = Align.Center)
-      ?(align_offset = 0.)
-      ?(avoid_collisions = true)
-      ?(collision_padding = 0.)
-      ?(attrs = [])
-      ~name
-      ~anchor
-      content
+  ?(side = Side.Bottom)
+  ?(side_offset = 0.)
+  ?(align = Align.Center)
+  ?(align_offset = 0.)
+  ?(avoid_collisions = true)
+  ?(collision_padding = 0.)
+  ?(attrs = [])
+  ~name
+  ~anchor
+  content
   =
   Node.div
     ~attrs:
       ([ Attr.create "data-radix-popper-content-wrapper" "" ]
        @ Portal.positioned
        @ [ hook
-             (Popper
-                { side
-                ; side_offset
-                ; align
-                ; align_offset
-                ; avoid_collisions
-                ; collision_padding
-                ; anchor
-                ; name
-                })
+           (Popper
+              { side
+              ; side_offset
+              ; align
+              ; align_offset
+              ; avoid_collisions
+              ; collision_padding
+              ; anchor
+              ; name
+              })
          ]
        @ attrs)
     [ content ]
@@ -692,10 +630,7 @@ let content_attrs ?(side = Side.Bottom) ?(align = Align.Center) () =
 
 let arrow ?class_ () =
   Node.span
-    ~attrs:
-      [ Attr.create "data-popper-arrow" ""
-      ; Attr.style (Css_gen.position `Absolute)
-      ]
+    ~attrs:[ Attr.create "data-popper-arrow" ""; Attr.style (Css_gen.position `Absolute) ]
     [ Node.create_svg
         "svg"
         ~attrs:
@@ -705,12 +640,7 @@ let arrow ?class_ () =
            ; Attr.create "preserveAspectRatio" "none"
            ; Attr.style (Css_gen.display `Block)
            ]
-           @ Option.value_map class_ ~default:[] ~f:(fun c -> [ Cn.attr [ c ] ])
-          )
-        [ Node.create_svg
-            "polygon"
-            ~attrs:[ Attr.create "points" "0,0 30,0 15,10" ]
-            []
-        ]
+           @ Option.value_map class_ ~default:[] ~f:(fun c -> [ Cn.attr [ c ] ]))
+        [ Node.create_svg "polygon" ~attrs:[ Attr.create "points" "0,0 30,0 15,10" ] [] ]
     ]
 ;;

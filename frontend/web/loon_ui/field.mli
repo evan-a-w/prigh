@@ -69,12 +69,7 @@ val content : ?attrs:Attr.t list -> ?class_:string -> Node.t list -> Node.t
 
 (** A {!Label} for a field's control; wrapping a whole [root] it makes a
     choice card. *)
-val label
-  :  ?attrs:Attr.t list
-  -> ?class_:string
-  -> ?for_:string
-  -> Node.t list
-  -> Node.t
+val label : ?attrs:Attr.t list -> ?class_:string -> ?for_:string -> Node.t list -> Node.t
 
 (** A title that is not a [<label>] (e.g. inside a choice card). *)
 val title : ?attrs:Attr.t list -> ?class_:string -> Node.t list -> Node.t

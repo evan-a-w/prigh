@@ -58,14 +58,7 @@ module Ctx = struct
     let x, y = xy t x y in
     Buffer.add_string
       t.buf
-      (sprintf
-         "C%s,%s,%s,%s,%s,%s"
-         (d3 x1)
-         (d3 y1)
-         (d3 x2)
-         (d3 y2)
-         (d3 x)
-         (d3 y))
+      (sprintf "C%s,%s,%s,%s,%s,%s" (d3 x1) (d3 y1) (d3 x2) (d3 y2) (d3 x) (d3 y))
   ;;
 
   let close t = Buffer.add_char t.buf 'Z'
@@ -75,18 +68,13 @@ end
    area's top, 1 for its base, NaN for a lone line); [t] the step position.
    Returns whether to close. *)
 let segment (ctx : Ctx.t) curve ~line ~t (pts : point list) =
-  let start x y =
-    if Float.(line = 1.) then Ctx.line_to ctx x y else Ctx.move_to ctx x y
-  in
-  let closes n_points =
-    Float.(line = 1.) || (Float.is_nan line && n_points = 1)
-  in
+  let start x y = if Float.(line = 1.) then Ctx.line_to ctx x y else Ctx.move_to ctx x y in
+  let closes n_points = Float.(line = 1.) || (Float.is_nan line && n_points = 1) in
   let pts = Array.of_list pts in
   let n = Array.length pts in
   match (curve : Curve.t) with
   | Linear | Linear_closed ->
-    Array.iteri pts ~f:(fun i (x, y) ->
-      if i = 0 then start x y else Ctx.line_to ctx x y);
+    Array.iteri pts ~f:(fun i (x, y) -> if i = 0 then start x y else Ctx.line_to ctx x y);
     let closes =
       match curve with
       | Linear_closed -> n > 0
@@ -150,11 +138,7 @@ let segment (ctx : Ctx.t) curve ~line ~t (pts : point list) =
     and y1 = ref Float.nan
     and t0 = ref Float.nan
     and count = ref 0 in
-    let div a h other =
-      if Float.(h = 0.)
-      then a /. if Float.(other < 0.) then -0. else 0.
-      else a /. h
-    in
+    let div a h other = if Float.(h = 0.) then a /. if Float.(other < 0.) then -0. else 0. else a /. h in
     let slope3 x2 y2 =
       let h0 = !x1 -. !x0
       and h1 = x2 -. !x1 in
@@ -163,9 +147,7 @@ let segment (ctx : Ctx.t) curve ~line ~t (pts : point list) =
       let p = ((s0 *. h1) +. (s1 *. h0)) /. (h0 +. h1) in
       let v =
         (sign s0 +. sign s1)
-        *. Float.min
-             (Float.min (Float.abs s0) (Float.abs s1))
-             (0.5 *. Float.abs p)
+        *. Float.min (Float.min (Float.abs s0) (Float.abs s1)) (0.5 *. Float.abs p)
       in
       if Float.is_nan v then 0. else v
     in
@@ -175,14 +157,7 @@ let segment (ctx : Ctx.t) curve ~line ~t (pts : point list) =
     in
     let emit ta tb =
       let dx = (!x1 -. !x0) /. 3. in
-      Ctx.curve_to
-        ctx
-        (!x0 +. dx)
-        (!y0 +. (dx *. ta))
-        (!x1 -. dx)
-        (!y1 -. (dx *. tb))
-        !x1
-        !y1
+      Ctx.curve_to ctx (!x0 +. dx) (!y0 +. (dx *. ta)) (!x1 -. dx) (!y1 -. (dx *. tb)) !x1 !y1
     in
     Array.iter pts ~f:(fun (x, y) ->
       if not (Float.(x = !x1) && Float.(y = !y1))
@@ -255,23 +230,18 @@ let step_t : Curve.t -> float = function
 ;;
 
 let ctx ~vertical curve =
-  { Ctx.buf = Buffer.create 256; flip = vertical && Curve.equal curve Monotone }
+  { Ctx.buf = Buffer.create 256
+  ; flip = vertical && Curve.equal curve Monotone
+  }
 ;;
 
 let flip_points ~vertical curve pts =
-  if vertical && Curve.equal curve Monotone
-  then List.map pts ~f:(fun (x, y) -> y, x)
-  else pts
+  if vertical && Curve.equal curve Monotone then List.map pts ~f:(fun (x, y) -> y, x) else pts
 ;;
 
 let line ?(vertical = false) curve pts =
   let ctx = ctx ~vertical curve in
-  segment
-    ctx
-    curve
-    ~line:Float.nan
-    ~t:(step_t curve)
-    (flip_points ~vertical curve pts);
+  segment ctx curve ~line:Float.nan ~t:(step_t curve) (flip_points ~vertical curve pts);
   Buffer.contents ctx.buf
 ;;
 
@@ -279,12 +249,7 @@ let area ?(vertical = false) curve ~top ~base =
   let ctx = ctx ~vertical curve in
   let t = step_t curve in
   segment ctx curve ~line:0. ~t (flip_points ~vertical curve top);
-  segment
-    ctx
-    curve
-    ~line:1.
-    ~t:(1. -. t)
-    (flip_points ~vertical curve (List.rev base));
+  segment ctx curve ~line:1. ~t:(1. -. t) (flip_points ~vertical curve (List.rev base));
   Buffer.contents ctx.buf
 ;;
 
@@ -295,19 +260,11 @@ let rectangle ?radius ~x ~y ~width ~height () =
   let ys = if Float.(rh >= 0.) then 1. else -1. in
   let xs = if Float.(rw >= 0.) then 1. else -1. in
   let cw =
-    if Float.(rh >= 0. && rw >= 0.) || Float.(rh < 0. && rw < 0.)
-    then "1"
-    else "0"
+    if Float.(rh >= 0. && rw >= 0.) || Float.(rh < 0. && rw < 0.) then "1" else "0"
   in
   let n v = num (r v) in
   let simple () =
-    sprintf
-      "M %s,%s h %s v %s h %s Z"
-      (n x)
-      (n y)
-      (n width)
-      (n height)
-      (n (-.width))
+    sprintf "M %s,%s h %s v %s h %s Z" (n x) (n y) (n width) (n height) (n (-.width))
   in
   match radius with
   | Some (`Corners (a, b, c, d)) when Float.(max_radius > 0.) ->
@@ -320,26 +277,12 @@ let rectangle ?radius ~x ~y ~width ~height () =
     let add = Buffer.add_string buf in
     add (sprintf "M%s,%s" (n x) (n (y +. (ys *. a))));
     if Float.(a > 0.)
-    then
-      add
-        (sprintf
-           "A %s,%s,0,0,%s,%s,%s"
-           (n a)
-           (n a)
-           cw
-           (n (x +. (xs *. a)))
-           (n y));
+    then add (sprintf "A %s,%s,0,0,%s,%s,%s" (n a) (n a) cw (n (x +. (xs *. a))) (n y));
     add (sprintf "L %s,%s" (n (x +. width -. (xs *. b))) (n y));
     if Float.(b > 0.)
     then
       add
-        (sprintf
-           "A %s,%s,0,0,%s,\n        %s,%s"
-           (n b)
-           (n b)
-           cw
-           (n (x +. width))
-           (n (y +. (ys *. b))));
+        (sprintf "A %s,%s,0,0,%s,\n        %s,%s" (n b) (n b) cw (n (x +. width)) (n (y +. (ys *. b))));
     add (sprintf "L %s,%s" (n (x +. width)) (n (y +. height -. (ys *. c))));
     if Float.(c > 0.)
     then
@@ -355,13 +298,7 @@ let rectangle ?radius ~x ~y ~width ~height () =
     if Float.(d > 0.)
     then
       add
-        (sprintf
-           "A %s,%s,0,0,%s,\n        %s,%s"
-           (n d)
-           (n d)
-           cw
-           (n x)
-           (n (y +. height -. (ys *. d))));
+        (sprintf "A %s,%s,0,0,%s,\n        %s,%s" (n d) (n d) cw (n x) (n (y +. height -. (ys *. d))));
     add "Z";
     Buffer.contents buf
   | Some (`All rad) when Float.(max_radius > 0. && rad > 0.) ->
@@ -409,15 +346,13 @@ let rectangle ?radius ~x ~y ~width ~height () =
 let radian = Float.pi /. 180.
 
 let polar ~cx ~cy ~radius ~angle =
-  ( cx +. (Float.cos (-.radian *. angle) *. radius)
-  , cy +. (Float.sin (-.radian *. angle) *. radius) )
+  cx +. (Float.cos (-.radian *. angle) *. radius), cy +. (Float.sin (-.radian *. angle) *. radius)
 ;;
 
 let sign x = if Float.(x = 0.) then 0. else if Float.(x > 0.) then 1. else -1.
 
 let delta_angle start_angle end_angle =
-  sign (end_angle -. start_angle)
-  *. Float.min (Float.abs (end_angle -. start_angle)) 359.999
+  sign (end_angle -. start_angle) *. Float.min (Float.abs (end_angle -. start_angle)) 359.999
 ;;
 
 let n v = num (r v)
@@ -447,10 +382,7 @@ let sector_path ~cx ~cy ~inner_radius ~outer_radius ~start_angle ~end_angle =
     let iex, iey = polar ~cx ~cy ~radius:inner_radius ~angle:temp_end in
     path
     ^ sprintf
-        "L %s,%s\n\
-        \            A %s,%s,0,\n\
-        \            %s,%s,\n\
-        \            %s,%s Z"
+        "L %s,%s\n            A %s,%s,0,\n            %s,%s,\n            %s,%s Z"
         (n iex)
         (n iey)
         (n inner_radius)
@@ -463,9 +395,7 @@ let sector_path ~cx ~cy ~inner_radius ~outer_radius ~start_angle ~end_angle =
 ;;
 
 let tangent_circle ~cx ~cy ~radius ~angle ~sign ~is_external ~corner_radius =
-  let centre_radius =
-    (corner_radius *. if is_external then 1. else -1.) +. radius
-  in
+  let centre_radius = (corner_radius *. if is_external then 1. else -1.) +. radius in
   let theta = Float.asin (corner_radius /. centre_radius) /. radian in
   let centre_angle = angle +. (sign *. theta) in
   let circle_tangency = polar ~cx ~cy ~radius ~angle:centre_angle in
@@ -513,11 +443,7 @@ let sector_with_corner
   else (
     let path =
       sprintf
-        "M %s,%s\n\
-        \    A%s,%s,0,0,%s,%s,%s\n\
-        \    A%s,%s,0,%s,%s,%s,%s\n\
-        \    A%s,%s,0,0,%s,%s,%s\n\
-        \  "
+        "M %s,%s\n    A%s,%s,0,0,%s,%s,%s\n    A%s,%s,0,%s,%s,%s,%s\n    A%s,%s,0,0,%s,%s,%s\n  "
         (n solx)
         (n soly)
         (n corner_radius)
@@ -551,10 +477,7 @@ let sector_with_corner
       else
         path
         ^ sprintf
-            "L%s,%s\n\
-            \      A%s,%s,0,0,%s,%s,%s\n\
-            \      A%s,%s,0,%s,%s,%s,%s\n\
-            \      A%s,%s,0,0,%s,%s,%sZ"
+            "L%s,%s\n      A%s,%s,0,0,%s,%s,%s\n      A%s,%s,0,%s,%s,%s,%s\n      A%s,%s,0,0,%s,%s,%sZ"
             (n eilx)
             (n eily)
             (n corner_radius)
@@ -604,15 +527,7 @@ let sector
            ~force_corner_radius
            ~start_angle
            ~end_angle)
-    else
-      Some
-        (sector_path
-           ~cx
-           ~cy
-           ~inner_radius
-           ~outer_radius
-           ~start_angle
-           ~end_angle))
+    else Some (sector_path ~cx ~cy ~inner_radius ~outer_radius ~start_angle ~end_angle))
 ;;
 
 let polygon pts =
@@ -620,7 +535,6 @@ let polygon pts =
   | [] -> ""
   | _ ->
     String.concat
-      (List.mapi pts ~f:(fun i (x, y) ->
-         sprintf "%s%s,%s" (if i = 0 then "M" else "L") (n x) (n y)))
+      (List.mapi pts ~f:(fun i (x, y) -> sprintf "%s%s,%s" (if i = 0 then "M" else "L") (n x) (n y)))
     ^ "Z"
 ;;

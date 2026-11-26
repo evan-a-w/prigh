@@ -14,15 +14,13 @@ module Media_variant = struct
   let classes = function
     | Default -> "bg-transparent"
     | Icon ->
-      "bg-muted text-foreground flex size-8 shrink-0 items-center \
-       justify-center rounded-lg [&_svg:not([class*='size-'])]:size-4"
+      "bg-muted text-foreground flex size-8 shrink-0 items-center justify-center \
+       rounded-lg [&_svg:not([class*='size-'])]:size-4"
   ;;
 end
 
 let div slot classes ?(attrs = []) ?class_ children =
-  Node.div
-    ~attrs:([ data "slot" slot; Cn.with_class ?class_ [ classes ] ] @ attrs)
-    children
+  Node.div ~attrs:([ data "slot" slot; Cn.with_class ?class_ [ classes ] ] @ attrs) children
 ;;
 
 let root =
@@ -55,13 +53,12 @@ let title = div "empty-title" "text-sm font-medium tracking-tight font-heading"
 let description =
   div
     "empty-description"
-    "text-sm/relaxed text-muted-foreground [&>a]:underline \
-     [&>a]:underline-offset-4 [&>a:hover]:text-primary"
+    "text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 \
+     [&>a:hover]:text-primary"
 ;;
 
 let content =
   div
     "empty-content"
-    "gap-2.5 text-sm flex w-full max-w-sm min-w-0 flex-col items-center \
-     text-balance"
+    "gap-2.5 text-sm flex w-full max-w-sm min-w-0 flex-col items-center text-balance"
 ;;

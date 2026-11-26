@@ -53,7 +53,8 @@ let%expect_test "!command, !!command and !&command" =
     h
     {|{"event":"message_start","message":{"role":"user","text":"$ echo hi\nhi\n"}}|};
   Harness.text h ~selector:".entries";
-  [%expect {| (✓ bash echo hi) |}];
+  [%expect
+    {| (✓ bash echo hi) |}];
   Harness.act h (Reply (Job_started, Ok (Jsonaf.of_string {|{"job_id":"j1"}|})));
   Harness.text h ~selector:".toast";
   [%expect

@@ -67,12 +67,7 @@ val image
   -> Node.t
 
 (** Shown unless the image has loaded (initials, an icon). *)
-val fallback
-  :  ?attrs:Attr.t list
-  -> ?class_:string
-  -> t
-  -> Node.t list
-  -> Node.t
+val fallback : ?attrs:Attr.t list -> ?class_:string -> t -> Node.t list -> Node.t
 
 (** A dot (or a small icon) at the avatar's bottom right, sized by the
     avatar's size: put it among the avatar's children. *)

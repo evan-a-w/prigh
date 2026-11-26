@@ -141,7 +141,8 @@ let%expect_test
   (let m = H.model h in
    print_endline
      (Prigh_web.Page_notify.title
-        ~session:(Prigh_web.Session_title.of_state m (Option.value_exn m.state))
+        ~session:
+          (Prigh_web.Session_title.of_state m (Option.value_exn m.state))
         m.notifications));
   [%expect {| fix the parser bug · prigh |}];
   (* The clock moves the ages on, and refreshes the list. *)

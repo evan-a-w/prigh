@@ -24,7 +24,8 @@ let show ?selector c = Render.html ?selector (Ui_chart.view ctx ~path:"0" c)
 let count selector c =
   printf
     "%d %s\n"
-    (List.length (Render.select ~selector (Ui_chart.view ctx ~path:"0" c)))
+    (List.length
+       (Render.select ~selector (Ui_chart.view ctx ~path:"0" c)))
     selector
 ;;
 

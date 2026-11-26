@@ -18,8 +18,7 @@ let in_browser () = Js.Optdef.test (Js.Unsafe.global##.document : _ Js.Optdef.t)
 
 (* Radix's [focus(element, { select: true })]: an input's text is selected. *)
 let select_input (el : Dom_html.element Js.t) =
-  if String.equal (Js.to_string el##.tagName) "INPUT"
-  then (Js.Unsafe.coerce el)##select
+  if String.equal (Js.to_string el##.tagName) "INPUT" then (Js.Unsafe.coerce el)##select
 ;;
 
 let focus_nth id ~last =
@@ -65,10 +64,10 @@ let guard ~id side =
                  (Js.Unsafe.coerce ev)##.relatedTarget
                  (fun () -> false)
                  (fun (related : Dom.node Js.t) ->
-                    Js.Opt.case
-                      (Dom_html.document##getElementById (Js.string id))
-                      (fun () -> false)
-                      (fun root -> Js.to_bool (root##contains related)))
+                   Js.Opt.case
+                     (Dom_html.document##getElementById (Js.string id))
+                     (fun () -> false)
+                     (fun root -> Js.to_bool (root##contains related)))
           in
           match side, from_inside with
           | `Start, true | `End, false -> last_in id
@@ -79,33 +78,27 @@ let guard ~id side =
 
 let focus_no_scroll (el : Dom_html.element Js.t) : unit =
   (Js.Unsafe.coerce el)##focus
-    object%js
-      val preventScroll = Js._true
-    end
+    (object%js
+       val preventScroll = Js._true
+     end)
 ;;
 
 let active () = Js.Opt.to_option Dom_html.document##.activeElement
 
 let focus_inside (el : Dom_html.element Js.t) mode =
-  let first selector =
-    Js.Opt.to_option (el##querySelector (Js.string selector))
-  in
+  let first selector = Js.Opt.to_option (el##querySelector (Js.string selector)) in
   (* Radix's FocusScope: the first tabbable that takes the focus (not one
      hidden), links left out; else the element itself. *)
   let focus_first_tabbable () =
     let candidates =
-      Dom.list_of_nodeList
-        (el##querySelectorAll (Js.string (focusable_not_guard ())))
+      Dom.list_of_nodeList (el##querySelectorAll (Js.string (focusable_not_guard ())))
       |> List.filter ~f:(fun (c : Dom_html.element Js.t) ->
         not (String.equal (Js.to_string c##.tagName) "A"))
     in
     let focused =
       List.exists candidates ~f:(fun c ->
         focus_no_scroll c;
-        let took =
-          Option.value_map (active ()) ~default:false ~f:(fun a ->
-            phys_equal a c)
-        in
+        let took = Option.value_map (active ()) ~default:false ~f:(fun a -> phys_equal a c) in
         if took then select_input c;
         took)
     in
@@ -188,18 +181,13 @@ module Mount_hook = Vdom.Attr.Hooks.Make (struct
             (not (phys_equal a p)) && contains a p)
       in
       match state.previous with
-      | Some prev
-        when lost
-             && (not !skip_restore)
-             && Js.to_bool (Js.Unsafe.coerce prev)##.isConnected ->
+      | Some prev when lost && (not !skip_restore) && Js.to_bool (Js.Unsafe.coerce prev)##.isConnected ->
         focus_no_scroll prev
       | _ -> ()
     ;;
   end)
 
-let on_mount mode =
-  Vdom.Attr.create_hook "loon-focus-on-mount" (Mount_hook.create mode)
-;;
+let on_mount mode = Vdom.Attr.create_hook "loon-focus-on-mount" (Mount_hook.create mode)
 
 let restore id =
   Effect.of_thunk (fun () ->
@@ -210,33 +198,32 @@ let restore id =
           (Js.wrap_callback (fun (_ : Js.number_t) ->
              (* Not when an open dialog has taken focus meanwhile (one a
                 menu item opened). *)
-             let target =
-               Js.Opt.to_option
-                 (Dom_html.document##getElementById (Js.string id))
-             in
+             let target = Js.Opt.to_option (Dom_html.document##getElementById (Js.string id)) in
              let in_other_dialog =
                Js.Opt.case
                  Dom_html.document##.activeElement
                  (fun () -> false)
                  (fun a ->
-                    match
-                      Js.Opt.to_option
-                        ((Js.Unsafe.coerce a)##closest
-                           (Js.string
-                              "[role=dialog][data-state=open], \
-                               [role=alertdialog][data-state=open]")
-                         : Dom_html.element Js.t Js.opt)
-                    with
-                    | None -> false
-                    | Some dialog ->
-                      (match target with
-                       | None -> true
-                       | Some target ->
-                         not
-                           (Js.to_bool
-                              (dialog##contains (target :> Dom.node Js.t)))))
+                   match
+                     Js.Opt.to_option
+                       ((Js.Unsafe.coerce a)##closest
+                          (Js.string
+                             "[role=dialog][data-state=open], \
+                              [role=alertdialog][data-state=open]")
+                        : Dom_html.element Js.t Js.opt)
+                   with
+                   | None -> false
+                   | Some dialog ->
+                     (match target with
+                      | None -> true
+                      | Some target ->
+                        not (Js.to_bool (dialog##contains (target :> Dom.node Js.t)))))
              in
-             if not in_other_dialog then Option.iter target ~f:focus_no_scroll))
+             if not in_other_dialog
+             then
+               Option.iter
+                 target
+                 ~f:focus_no_scroll))
       in
       ()))
 ;;
@@ -254,10 +241,8 @@ module When_hook = Vdom.Attr.Hooks.Make (struct
 
     let focus_if focused (el : Dom_html.element Js.t) =
       let active =
-        Js.Opt.case
-          Dom_html.document##.activeElement
-          (fun () -> false)
-          (fun a -> phys_equal a el)
+        Js.Opt.case Dom_html.document##.activeElement (fun () -> false) (fun a ->
+          phys_equal a el)
       in
       if focused && not active then el##focus
     ;;
@@ -274,9 +259,7 @@ module When_hook = Vdom.Attr.Hooks.Make (struct
     let destroy _ () _ = ()
   end)
 
-let when_ focused =
-  Vdom.Attr.create_hook "loon-focus-when" (When_hook.create focused)
-;;
+let when_ focused = Vdom.Attr.create_hook "loon-focus-when" (When_hook.create focused)
 
 let loop_tab (ev : Dom_html.keyboardEvent Js.t) =
   match Dom_util.key ev with
@@ -287,9 +270,7 @@ let loop_tab (ev : Dom_html.keyboardEvent Js.t) =
                || Js.to_bool ev##.ctrlKey
                || Js.to_bool ev##.metaKey) ->
     Effect.of_thunk (fun () ->
-      let container : Dom_html.element Js.t =
-        Js.Unsafe.get ev "currentTarget"
-      in
+      let container : Dom_html.element Js.t = Js.Unsafe.get ev "currentTarget" in
       let tabbables =
         Dom.list_of_nodeList
           (container##querySelectorAll (Js.string (focusable_not_guard ())))

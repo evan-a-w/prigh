@@ -63,14 +63,18 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   let thinking = Option.value m.pending.thinking ~default:state.thinking in
   let cache_rate =
     if Float.(state.usage.input > 0.)
-    then Some (100. *. state.usage.cache_read /. state.usage.input)
+    then
+      Some
+        (100.
+         *. state.usage.cache_read
+         /. state.usage.input)
     else None
   in
   Node.div
     ~attrs:
       [ Attr.class_
-          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 \
-           rounded-lg border-0 bg-popover p-3 text-xs whitespace-normal \
+          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 rounded-lg \
+           border-0 bg-popover p-3 text-xs whitespace-normal \
            text-popover-foreground shadow-md ring-1 ring-foreground/10 \
            grid-cols-[1fr_auto] narrow:fixed narrow:inset-x-0 narrow:top-auto \
            narrow:bottom-0 narrow:w-auto narrow:max-w-none narrow:gap-x-4 \

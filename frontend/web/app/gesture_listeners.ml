@@ -20,22 +20,17 @@ let query selector : Dom_html.element Js.t option =
 ;;
 
 let query_all selector : Dom_html.element Js.t list =
-  Dom.list_of_nodeList
-    (Dom_html.document##querySelectorAll (Js.string selector))
+  Dom.list_of_nodeList (Dom_html.document##querySelectorAll (Js.string selector))
 ;;
 
-let has (el : Dom_html.element Js.t) cls =
-  Js.to_bool (el##.classList##contains (Js.string cls))
-;;
+let has (el : Dom_html.element Js.t) cls = Js.to_bool (el##.classList##contains (Js.string cls))
 
 let set_style (el : Dom_html.element Js.t) name value =
   ignore
     (meth
        el##.style
        "setProperty"
-       [| Js.Unsafe.inject (Js.string name)
-        ; Js.Unsafe.inject (Js.string value)
-       |]
+       [| Js.Unsafe.inject (Js.string name); Js.Unsafe.inject (Js.string value) |]
      : Js.Unsafe.any)
 ;;
 
@@ -49,8 +44,7 @@ let now () = Js.to_float (new%js Js.date_now)##getTime
 
 let reduced_motion () =
   Js.to_bool
-    (Dom_html.window##matchMedia (Js.string "(prefers-reduced-motion: reduce)"))##.
-    matches
+    (Dom_html.window##matchMedia (Js.string "(prefers-reduced-motion: reduce)"))##.matches
 ;;
 
 let narrow () = Option.is_some (query ".app.narrow")
@@ -123,8 +117,7 @@ let unswipe_row (row : Dom_html.element Js.t) =
   row##.classList##remove (Js.string "swiping");
   clear_style row "--swipe-x";
   Option.iter (row_actions row) ~f:(fun a -> clear_style a "width");
-  Option.iter (row_actions row) ~f:(fun a ->
-    a##setAttribute (Js.string "aria-hidden") (Js.string "true"))
+  Option.iter (row_actions row) ~f:(fun a -> a##setAttribute (Js.string "aria-hidden") (Js.string "true"))
 ;;
 
 let swiped_rows () = query_all ".session.swiped"
@@ -140,10 +133,7 @@ let candidate (target : Dom_html.element Js.t) ~x =
       Float.(float_of el "scrollTop" <= 0.)
       && (phys_equal el sheet
           ||
-          match
-            Js.Opt.to_option
-              (get el "parentElement" : Dom_html.element Js.t Js.opt)
-          with
+          match Js.Opt.to_option (get el "parentElement" : Dom_html.element Js.t Js.opt) with
           | Some p -> at_top p
           | None -> true)
     in
@@ -154,11 +144,7 @@ let candidate (target : Dom_html.element Js.t) ~x =
      | None ->
        (match closest target ".modal" with
         | Some modal ->
-          if
-            Float.(x < edge)
-            && Option.is_some
-                 (Js.Opt.to_option
-                    (modal##querySelector (Js.string ".modal-back")))
+          if Float.(x < edge) && Option.is_some (Js.Opt.to_option (modal##querySelector (Js.string ".modal-back")))
           then Some (Back modal)
           else None
         | None ->
@@ -170,8 +156,7 @@ let candidate (target : Dom_html.element Js.t) ~x =
                match closest target ".sidebar" with
                | Some _ ->
                  (match closest target ".session" with
-                  | Some row when Option.is_some (row_actions row) ->
-                    Some (Row row)
+                  | Some row when Option.is_some (row_actions row) -> Some (Row row)
                   | _ -> Some (Drawer_close sidebar))
                | None ->
                  if Option.is_some (closest target ".scrim")
@@ -216,14 +201,9 @@ let follow ~schedule:_ d =
     let start = if has row "swiped" then -.actions_width else 0. in
     let x = Float.min 0. (start +. dx) in
     (* Past its actions it resists. *)
-    let x =
-      if Float.(x < -.actions_width)
-      then -.actions_width +. ((x +. actions_width) /. 3.)
-      else x
-    in
+    let x = if Float.(x < -.actions_width) then -.actions_width +. ((x +. actions_width) /. 3.) else x in
     row##.classList##add (Js.string "swiping");
-    Option.iter (row_actions row) ~f:(fun a ->
-      a##removeAttribute (Js.string "aria-hidden"));
+    Option.iter (row_actions row) ~f:(fun a -> a##removeAttribute (Js.string "aria-hidden"));
     place_row row x
   | Tile tile ->
     let y = Float.min 0. dy in
@@ -242,25 +222,16 @@ let settle (el : Dom_html.element Js.t) props =
 let speed d ~dist = Float.abs dist /. Float.max 1. (now () -. d.t0)
 
 let release ~schedule d =
-  let far ~dist ~min:least ~fast =
-    Float.(abs dist > least || (abs dist > 24. && speed d ~dist > fast))
-  in
+  let far ~dist ~min:least ~fast = Float.(abs dist > least || (abs dist > 24. && speed d ~dist > fast)) in
   match d.kind with
   | Drawer_open sidebar ->
-    let opens =
-      Float.(d.dx > 0.)
-      && far ~dist:d.dx ~min:(drawer_width sidebar /. 3.) ~fast:0.4
-    in
+    let opens = Float.(d.dx > 0.) && far ~dist:d.dx ~min:(drawer_width sidebar /. 3.) ~fast:0.4 in
     settle sidebar [ "transform" ];
     if opens then schedule Prigh_web.App.Action.Toggle_sidebar
   | Drawer_close sidebar ->
-    let closes =
-      Float.(d.dx < 0.)
-      && far ~dist:d.dx ~min:(drawer_width sidebar /. 3.) ~fast:0.4
-    in
+    let closes = Float.(d.dx < 0.) && far ~dist:d.dx ~min:(drawer_width sidebar /. 3.) ~fast:0.4 in
     settle sidebar [ "transform" ];
-    Option.iter (query ".app.narrow .scrim") ~f:(fun s ->
-      clear_style s "opacity");
+    Option.iter (query ".app.narrow .scrim") ~f:(fun s -> clear_style s "opacity");
     if closes then schedule Prigh_web.App.Action.Toggle_sidebar
   | Back modal ->
     let back = Float.(d.dx > 0.) && far ~dist:d.dx ~min:90. ~fast:0.4 in
@@ -286,23 +257,18 @@ let release ~schedule d =
         (* Down out of sight, then gone. *)
         set_style sheet "transition" "transform 0.16s ease-in";
         set_style sheet "transform" "translateY(100%)";
-        ignore (Dom_html.setTimeout close 150. : Dom_html.timeout_id_safe)))
+        ignore
+          (Dom_html.setTimeout close 150. : Dom_html.timeout_id_safe)))
     else settle sheet [ "transform" ]
   | Row row ->
     row##.classList##remove (Js.string "swiping");
     let start = if has row "swiped" then -.actions_width else 0. in
     let x = start +. d.dx in
-    let opens =
-      Float.(x < -.actions_width /. 2.)
-      || (Float.(d.dx < -24.) && Float.(speed d ~dist:d.dx > 0.4))
-    in
-    let opens =
-      opens && not (Float.(d.dx > 24.) && Float.(speed d ~dist:d.dx > 0.4))
-    in
+    let opens = Float.(x < -.actions_width /. 2.) || (Float.(d.dx < -24.) && Float.(speed d ~dist:d.dx > 0.4)) in
+    let opens = opens && not (Float.(d.dx > 24.) && Float.(speed d ~dist:d.dx > 0.4)) in
     if opens
     then (
-      List.iter (swiped_rows ()) ~f:(fun r ->
-        if not (phys_equal r row) then unswipe_row r);
+      List.iter (swiped_rows ()) ~f:(fun r -> if not (phys_equal r row) then unswipe_row r);
       row##.classList##add (Js.string "swiped");
       place_row row (-.actions_width))
     else unswipe_row row
@@ -319,9 +285,7 @@ let release ~schedule d =
 
 let touch ev =
   let touches = get ev "touches" in
-  if Float.(float_of touches "length" <> 1.)
-  then None
-  else Some (get touches "0")
+  if Float.(float_of touches "length" <> 1.) then None else Some (get touches "0")
 ;;
 
 let listen event handler ~passive =
@@ -366,16 +330,7 @@ let install ~schedule =
           then swallow_click := true;
           unswipe_row row));
       Option.iter (candidate target ~x) ~f:(fun kind ->
-        drag
-        := Some
-             { kind
-             ; x0 = x
-             ; y0 = y
-             ; t0 = now ()
-             ; live = None
-             ; dx = 0.
-             ; dy = 0.
-             })
+        drag := Some { kind; x0 = x; y0 = y; t0 = now (); live = None; dx = 0.; dy = 0. })
     | Some _ -> ());
   listen "touchmove" ~passive:false (fun ev ->
     match !drag, touch ev with
@@ -407,9 +362,7 @@ let install ~schedule =
        | Some false | None -> ())
     | Some _, None ->
       (* A second finger: not a drag any more. *)
-      Option.iter !drag ~f:(fun d ->
-        if Option.is_some d.live
-        then release ~schedule { d with dx = 0.; dy = 0. });
+      Option.iter !drag ~f:(fun d -> if Option.is_some d.live then release ~schedule { d with dx = 0.; dy = 0. });
       drag := None
     | None, _ -> ());
   let finish ~cancel ev =
@@ -417,9 +370,7 @@ let install ~schedule =
     | Some ({ live = Some true; _ } as d) ->
       drag := None;
       (* Its own clicks (back, remove) first: then the touch's is swallowed. *)
-      if cancel
-      then release ~schedule { d with dx = 0.; dy = 0. }
-      else release ~schedule d;
+      if cancel then release ~schedule { d with dx = 0.; dy = 0. } else release ~schedule d;
       swallow_click := true;
       ignore ev
     | Some _ | None -> drag := None
