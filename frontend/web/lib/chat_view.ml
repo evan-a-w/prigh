@@ -447,13 +447,15 @@ let hidden ?(deleting = Int.Set.empty) ~fold chat =
         sum + List.count (parts e) ~f:(fun kind -> not (Fold.shows fold kind)))
 ;;
 
-(* An agent CLI was asked and is silent: nothing of it streams. *)
+(* An agent CLI was asked and is silent: what it waits for. *)
 let agent_waiting chat =
-  Chat.running chat
-  &&
-  match Chat.activity chat with
-  | Starting _ | Waiting_for _ -> true
-  | _ -> false
+  if not (Chat.running chat)
+  then None
+  else (
+    match Chat.activity chat with
+    | Starting agent -> Some (sprintf "Starting %s" agent)
+    | Waiting_for agent -> Some (sprintf "Waiting for %s" agent)
+    | _ -> None)
 ;;
 
 module Quiet_deps = struct
@@ -604,8 +606,7 @@ and assistant
      the model is failing. *)
   let in_box =
     match quiet, Chat.activity chat with
-    | _, (Retrying _ | Waiting (Some _) | Starting _ | Waiting_for _) | None, _
-      -> false
+    | _, (Retrying _ | Waiting (Some _)) | None, _ -> false
     | Some runs, _ -> Activity_runs.continues runs n
   in
   let pending =
@@ -698,11 +699,7 @@ and activity ~ui ~names ~fold times chat runs (box : Activity_runs.Box.t) =
     let current =
       List.rev statuses |> List.find ~f:(fun (_, status) -> busy status)
     in
-    (* An agent CLI gone silent: the waiting row says so, not the box. *)
-    let running =
-      Option.is_some current
-      || (chat_running && tail && not (agent_waiting chat))
-    in
+    let running = Option.is_some current || (chat_running && tail) in
     let failed =
       List.count statuses ~f:(fun (_, status) ->
         match status with
@@ -713,7 +710,9 @@ and activity ~ui ~names ~fold times chat runs (box : Activity_runs.Box.t) =
       match current with
       | Some (step, _) ->
         Prigh_ui.Tool_phrase.doing (Activity_runs.Step.phrase step)
-      | None when running -> "Thinking"
+      | None when running ->
+        (* An agent CLI gone silent says what it waits for. *)
+        Option.value (agent_waiting chat) ~default:"Thinking"
       | None ->
         Prigh_ui.Tool_phrase.did (List.map steps ~f:Activity_runs.Step.phrase)
     in
@@ -962,7 +961,7 @@ and entry
           ; continues = Activity_runs.continues runs n
           ; tail
           ; chat_running = tail && Chat.running chat
-          ; agent_waiting = tail && agent_waiting chat
+          ; agent_waiting = tail && Option.is_some (agent_waiting chat)
           }
       , boxes )
   in
@@ -1222,10 +1221,15 @@ and entries_view ?menu ?index ~ui ~names ~deleting ~dividers ~fold times chat =
                :: rev_nodes) )))
   in
   (* An agent CLI asked for a reply has said nothing yet: no message of it
-     streams, as the model's does from its asking. *)
+     streams, as the model's does from its asking. Quiet, a run it goes on
+     with says so instead. *)
+  let in_run =
+    Option.exists quiet ~f:(fun runs ->
+      Option.is_some (Activity_runs.tail runs))
+  in
   let rev_nodes =
     match Chat.streaming chat with
-    | None when agent_waiting chat ->
+    | None when Option.is_some (agent_waiting chat) && not in_run ->
       keyed "waiting" (div "msg assistant streaming" [ pending chat ])
       :: rev_nodes
     | _ -> rev_nodes

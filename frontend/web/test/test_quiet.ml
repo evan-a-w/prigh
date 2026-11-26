@@ -470,7 +470,7 @@ let%expect_test "web searches and code searches are counted apart" =
 (* An agent CLI (Antigravity over ACP) says nothing for a while after it is
    asked and after a step's calls end: "Waiting for …" shows then, and only
    then; once it thinks, writes or calls, the run says what it does. *)
-let%expect_test "an agent CLI's waiting row and its run never show together" =
+let%expect_test "an agent CLI waits: in its run when it has one, else a row" =
   let waiting =
     ev {|"event":"agent_waiting","agent":"Antigravity","starting":false|}
   in
@@ -530,16 +530,24 @@ let%expect_test "an agent CLI's waiting row and its run never show together" =
   both chat;
   [%expect
     {|
-    fix the bug 15:00 ✓ Worked for 3s · ran a command Waiting for Antigravity… Esc to stop
+    fix the bug 15:00 Waiting for Antigravity
     fix the bug 15:00 Thought Let me look Let me look ✓ bash make Waiting for Antigravity… Esc to stop
     |}];
-  (* It thinks on: the run takes the thought, the waiting row goes. *)
+  (* Its next message starts, still silent: the run still waits. *)
   let chat =
     List.fold
       ~init:chat
       ~f:Chat_harness.apply
-      [ ev {|"event":"turn_start"|}; waiting; message_start; thought "Now b" ]
+      [ ev {|"event":"turn_start"|}; waiting; message_start ]
   in
+  both chat;
+  [%expect
+    {|
+    fix the bug 15:00 Waiting for Antigravity
+    fix the bug 15:00 Thought Let me look Let me look ✓ bash make Waiting for Antigravity… Esc to stop
+    |}];
+  (* It thinks on: the run says so. *)
+  let chat = Chat_harness.apply chat (thought "Now b") in
   both chat;
   [%expect
     {|
