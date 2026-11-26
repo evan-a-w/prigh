@@ -80,10 +80,10 @@ RUN --mount=type=bind,from=prebuilt,target=/prebuilt \
  && "$magick_pkg/bin/magick" '/tmp/big.png[0]' -resize '1000x1000>' -quality 85 /tmp/small.jpg \
  && [ "$("$magick_pkg/bin/magick" identify -format '%m %wx%h,' /tmp/small.png /tmp/small.jpg)" = 'PNG 2000x1333,JPEG 1000x667,' ] \
  && rm /tmp/big.png /tmp/small.png /tmp/small.jpg \
- && closure=$(nix-store -qR $refs "$nix_pkg" "$magick_pkg") \
+ && closure=$(nix-store -qR $refs "$nix_pkg" "$magick_pkg" $(cat /seed-agents/roots)) \
  && mkdir -p /seed/store \
  && for p in $closure; do [ -e "/seed-agents/store/${p##*/}" ] || cp -a "$p" /seed/store/; done \
- && nix-store --dump-db $closure $(cat /seed-agents/roots) >/seed/registration \
+ && nix-store --dump-db $closure >/seed/registration \
  && printf '%s\n' $refs "$nix_pkg" "$magick_pkg" $(cat /seed-agents/roots) >/seed/roots \
  && cp /seed-agents/clis /seed/agent-clis \
  && echo "$nix_pkg" >/seed/nix \

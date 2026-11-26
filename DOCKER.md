@@ -241,9 +241,9 @@ only the agents). Users and settings are the same on either engine.
   user's home. Settings → Engines (`/adapters` in the TUI) shows each CLI's
   state per host and what to run next.
 - The CLIs are part of the image's Nix seed (a layer of their own, which
-  changes only when `nixpkgs-agents` does): about 1.9 GB unpacked, copied
-  into `/nix` at the first start of an image that has new ones. Building
-  from source, `PRIGH_AGENT_CLIS` picks them (`none` for none). A user's
+  changes only when `nixpkgs-agents` does): about 2 GB unpacked (a
+  770 MB download), copied into `/nix` at the first start of an image that
+  has new ones. Building from source, `PRIGH_AGENT_CLIS` picks them (`none` for none). A user's
   `nix profile install nixpkgs#codex` (or any other agent) comes first on
   their `PATH`.
 - On a tool host outside the container (`PRIGH_NO_BACKEND_HOST=1`),
