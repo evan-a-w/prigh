@@ -683,6 +683,63 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "a session on the placeholder model (as recorded before prigh named the \
+     harness's default) takes the real one once the agent lists its models"
+  =
+  with_acp ~peer:(fun _ p ->
+    P.initialize p;
+    session_with_models p "ses_1";
+    List.iter [ "Hi."; "Again." ] ~f:(fun reply ->
+      let prompt = P.expect p "session/prompt" in
+      P.text p "ses_1" reply;
+      P.result p prompt {|{"stopReason":"end_turn"}|}))
+  @@ fun agent _ ->
+  let show () =
+    let state = Agent.state agent in
+    printf
+      "model %s %S, window %d; recorded %s\n"
+      (Model.key state.model)
+      state.model.name
+      state.model.context_window
+      (Option.value_map
+         (Session.model (Agent.session agent))
+         ~default:"-"
+         ~f:fst)
+  in
+  Agent.set_model agent (External_model.model ~adapter:"acp:opencode" "default");
+  show ();
+  prompt agent "one";
+  show ();
+  prompt agent "two";
+  [%expect
+    {|
+    model acp:opencode/default "\226\128\166", window 0; recorded acp:opencode/default
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "one"
+    assistant (acp:opencode/gemini-flash, End_turn): "Hi."
+    model acp:opencode/gemini-flash "Gemini 3.8 Flash", window 1048576; recorded acp:opencode/gemini-flash
+    agent got session/prompt "two"
+    assistant (acp:opencode/gemini-flash, End_turn): "Again."
+    |}];
+  (* Recorded on the placeholder: the agent's default once listed, nothing
+     before. *)
+  let restore models =
+    External_model.restore ~adapter:"acp:opencode" ~models "acp:opencode/default"
+    |> Option.map ~f:Model.key
+  in
+  print_s
+    [%message
+      ""
+        ~before:(restore [] : string option)
+        ~listed:
+          (restore (Option.value_exn (Agent.external_models agent))
+           : string option)];
+  [%expect {| ((before ()) (listed (acp:opencode/gemini-flash))) |}]
+;;
+
 let%expect_test "an ACP agent's catalog: a session opened to read its models" =
   with_sandbox
   @@ fun t ->

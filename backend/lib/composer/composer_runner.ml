@@ -836,6 +836,10 @@ and run_turn'
         else sprintf "%s could not start: %s" A.display_name why)
    | Some (Ok (Live ((module L), a))) ->
      note_thread t s (module L) a;
+     if Option.is_none input.model
+     then
+       Option.iter (List.hd (L.models a)) ~f:(fun (m : Model.t) ->
+         Composer_recorder.default_model recorder m.id);
      let settings = settings input in
      let leftover = Queue.create () in
      let handoff =

@@ -69,6 +69,10 @@ val stop : t -> Adapter_event.Stop.t option
 val thread_id : t -> string option
 val model : t -> string
 
+(** The run sent no model: the harness runs its default, [id] (once
+    listed), unless it names its model itself. *)
+val default_model : t -> string -> unit
+
 (** The cost the harness reported for the run so far, in USD. *)
 val cost_usd : t -> float
 

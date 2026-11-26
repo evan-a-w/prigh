@@ -100,6 +100,11 @@ let create ~adapter ~model ~cwd ~emit ~notice ~prompts =
 let stop t = t.stop
 let thread_id t = t.thread_id
 let model t = t.model
+
+let default_model t id =
+  if String.equal t.model (model_name ~adapter:t.adapter None)
+  then t.model <- model_name ~adapter:t.adapter (Some id)
+;;
 let cost_usd t = t.cost_usd
 let context t = t.context
 let last_input t = t.last_input
