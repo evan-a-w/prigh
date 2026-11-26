@@ -187,8 +187,8 @@ machine's tool host, so sessions run their tools here, as with a TUI.
 ```nix
 # Home Manager (flake input `prigh`):
 imports = [ prigh.homeManagerModules.default ];
-programs.prigh.enable = true;          # prigh, codex, opencode, bwrap on PATH (agents.*: claudeCode,
-                                       # on when unfree is allowed; extraPackages)
+programs.prigh.enable = true;          # prigh, codex, claude, agy (>= 1.5.0), opencode, bwrap on
+                                       # PATH (allow unfree; agents.*: goose, extraPackages)
 programs.prigh.desktop.enable = true;  # "prigh" in the application menu
 # also desktop.ui, .window, .browser (table below), .extraArgs,
 # .useSystemNixpkgs, .disableDmabuf (troubleshooting), .computerUse
@@ -292,7 +292,7 @@ the model's API (the default), and, when you deploy it, the **composer**,
 which hands the work to a coding agent installed and signed in on the
 session's tool host: the Codex CLI (`codex app-server`), Claude Code
 (`claude`, stream-json), an ACP agent (`acp:opencode`, `acp:antigravity`
-(`agy acp`), `acp:grok` (Grok Build), `acp:gemini`, `acp:goose`, or
+(`agy acp`), `acp:grok` (Grok Build), `acp:goose`, or
 `acp:mine=my-agent --acp`) or `prigh`, prigh's own harness as an adapter.
 prigh keeps the session: its log (messages, tool calls, models, usage and
 the cost the agent reports), naming, search, worktrees, approvals and the
@@ -327,7 +327,10 @@ hooks are not loaded. Settings → Engines in prigh-web, and `/adapters` in
 the TUI, show whether each CLI is installed and logged in on each tool host,
 and what to run there when not ("Claude Code on laptop is not logged in:
 run `claude auth login` there"); prigh never installs one or logs in for
-you.
+you. The Home Manager module installs Codex, Claude Code, Antigravity
+(`agy` >= 1.5.0, the flake's if your nixpkgs' is older; it and Claude Code
+are unfree) and OpenCode by default (the Docker image has them too), and
+Goose with `agents.goose`; Grok Build is not in nixpkgs.
 
 ### Computer use
 

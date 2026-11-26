@@ -110,6 +110,7 @@ module Status = struct
     ; quirks : Acp_agent.Quirks.t
     ; checking : bool
     ; check_failed : string option
+    ; no_sandbox : string option
     }
   [@@deriving sexp_of, equal]
 
@@ -170,6 +171,14 @@ module Status = struct
            (Adapter_id.label t.adapter)
            t.host_name
            command)
+    | Installed _, _, _ ->
+      Option.map t.no_sandbox ~f:(fun why ->
+        sprintf
+          "%s's sandbox cannot run on %s (%s): it runs without it, and prigh \
+           still asks before its commands and edits as the session's mode says"
+          (Adapter_id.label t.adapter)
+          t.host_name
+          why)
     | _ -> None
   ;;
 
@@ -249,7 +258,9 @@ module Status = struct
     | Logged_out | Not_needed | Unknown -> []
   ;;
 
-  let with_evidence t ~prigh_login ~(seen : Seen.t option) ~checking =
+  let with_evidence ?no_sandbox t ~prigh_login ~(seen : Seen.t option) ~checking
+    =
+    let t = { t with no_sandbox } in
     match t.install, prigh_login with
     | Installed _, Some label ->
       { t with
@@ -424,6 +435,7 @@ let of_found
     ; quirks = quirks ?acp adapter
     ; checking = false
     ; check_failed = None
+    ; no_sandbox = None
     }
   | Some path ->
     let version =
@@ -439,6 +451,7 @@ let of_found
     ; quirks = quirks ?acp adapter
     ; checking = false
     ; check_failed = None
+    ; no_sandbox = None
     }
 ;;
 
@@ -452,6 +465,7 @@ let prigh_status ~host ~host_name ~checked_at : Status.t =
   ; quirks = Acp_agent.Quirks.none
   ; checking = false
   ; check_failed = None
+  ; no_sandbox = None
   }
 ;;
 
@@ -469,6 +483,7 @@ let unknown ?acp adapters ~host ~host_name ~checked_at why =
       ; quirks = quirks ?acp adapter
       ; checking = false
       ; check_failed = None
+      ; no_sandbox = None
       })
 ;;
 
@@ -536,6 +551,7 @@ let of_result
              ; quirks = quirks ?acp adapter
              ; checking = false
              ; check_failed = None
+             ; no_sandbox = None
              })))
 ;;
 

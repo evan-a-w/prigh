@@ -22,6 +22,12 @@ services:
       PRIGH_SUPERUSERS: ${PRIGH_SUPERUSERS:-}
       PRIGH_NO_BACKEND_HOST: ${PRIGH_NO_BACKEND_HOST:-}
       PRIGH_ALLOW_NO_TOKEN: ${PRIGH_ALLOW_NO_TOKEN:-}
+      # What runs sessions and the agents the composer drives (DOCKER.md,
+      # "Engines"), e.g. harness,composer and
+      # codex,claude,acp:antigravity,acp:opencode; and session sharing.
+      PRIGH_ENGINES: ${PRIGH_ENGINES:-}
+      PRIGH_ADAPTERS: ${PRIGH_ADAPTERS:-}
+      PRIGH_SHARING: ${PRIGH_SHARING:-}
       PRIGH_ARGS: ${PRIGH_ARGS:-}
       PRIGH_TUI_ARGS: ${PRIGH_TUI_ARGS:-}
       PRIGH_CWD: ${PRIGH_CWD:-}

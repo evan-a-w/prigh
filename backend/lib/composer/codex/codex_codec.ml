@@ -9,6 +9,7 @@ module Settings = struct
     ; approval : Approval_mode.t
     ; plan : bool
     ; efforts : string list option
+    ; sandbox : bool
     }
   [@@deriving sexp_of]
 end
@@ -305,15 +306,20 @@ let reply_error id ~code message =
 let approval_policy : Json.t = `String "untrusted"
 let reviewer = "user"
 
-let sandbox_mode : Approval_mode.t -> string = function
+(* Where the sandbox cannot run ([sandbox] false), none: the approval policy
+   stays, so Codex still asks before all it does not know to be read-only. *)
+let sandbox_mode (s : Settings.t) =
+  match s.approval with
+  | _ when not s.sandbox -> "danger-full-access"
   | Ask -> "read-only"
   | Auto_edit | Smart -> "workspace-write"
   | Auto -> "danger-full-access"
 ;;
 
-let sandbox_policy (mode : Approval_mode.t) =
+let sandbox_policy (s : Settings.t) =
   let type_ =
-    match mode with
+    match s.approval with
+    | _ when not s.sandbox -> "dangerFullAccess"
     | Ask -> "readOnly"
     | Auto_edit | Smart -> "workspaceWrite"
     | Auto -> "dangerFullAccess"
@@ -388,7 +394,7 @@ let thread_params
     ; opt "model" (fun m -> `String m) s.model
     ; Some ("approvalPolicy", approval_policy)
     ; Some ("approvalsReviewer", `String reviewer)
-    ; Some ("sandbox", `String (sandbox_mode s.approval))
+    ; Some ("sandbox", `String (sandbox_mode s))
     ; opt "developerInstructions" (fun i -> `String i) o.developer_instructions
     ; Some ("config", `Object config)
     ; dynamic_tools
@@ -488,7 +494,7 @@ let start_turn t (s : Settings.t) inputs =
             ; Some ("cwd", `String s.cwd)
             ; Some ("approvalPolicy", approval_policy)
             ; Some ("approvalsReviewer", `String reviewer)
-            ; Some ("sandboxPolicy", sandbox_policy s.approval)
+            ; Some ("sandboxPolicy", sandbox_policy s)
             ; opt "model" (fun m -> `String m) s.model
             ; opt "effort" (fun e -> `String e) effort
             ; Some ("summary", `String "auto")

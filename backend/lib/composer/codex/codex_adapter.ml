@@ -6,6 +6,8 @@ type t =
   ; driver : Codex_codec.Response.t Adapter.Driver.t
   ; sw : Switch.t
   ; cwd : string
+  ; sandbox : bool
+    (** [false]: it cannot run on the host ([Start.no_sandbox]) *)
   ; mutable models : Model.t list
   ; mutable on_change : unit -> unit
   ; mutable version : string option
@@ -56,13 +58,16 @@ let efforts models (s : Adapter.Settings.t) =
     @ List.map m.thinking_levels ~f:Thinking.Level.to_string)
 ;;
 
-let settings ~cwd ~models (s : Adapter.Settings.t) : Codex_codec.Settings.t =
+let settings ~cwd ~sandbox ~models (s : Adapter.Settings.t)
+  : Codex_codec.Settings.t
+  =
   { cwd
   ; model = s.model
   ; thinking = s.thinking
   ; approval = s.approval
   ; plan = s.plan
   ; efforts = efforts models s
+  ; sandbox
   }
 ;;
 
@@ -175,7 +180,14 @@ let refuse_orphan t (event : Adapter_event.t) =
 ;;
 
 (* The process's driver, reading its lines, and the handshake. *)
-let open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd =
+let open_process
+      ~sw
+      ?interrupt_grace
+      ?request_timeout
+      ?(sandbox = true)
+      transport
+      ~cwd
+  =
   let codec = Codex_codec.create () in
   let driver =
     Adapter.Driver.create
@@ -190,6 +202,7 @@ let open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd =
     ; driver
     ; sw
     ; cwd
+    ; sandbox
     ; models = []
     ; on_change = Fn.id
     ; version = None
@@ -341,14 +354,24 @@ let start
   =
   let open Or_error.Let_syntax in
   let%bind t =
-    open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd:start.cwd
+    open_process
+      ~sw
+      ?interrupt_grace
+      ?request_timeout
+      ~sandbox:(Option.is_none start.no_sandbox)
+      transport
+      ~cwd:start.cwd
   in
   Option.iter start.login ~f:(fun login ->
     hand_login t (Codex_login.create login));
   let codec = t.codec
   and driver = t.driver in
   let s =
-    settings ~cwd:start.cwd ~models:[] (Adapter.Settings.of_start start)
+    settings
+      ~cwd:start.cwd
+      ~sandbox:t.sandbox
+      ~models:[]
+      (Adapter.Settings.of_start start)
   in
   let options : Codex_codec.Thread_options.t =
     { Codex_codec.Thread_options.empty with
@@ -384,7 +407,7 @@ let start
 ;;
 
 let next_event t = Adapter.Driver.next_event t.driver
-let settings_of t s = settings ~cwd:t.cwd ~models:t.models s
+let settings_of t s = settings ~cwd:t.cwd ~sandbox:t.sandbox ~models:t.models s
 
 let send t settings input =
   Adapter.Driver.await_idle t.driver;

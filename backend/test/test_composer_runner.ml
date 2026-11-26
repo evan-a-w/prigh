@@ -10,6 +10,7 @@ module Json = Jsonaf
    [thread/name/set]) are skipped with their answers. *)
 let codex_replay
       ?(on_wait = fun (_ : string) -> ())
+      ?(on_request = fun (_ : Json.t) -> ())
       name
       (p : Line_transport.Peer.t)
   =
@@ -61,6 +62,7 @@ let codex_replay
               | _ -> false)
           with
           | Some j ->
+            on_request j;
             Option.iter
               (int_of (member "id" j))
               ~f:(fun ours -> Hashtbl.set ids ~key:id ~data:ours)
@@ -408,10 +410,19 @@ let usage_limit_frames =
 
 (* A Codex that answers the handshake and the thread, then plays [frames]
    for the turn, or exits with [crash] partway. *)
-let codex_turn ?crash frames (p : Line_transport.Peer.t) =
+let codex_turn
+      ?crash
+      ?(on_request = fun (_ : Json.t) -> ())
+      frames
+      (p : Line_transport.Peer.t)
+  =
   let next () =
-    Json.parse (Option.value_exn (Line_transport.Peer.read_line p))
-    |> Or_error.ok_exn
+    let j =
+      Json.parse (Option.value_exn (Line_transport.Peer.read_line p))
+      |> Or_error.ok_exn
+    in
+    on_request j;
+    j
   in
   let reply j result =
     Line_transport.Peer.write_line
@@ -436,9 +447,14 @@ let codex_turn ?crash frames (p : Line_transport.Peer.t) =
     | _ -> thread ()
   in
   thread ();
-  let turn = next () in
+  let rec turn () =
+    let j = next () in
+    match Json.member "method" j with
+    | Some (`String "turn/start") -> j
+    | _ -> turn ()
+  in
   reply
-    turn
+    (turn ())
     (`Object
         [ "turn", `Object [ "id", `String "tu"; "status", `String "inProgress" ]
         ]);
@@ -503,6 +519,124 @@ let%expect_test
     spawn #2: codex app-server
     codex got thread/resume
     assistant (codex/gpt-5, End_turn): "back again"
+    |}]
+;;
+
+(* The sandbox and approval policy of Codex's thread and turn requests. *)
+let print_policy j =
+  match Json.member "method" j, Json.member "params" j with
+  | Some (`String m), Some params
+    when List.mem
+           [ "thread/start"; "thread/resume"; "turn/start" ]
+           m
+           ~equal:String.equal ->
+    let field k = Option.map (Json.member k params) ~f:Json.to_string in
+    printf
+      "%s: approvalPolicy %s, sandbox %s\n"
+      m
+      (Option.value (field "approvalPolicy") ~default:"-")
+      (Option.value
+         (Option.first_some (field "sandbox") (field "sandboxPolicy"))
+         ~default:"-")
+  | _ -> ()
+;;
+
+let no_sandbox ~cwd =
+  { (Adapter.Start.default ~cwd) with
+    no_sandbox = Some "laptop (no user namespaces)"
+  }
+;;
+
+let%expect_test
+    "codex where its sandbox cannot run: none, said once, prigh still asks"
+  =
+  with_composer
+    ~approval:Ask
+    ~start:no_sandbox
+    ~adapter:(module Codex_adapter)
+    ~peer:(fun _ ->
+      codex_replay "tool_call_read_only_on_request" ~on_request:print_policy)
+  @@ fun _ agent _ ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; name; _ }) ->
+      printf "confirm %s\n" name;
+      Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
+    | _ -> ());
+  prompt agent "run it";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nrun it"
+    spawn #1: codex app-server
+    thread/start: approvalPolicy "untrusted", sandbox "danger-full-access"
+    notice: Codex's sandbox cannot run on laptop (no user namespaces): it runs without it, and prigh still asks before its commands and edits as the session's mode says
+    turn/start: approvalPolicy "untrusted", sandbox {"type":"dangerFullAccess"}
+    assistant (codex/gpt-6-sol, Tool_use): "I\226\128\153ll write the exact text to the file with a local shell command."
+    tool_start bash {"command":"printf '%s' 'codex app-server approval fixture' > .codex-probe-write-action.txt"}
+    confirm bash
+    tool_end bash -> ""
+    assistant (codex/gpt-6-sol, End_turn): "Created or overwrote `.codex-probe-write-action.txt` with exactly `codex app-server approval fixture`."
+    |}]
+;;
+
+let done_frames turn =
+  [ sprintf
+      {|{"method":"turn/started","params":{"threadId":"th","turn":{"id":"%s","items":[],"status":"inProgress"}}}|}
+      turn
+  ; sprintf
+      {|{"method":"turn/completed","params":{"threadId":"th","turn":{"id":"%s","items":[],"status":"completed"}}}|}
+      turn
+  ]
+;;
+
+let%expect_test
+    "codex without its sandbox: said in the first turn it matters, once"
+  =
+  with_composer
+    ~approval:Auto
+    ~start:no_sandbox
+    ~adapter:(module Codex_adapter)
+    ~peer:(fun n ->
+      codex_turn ~on_request:print_policy (done_frames (sprintf "tu%d" n)))
+  @@ fun _ agent _ ->
+  prompt agent "in Auto";
+  Agent.set_mode agent ~approval:Auto_edit;
+  prompt agent "in Auto-edit";
+  prompt agent "again";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nin Auto"
+    spawn #1: codex app-server
+    thread/start: approvalPolicy "untrusted", sandbox "danger-full-access"
+    codex got thread/start
+    turn/start: approvalPolicy "untrusted", sandbox {"type":"dangerFullAccess"}
+    user: "in Auto-edit"
+    spawn #2: codex app-server
+    thread/resume: approvalPolicy "untrusted", sandbox "danger-full-access"
+    codex got thread/resume
+    notice: Codex's sandbox cannot run on laptop (no user namespaces): it runs without it, and prigh still asks before its commands and edits as the session's mode says
+    turn/start: approvalPolicy "untrusted", sandbox {"type":"dangerFullAccess"}
+    user: "again"
+    spawn #3: codex app-server
+    thread/resume: approvalPolicy "untrusted", sandbox "danger-full-access"
+    codex got thread/resume
+    turn/start: approvalPolicy "untrusted", sandbox {"type":"dangerFullAccess"}
+    |}]
+;;
+
+let%expect_test "codex where its sandbox runs: the mode's" =
+  with_composer
+    ~approval:Auto_edit
+    ~adapter:(module Codex_adapter)
+    ~peer:(fun _ -> codex_turn ~on_request:print_policy (done_frames "tu"))
+  @@ fun _ agent _ ->
+  prompt agent "go";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo"
+    spawn #1: codex app-server
+    thread/start: approvalPolicy "untrusted", sandbox "workspace-write"
+    codex got thread/start
+    turn/start: approvalPolicy "untrusted", sandbox {"type":"workspaceWrite"}
     |}]
 ;;
 

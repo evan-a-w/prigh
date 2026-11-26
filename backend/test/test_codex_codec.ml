@@ -18,6 +18,7 @@ let settings ?(approval = Approval_mode.Auto) ?model () =
   ; approval
   ; plan = false
   ; efforts = None
+  ; sandbox = true
   }
 ;;
 

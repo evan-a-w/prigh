@@ -823,3 +823,32 @@ prigh: fetching backend /nix/store/backend-backend (3 MiB) from https://cache.ex
 prigh: /nix/store/backend-backend from https://cache.example has hash sha256-garbage, expected sha256-backend-backend
 [exit 1]
 --- out: backend.nar
+
+=== image build: agent CLIs
+$ AGENT_CLIS=codex,claude fetch-agent-clis.sh
++ nix build --impure --no-link --print-out-paths --expr (builtins.getFlake "path:/deps").agentClis.x86_64-linux.codex
+prigh: agent CLI codex: WORK/store/codex-1.0/bin/codex (codex 1.0)
++ nix build --impure --no-link --print-out-paths --expr (builtins.getFlake "path:/deps").agentClis.x86_64-linux.claude
+prigh: agent CLI claude: WORK/store/claude-1.0/bin/claude (claude 1.0)
++ nix-store -qR WORK/store/codex-1.0 WORK/store/claude-1.0
+--- store: claude-1.0 codex-1.0 glibc
+--- clis: WORK/store/codex-1.0/bin/codex WORK/store/claude-1.0/bin/claude
+--- roots: WORK/store/codex-1.0 WORK/store/claude-1.0
+$ AGENT_CLIS= claude  fetch-agent-clis.sh
++ nix build --impure --no-link --print-out-paths --expr (builtins.getFlake "path:/deps").agentClis.x86_64-linux.claude
+prigh: agent CLI claude: WORK/store/claude-1.0/bin/claude (claude 1.0)
++ nix-store -qR WORK/store/claude-1.0
+--- store: claude-1.0 glibc
+--- clis: WORK/store/claude-1.0/bin/claude
+--- roots: WORK/store/claude-1.0
+$ AGENT_CLIS=none fetch-agent-clis.sh
+
+--- store: *
+--- clis: 
+--- roots: 
+$ AGENT_CLIS=codex,gemini fetch-agent-clis.sh
+prigh: AGENT_CLIS has gemini; the agent CLIs are claude,codex (or none)
+[exit 1]
+--- store: *
+--- clis: 
+--- roots: 

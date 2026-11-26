@@ -147,7 +147,8 @@ docker run --rm -it -v "$PWD:/work" -w /work ghcr.io/evan-a-w/prigh:main prigh t
 | `PRIGH_SUPERUSERS` | – | comma-separated users allowed `/setusr` and Nix store cleaning |
 | `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container |
 | `PRIGH_ENGINES` | `harness` | what runs sessions: `harness`, `composer` (drives Codex, Claude Code and other agents on each session's tool host: see [Engines](#engines)) or both, the first the default |
-| `PRIGH_ADAPTERS` | `codex,claude` | the agents the composer drives (`codex`, `claude`, `prigh`, `acp:NAME`); install and sign in to them on the tool hosts yourself |
+| `PRIGH_ADAPTERS` | `codex,claude` | the agents the composer drives (`codex`, `claude`, `prigh`, `acp:NAME`), e.g. `codex,claude,acp:antigravity,acp:opencode` for all the image has; users sign in to them |
+| `PRIGH_SHARING` | – | `off`: users cannot share provider logins with each other |
 | `PRIGH_ALLOW_NO_TOKEN` | – | `1`: start without a token |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` behind a proxy) |
 | `PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7790, 7777 | host ports |
@@ -169,6 +170,7 @@ docker run --rm -it -v "$PWD:/work" -w /work ghcr.io/evan-a-w/prigh:main prigh t
 | `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of `prigh`; `/home/prigh` is chowned at start if it differs |
 | `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://attic.caduc.co/prigh` and its key | (build) binary caches, space-separated; empty substituter: compile everything |
 | `PRIGH_EXTRA_APT_PACKAGES` | – | (build) Debian packages baked into the image, e.g. `python3 build-essential` |
+| `PRIGH_AGENT_CLIS` | `codex,claude,antigravity,opencode` | (build) the agent CLIs baked into the image ([Engines](#engines)); `none`: none |
 
 Provider keys in the environment (`ANTHROPIC_API_KEY`, …) are ignored when
 there are tokens; they apply only with `PRIGH_ALLOW_NO_TOKEN=1` or
@@ -217,19 +219,45 @@ by `prigh`) and survive rebuilds.
 
 ## Engines
 
-`PRIGH_ENGINES=harness,composer` (or `composer` alone) also runs sessions on
-coding agents you sign in to yourself, `PRIGH_ADAPTERS` saying which
-(`codex,claude` by default); a container can serve the harness, the
-composer or both, users and settings being the same on each. The image
-bundles none of the CLIs. Each runs on the session's tool host as the
-user who owns it, so install and log in to it there: in the container, from
-that user's terminal in prigh-web (`nix profile install nixpkgs#codex`,
-then `codex login`; `claude auth login` for Claude Code), or on the machine
-of a tool host they connect (with `PRIGH_NO_BACKEND_HOST=1`, the only
-place). Its login (`~/.codex`, `~/.claude`) stays in that user's home.
-Settings → Engines (`/adapters` in the TUI) shows each CLI's state per
-host and what to run when it is not installed or not logged in; prigh never
-installs one or logs in.
+The image has the coding-agent CLIs on every user's `PATH`: Codex
+(`codex`), Claude Code (`claude`), Antigravity (`agy`) and OpenCode
+(`opencode`), from the flake's `nixpkgs-agents` (nixos-unstable, so newer
+than `nixpkgs`; Claude Code and Antigravity are unfree). To run sessions on
+them as well as on the harness:
+
+```
+PRIGH_ENGINES=harness,composer
+PRIGH_ADAPTERS=codex,claude,acp:antigravity,acp:opencode
+```
+
+(the first engine is the default for new sessions; `composer` alone serves
+only the agents). Users and settings are the same on either engine.
+
+- Each agent runs on the session's tool host as the user who owns it, and
+  signs in as that user, from their terminal in prigh-web: `codex login`,
+  `claude auth login`, `opencode auth login`; for Antigravity, `/login
+  google-antigravity` in prigh (or `agy acp --login`, then `/adapters
+  import antigravity`). Logins (`~/.codex`, `~/.claude`, …) stay in the
+  user's home. Settings → Engines (`/adapters` in the TUI) shows each CLI's
+  state per host and what to run next.
+- The CLIs are part of the image's Nix seed (a layer of their own, which
+  changes only when `nixpkgs-agents` does): about 2 GB unpacked (a
+  770 MB download), copied into `/nix` at the first start of an image that
+  has new ones. Building from source, `PRIGH_AGENT_CLIS` picks them (`none`
+  for none). A user's `nix profile install nixpkgs#codex` (or any other
+  agent) comes first on their `PATH`.
+- On a tool host outside the container (`PRIGH_NO_BACKEND_HOST=1`),
+  install the CLIs on that machine.
+- Codex's sandbox (bubblewrap) needs user namespaces, which Docker's
+  default seccomp profile forbids without `CAP_SYS_ADMIN`. prigh finds
+  this out once per tool host and Codex binary (`codex sandbox -- true`)
+  and then runs Codex there without its sandbox, in every access mode,
+  saying so once per session (and in Settings → Engines): prigh still
+  asks before Codex's commands and edits as the session's mode says. To
+  keep Codex's sandbox, give the container a seccomp profile that allows
+  `unshare` and `clone` with `CLONE_NEWUSER`, if the host's kernel
+  permits unprivileged user namespaces. The container's per-user
+  isolation applies either way.
 
 ## Git and SSH
 
@@ -254,7 +282,7 @@ author (a user's own `git config --global` wins).
 ## Installing tools
 
 The image ships `bash git ripgrep tmux curl jq less openssh-client procps`,
-ImageMagick's `magick` and Nix. The root filesystem is read-only and users
+ImageMagick's `magick`, the agent CLIs ([Engines](#engines)) and Nix. The root filesystem is read-only and users
 are unprivileged, so there is no apt or sudo; any user gets tools from
 nixpkgs as itself:
 
@@ -519,6 +547,8 @@ A stale cache makes builds slower, never broken.
 1. A `nixos/nix` stage (`docker/fetch-prigh.sh`) fetches `.#backend` and
    `.#frontend` (from `prebuilt` NARs or the cache, without their ~3 GB
    toolchain closure; built if missing) and keeps the binaries, prigh-web's
-   site and the Nix seed (glibc, gmp, `nix`, `imagemagick`).
+   site and the Nix seed (glibc, gmp, `nix`, `imagemagick`). Before that,
+   `docker/fetch-agent-clis.sh` builds the agent CLIs (`AGENT_CLIS`) from
+   the flake alone, for a seed layer of their own.
 2. The runtime stage is `debian:bookworm-slim`, with `tini -g` as PID 1 and
    `libnss-extrausers` for users added at runtime on the read-only root.

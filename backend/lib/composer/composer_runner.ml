@@ -34,6 +34,9 @@ type t =
     (* a cwd whose files have no checkpoints, and why *)
   ; mutable checkpoint_noted : bool
   ; mutable transport_noted : bool (* [Line_transport.notice] was shown *)
+  ; mutable no_sandbox :
+      string option (* the live process's [Start.no_sandbox] *)
+  ; mutable sandbox_noted : bool
   ; mutable forking : string option (* the thread a new one forks *)
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
@@ -90,6 +93,8 @@ let create
   ; not_git = None
   ; checkpoint_noted = false
   ; transport_noted = false
+  ; no_sandbox = None
+  ; sandbox_noted = false
   ; forking = None
   ; services = None
   ; cancel = Cancellation.never
@@ -253,6 +258,7 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        raise exn
      | Ok a ->
        t.on_start start (Ok ());
+       t.no_sandbox <- start.no_sandbox;
        t.resumed <- start.resume;
        t.forking <- Option.some_if start.fork start.resume |> Option.join;
        (* A new thread has seen nothing: whatever an older one saw. *)
@@ -729,6 +735,27 @@ let capture t (s : Engine_intf.Services.t) ~which =
        None)
 ;;
 
+(* Said once, in the first turn its sandbox would have mattered in. *)
+let note_sandbox
+      t
+      (s : Engine_intf.Services.t)
+      (input : Engine_intf.Turn.Input.t)
+  =
+  match t.no_sandbox, input.approval with
+  | None, _ | Some _, Auto -> ()
+  | Some where, (Ask | Auto_edit | Smart) ->
+    if not t.sandbox_noted
+    then (
+      t.sandbox_noted <- true;
+      let (module A) = t.adapter in
+      s.notice
+        (sprintf
+           "%s's sandbox cannot run on %s: it runs without it, and prigh still \
+            asks before its commands and edits as the session's mode says"
+           A.display_name
+           where))
+;;
+
 let rec run_turn
           t
           (s : Engine_intf.Services.t)
@@ -836,6 +863,7 @@ and run_turn'
         else sprintf "%s could not start: %s" A.display_name why)
    | Some (Ok (Live ((module L), a))) ->
      note_thread t s (module L) a;
+     note_sandbox t s input;
      if Option.is_none input.model
      then
        Option.iter

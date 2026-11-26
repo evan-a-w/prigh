@@ -26,6 +26,11 @@
       url = "github:oxcaml/opam-repository";
       flake = false;
     };
+
+    # The coding-agent CLIs baked into the Docker image (`agentClis`
+    # below), locked apart from nixpkgs so they can follow nixos-unstable
+    # (`nix flake update nixpkgs-agents`) without moving the toolchain.
+    nixpkgs-agents.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs =
@@ -36,6 +41,7 @@
       opam-nix,
       opam-repository,
       ox-opam-repository,
+      nixpkgs-agents,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -186,9 +192,29 @@
         prighDesktopUnwrapped = desktop.unwrapped;
         prighDesktop = desktop.wrapped;
         prighComputer = desktop.computer;
+
+        # The agent CLIs baked into the Docker image (DOCKER.md, "Engines"),
+        # by the names its AGENT_CLIS build argument takes. Unfree ones are
+        # allowed by name.
+        agentPkgs = import nixpkgs-agents {
+          inherit system;
+          config.allowUnfreePredicate =
+            p:
+            builtins.elem (lib.getName p) [
+              "claude-code"
+              "antigravity-cli"
+            ];
+        };
+        agentClis = {
+          inherit (agentPkgs) codex opencode;
+          claude = agentPkgs.claude-code;
+          antigravity = agentPkgs.antigravity-cli;
+        };
       in
       {
         legacyPackages = frontendScope;
+
+        inherit agentClis;
 
         packages = {
           default = prigh;
@@ -196,6 +222,11 @@
           backend = prighBackend;
           prigh-desktop = prighDesktop;
           prigh-desktop-unwrapped = prighDesktopUnwrapped;
+        }
+        # The Home Manager module's default when the system's nixpkgs has
+        # none at least 1.5.0.
+        // lib.optionalAttrs (lib.meta.availableOn pkgs.stdenv.hostPlatform agentClis.antigravity) {
+          antigravity-cli = agentClis.antigravity;
         }
         // lib.optionalAttrs isLinux {
           prigh-computer = prighComputer;
@@ -476,31 +507,61 @@
               }).config;
             names = c: lib.concatMapStringsSep " " (p: p.name) c.home.packages;
             failing = c: lib.concatMapStrings (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
+            # stand-ins for the unfree antigravity-cli: only their version matters
+            agy = version: pkgs.runCommand "antigravity-cli-${version}" { inherit version; } "mkdir $out";
+            newAgy.programs.prigh.agents.antigravityPackage = agy "1.5.0";
             off = eval { };
-            cli = eval { programs.prigh.enable = true; };
+            cli = eval {
+              imports = [ newAgy ];
+              programs.prigh.enable = true;
+            };
             agentNames = lib.concatStringsSep " " (
-              [ pkgs.codex.name pkgs.opencode.name ] ++ lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.bubblewrap.name
+              [
+                pkgs.codex.name
+                pkgs.claude-code.name
+                "antigravity-cli-1.5.0"
+                pkgs.opencode.name
+              ]
+              ++ lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.bubblewrap.name
             );
             bare = eval {
               programs.prigh = {
                 enable = true;
                 agents = {
                   codex = false;
+                  claudeCode = false;
+                  antigravity = false;
                   opencode = false;
                   bubblewrap = false;
                 };
               };
             };
-            withClaude = eval {
+            others = eval {
               programs.prigh = {
                 enable = true;
                 agents = {
-                  claudeCode = true;
+                  antigravity = false;
+                  goose = true;
                   extraPackages = [ (pkgs.writeShellScriptBin "my-agent" "") ];
                 };
               };
             };
+            oldAgy = eval {
+              programs.prigh = {
+                enable = true;
+                agents.antigravityPackage = agy "1.2.3";
+              };
+            };
+            # the pinned nixpkgs has antigravity-cli 1.2.3: the flake's
+            defaultAgy = eval { programs.prigh.enable = true; };
+            noAgy = eval {
+              programs.prigh = {
+                enable = true;
+                agents.antigravityPackage = null;
+              };
+            };
             desktop = eval {
+              imports = [ newAgy ];
               programs.prigh = {
                 enable = true;
                 desktop = {
@@ -553,8 +614,19 @@
             test "${names bare}" = "prigh"
             test "${names cli}" = "prigh ${agentNames}"
             test "${names desktop}" = "prigh ${agentNames} prigh-desktop-${desktopVersion}"
-            # Claude Code is unfree: only when asked for (or unfree is allowed)
-            test "${lib.concatMapStringsSep " " (p: p.pname or p.name) withClaude.home.packages}" = "prigh codex claude-code opencode${lib.optionalString pkgs.stdenv.hostPlatform.isLinux " bubblewrap"} my-agent"
+            test "${lib.concatMapStringsSep " " (p: p.pname or p.name) others.home.packages}" = "prigh codex claude-code opencode goose-cli${lib.optionalString pkgs.stdenv.hostPlatform.isLinux " bubblewrap"} my-agent"
+            test -z ${lib.escapeShellArg (failing cli + failing others)}
+            # antigravity (on by default) needs agy acp, antigravity-cli >= 1.5.0
+            test -z ${lib.escapeShellArg (failing defaultAgy)}
+            test "${
+              lib.concatMapStringsSep " " (p: p.name) (
+                lib.filter (p: lib.hasPrefix "antigravity" p.name) defaultAgy.home.packages
+              )
+            }" = "${agentClis.antigravity.name}"
+            echo ${lib.escapeShellArg (failing oldAgy)} | grep -q "antigravityPackage is antigravity-cli 1.2.3, and prigh needs"
+            echo ${lib.escapeShellArg (failing oldAgy)} | grep -q "agents.antigravityPackage ="
+            echo ${lib.escapeShellArg (failing noAgy)} | grep -q "antigravityPackage is null (none for ${system}),"
+            test "${names noAgy}" = "prigh ${pkgs.codex.name} ${pkgs.claude-code.name} ${pkgs.opencode.name}${lib.optionalString pkgs.stdenv.hostPlatform.isLinux " ${pkgs.bubblewrap.name}"}"
             test -z ${lib.escapeShellArg (failing desktop)}
             echo ${lib.escapeShellArg (failing secret)} | grep -q 'programs.prigh.desktop.extraArgs has -token=sekrit:'
             # the desktop app was given the options

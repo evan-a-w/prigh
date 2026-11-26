@@ -3,8 +3,8 @@
 # The first stage builds the backend, the TUI and prigh-web with the flake
 # (OxCaml is only practical to build through Nix). The runtime image is
 # Debian with just the two binaries, the few Nix store paths they link
-# against, prigh-web's static assets, and Nix itself for the agents to
-# install tools with.
+# against, prigh-web's static assets, the coding-agent CLIs the composer
+# drives, and Nix itself for the agents to install tools with.
 
 ARG NIX_IMAGE=nixos/nix:2.35.2
 ARG RUNTIME_IMAGE=debian:bookworm-slim
@@ -40,6 +40,13 @@ RUN printf '%s\n' 'experimental-features = nix-command flakes' 'sandbox = false'
 ARG PREFETCH_DEPS=0
 COPY flake.nix flake.lock /deps/
 COPY nix /deps/nix
+
+# The coding-agent CLIs on every user's PATH (DOCKER.md, "Engines"): the
+# flake's agentClis, comma-separated, or none. Built from only the flake, so
+# that they make a layer of their own, unchanged from commit to commit.
+ARG AGENT_CLIS=codex,claude,antigravity,opencode
+COPY docker/fetch-agent-clis.sh /fetch-agent-clis.sh
+RUN bash /fetch-agent-clis.sh
 COPY frontend/dune-project frontend/prigh_frontend.opam /deps/frontend/
 RUN if [ "$PREFETCH_DEPS" = 1 ]; then nix build --no-link path:/deps#frontend.inputDerivation; fi
 COPY backend/dune-project backend/prigh.opam /deps/backend/
@@ -52,6 +59,8 @@ RUN if [ "$PREFETCH_DEPS" = 1 ]; then nix build --no-link path:/deps#backend.inp
 # ImageMagick: the backend downscales images too large for a model with it,
 # and the flake's wrapper puts the same package on PATH (flake.nix). It is
 # checked here, since a missing one only shows when someone sends an image.
+# The seed's store leaves out the agent CLIs' paths, a layer of their own;
+# its database and roots have them.
 ARG REQUIRE_CACHED=0
 COPY . /src
 RUN --mount=type=bind,from=prebuilt,target=/prebuilt \
@@ -71,11 +80,12 @@ RUN --mount=type=bind,from=prebuilt,target=/prebuilt \
  && "$magick_pkg/bin/magick" '/tmp/big.png[0]' -resize '1000x1000>' -quality 85 /tmp/small.jpg \
  && [ "$("$magick_pkg/bin/magick" identify -format '%m %wx%h,' /tmp/small.png /tmp/small.jpg)" = 'PNG 2000x1333,JPEG 1000x667,' ] \
  && rm /tmp/big.png /tmp/small.png /tmp/small.jpg \
- && closure=$(nix-store -qR $refs "$nix_pkg" "$magick_pkg") \
+ && closure=$(nix-store -qR $refs "$nix_pkg" "$magick_pkg" $(cat /seed-agents/roots)) \
  && mkdir -p /seed/store \
- && cp -a $closure /seed/store/ \
+ && for p in $closure; do [ -e "/seed-agents/store/${p##*/}" ] || cp -a "$p" /seed/store/; done \
  && nix-store --dump-db $closure >/seed/registration \
- && printf '%s\n' $refs "$nix_pkg" "$magick_pkg" >/seed/roots \
+ && printf '%s\n' $refs "$nix_pkg" "$magick_pkg" $(cat /seed-agents/roots) >/seed/roots \
+ && cp /seed-agents/clis /seed/agent-clis \
  && echo "$nix_pkg" >/seed/nix \
  && echo "$magick_pkg" >/seed/magick \
  && sha256sum /seed/registration | cut -c1-32 >/seed/id \
@@ -111,6 +121,7 @@ RUN sed -i -E '/extrausers/! s/^(passwd|group|shadow):(.*)$/\1:\2 extrausers/' /
 # The store paths prigh and nix need, outside /nix: /nix is a volume, which
 # hides the image's /nix and keeps its contents across upgrades, so the
 # entrypoint copies the missing ones in at every start.
+COPY --from=nix-build /seed-agents/store /opt/nix-seed/store
 COPY --from=nix-build /seed /opt/nix-seed
 COPY --from=nix-build /opt/prigh /opt/prigh
 COPY docker/prigh-docker /usr/local/bin/prigh-docker
@@ -128,6 +139,10 @@ RUN mv /opt/nix-seed/flake-registry.json /etc/nix/ \
  && [ -x "/opt/nix-seed/store/${magick_pkg##*/}/bin/magick" ] \
  && grep -qxF "$magick_pkg" /opt/nix-seed/roots \
  && ln -s "$magick_pkg/bin/magick" /usr/local/bin/magick \
+ && while read -r exe; do \
+      p=${exe#/nix/store/} && ls "/opt/nix-seed/store/$p" >/dev/null && grep -qxF "/nix/store/${p%%/*}" /opt/nix-seed/roots \
+        && ln -s "$exe" /usr/local/bin/ || exit 1; \
+    done </opt/nix-seed/agent-clis \
  && groupadd -r -g 30000 nixbld \
  && for i in 1 2 3 4 5 6 7 8; do \
       useradd -r -M -N -u $((30000 + i)) -g nixbld -G nixbld -d /var/empty -s /usr/sbin/nologin \

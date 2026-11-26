@@ -371,6 +371,7 @@ EOF
 	pd PRIGH_TOKEN=tok
 
 	fetch_tests
+	agent_cli_tests
 }
 
 # A fake nix and nix-store for fetch-prigh.sh: they print what they are asked
@@ -432,6 +433,61 @@ fetch_tests() {
 	fetch NIX_SUBSTITUTER=
 	section "image build: a download that does not match its hash"
 	fetch FAKE_CACHED=/nix/store/backend-backend FAKE_CORRUPT=/nix/store/backend-backend
+}
+
+# A fake nix and nix-store for fetch-agent-clis.sh: the flake's agentClis are
+# codex and claude, each a store path in $work/store with its program.
+fake_agent_nix() {
+	mkdir -p "$work/abin" "$work/store"
+	cat >"$work/abin/nix" <<'EOF'
+#!/usr/bin/env bash
+last=${*: -1}
+case "$last" in
+builtins.currentSystem) printf x86_64-linux ;;
+*attrNames*) printf claude,codex ;;
+*.meta.mainProgram) name=${last%.meta.mainProgram} && printf %s "${name##*.}" ;;
+*)
+	echo "+ nix $*" >&2
+	name=${last##*.}
+	p=$FAKE_STORE/$name-1.0
+	mkdir -p "$p/bin"
+	printf '#!/bin/sh\necho "%s 1.0"\n' "$name" >"$p/bin/$name"
+	chmod +x "$p/bin/$name"
+	echo "$p" ;;
+esac
+EOF
+	cat >"$work/abin/nix-store" <<'EOF'
+#!/usr/bin/env bash
+echo "+ nix-store $*" >&2
+for p in "${@:2}"; do echo "$p"; done
+echo "$FAKE_STORE/glibc"
+EOF
+	chmod +x "$work/abin/nix" "$work/abin/nix-store"
+	mkdir -p "$work/store/glibc"
+}
+
+# agents AGENT_CLIS: fetch-agent-clis.sh with the fake nix, then what it left.
+agents() {
+	local out status
+	rm -rf "$work/agents"
+	echo "\$ AGENT_CLIS=$1 fetch-agent-clis.sh"
+	out=$(env -i PATH="$work/abin:$PATH" FAKE_STORE="$work/store" PRIGH_SRC=/deps \
+		PRIGH_OUT="$work/agents" AGENT_CLIS="$1" bash "$here/fetch-agent-clis.sh" 2>&1) &&
+		status=0 || status=$?
+	printf '%s\n' "$out" | sed -e "s|$work|WORK|g"
+	[ "$status" = 0 ] || echo "[exit $status]"
+	echo "--- store: $(cd "$work/agents/store" && echo *)"
+	echo "--- clis: $(sed -e "s|$work|WORK|g" "$work/agents/clis" | paste -sd ' ')"
+	echo "--- roots: $(sed -e "s|$work|WORK|g" "$work/agents/roots" | paste -sd ' ')"
+}
+
+agent_cli_tests() {
+	fake_agent_nix
+	section "image build: agent CLIs"
+	agents codex,claude
+	agents ' claude '
+	agents none
+	agents codex,gemini
 }
 
 actual="$work/actual"
