@@ -744,9 +744,10 @@ let state t =
     | Some tokens -> tokens
     | None when is_external t.model ->
       (* What its last reply reported may sum a turn's requests. *)
-      Int.min
-        (Session.context_tokens t.session)
-        (Message.estimate_tokens (Session.messages t.session))
+      let estimate = Message.estimate_tokens (Session.messages t.session) in
+      (match Session.context_tokens t.session with
+       | 0 -> estimate
+       | reported -> Int.min reported estimate)
     | None -> Session.context_tokens t.session
   in
   { State.session_id = Session.id t.session
@@ -3578,7 +3579,9 @@ let summarise_for_agent ?instructions ?cancel t =
       ~env:t.env
       ~provider:t.provider
       ~model:
-        (Compaction_settings.summary_model (compaction_settings t) (aux_model t))
+        (Compaction_settings.summary_model
+           (compaction_settings t)
+           (aux_model t))
       ~prompt:Compaction.Prompt.none
       ?cancel
       ?instructions

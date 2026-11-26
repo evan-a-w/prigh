@@ -642,7 +642,9 @@ let create
       | None ->
         Or_error.errorf "%s has no command to compact its context" display_name
       | Some command ->
-        let text = "/" ^ String.chop_prefix_if_exists command.name ~prefix:"/" in
+        let text =
+          "/" ^ String.chop_prefix_if_exists command.name ~prefix:"/"
+        in
         let%map.Or_error () = send t settings { text; images = [] } in
         t.compacting <- true
     ;;

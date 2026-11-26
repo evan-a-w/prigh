@@ -52,7 +52,7 @@ let model
       ~adapter
       ?name
       ?context_window
-            ?(thinking_levels = [])
+      ?(thinking_levels = [])
       ?(can_disable_thinking = false)
       ?(images = true)
       id
