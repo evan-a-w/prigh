@@ -1,7 +1,9 @@
 open! Core
 open! Prigh
 
-let call id = { Content.Tool_call.id; name = "ls"; arguments = "{}" }
+let call id =
+  { Content.Tool_call.id; name = "ls"; arguments = "{}"; extra = None }
+;;
 
 let start ?(call_id = "p1") agent_id task : Agent_event.t =
   Subagent_start

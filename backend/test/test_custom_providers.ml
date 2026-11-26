@@ -1031,9 +1031,17 @@ let conversation =
           [ Content.thinking "Two files to read."
           ; Text "Reading."
           ; Tool_call
-              { id = "call_1"; name = "read"; arguments = {|{"path":"a.png"}|} }
+              { id = "call_1"
+              ; name = "read"
+              ; arguments = {|{"path":"a.png"}|}
+              ; extra = None
+              }
           ; Tool_call
-              { id = "call_2"; name = "read"; arguments = {|{"path":"b.txt"}|} }
+              { id = "call_2"
+              ; name = "read"
+              ; arguments = {|{"path":"b.txt"}|}
+              ; extra = None
+              }
           ]
       ; stop_reason = Tool_use
       ; usage = Usage.zero
@@ -1255,6 +1263,161 @@ let%expect_test
      ((events ()) (finish_reason ())
       (usage (((input 50) (output 7) (cache_read 20))))))
     |}]
+;;
+
+(* Gemini's OpenAI-compatible endpoint signs a step's first tool call in
+   [extra_content], on whichever delta of the call it likes, and rejects the
+   next request unless the signature comes back with the call. *)
+let gemini_chunks =
+  [ {|{"choices":[{"index":0,"delta":{"role":"assistant","content":"Fetching both."}}]}|}
+  ; {|{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"f1","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":"}}]}}]}|}
+  ; {|{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"a\"}"},"extra_content":{"google":{"thought_signature":"SIG_A"}}}]}}]}|}
+  ; {|{"choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"id":"f2","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"b\"}"}}]}}]}|}
+  ; {|{"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}|}
+  ]
+;;
+
+let gemini_model () =
+  Custom_provider.model
+    { name = "gemini"
+    ; base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+    ; api = Chat
+    ; headers = []
+    ; models = []
+    }
+    "gemini-3-pro-preview"
+;;
+
+let print_assistant_messages ~quirks (r : Provider.Request.t) =
+  match
+    Json.member "messages" (Openai_chat.For_testing.request_body ~quirks r)
+  with
+  | Some (`Array messages) ->
+    List.iter messages ~f:(fun m ->
+      match Json.member "role" m with
+      | Some (`String "assistant") -> print_endline (Json.to_string m)
+      | _ -> ())
+  | _ -> ()
+;;
+
+let%expect_test "chat completions: Gemini thought signatures" =
+  let model = gemini_model () in
+  let reply =
+    { (Openai_chat.For_testing.parse_reply
+         (List.map gemini_chunks ~f:Json.of_string))
+      with
+      model = Model.key model
+    }
+  in
+  print_s [%sexp (reply.content : Content.t list)];
+  [%expect
+    {|
+    ((Text "Fetching both.")
+     (Tool_call
+      ((id f1) (name web_fetch) (arguments "{\"url\":\"a\"}")
+       (extra "{\"google\":{\"thought_signature\":\"SIG_A\"}}")))
+     (Tool_call ((id f2) (name web_fetch) (arguments "{\"url\":\"b\"}"))))
+    |}];
+  (* The session keeps the signature across a reload. *)
+  let dir = Filename_unix.temp_dir "prigh-gemini" "" in
+  let session = Session.create ~dir ~cwd:"/proj" () in
+  let (_ : Session.Entry.t) =
+    Session.append_message session (Assistant reply)
+  in
+  let loaded = Or_error.ok_exn (Session.load (Session.path session)) in
+  let reloaded =
+    List.find_map_exn (Session.messages loaded) ~f:(function
+      | Message.Assistant a -> Some a
+      | User _ | Tool_result _ -> None)
+  in
+  print_s
+    [%sexp ([%equal: Content.t list] reloaded.content reply.content : bool)];
+  [%expect {| true |}];
+  let result id =
+    Message.Tool_result
+      { tool_call_id = id
+      ; tool_name = "web_fetch"
+      ; text = "ok"
+      ; is_error = false
+      ; images = []
+      }
+  in
+  let foreign =
+    { Message.Assistant.content =
+        [ Text "Reading."
+        ; Tool_call
+            { id = "toolu_1"; name = "read"; arguments = "{}"; extra = None }
+        ; Tool_call
+            { id = "toolu_2"; name = "read"; arguments = "{}"; extra = None }
+        ]
+    ; stop_reason = Tool_use
+    ; usage = Usage.zero
+    ; model = "anthropic/claude-sonnet-4-5"
+    }
+  in
+  let request ?(model = model) () =
+    { Provider.Request.model
+    ; system = None
+    ; messages =
+        [ Message.user "fetch a and b"
+        ; Assistant foreign
+        ; result "toolu_1"
+        ; result "toolu_2"
+        ; Assistant reloaded
+        ; result "f1"
+        ; result "f2"
+        ]
+    ; tools = []
+    ; thinking = Off
+    ; max_tokens = None
+    ; cache_key = None
+    }
+  in
+  (* Gemini's own step goes back verbatim (only its first call is signed);
+     another model's step gets the dummy signature on its first call. *)
+  print_assistant_messages ~quirks:Openai_chat.Quirks.gemini (request ());
+  [%expect
+    {|
+    {"role":"assistant","content":"Reading.","tool_calls":[{"id":"toolu_1","type":"function","function":{"name":"read","arguments":"{}"},"extra_content":{"google":{"thought_signature":"skip_thought_signature_validator"}}},{"id":"toolu_2","type":"function","function":{"name":"read","arguments":"{}"}}]}
+    {"role":"assistant","content":"Fetching both.","tool_calls":[{"id":"f1","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"a\"}"},"extra_content":{"google":{"thought_signature":"SIG_A"}}},{"id":"f2","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"b\"}"}}]}
+    |}];
+  (* Another Gemini model's signature would not validate: the dummy instead. *)
+  print_assistant_messages
+    ~quirks:Openai_chat.Quirks.gemini
+    (request ~model:{ model with id = "gemini-3-flash-preview" } ());
+  [%expect
+    {|
+    {"role":"assistant","content":"Reading.","tool_calls":[{"id":"toolu_1","type":"function","function":{"name":"read","arguments":"{}"},"extra_content":{"google":{"thought_signature":"skip_thought_signature_validator"}}},{"id":"toolu_2","type":"function","function":{"name":"read","arguments":"{}"}}]}
+    {"role":"assistant","content":"Fetching both.","tool_calls":[{"id":"f1","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"a\"}"},"extra_content":{"google":{"thought_signature":"skip_thought_signature_validator"}}},{"id":"f2","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"b\"}"}}]}
+    |}];
+  (* Any OpenAI-compatible server gets its own [extra_content] back, and no
+     dummies. *)
+  print_assistant_messages ~quirks:Openai_chat.Quirks.generic (request ());
+  [%expect
+    {|
+    {"role":"assistant","content":"Reading.","tool_calls":[{"id":"toolu_1","type":"function","function":{"name":"read","arguments":"{}"}},{"id":"toolu_2","type":"function","function":{"name":"read","arguments":"{}"}}]}
+    {"role":"assistant","content":"Fetching both.","tool_calls":[{"id":"f1","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"a\"}"},"extra_content":{"google":{"thought_signature":"SIG_A"}}},{"id":"f2","type":"function","function":{"name":"web_fetch","arguments":"{\"url\":\"b\"}"}}]}
+    |}];
+  List.iter
+    [ "https://generativelanguage.googleapis.com/v1beta/openai"
+    ; "https://aiplatform.googleapis.com/v1/projects/p/locations/global/endpoints/openapi"
+    ; "http://localhost:4000/v1"
+    ]
+    ~f:(fun url ->
+      let quirks = Openai_chat.Quirks.of_url url in
+      print_s [%sexp (quirks.gemini : bool)]);
+  [%expect
+    {|
+    true
+    true
+    false
+    |}];
+  print_endline
+    (Sse_request.error_message_of_body
+       ~status:400
+       {|[{"error":{"code":400,"message":"Function call is missing a thought_signature in functionCall parts. This is required for tools to work correctly, and missing thought_signature may lead to degraded model performance. Additional data, function call `default_api:web_fetch` , position 4. Please refer to https://ai.google.dev/gemini-api/docs/thought-signatures for more details.","status":"INVALID_ARGUMENT"}}]|});
+  [%expect
+    {| HTTP 400: Gemini refused the history: a tool call in it lacks its thought signature. /compact (which summarises the old tool calls) or /new gets past it; please report it with the session, as prigh should have sent one. |}]
 ;;
 
 (* ---- end to end ------------------------------------------------------------- *)

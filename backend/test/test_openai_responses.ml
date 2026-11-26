@@ -56,7 +56,11 @@ let conversation =
           [ Content.thinking ~signature:reasoning_item "Plan"
           ; Text "Listing."
           ; Tool_call
-              { id = "call_1"; name = "bash"; arguments = {|{"cmd":"ls"}|} }
+              { id = "call_1"
+              ; name = "bash"
+              ; arguments = {|{"cmd":"ls"}|}
+              ; extra = None
+              }
           ]
       ; stop_reason = Tool_use
       ; usage = Usage.zero
@@ -512,9 +516,14 @@ let%expect_test
                 ; name = "apply_patch"
                 ; arguments =
                     {|{"input":"*** Begin Patch\n*** Delete File: a\n*** End Patch"}|}
+                ; extra = None
                 }
             ; Tool_call
-                { id = "call_2"; name = "bash"; arguments = {|{"cmd":"ls"}|} }
+                { id = "call_2"
+                ; name = "bash"
+                ; arguments = {|{"cmd":"ls"}|}
+                ; extra = None
+                }
             ]
         ; stop_reason = Tool_use
         ; usage = Usage.zero

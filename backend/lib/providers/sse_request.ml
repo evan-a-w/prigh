@@ -19,6 +19,18 @@ let quota_codes =
   [ "usage_limit_reached"; "insufficient_quota"; "billing_hard_limit_reached" ]
 ;;
 
+let missing_thought_signature =
+  "Gemini refused the history: a tool call in it lacks its thought signature. \
+   /compact (which summarises the old tool calls) or /new gets past it; please \
+   report it with the session, as prigh should have sent one."
+;;
+
+let readable detail =
+  if String.is_substring detail ~substring:"thought_signature"
+  then missing_thought_signature
+  else detail
+;;
+
 (* The message, plus [Usage_limit.marker] when the error's type or code (or,
    for Anthropic's subscriptions, [limit_rejected]) says the allowance is used
    up rather than briefly rate limited. *)
@@ -26,6 +38,12 @@ let error_message_of_body ?(limit_rejected = false) ?resets_at ~status body =
   let detail, code =
     match Json.parse body with
     | Ok json ->
+      (* Gemini's OpenAI-compatible endpoint wraps its error in an array. *)
+      let json =
+        match json with
+        | `Array [ (`Object _ as error) ] -> error
+        | json -> json
+      in
       (match Json.member "error" json with
        | Some err ->
          ( Option.value (member_string "message" err) ~default:body
@@ -42,7 +60,7 @@ let error_message_of_body ?(limit_rejected = false) ?resets_at ~status body =
   sprintf
     "HTTP %d: %s%s"
     status
-    (String.strip detail)
+    (readable (String.strip detail))
     (if exhausted
      then
        " "

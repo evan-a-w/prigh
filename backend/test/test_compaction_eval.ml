@@ -19,7 +19,7 @@ let assistant content : Message.t =
 ;;
 
 let call id name arguments =
-  assistant [ Text "working"; Tool_call { id; name; arguments } ]
+  assistant [ Text "working"; Tool_call { id; name; arguments; extra = None } ]
 ;;
 
 let result ?(is_error = false) id name text : Message.t =

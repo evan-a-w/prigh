@@ -283,7 +283,7 @@ let%expect_test "Agent.state rolls up subagent usage and cost" =
 
 let%expect_test "Rpc_json encodes nested subagent events" =
   let call : Content.Tool_call.t =
-    { id = "c1"; name = "read"; arguments = "{}" }
+    { id = "c1"; name = "read"; arguments = "{}"; extra = None }
   in
   let nested =
     Agent_event.Subagent

@@ -27,7 +27,7 @@ let custom_provider ~env ?timeout (p : Custom_provider.t) ~key : Provider.t =
       ~name:p.name
       ~url:(p.base_url ^ "/chat/completions")
       ~headers:(bearer @ p.headers)
-      ~quirks:Openai_chat.Quirks.generic
+      ~quirks:(Openai_chat.Quirks.of_url p.base_url)
       ()
   | Responses ->
     Openai_responses.create

@@ -4426,6 +4426,7 @@ let shell t ~command ~add_to_context =
       { id = call_id
       ; name = "shell"
       ; arguments = Json.to_string (`Object [ "command", `String command ])
+      ; extra = None
       }
     in
     let output = Buffer.create 1024 in

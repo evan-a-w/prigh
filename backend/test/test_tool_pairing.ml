@@ -3,7 +3,9 @@ open! Prigh
 open Tool_test_helpers
 module Reply = Faux_provider.Reply
 
-let call id = { Content.Tool_call.id; name = "bash"; arguments = "{}" }
+let call id =
+  { Content.Tool_call.id; name = "bash"; arguments = "{}"; extra = None }
+;;
 
 let assistant ids =
   Message.Assistant

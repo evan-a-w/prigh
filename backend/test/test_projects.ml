@@ -277,7 +277,9 @@ let%expect_test "a fork in a worktree is told its paths moved" =
         [ Message.user "look at src/f"
         ; Assistant
             { content =
-                [ Tool_call { id = "b1"; name = "subagent"; arguments } ]
+                [ Tool_call
+                    { id = "b1"; name = "subagent"; arguments; extra = None }
+                ]
             ; stop_reason = Tool_use
             ; usage = Usage.zero
             ; model = Model.default.id

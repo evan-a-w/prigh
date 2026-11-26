@@ -55,7 +55,11 @@ let conversation ~model =
   ; Assistant
       { content =
           [ Tool_call
-              { id = "call_1"; name = "read"; arguments = {|{"path":"a.png"}|} }
+              { id = "call_1"
+              ; name = "read"
+              ; arguments = {|{"path":"a.png"}|}
+              ; extra = None
+              }
           ]
       ; stop_reason = Tool_use
       ; usage = Usage.zero

@@ -27,7 +27,8 @@ let shapes messages = String.concat ~sep:" " (List.map messages ~f:shape)
 
 let call id ~name ~arguments =
   Message.Assistant
-    { content = [ Text "working"; Tool_call { id; name; arguments } ]
+    { content =
+        [ Text "working"; Tool_call { id; name; arguments; extra = None } ]
     ; usage = Usage.zero
     ; stop_reason = Tool_use
     ; model = "m"
