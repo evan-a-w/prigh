@@ -9,7 +9,8 @@ open! Import
     questions to the user, and prigh's own tools reach it over MCP
     ({!Injected_tools}).
 
-    The process starts with the first turn and lives on between turns;
+    The process starts with the first turn (or before, {!Runner.prewarm})
+    and lives on between turns;
     when it exits (or ignores an interrupt) the next turn starts another,
     continuing the harness's thread. *)
 
@@ -34,6 +35,10 @@ type t
     session cannot rewind. [catalog]: what the harness said of its login
     without a thread ({!Adapter_catalog}), for its models and limits before
     its process runs. [on_change]: the harness's models or limits changed.
+    [slow_start]: a run whose first output from the harness came later than
+    this (3 s) after it started gets a notice of where the time went
+    ({!Turn_timings}). {!Runner.prewarm} starts the process before the
+    first turn.
 
     A turn ends when the user aborts it (Esc), also while the process
     starts, and when the process exits or stops; then whatever it was
@@ -61,6 +66,7 @@ val create
   -> ?checkpoint:(Json.t -> Tool.Result.t)
   -> ?catalog:(unit -> Adapter.Catalog.t option)
   -> ?on_change:(unit -> unit)
+  -> ?slow_start:Time_float.Span.t
   -> unit
   -> t
 

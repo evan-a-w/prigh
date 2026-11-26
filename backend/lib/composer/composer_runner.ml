@@ -42,6 +42,9 @@ type t =
   ; mutable context : int option * int option
   ; catalog : unit -> Adapter.Catalog.t option
   ; on_change : unit -> unit
+  ; mutable warming : unit Promise.t option (* a [prewarm] starting *)
+  ; slow_start : Time_float.Span.t
+  ; mutable epoch : int (* [close]s: a start that outlived one stops *)
   }
 
 let create
@@ -59,6 +62,7 @@ let create
       ?checkpoint
       ?(catalog = fun () -> None)
       ?(on_change = ignore)
+      ?(slow_start = Time_float.Span.of_sec 3.)
       ()
   =
   { sw
@@ -95,12 +99,16 @@ let create
   ; context = None, None
   ; catalog
   ; on_change
+  ; warming = None
+  ; slow_start
+  ; epoch = 0
   }
 ;;
 
 let thread_id t = t.thread_id
 
 let close t =
+  t.epoch <- t.epoch + 1;
   Option.iter t.live ~f:(fun (Live ((module A), a)) -> A.stop a);
   t.live <- None
 ;;
@@ -203,7 +211,8 @@ let note_thread
 
 let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
   let (module A) = t.adapter in
-  match t.spawn (A.launch start) with
+  let launch = Turn_timings.phase "launch" (fun () -> A.launch start) in
+  match Turn_timings.phase "spawn" (fun () -> t.spawn launch) with
   | Error e -> Error (`Spawn e)
   | Ok transport ->
     Option.iter (Line_transport.notice transport) ~f:(fun notice ->
@@ -228,13 +237,14 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
         }
     in
     (match
-       A.start
-         ~sw:t.sw
-         ?interrupt_grace:t.interrupt_grace
-         ?request_timeout:t.request_timeout
-         ~injected
-         transport
-         start
+       Turn_timings.phase "handshake" (fun () ->
+         A.start
+           ~sw:t.sw
+           ?interrupt_grace:t.interrupt_grace
+           ?request_timeout:t.request_timeout
+           ~injected
+           transport
+           start)
      with
      | exception exn ->
        (* Cancelled while it started (Esc): it would run for nobody. *)
@@ -246,7 +256,6 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        t.forking <- Option.some_if start.fork start.resume |> Option.join;
        (* A new thread has seen nothing: whatever an older one saw. *)
        if Option.is_none start.resume then t.fresh <- true;
-       note_thread t s (module A) a;
        Ok (Live ((module A), a))
      | Error e ->
        Line_transport.stop transport;
@@ -339,7 +348,7 @@ let renew_login t (s : Engine_intf.Services.t) ~login =
   | Some _ | None -> ()
 ;;
 
-let live
+let live_now
       t
       (s : Engine_intf.Services.t)
       (input : Engine_intf.Turn.Input.t)
@@ -355,8 +364,12 @@ let live
      t.live <- None;
      t.thread_id <- None
    | Some _ | None -> ());
-  let base = t.start ~cwd:s.cwd in
-  renew_login t s ~login:base.login;
+  let base =
+    Turn_timings.phase "login" (fun () ->
+      let base = t.start ~cwd:s.cwd in
+      renew_login t s ~login:base.login;
+      base)
+  in
   let base =
     match base.login, t.login_dropped with
     | Some login, Some dropped
@@ -377,6 +390,9 @@ let live
   | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
   | _ ->
     starting ();
+    Turn_timings.phase "process"
+    @@ fun () ->
+    let epoch = t.epoch in
     let (module A) = t.adapter in
     let resume = Option.first_some t.thread_id base.resume in
     let fork = base.fork && Option.is_none t.thread_id in
@@ -458,6 +474,10 @@ let live
       | started, _ -> started
     in
     (match started with
+     | Ok (Live ((module L), a)) when t.epoch <> epoch ->
+       (* Closed while it started (the session was left): nobody runs it. *)
+       L.stop a;
+       Or_error.errorf "%s was stopped while it started" A.display_name
      | Ok (Live ((module L), a) as live) ->
        L.on_change a (fun () ->
          (match L.models a with
@@ -470,6 +490,34 @@ let live
        t.live_login <- login;
        Ok live
      | Error (`Spawn e | `Start e) -> Error e)
+;;
+
+(* A process [prewarm] is starting for the session is this turn's. *)
+let live t s input ~starting =
+  Option.iter t.warming ~f:(fun warming ->
+    Turn_timings.phase "warming_up" (fun () -> Promise.await warming));
+  live_now t s input ~starting
+;;
+
+let prewarm t s input =
+  let up =
+    match t.live with
+    | Some (Live ((module L), a)) ->
+      L.alive a && Option.equal String.equal t.live_host (Some (t.host ()))
+    | None -> false
+  in
+  if (not up) && Option.is_none t.warming && Option.is_none t.services
+  then (
+    let warming, warmed = Promise.create () in
+    t.warming <- Some warming;
+    Guarded.fork ~sw:t.sw ~what:"starting an external harness early" (fun () ->
+      Exn.protect
+        ~finally:(fun () ->
+          t.warming <- None;
+          Promise.resolve warmed ())
+        ~f:(fun () ->
+          (* What goes wrong is said by the turn, which tries again. *)
+          ignore (live_now t s input ~starting:ignore : live Or_error.t))))
 ;;
 
 (* What the harness has not seen of the session, handed to it before the
@@ -668,6 +716,10 @@ let rec run_turn
   t.services <- Some s;
   t.cancel <- turn_cancel;
   t.run_cancel <- cancel;
+  (match Turn_timings.current () with
+   | Some _ -> fun f -> f ()
+   | None -> Turn_timings.with_ (Turn_timings.create ()))
+  @@ fun () ->
   Exn.protect
     ~finally:(fun () -> Cancellation.cancel turn_cancel)
     ~f:(fun () ->
@@ -707,6 +759,37 @@ and run_turn'
       recorder
       (Turn_end { turn_id = None; stop = Failed { kind = Other; message } })
   in
+  let timings = Turn_timings.current () in
+  (* Said once a run: how long it took the harness to start answering, when
+     that was slow. *)
+  let reported = ref false in
+  let report () =
+    Option.iter timings ~f:(fun timings ->
+      if not !reported
+      then (
+        reported := true;
+        let total = Turn_timings.elapsed timings in
+        Trace.add_attrs ~under:"prompt" [ "first_output_s", Float total ];
+        if Float.(total > Time_float.Span.to_sec t.slow_start)
+        then
+          s.notice
+            (Turn_timings.notice
+               ~harness:A.display_name
+               ~total
+               (Turn_timings.phases timings))))
+  in
+  (* The files are checkpointed while the harness starts: it is sent
+     nothing before they are. *)
+  let before_checkpoint =
+    match input.kind, t.checkpoint, t.not_git with
+    | Compact _, _, _ | Prompt, None, _ -> None
+    | Prompt, Some _, Some (cwd, _) when String.equal cwd s.cwd -> None
+    | Prompt, Some _, _ ->
+      Some
+        (Fiber.fork_promise ~sw:t.sw (fun () ->
+           Turn_timings.phase ~alongside:true "checkpoint" (fun () ->
+             capture t s ~which:"before")))
+  in
   (match
      Cancellation.protect cancel ~f:(fun () ->
        live t s input ~starting:(fun () -> Composer_recorder.starting recorder))
@@ -722,17 +805,19 @@ and run_turn'
         then why
         else sprintf "%s could not start: %s" A.display_name why)
    | Some (Ok (Live ((module L), a))) ->
-     (match input.kind with
-      | Prompt -> before := capture t s ~which:"before"
-      | Compact _ -> ());
+     note_thread t s (module L) a;
      let settings = settings input in
      let leftover = Queue.create () in
      let handoff =
        ref
          (Option.map
-            (handoff t s ~pending:(List.length input.prompts))
+            (Turn_timings.phase "handoff" (fun () ->
+               handoff t s ~pending:(List.length input.prompts)))
             ~f:(fun (h : Handoff.t) -> h.text))
      in
+     Option.iter before_checkpoint ~f:(fun p ->
+       before
+       := Turn_timings.phase "checkpoint_wait" (fun () -> Promise.await_exn p));
      let with_handoff (input : Adapter.Input.t) =
        match !handoff with
        | None -> input
@@ -743,15 +828,29 @@ and run_turn'
      let rec turn ~first messages =
        Composer_recorder.waiting recorder;
        let result =
-         match input.kind with
-         | Compact { instructions } when first ->
-           L.compact a settings ~instructions
-         | Compact _ | Prompt ->
-           L.send a settings (with_handoff (input_of messages))
+         Turn_timings.phase "send" (fun () ->
+           match input.kind with
+           | Compact { instructions } when first ->
+             L.compact a settings ~instructions
+           | Compact _ | Prompt ->
+             L.send a settings (with_handoff (input_of messages)))
        in
        match result with
        | Error e -> fail (Error.to_string_hum e)
        | Ok () ->
+         let sent_at = Time_float.now () in
+         let output () =
+           if not !reported
+           then (
+             Option.iter timings ~f:(fun timings ->
+               Turn_timings.record
+                 timings
+                 "first_output"
+                 ~seconds:
+                   (Time_float.Span.to_sec
+                      (Time_float.diff (Time_float.now ()) sent_at)));
+             report ())
+         in
          sent := true;
          cost_total := Some (fun () -> L.cost_total a);
          let requests = String.Table.create () in
@@ -773,7 +872,16 @@ and run_turn'
              Hashtbl.remove requests request_id)
          in
          let rec events ~sw =
-           match L.next_event a with
+           let event = L.next_event a in
+           (match event with
+            | Notice _
+            | Usage _
+            | Turn_started _
+            | Thread_started _
+            | Retrying _
+            | Request_withdrawn _ -> ()
+            | _ -> output ());
+           match event with
            | Turn_end { stop = st; turn_id } as e ->
              Composer_recorder.feed recorder e;
              Option.iter turn_id ~f:(fun id ->
@@ -1108,7 +1216,10 @@ let runner t =
     ~close:(fun () -> close t)
     ~rewind:(rewind t)
     ~limits:(fun () -> limits t)
+    ~prewarm:(prewarm t)
     ~live:(fun () ->
+      Option.is_some t.warming
+      ||
       match t.live with
       | Some (Live ((module L), a)) -> L.alive a
       | None -> false)

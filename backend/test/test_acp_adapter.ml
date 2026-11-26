@@ -156,6 +156,9 @@ module P = struct
   ;;
 end
 
+(* Durations vary from run to run. *)
+let seconds_re = Re.compile (Re.Perl.re {|[0-9]+\.[0-9] s|})
+let mask_seconds s = Re.replace_string seconds_re ~by:"_ s" s
 let opencode : Acp_agent.t = Option.value_exn (Acp_agent.find_known "opencode")
 
 let print_event (e : Agent.Event.t) =
@@ -173,7 +176,7 @@ let print_event (e : Agent.Event.t) =
       call.name
       (if result.is_error then "ERROR " else "")
       result.text
-  | Notice n -> printf "notice: %s\n" n
+  | Notice n -> printf "notice: %s\n" (mask_seconds n)
   | _ -> ()
 ;;
 
@@ -182,6 +185,7 @@ let with_acp
       ?(approval : Approval_mode.t option)
       ?(on_launch = ignore)
       ?start
+      ?slow_start
       ~peer
       f
   =
@@ -209,6 +213,7 @@ let with_acp
         on_launch launch;
         Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
       ?start
+      ?slow_start
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
       ()
   in
@@ -1186,4 +1191,100 @@ let%expect_test "Antigravity: no token for agy, so its own login, saying so" =
     agent got session/prompt "hi"
     assistant (acp:antigravity/default, End_turn): "ok"
     |}]
+;;
+
+let%expect_test
+    "two turns: one process, one session/new, nothing replayed; where the time \
+     went"
+  =
+  with_acp ~slow_start:Time_float.Span.zero ~peer:(fun _ p ->
+    P.initialize
+      ~caps:{|{"loadSession":true,"sessionCapabilities":{"resume":{}}}|}
+      p;
+    P.new_session p "ses_1";
+    List.iter [ "One."; "Two." ] ~f:(fun reply ->
+      let prompt = P.expect p "session/prompt" in
+      P.text p "ses_1" reply;
+      P.result p prompt {|{"stopReason":"end_turn"}|}))
+  @@ fun agent _ ->
+  prompt agent "first";
+  prompt agent "second";
+  [%expect
+    {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "first"
+    notice: OpenCode took _ s to start answering: mcp_refresh _ s, login _ s, process _ s (launch _ s, spawn _ s, handshake _ s (initialize _ s, session/new _ s)), handoff _ s, send _ s, first_output _ s
+    assistant (acp:opencode/default, End_turn): "One."
+    agent got session/prompt "second"
+    notice: OpenCode took _ s to start answering: mcp_refresh _ s, login _ s, handoff _ s, send _ s, first_output _ s
+    assistant (acp:opencode/default, End_turn): "Two."
+    |}]
+;;
+
+let%expect_test
+    "a session opened on an ACP agent starts it before the first message"
+  =
+  let opened, open_ = Eio.Promise.create () in
+  with_acp ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    Eio.Promise.resolve open_ ();
+    let prompt = P.expect p "session/prompt" in
+    P.text p "ses_1" "Warm.";
+    P.result p prompt {|{"stopReason":"end_turn"}|};
+    let prompt = P.expect p "session/prompt" in
+    P.text p "ses_1" "Still warm.";
+    P.result p prompt {|{"stopReason":"end_turn"}|})
+  @@ fun agent _ ->
+  Agent.prewarm agent;
+  (* again while it starts: nothing more *)
+  Agent.prewarm agent;
+  print_s [%message (Agent.external_live agent : bool)];
+  Eio.Promise.await opened;
+  print_endline "the user sends a message";
+  prompt agent "go";
+  Agent.prewarm agent;
+  prompt agent "again";
+  [%expect
+    {|
+    spawn #1: opencode acp
+    ("Agent.external_live agent" true)
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    the user sends a message
+    agent got session/prompt "go"
+    assistant (acp:opencode/default, End_turn): "Warm."
+    agent got session/prompt "again"
+    assistant (acp:opencode/default, End_turn): "Still warm."
+    |}]
+;;
+
+let%expect_test "start timings, as the notice says them" =
+  let phase ?(alongside = false) ?(children = []) name seconds =
+    { Turn_timings.Phase.name; seconds; alongside; children }
+  in
+  print_endline
+    (Turn_timings.notice
+       ~harness:"Antigravity"
+       ~total:5.04
+       [ phase "login" 0.01
+       ; phase
+           "process"
+           3.2
+           ~children:
+             [ phase "spawn" 0.4
+             ; phase
+                 "handshake"
+                 2.8
+                 ~children:
+                   [ phase "initialize" 0.1; phase "session/resume" 2.7 ]
+             ]
+       ; phase "send" 0.
+       ; phase "first_output" 1.8
+       ; phase "checkpoint" 0.6 ~alongside:true
+       ]);
+  [%expect
+    {| Antigravity took 5.0 s to start answering: login 0.0 s, process 3.2 s (spawn 0.4 s, handshake 2.8 s (initialize 0.1 s, session/resume 2.7 s)), send 0.0 s, first_output 1.8 s, checkpoint 0.6 s (alongside) |}]
 ;;

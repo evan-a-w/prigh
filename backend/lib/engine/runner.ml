@@ -11,6 +11,7 @@ type t =
       ; rewind : Session.t -> to_:string -> unit Or_error.t
       ; limits : unit -> Subscription_usage.Status.t option
       ; live : unit -> bool
+      ; prewarm : Engine_intf.Services.t -> Engine_intf.Turn.Input.t -> unit
       }
       -> t
 
@@ -19,10 +20,11 @@ let create
       ?(rewind = fun _ ~to_:_ -> Ok ())
       ?(limits = fun () -> None)
       ?(live = fun () -> false)
+      ?(prewarm = fun _ _ -> ())
       runner
       value
   =
-  T { runner; value; close; rewind; limits; live }
+  T { runner; value; close; rewind; limits; live; prewarm }
 ;;
 
 let close (T { close; _ }) = close ()
@@ -38,3 +40,4 @@ let models (T { runner = (module R); value; _ }) = R.models value
 let context (T { runner = (module R); value; _ }) = R.context value
 let limits (T { limits; _ }) = limits ()
 let live (T { live; _ }) = live ()
+let prewarm (T { prewarm; _ }) services input = prewarm services input

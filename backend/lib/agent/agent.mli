@@ -326,8 +326,14 @@ val external_models : t -> Model.t list option
     used ([None] for the harness engine, or before it said). *)
 val external_limits : t -> Subscription_usage.Status.t option
 
-(** Whether the external harness's process is up for the session. *)
+(** Whether the external harness's process is up (or starting) for the
+    session. *)
 val external_live : t -> bool
+
+(** Starts the external harness's process in the background, when the
+    session runs on one, is idle and its tool host is connected: its first
+    message then does not wait for it. *)
+val prewarm : t -> unit
 
 (** Stops the external harness's process, if one runs: a later run starts
     it again. *)

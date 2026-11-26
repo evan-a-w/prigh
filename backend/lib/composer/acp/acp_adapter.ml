@@ -313,15 +313,16 @@ let create
                Acp_agent.start_hint agent ~stderr:exit.stderr_tail))
       in
       let%bind init =
-        Adapter.Driver.request
-          driver
-          (Codec.initialize
-             codec
-             ~client_name:"prigh"
-             ~client_version:Version.to_string)
-          ~matches:(function
-          | Initialized _ | Failed { kind = Initialize; _ } -> true
-          | _ -> false)
+        Turn_timings.phase "initialize" (fun () ->
+          Adapter.Driver.request
+            driver
+            (Codec.initialize
+               codec
+               ~client_name:"prigh"
+               ~client_version:Version.to_string)
+            ~matches:(function
+            | Initialized _ | Failed { kind = Initialize; _ } -> true
+            | _ -> false))
         |> starting
       in
       let%bind auth_methods =
@@ -354,33 +355,40 @@ let create
         Option.value_map caps ~default:false ~f:(fun c -> c.resume_session)
       in
       let fresh () =
-        Adapter.Driver.request
-          driver
-          (Codec.new_session codec ~cwd:start.cwd ~mcp_servers)
-          ~matches:(function
-          | Session_opened { kind = New_session; _ }
-          | Failed { kind = New_session; _ } -> true
-          | _ -> false)
+        Turn_timings.phase "session/new" (fun () ->
+          Adapter.Driver.request
+            driver
+            (Codec.new_session codec ~cwd:start.cwd ~mcp_servers)
+            ~matches:(function
+            | Session_opened { kind = New_session; _ }
+            | Failed { kind = New_session; _ } -> true
+            | _ -> false))
       in
       let%bind opened =
         (match start.resume with
          | Some session_id when (not start.fork) && can_resume ->
-           Adapter.Driver.request
-             driver
-             (Codec.resume_session
-                codec
-                ~session_id
-                ~cwd:start.cwd
-                ~mcp_servers)
-             ~matches:(function
-             | Session_opened { kind = Resume_session; _ }
-             | Failed { kind = Resume_session; _ } -> true
-             | _ -> false)
+           Turn_timings.phase "session/resume" (fun () ->
+             Adapter.Driver.request
+               driver
+               (Codec.resume_session
+                  codec
+                  ~session_id
+                  ~cwd:start.cwd
+                  ~mcp_servers)
+               ~matches:(function
+               | Session_opened { kind = Resume_session; _ }
+               | Failed { kind = Resume_session; _ } -> true
+               | _ -> false))
          | Some session_id when (not start.fork) && can_load ->
-           load
-             t
-             (Codec.load_session codec ~session_id ~cwd:start.cwd ~mcp_servers)
-             ~session_id
+           Turn_timings.phase "session/load" (fun () ->
+             load
+               t
+               (Codec.load_session
+                  codec
+                  ~session_id
+                  ~cwd:start.cwd
+                  ~mcp_servers)
+               ~session_id)
          | Some _ ->
            Adapter.Driver.push
              driver
@@ -435,9 +443,10 @@ let create
       | Error _ as e -> e
       | Ok line ->
         let%bind.Or_error r =
-          Adapter.Driver.request t.driver line ~matches:(function
-            | Mode_set _ | Failed { kind = Set_mode; _ } -> true
-            | _ -> false)
+          Turn_timings.phase "session/set_mode" (fun () ->
+            Adapter.Driver.request t.driver line ~matches:(function
+              | Mode_set _ | Failed { kind = Set_mode; _ } -> true
+              | _ -> false))
         in
         refused "the mode" r
     ;;
@@ -484,9 +493,10 @@ let create
         | Error _ as e -> e
         | Ok line ->
           let%bind r =
-            Adapter.Driver.request t.driver line ~matches:(function
-              | Config_set _ | Failed { kind = Set_config_option; _ } -> true
-              | _ -> false)
+            Turn_timings.phase "session/set_config_option" (fun () ->
+              Adapter.Driver.request t.driver line ~matches:(function
+                | Config_set _ | Failed { kind = Set_config_option; _ } -> true
+                | _ -> false))
           in
           refused what r
       in

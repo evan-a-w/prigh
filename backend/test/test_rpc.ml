@@ -941,19 +941,17 @@ let%expect_test "trace: the session's summary, and its Perfetto export" =
   trace "{}";
   [%expect
     {|
-    1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)
     For a timeline (Perfetto): prigh trace <id> -perfetto trace.json
     level: "default"
-    spans: 12
+    spans: 13
     |}];
   trace {|{"perfetto": true}|};
   [%expect
     {|
-    1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)
     For a timeline (Perfetto): prigh trace <id> -perfetto trace.json
     level: "default"
-    spans: 12
-    perfetto: prompt turn model_request connect first_token stream tool turn model_request connect first_token stream
+    spans: 13
+    perfetto: prompt mcp_refresh turn model_request connect first_token stream tool turn model_request connect first_token stream
     |}];
   trace {|{"perfetto": 1}|};
   [%expect

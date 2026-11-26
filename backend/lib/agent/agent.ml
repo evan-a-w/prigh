@@ -3712,6 +3712,55 @@ let name_subagent t ~task ~siblings ~cancel =
   |> Result.ok
 ;;
 
+let run_tools t =
+  (tools t @ reply_tools t)
+  @
+  (* An external harness is told of [goal_complete] at its start: it has it
+     always, and it refuses when no goal is active. *)
+  if own_loop t then [] else [ Tool_goal.create ~complete:(complete_goal t) ]
+;;
+
+let turn_input t ~context ~prompts ~kind : Engine_intf.Turn.Input.t =
+  { context
+  ; prompts
+  ; chat = t.chat_mode
+  ; thinking = t.thinking
+  ; approval = t.approval_mode
+  ; plan = t.plan_mode
+  ; model = External_model.native_id t.model
+  ; kind
+  }
+;;
+
+(* An external harness's process, started when the session is opened so
+   that its first message does not wait for it: what it needs of a run's
+   services is where it works and the tools it is offered. *)
+let prewarm t =
+  match t.runner, t.unavailable with
+  | Some runner, None
+    when (not (is_running t)) && (not (own_loop t)) && active_host_connected t
+    ->
+    Runner.prewarm
+      runner
+      { env = t.env
+      ; cwd = t.cwd
+      ; session = t.session
+      ; emit = ignore
+      ; notice = (fun n -> broadcast t (Notice n))
+      ; approve = approve t
+      ; ask_user = ask_user t ~cancel:Cancellation.never
+      ; ui = ui_host t ~cancel:Cancellation.never
+      ; tools = run_tools t
+      ; execute = executor t
+      ; background = t.background
+      ; steer = (fun () -> [])
+      ; halt = (fun () -> None)
+      ; add_spend = (fun ~usage:_ ~cost_usd:_ -> ())
+      }
+      (turn_input t ~context:[] ~prompts:[] ~kind:Prompt)
+  | _ -> ()
+;;
+
 (* No run starts on a session this backend cannot run (its engine is not
    deployed here): neither the user's nor mail, resumes, goals or
    background reports, which would otherwise run the harness in its place. *)
@@ -3743,6 +3792,8 @@ and run_now ~kind ~tried ~then_ t prompts =
     (fun () ->
        Trace.run t.tracer
        @@ fun () ->
+       Turn_timings.with_ (Turn_timings.create ())
+       @@ fun () ->
        let prompt_span =
          Trace.start
            ~root:true
@@ -3762,7 +3813,10 @@ and run_now ~kind ~tried ~then_ t prompts =
          Promise.resolve resolve ();
          if idle then state_changed t
        in
-       if not t.chat_mode then refresh_mcp_for_run t ~cancel;
+       if not t.chat_mode
+       then
+         Turn_timings.phase "mcp_refresh" (fun () ->
+           refresh_mcp_for_run t ~cancel);
        let halted = ref None in
        (* The prompts are in the session (and its file made) before the
           system prompt is built: that asks the tool host, which may take
@@ -3782,14 +3836,7 @@ and run_now ~kind ~tried ~then_ t prompts =
          ; approve = approve t
          ; ask_user = ask_user t ~cancel
          ; ui = ui_host t ~cancel
-         ; tools =
-             ((tools t @ reply_tools t)
-              @
-              (* An external harness is told of [goal_complete] at its start:
-                it has it always, and it refuses when no goal is active. *)
-              if own_loop t
-              then []
-              else [ Tool_goal.create ~complete:(complete_goal t) ])
+         ; tools = run_tools t
          ; execute = executor t
          ; background = t.background
          ; steer =
@@ -3868,15 +3915,7 @@ and run_now ~kind ~tried ~then_ t prompts =
              (runner t)
              services
              ~cancel
-             { context
-             ; prompts
-             ; chat = t.chat_mode
-             ; thinking = t.thinking
-             ; approval = t.approval_mode
-             ; plan = t.plan_mode
-             ; model = External_model.native_id t.model
-             ; kind
-             }
+             (turn_input t ~context ~prompts ~kind)
          with
          | added -> added
          | exception exn ->
