@@ -148,7 +148,9 @@ let numbered n =
     (List.map (List.range 1 (n + 1)) ~f:(sprintf "test %04d ... ok\n"))
 ;;
 
-let call id = Content.Tool_call { id; name = "bash"; arguments = "{}" }
+let call id =
+  Content.Tool_call { id; name = "bash"; arguments = "{}"; extra = None }
+;;
 
 let assistant ?(calls = []) text =
   Message.Assistant

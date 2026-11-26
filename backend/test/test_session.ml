@@ -612,6 +612,7 @@ let%expect_test "markdown export renders user, assistant, tool and result" =
                  { Content.Tool_call.id = "c1"
                  ; name = "bash"
                  ; arguments = {|{"command":"ls -la"}|}
+                 ; extra = None
                  }
              ]
          ; stop_reason = Tool_use

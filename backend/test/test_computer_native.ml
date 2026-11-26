@@ -381,7 +381,8 @@ let computer_turn ~args =
   ; Assistant
       { content =
           [ Content.thinking ~signature:"SIG" "plan"
-          ; Tool_call { id = "t1"; name = "computer"; arguments = args }
+          ; Tool_call
+              { id = "t1"; name = "computer"; arguments = args; extra = None }
           ]
       ; model = "anthropic/claude-opus-5-5"
       ; usage = Usage.zero

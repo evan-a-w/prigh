@@ -61,8 +61,17 @@ let conversation =
           ; Text ""
           ; Text "Listing."
           ; Tool_call
-              { id = "toolu_1"; name = "bash"; arguments = {|{"cmd":"ls"}|} }
-          ; Tool_call { id = "toolu_2"; name = "subagent"; arguments = "" }
+              { id = "toolu_1"
+              ; name = "bash"
+              ; arguments = {|{"cmd":"ls"}|}
+              ; extra = None
+              }
+          ; Tool_call
+              { id = "toolu_2"
+              ; name = "subagent"
+              ; arguments = ""
+              ; extra = None
+              }
           ]
       ; stop_reason = Tool_use
       ; usage = Usage.zero

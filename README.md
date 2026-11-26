@@ -427,7 +427,10 @@ lists the server's models. The models appear as `<name>/<model id>`
 ```
 
 `api` is `chat` (the default), `responses` or `anthropic`. `cost` is in
-dollars per million tokens.
+dollars per million tokens. Gemini works through its chat endpoint
+(`https://generativelanguage.googleapis.com/v1beta/openai`): prigh sends
+each tool call's thought signature back, and the documented placeholder
+for tool calls Gemini did not write (another model's history).
 
 ## Configuration
 

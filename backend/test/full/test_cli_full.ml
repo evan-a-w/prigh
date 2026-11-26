@@ -90,6 +90,7 @@ let%expect_test "compaction-eval: a developer's tool, left out of the help" =
                    { id
                    ; name = "read"
                    ; arguments = sprintf {|{"path":"f%d.ml"}|} i
+                   ; extra = None
                    }
                ]
            ; stop_reason = Tool_use

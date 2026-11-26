@@ -2,10 +2,14 @@ open! Core
 open! Import
 
 module Tool_call = struct
+  (* [extra] is provider-opaque JSON sent back with the call to the provider
+     that wrote it (OpenAI-compatible [extra_content]: Gemini's thought
+     signatures). *)
   type t =
     { id : string
     ; name : string
     ; arguments : string
+    ; extra : string option [@sexp.option] [@jsonaf.option]
     }
   [@@deriving sexp, jsonaf, equal]
 

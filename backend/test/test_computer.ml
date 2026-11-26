@@ -587,6 +587,7 @@ let%expect_test "pruning keeps every request's prefix until the next cut" =
                       (if wait
                        then `Object [ "duration", `Number "1" ]
                        else `Object [])
+                ; extra = None
                 }
             ]
         ; stop_reason = Tool_use

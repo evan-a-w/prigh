@@ -30,7 +30,11 @@ let%expect_test
             [ Content.thinking "I should list."
             ; Text "Listing."
             ; Tool_call
-                { id = "call_1"; name = "bash"; arguments = "{\"cmd\":\"ls\"}" }
+                { id = "call_1"
+                ; name = "bash"
+                ; arguments = "{\"cmd\":\"ls\"}"
+                ; extra = None
+                }
             ]
         ; stop_reason = Tool_use
         ; usage = Usage.zero
