@@ -149,7 +149,7 @@ let%expect_test
     (Chat_harness.apply
        chat
        (message_end
-          ~usage:{|{"input":1200,"output":345,"cache_read":56000}|}
+          ~usage:{|{"input":57200,"output":345,"cache_read":56000}|}
           [ thinking "Let me look.\nFirst the **files**."
           ; text "Here **is the `plan`**."
           ]));

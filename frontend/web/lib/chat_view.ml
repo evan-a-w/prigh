@@ -384,7 +384,7 @@ let footer ~names times (message : Message.Assistant.t) =
     | End_turn when message.usage.output > 0 ->
       let { Usage.input; output; cache_read } = message.usage in
       [ Option.value (Map.find names message.model) ~default:message.model
-      ; tokens (input + cache_read) ^ " in"
+      ; tokens input ^ " in"
       ]
       @ (if cache_read > 0 then [ tokens cache_read ^ " cached" ] else [])
       @ [ tokens output ^ " out" ]
