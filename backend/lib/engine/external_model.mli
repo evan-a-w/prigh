@@ -18,7 +18,9 @@ val is_external : string -> bool
 val default_id : string
 
 (** A model of [adapter]'s, as the session's [Model.t]: free, with the
-    context window and thinking levels the harness gave (when it did). *)
+    context window and thinking levels the harness gave (when it did). Without
+    a window, its family's ({!known_window}); else, for Codex and Claude Code,
+    200k, and for an ACP agent 0: unknown. *)
 val model
   :  adapter:string
   -> ?name:string
@@ -28,6 +30,10 @@ val model
   -> ?images:bool
   -> string
   -> Model.t
+
+(** The context window of a model family known by a word of [id] or [name]
+    (Gemini, Claude, GPT-OSS). *)
+val known_window : id:string -> name:string option -> int option
 
 (** [adapter]'s default model ({!default_id}). *)
 val default : adapter:string -> Model.t

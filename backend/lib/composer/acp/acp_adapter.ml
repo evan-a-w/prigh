@@ -4,6 +4,7 @@ module Codec = Acp_client_codec
 
 let capabilities_of
       ?(quirks = Acp_agent.Quirks.none)
+      ?(compact_command = false)
       (caps : Codec.Agent_capabilities.t option)
       (config : Codec.Session_config.t)
   : Capabilities.t
@@ -11,7 +12,7 @@ let capabilities_of
   { fork = By_handoff
   ; rewind = Unsupported
   ; context_edit = false
-  ; compact = Unsupported
+  ; compact = (if compact_command then Command else Summary)
   ; steer =
       (match quirks.steer with
        | Between_turns -> Between_turns
@@ -42,6 +43,9 @@ type t =
   ; mutable plan : bool option
     (* prigh's plan mode as last applied: the agent may leave plan mode
        itself (Grok, its plan approved) and is not put back *)
+  ; mutable commands : Codec.Command.t list (* its slash commands *)
+  ; mutable compacting : bool (* a turn running its compact command *)
+  ; mutable held : Adapter_event.t option (* the next event, held back *)
   }
 
 let mcp_server (name, json) : Codec.Mcp_server.t option =
@@ -73,7 +77,18 @@ let dispatch t (output : Codec.Output.t) =
   | Event e -> Adapter.Driver.push t.driver e
   | Send line -> Adapter.Driver.write t.driver line
   | Response r -> Adapter.Driver.answer t.driver r
-  | Config_changed _ | Commands _ | Title _ -> ()
+  | Commands commands -> t.commands <- commands
+  | Config_changed _ | Title _ -> ()
+;;
+
+(* The agent's own command for compacting its context, when it has one
+   (Antigravity's [/compact]). *)
+let compact_command t =
+  List.find t.commands ~f:(fun (c : Codec.Command.t) ->
+    List.mem
+      [ "compact"; "compress" ]
+      (String.lowercase (String.chop_prefix_if_exists c.name ~prefix:"/"))
+      ~equal:String.equal)
 ;;
 
 (* The agent's [thought_level] option, as prigh's thinking levels. *)
@@ -167,6 +182,7 @@ let create
     let current_capabilities t =
       capabilities_of
         ~quirks:agent.quirks
+        ~compact_command:(Option.is_some (compact_command t))
         (Codec.agent_capabilities t.codec)
         (Codec.session_config t.codec)
     ;;
@@ -289,6 +305,9 @@ let create
         ; plan = None
         ; login = None
         ; refused = false
+        ; commands = []
+        ; compacting = false
+        ; held = None
         }
       in
       Adapter.Driver.run
@@ -421,7 +440,7 @@ let create
       t
     ;;
 
-    let next_event t : Adapter_event.t =
+    let next_event' t : Adapter_event.t =
       match Adapter.Driver.next_event t.driver, t.login with
       | ( Turn_end { turn_id; stop = Failed { kind = Auth_required _; message } }
         , Some login ) ->
@@ -437,6 +456,25 @@ let create
                 }
           }
       | event, _ -> event
+    ;;
+
+    (* A turn of its compact command that ends well compacted the context:
+       said before its end. *)
+    let next_event t : Adapter_event.t =
+      match t.held with
+      | Some event ->
+        t.held <- None;
+        event
+      | None ->
+        (match next_event' t with
+         | Turn_end { stop = Done; _ } as event when t.compacting ->
+           t.compacting <- false;
+           t.held <- Some event;
+           Compacted { tokens_before = None; tokens_after = None }
+         | Turn_end _ as event ->
+           t.compacting <- false;
+           event
+         | event -> event)
     ;;
 
     let set_mode t mode_id =
@@ -597,8 +635,16 @@ let create
       { Adapter.Catalog.models; limits = None }
     ;;
 
-    let compact _ _ ~instructions:_ =
-      Or_error.errorf "%s does not compact on request" display_name
+    (* Its compact command, as a prompt. Not with [instructions]: Antigravity
+       answers a message after its [/compact] as a prompt. *)
+    let compact t settings ~instructions:_ =
+      match compact_command t with
+      | None ->
+        Or_error.errorf "%s has no command to compact its context" display_name
+      | Some command ->
+        let text = "/" ^ String.chop_prefix_if_exists command.name ~prefix:"/" in
+        let%map.Or_error () = send t settings { text; images = [] } in
+        t.compacting <- true
     ;;
 
     let steer t (input : Adapter.Input.t) =

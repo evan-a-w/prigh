@@ -40,6 +40,7 @@ type t =
   ; mutable run_cancel : Cancellation.t (* the run [cancel] is part of *)
   ; mutable models : Model.t list (* the harness's, as it last said *)
   ; mutable context : int option * int option
+  ; mutable known : Capabilities.t option (* the last process's *)
   ; catalog : unit -> Adapter.Catalog.t option
   ; on_change : unit -> unit
   ; mutable warming : unit Promise.t option (* a [prewarm] starting *)
@@ -95,6 +96,7 @@ let create
   ; run_cancel = Cancellation.never
   ; models = []
   ; context = None, None
+  ; known = None
   ; catalog
   ; on_change
   ; warming = None
@@ -106,7 +108,9 @@ let thread_id t = t.thread_id
 
 let close t =
   t.epoch <- t.epoch + 1;
-  Option.iter t.live ~f:(fun (Live ((module A), a)) -> A.stop a);
+  Option.iter t.live ~f:(fun (Live ((module A), a)) ->
+    t.known <- Some (A.current_capabilities a);
+    A.stop a);
   t.live <- None
 ;;
 
@@ -260,6 +264,25 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        Error (`Start e))
 ;;
 
+(* Whether the session was compacted (prigh summarised it: a [Compaction]
+   entry) since [thread]'s last run: the thread holds the context the summary
+   replaced, so a new one is started, handed the compacted session. *)
+let compacted_since session ~thread =
+  match
+    List.last
+      (List.filter (Session.external_turns session) ~f:(fun turn ->
+         String.equal turn.thread_id thread))
+  with
+  | None -> false
+  | Some last ->
+    List.drop_while (Session.active_path session) ~f:(fun e ->
+      not (String.equal e.id last.through))
+    |> List.exists ~f:(fun (e : Session.Entry.t) ->
+      match e.payload with
+      | Compaction _ -> true
+      | _ -> false)
+;;
+
 (* How to continue [resume] after the session was rewound past some of its
    runs on it (they are off the active path): as it is ([`Whole]), rolled
    back to the end of its last run still on the path, or not at all (a new
@@ -391,7 +414,14 @@ let live_now
     @@ fun () ->
     let epoch = t.epoch in
     let (module A) = t.adapter in
-    let resume = Option.first_some t.thread_id base.resume in
+    let resume =
+      match Option.first_some t.thread_id base.resume with
+      | Some thread when compacted_since s.session ~thread ->
+        t.thread_id <- None;
+        t.fresh <- true;
+        None
+      | resume -> resume
+    in
     let fork = base.fork && Option.is_none t.thread_id in
     let resume, at, revert =
       if fork
@@ -1022,10 +1052,23 @@ and run_turn'
       | [] -> ()
       | models -> t.models <- models)
    | None -> ());
+  (* How full its context is: as it says; else the session's estimate, or
+     the input its turn reported when less (Antigravity's sums the turn's
+     requests). After a compaction, only as it says. *)
   (let tokens, window = Composer_recorder.context recorder in
-   let old_tokens, old_window = t.context in
-   t.context
-   <- Option.first_some tokens old_tokens, Option.first_some window old_window);
+   let old_window = snd t.context in
+   let tokens =
+     match input.kind with
+     | Compact _ -> tokens
+     | Prompt ->
+       Option.first_some
+         tokens
+         (let estimate = Message.estimate_tokens (Session.messages s.session) in
+          match Composer_recorder.last_input recorder with
+          | Some input -> Some (Int.min input estimate)
+          | None -> Some estimate)
+   in
+   t.context <- tokens, Option.first_some window old_window);
   let cost = Composer_recorder.cost_usd recorder in
   if Float.( > ) cost 0. then s.add_spend ~usage:Usage.zero ~cost_usd:cost;
   t.services <- None;
@@ -1174,7 +1217,7 @@ module R = struct
        | Some (Live ((module L), a)) -> L.current_capabilities a
        | None ->
          let (module A : Adapter.S) = t.adapter in
-         A.capabilities)
+         Option.value t.known ~default:A.capabilities)
   ;;
 
   let models t =
@@ -1211,9 +1254,17 @@ let limits t =
   | None -> Option.bind (t.catalog ()) ~f:(fun c -> c.limits)
 ;;
 
+(* prigh compacted the session ([compacted_since]): the process stops, and
+   the next turn starts a new thread, its context not yet known. *)
+let compacted t =
+  close t;
+  t.context <- None, snd t.context
+;;
+
 let runner t =
   Runner.create
     ~close:(fun () -> close t)
+    ~compacted:(fun () -> compacted t)
     ~rewind:(rewind t)
     ~limits:(fun () -> limits t)
     ~prewarm:(prewarm t)

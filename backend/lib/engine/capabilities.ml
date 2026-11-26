@@ -14,6 +14,8 @@ module Compact = struct
     | Unsupported
     | Native
     | Auto_only
+    | Command
+    | Summary
   [@@deriving sexp_of, equal]
 end
 
@@ -98,7 +100,10 @@ let supports t (feature : Feature.t) =
   | Fork -> not (History_op.equal t.fork Unsupported)
   | Rewind -> not (History_op.equal t.rewind Unsupported)
   | Context_edit | Downsize_images -> t.context_edit
-  | Compact -> Compact.equal t.compact Native
+  | Compact ->
+    (match t.compact with
+     | Native | Command | Summary -> true
+     | Unsupported | Auto_only -> false)
   | Btw -> t.btw
   | Steer_subagent -> Subagents.equal t.subagents Full
   | Plan_mode -> t.plan_mode
@@ -157,7 +162,7 @@ let refusal t (feature : Feature.t) ~who =
          "%s compacts its context by itself when it fills: /compact isn't \
           available"
          who
-     | Native | Unsupported ->
+     | Native | Command | Summary | Unsupported ->
        sprintf
          "%s sessions can't be compacted: start a new session (/new) for a \
           fresh context"

@@ -103,10 +103,13 @@ let card (m : App.Model.t) (state : State.t) ~inject =
         [ span ~cls:"context-card-title text-[12.5px] font-semibold" "Context"
         ; span
             ~cls:"context-card-of font-mono text-xs"
-            (sprintf
-               "%s / %s"
-               (tokens state.context_tokens)
-               (tokens state.model.context_window))
+            (if state.model.context_window > 0
+             then
+               sprintf
+                 "%s / %s"
+                 (tokens state.context_tokens)
+                 (tokens state.model.context_window)
+             else tokens state.context_tokens)
         ]
     ; (match percent with
        | Some p ->
@@ -156,7 +159,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
                     (Float.iround_nearest_exn
                        (at /. 100. *. Float.of_int state.model.context_window)))
                  at
-             | None -> sprintf "Compacts at %.0f%%" at)
+             | None -> "Window unknown: no automatic compaction")
         ]
     ; div ~cls:"context-card-rule col-span-full border-t border-border" []
     ; (match Prigh_ui.Loop_status.budget_part state with

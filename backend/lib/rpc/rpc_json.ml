@@ -500,7 +500,8 @@ let capabilities (c : Capabilities.t) =
           (match c.compact with
            | Unsupported -> "unsupported"
            | Native -> "native"
-           | Auto_only -> "auto_only") )
+           | Auto_only -> "auto_only"
+           | Command | Summary -> "native") )
     ; ( "steer"
       , str
           (match c.steer with

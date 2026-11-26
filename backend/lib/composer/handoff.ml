@@ -76,7 +76,10 @@ let render index (message : Message.t) =
   in
   match Session.summary_of_message message with
   | Some summary ->
-    item "summary of earlier messages" [ cap summary ~cap:text_cap ~index ]
+    (* Verbatim, but for a summary near the whole budget. *)
+    item
+      "summary of earlier messages"
+      [ cap summary ~cap:(default_budget * 3) ~index ]
   | None ->
     (match message with
      | User u ->

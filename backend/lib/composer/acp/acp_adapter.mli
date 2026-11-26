@@ -22,11 +22,13 @@ val create
   -> Acp_agent.t
   -> Adapter.t
 
-(** What an ACP agent can do, from what it advertises: no rewind, context
-    edits or compaction on request; plan mode when it has a [plan] mode;
-    images when it takes them. *)
+(** What an ACP agent can do, from what it advertises: no rewind or context
+    edits; compaction through its compact command ([compact_command]: it
+    lists [/compact] or [/compress]), else by prigh's summary; plan mode when
+    it has a [plan] mode; images when it takes them. *)
 val capabilities_of
   :  ?quirks:Acp_agent.Quirks.t (** steering mid-turn, for an agent that can *)
+  -> ?compact_command:bool
   -> Acp_client_codec.Agent_capabilities.t option
   -> Acp_client_codec.Session_config.t
   -> Capabilities.t

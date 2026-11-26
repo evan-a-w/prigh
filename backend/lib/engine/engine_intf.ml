@@ -97,13 +97,16 @@ module type Runner_api = sig
       whether an external harness's process is up (or starting) for the
       session.
       [prewarm]: starts what a turn needs (an external harness's process)
-      before the first one, in the background. *)
+      before the first one, in the background. [compacted]: prigh compacted
+      the session (a summary replaced its older part): an external harness
+      drops its thread, whose context the summary replaced. *)
   val create
     :  ?close:(unit -> unit)
     -> ?rewind:(Session.t -> to_:string -> unit Or_error.t)
     -> ?limits:(unit -> Subscription_usage.Status.t option)
     -> ?live:(unit -> bool)
     -> ?prewarm:(Services.t -> Turn.Input.t -> unit)
+    -> ?compacted:(unit -> unit)
     -> (module S with type t = 'a)
     -> 'a
     -> t
@@ -127,6 +130,9 @@ module type Runner_api = sig
 
   (** See [create]: nothing for the harness. *)
   val prewarm : t -> Services.t -> Turn.Input.t -> unit
+
+  (** See [create]: nothing for the harness. *)
+  val compacted : t -> unit
 
   val run_turn
     :  t

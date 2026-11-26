@@ -2261,9 +2261,11 @@ let models_picker
         ~id:model.key
         ~detail:
           (sprintf
-             "%s, %s ctx%s"
+             "%s%s%s"
              model.provider
-             (compact_tokens model.context_window)
+             (if model.context_window > 0
+              then sprintf ", %s ctx" (compact_tokens model.context_window)
+              else "")
              (if usable model then "" else ", not logged in"))
         ~search:(model.name ^ " " ^ model.provider ^ " " ^ model.key)
         ~marked:(Option.equal String.equal current (Some model.key))
