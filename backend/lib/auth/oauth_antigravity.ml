@@ -44,20 +44,6 @@ module Client = struct
     | _ -> None
   ;;
 
-  let load ?(getenv = Sys.getenv) store =
-    match
-      ( getenv "PRIGH_ANTIGRAVITY_CLIENT_ID"
-      , getenv "PRIGH_ANTIGRAVITY_CLIENT_SECRET" )
-    with
-    | Some id, Some secret
-      when (not (String.is_empty id)) && not (String.is_empty secret) ->
-      Some { id; secret }
-    | _ ->
-      (match In_channel.read_all (file store) with
-       | exception _ -> None
-       | text -> Result.ok (Json.parse text) |> Option.bind ~f:of_json)
-  ;;
-
   let save store t =
     Or_error.try_with (fun () ->
       let path = file store in
@@ -73,6 +59,54 @@ module Client = struct
       Core_unix.rename ~src:tmp ~dst:path)
   ;;
 
+  let find_script =
+    sprintf
+      {|b=$(command -v agy 2>/dev/null) && b=$(readlink -f "$b")
+for f in "$b" "$(dirname "$b")/.agy-wrapped"; do
+  [ -f "$f" ] && grep -aoE '%s' "$f" 2>/dev/null | sort -u | sed 's/^/client /'
+done
+true|}
+      pattern
+  ;;
+
+  let of_lines lines =
+    of_candidates
+      (List.filter_map lines ~f:(String.chop_prefix ~prefix:"client "))
+  ;;
+
+  let discover_local () =
+    match
+      Core_unix.open_process_in
+        (sprintf "bash -c %s" (Filename.quote find_script))
+    with
+    | exception _ -> None
+    | ic ->
+      let lines = In_channel.input_lines ic in
+      ignore (Core_unix.close_process_in ic : Core_unix.Exit_or_signal.t);
+      of_lines lines
+  ;;
+
+  let load ?(getenv = Sys.getenv) store =
+    match
+      ( getenv "PRIGH_ANTIGRAVITY_CLIENT_ID"
+      , getenv "PRIGH_ANTIGRAVITY_CLIENT_SECRET" )
+    with
+    | Some id, Some secret
+      when (not (String.is_empty id)) && not (String.is_empty secret) ->
+      Some { id; secret }
+    | _ ->
+      (match
+         match In_channel.read_all (file store) with
+         | exception _ -> None
+         | text -> Result.ok (Json.parse text) |> Option.bind ~f:of_json
+       with
+       | Some t -> Some t
+       | None ->
+         let found = discover_local () in
+         Option.iter found ~f:(fun t -> ignore (save store t : unit Or_error.t));
+         found)
+  ;;
+
   let missing =
     "prigh does not know Antigravity's OAuth client yet: import a tool host's \
      login once (/adapters import antigravity, which reads it from that host's \
@@ -83,6 +117,7 @@ end
 
 let authorize_endpoint = "https://accounts.google.com/o/oauth2/auth"
 let token_url = "https://oauth2.googleapis.com/token"
+let agy_version = "1.5.13"
 let redirect_uri = "https://antigravity.google/oauth-callback"
 
 let scopes =

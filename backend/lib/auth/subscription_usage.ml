@@ -49,10 +49,13 @@ type t =
   }
 [@@deriving sexp_of, equal]
 
-let providers : Provider_id.t list = [ Anthropic; Openai_codex ]
+let providers : Provider_id.t list =
+  [ Anthropic; Openai_codex; Google_antigravity ]
+;;
 
 let name : Provider_id.t -> string = function
   | Anthropic -> "Claude"
+  | Google_antigravity -> "Antigravity"
   | p -> Provider_id.display_name p
 ;;
 
@@ -148,17 +151,16 @@ module Http = struct
   type t =
     url:string
     -> headers:(string * string) list
+    -> ?body:string
     -> unit
     -> (int * (string * string) list * string, string) Result.t
 
-  let real ~env ~url ~headers () =
+  let real ~env ~url ~headers ?body () =
+    let timeout = Time_ns.Span.of_int_sec 20 in
     match
-      Http_client.get
-        ~env
-        ~timeout:(Time_ns.Span.of_int_sec 20)
-        ~url
-        ~headers
-        ()
+      match body with
+      | None -> Http_client.get ~env ~timeout ~url ~headers ()
+      | Some body -> Http_client.post ~env ~timeout ~url ~headers ~body ()
     with
     | Ok (response, body) -> Ok (response.status, response.headers, body)
     | Error e -> Error (Http_client.Error.to_string e)
@@ -413,6 +415,68 @@ let parse_codex ~now body =
     Limits { plan = string_field json "plan_type"; windows = main @ additional }
 ;;
 
+let antigravity_plan load =
+  let tier key =
+    Option.bind (parse_json load |> Result.ok) ~f:(fun json -> field json key)
+  in
+  List.find_map [ "paidTier"; "currentTier" ] ~f:(fun key ->
+    Option.bind (tier key) ~f:(fun tier ->
+      match Option.map (string_field tier "id") ~f:String.lowercase with
+      | Some "free-tier" -> Some "Free"
+      | Some "standard-tier" -> Some "Standard"
+      | Some "g1-pro-tier" -> Some "Pro"
+      | Some "g1-ultra-tier" -> Some "Ultra"
+      | id -> Option.first_some (string_field tier "name") id))
+;;
+
+let antigravity_window_label = function
+  | "5h" -> "5-hour"
+  | "weekly" -> "Weekly"
+  | "daily" -> "Daily"
+  | w -> humanize w
+;;
+
+(* A group's buckets, labelled "5-hour · Gemini Models". *)
+let antigravity_windows group =
+  let group_name = string_field group "displayName" in
+  match field group "buckets" with
+  | Some (`Array buckets) ->
+    List.filter_map buckets ~f:(fun bucket ->
+      let open Option.Let_syntax in
+      let%bind remaining = number_field bucket "remainingFraction" in
+      let%map id =
+        Option.first_some
+          (string_field bucket "bucketId")
+          (string_field bucket "displayName")
+      in
+      let window =
+        match string_field bucket "window" with
+        | Some w -> antigravity_window_label w
+        | None -> Option.value (string_field bucket "displayName") ~default:id
+      in
+      { Window.id
+      ; label =
+          Option.value_map group_name ~default:window ~f:(fun g ->
+            window ^ " · " ^ g)
+      ; used_percent =
+          Float.clamp_exn ((1. -. remaining) *. 100.) ~min:0. ~max:100.
+      ; resets_at = Option.bind (field bucket "resetTime") ~f:time
+      })
+  | _ -> []
+;;
+
+let parse_antigravity ~load body =
+  match parse_json body with
+  | Error e -> Status.Failed ("Antigravity's quota answer: " ^ e)
+  | Ok json ->
+    let windows =
+      match field json "groups" with
+      | Some (`Array groups) -> List.concat_map groups ~f:antigravity_windows
+      | _ -> []
+    in
+    Limits { plan = antigravity_plan load; windows }
+;;
+
 let anthropic_origin = "https://api.anthropic.com"
 let codex_origin = "https://chatgpt.com"
 
@@ -483,6 +547,66 @@ let answer provider ~parse result =
             detail))
 ;;
 
+(* agy's [--cloud_code_endpoint]; with another User-Agent only the Claude
+   and GPT group is answered. *)
+let antigravity_origin = "https://daily-cloudcode-pa.googleapis.com"
+let antigravity_default_project = "default-cli-project"
+
+let antigravity_user_agent =
+  sprintf
+    "antigravity/cli/%s (prigh/%s; os_type=linux; arch=amd64; \
+     auth_method=consumer)"
+    Oauth_antigravity.agy_version
+    Version.to_string
+;;
+
+let antigravity ?getenv ~(http : Http.t) token =
+  let post path body =
+    http
+      ~url:(url ?getenv antigravity_origin ("/v1internal:" ^ path))
+      ~headers:
+        [ "Authorization", "Bearer " ^ token
+        ; "Content-Type", "application/json"
+        ; "Accept", "application/json"
+        ; "User-Agent", antigravity_user_agent
+        ]
+      ~body:(Json.to_string body)
+      ()
+  in
+  let loaded =
+    post
+      "loadCodeAssist"
+      (`Object
+          [ "cloudaicompanionProject", `String antigravity_default_project
+          ; ( "metadata"
+            , `Object
+                [ "ideType", `String "IDE_UNSPECIFIED"
+                ; "platform", `String "PLATFORM_UNSPECIFIED"
+                ; "pluginType", `String "GEMINI"
+                ; "duetProject", `String antigravity_default_project
+                ] )
+          ])
+  in
+  match loaded with
+  | Ok (200, _, load) ->
+    let project =
+      Option.bind
+        (parse_json load |> Result.ok)
+        ~f:(fun json -> string_field json "cloudaicompanionProject")
+      |> Option.value ~default:antigravity_default_project
+    in
+    (match
+       post "retrieveUserQuotaSummary" (`Object [ "project", `String project ])
+     with
+     | Ok (404, _, _) ->
+       Status.Failed
+         "Google does not give this login's quota summary (HTTP 404): agy's \
+          /usage, on a tool host, shows it"
+     | summary ->
+       answer Google_antigravity ~parse:(parse_antigravity ~load) summary)
+  | other -> answer Google_antigravity ~parse:(fun _ -> Not_signed_in) other
+;;
+
 let of_resolved ?getenv ~(http : Http.t) ~now provider resolved =
   let login = "/login " ^ Provider_id.to_string provider in
   match resolved with
@@ -531,7 +655,7 @@ let of_resolved ?getenv ~(http : Http.t) ~now provider resolved =
                  ; "User-Agent", "prigh/" ^ Version.to_string
                  ]
                ()))
-     | Google_antigravity -> Not_signed_in
+     | Google_antigravity -> antigravity ?getenv ~http resolved.token
      | Openai | Deepseek | Custom _ -> Not_signed_in)
 ;;
 

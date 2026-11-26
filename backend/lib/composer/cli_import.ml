@@ -73,12 +73,8 @@ if [ ! -f "$p" ]; then
   if [ "$(uname)" = Darwin ] && security find-generic-password -s gemini -a antigravity >/dev/null 2>&1; then k=keychain
   elif command -v secret-tool >/dev/null 2>&1 && secret-tool lookup service gemini username antigravity >/dev/null 2>&1; then k=keyring; fi
 fi
-b=$(command -v agy 2>/dev/null) && b=$(readlink -f "$b")
-for f in "$b" "$(dirname "$b")/.agy-wrapped"; do
-  [ -f "$f" ] && c="$c$(grep -aoE '%s' "$f" 2>/dev/null | sort -u | sed 's/^/client /')
-"
-done|}
-         Oauth_antigravity.Client.pattern)
+c=$(%s)|}
+         Oauth_antigravity.Client.find_script)
   | _ -> None
 ;;
 

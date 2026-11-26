@@ -27,7 +27,12 @@ module Client : sig
   (** The consumer client among the strings [pattern] matched, if there. *)
   val of_candidates : string list -> t option
 
-  (** The environment's, else the one saved beside [store]. *)
+  (** A shell script printing [client CANDIDATE] lines for the agy on its
+      [PATH] (nix's wrapper's [.agy-wrapped] too). *)
+  val find_script : string
+
+  (** The environment's, else the one saved beside [store], else (saved
+      then) the one in the backend's own agy, if it has one. *)
   val load : ?getenv:(string -> string option) -> Auth_store.t -> t option
 
   val save : Auth_store.t -> t -> unit Or_error.t
@@ -37,6 +42,9 @@ module Client : sig
 end
 
 val token_url : string
+
+(** The agy release prigh speaks as, to Google's endpoints. *)
+val agy_version : string
 
 (** A refresh: Google's answer keeps [refresh_token]. *)
 val refresh
