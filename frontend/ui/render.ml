@@ -992,9 +992,15 @@ let status (m : App.Model.t) : Content.Line.t =
           (P.Session_engine.model_label
              s.engine
              ~model:
-               (match Provider_logins.beside_model m.auth s with
-                | Some l -> s.model.id ^ "@" ^ l
-                | None -> s.model.id))
+               (let id =
+                  (* A harness's placeholder, before it listed its models. *)
+                  if String.equal s.model.id "default"
+                  then s.model.name
+                  else s.model.id
+                in
+                match Provider_logins.beside_model m.auth s with
+                | Some l -> id ^ "@" ^ l
+                | None -> id))
       ]
     in
     let after_model =

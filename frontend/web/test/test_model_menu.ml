@@ -397,7 +397,7 @@ let%expect_test "newest first, a CLI's models in its own order where they stand"
   in
   Prigh_web.Model_menu.newest_first
     [ model "anthropic" "opus-4" "Opus 4"
-    ; model "codex" "default" "GPT-5"
+    ; model "codex" "gpt-5" "GPT-5"
     ; model "codex" "gpt-6" "GPT-6"
     ; model "anthropic" "opus-5" "Opus 5"
     ; model "openai" "o3" "o3"
@@ -410,7 +410,7 @@ let%expect_test "newest first, a CLI's models in its own order where they stand"
   [%expect
     {|
     anthropic/opus-5
-    codex/default
+    codex/gpt-5
     codex/gpt-6
     anthropic/opus-4
     openai/o3

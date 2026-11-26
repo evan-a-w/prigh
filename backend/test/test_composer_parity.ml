@@ -379,8 +379,8 @@ let%expect_test "codex: its models, picked and thought about per turn" =
   show_models agent;
   [%expect
     {|
-    model codex/default (…), thinking default, context 0 of 200000
-      codex/default "\226\128\166" thinking=[default low medium high]
+    model codex/default (loading models…), thinking default, context 0 of 200000
+      codex/default "loading models\226\128\166" thinking=[default low medium high]
     |}];
   prompt agent "hi";
   (* The harness said which models it has, and how full its context is. *)

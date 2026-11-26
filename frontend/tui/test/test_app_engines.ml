@@ -251,7 +251,7 @@ let%expect_test
     ~quiet:true
     h
     Models_catalog
-    (sprintf "[%s]" (codex "default" "Default"));
+    (sprintf "[%s]" (codex "default" "loading models…"));
   H.step h (Intent Model_picker);
   H.show h;
   (* Codex listed its models (prigh has no OpenAI login): asked again, the
@@ -262,9 +262,9 @@ let%expect_test
     Models_catalog
     (sprintf
        "[%s,%s,%s]"
-       (codex "default" "Default (GPT-6.2-Sol)")
        (codex "gpt-6.2-sol" "GPT-6.2-Sol")
-       (codex "gpt-6.2-mini" "GPT-6.2-Mini"));
+       (codex "gpt-6.2-mini" "GPT-6.2-Mini")
+       (codex "gpt-6.2-max" "GPT-6.2-Max"));
   H.show h;
   [%expect
     {|
@@ -275,7 +275,7 @@ let%expect_test
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     Model  (1)
     / ▏
-    ▸  Default  codex/default  ctx 200k  $10/$50 per M
+    ▸  loading models…  codex/default  ctx 200k  $10/$50 per M
     ────────────────────────────────────────────────────────────────────────────────
     >
     Codex · deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
@@ -288,9 +288,9 @@ let%expect_test
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     Model  (3)
     / ▏
-    ▸  Default (GPT-6.2-Sol)  codex/default  ctx 200k  $10/$50 per M
-       GPT-6.2-Sol            codex/gpt-6.2-sol  ctx 200k  $10/$50 per M
-       GPT-6.2-Mini           codex/gpt-6.2-mini  ctx 200k  $10/$50 per M
+    ▸  GPT-6.2-Sol   codex/gpt-6.2-sol  ctx 200k  $10/$50 per M
+       GPT-6.2-Mini  codex/gpt-6.2-mini  ctx 200k  $10/$50 per M
+       GPT-6.2-Max   codex/gpt-6.2-max  ctx 200k  $10/$50 per M
     ────────────────────────────────────────────────────────────────────────────────
     >
     Codex · deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only

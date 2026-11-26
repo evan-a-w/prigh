@@ -58,12 +58,12 @@ let version name =
 ;;
 
 let newest_first models =
-  (* A CLI's (it has a [default]) stay in its order: its default first. *)
-  let cli =
-    List.filter_map models ~f:(fun (m : Llm.t) ->
-      Option.some_if (String.equal m.id "default") m.provider)
+  (* A CLI's stay in its order: its default first. *)
+  let is_cli (m : Llm.t) =
+    match m.provider with
+    | "codex" | "claude" -> true
+    | provider -> String.is_prefix provider ~prefix:"acp:"
   in
-  let is_cli (m : Llm.t) = List.mem cli m.provider ~equal:String.equal in
   (* The others are sorted among themselves, in the places they held. *)
   let sorted =
     List.filter models ~f:(Fn.non is_cli)

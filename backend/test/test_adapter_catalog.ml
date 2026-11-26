@@ -490,10 +490,10 @@ let%expect_test "codex: the picker lists Codex's models before the first turn" =
   chip ();
   [%expect
     {|
-    chip: codex/default (…)
+    chip: codex/default (loading models…)
     list_models, before Codex said:
     spawn codex on backend
-      codex/default "\226\128\166" thinking=[default low medium high]
+      codex/default "loading models\226\128\166" thinking=[default low medium high]
     codex got initialize
     codex got model/list
     codex got account/rateLimits/read
@@ -593,7 +593,7 @@ let%expect_test
     {|
     list_models, before Antigravity said:
     spawn agy on backend
-      acp:antigravity/default "\226\128\166" thinking=[off]
+      acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
@@ -616,7 +616,7 @@ let%expect_test
     event: models_changed
     list_models, on Codex:
     spawn codex on backend
-      codex/default "\226\128\166" thinking=[default low medium high]
+      codex/default "loading models\226\128\166" thinking=[default low medium high]
     codex got initialize
     codex got model/list
     codex got account/rateLimits/read
@@ -707,9 +707,9 @@ let%expect_test
     spawn grok on backend
     event: models_changed
     notice: Grok Build on <machine> could not list its models: grok: command not found. Check that it is installed and logged in there (Settings → Engines).
-      acp:grok/default "\226\128\166" thinking=[off]
-      acp:grok/default "\226\128\166" thinking=[off]
-      acp:grok/default "\226\128\166" thinking=[off]
+      acp:grok/default "loading models\226\128\166" thinking=[off]
+      acp:grok/default "loading models\226\128\166" thinking=[off]
+      acp:grok/default "loading models\226\128\166" thinking=[off]
     |}]
 ;;
 
@@ -741,12 +741,12 @@ let%expect_test
   [%expect
     {|
     spawn agy on backend
-      acp:antigravity/default "\226\128\166" thinking=[off]
+      acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
     notice: Antigravity on <machine> could not list its models: Antigravity is not logged in on this host: run `agy acp --login` there. Check that it is installed and logged in there (Settings → Engines).
-      acp:antigravity/default "\226\128\166" thinking=[off]
+      acp:antigravity/default "loading models\226\128\166" thinking=[off]
     |}];
   let changed = next_change () in
   connect_host ~id:"host-desktop" ~name:"desktop";
@@ -760,7 +760,7 @@ let%expect_test
     notice: tools now run on desktop in $DIR
     event: models_changed
     spawn agy on host-desktop
-      acp:antigravity/default "\226\128\166" thinking=[off]
+      acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
@@ -798,7 +798,7 @@ let%expect_test
   [%expect
     {|
     spawn agy on backend with prigh's token in $PRIGH_AGY_TOKEN_FD
-      acp:antigravity/default "\226\128\166" thinking=[off]
+      acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
@@ -820,7 +820,7 @@ let%expect_test
     {|
     event: models_changed
     spawn agy on backend
-      acp:antigravity/default "\226\128\166" thinking=[off]
+      acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
@@ -844,7 +844,7 @@ let%expect_test
     event: models_changed
     event: models_changed
     spawn codex on backend
-      codex/default "\226\128\166" thinking=[default low medium high]
+      codex/default "loading models\226\128\166" thinking=[default low medium high]
     codex got initialize
     codex got account/login/start
     codex was handed token tok-openai-codex
@@ -854,7 +854,7 @@ let%expect_test
     event: models_changed
     event: models_changed
     spawn claude on backend with prigh's token in $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
-      claude/default "\226\128\166" thinking=[off default low medium high max]
+      claude/default "loading models\226\128\166" thinking=[off default low medium high max]
     claude got initialize
     claude got get_usage
     event: models_changed
@@ -885,11 +885,11 @@ let%expect_test "prigh's login refused: what to do is about that login" =
   [%expect
     {|
     spawn agy on backend with prigh's token in $PRIGH_AGY_TOKEN_FD
-      acp:antigravity/default "\226\128\166" thinking=[off]
+      acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
     event: models_changed
     notice: Antigravity on <machine> could not list its models: it was refused prigh's google-antigravity login "Work", or could not use it: /login google-antigravity logs in again, or Settings → Engines runs Antigravity on its own login. Check that it is installed there (Settings → Engines).
-      acp:antigravity/default "\226\128\166" thinking=[off]
+      acp:antigravity/default "loading models\226\128\166" thinking=[off]
     |}]
 ;;

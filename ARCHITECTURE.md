@@ -328,6 +328,10 @@ The composer (`composer/`), from the bottom up:
   Antigravity with another `session/prompt`, Grok with `_x.ai/interject`,
   per `Acp_agent.Quirks`), between turns otherwise; and records the cost the CLI reports as spend
   (`External_model` names its replies `codex/MODEL`, priced at zero).
+  A session always names a model the CLI listed (its default first, under
+  its real id); only until the CLI or its catalog lists them does it run on
+  a placeholder (`ADAPTER/default`, shown "loading models…"), which then
+  takes the default, as a session recorded on it before does.
 - **`Adapter_catalog`** holds, per host and adapter, the models and usage
   limits the CLI's own login offers (Codex's `model/list` and
   `account/rateLimits/read`, Claude Code's `initialize` and `get_usage`),

@@ -299,13 +299,13 @@ let%expect_test "a Codex session that reported no cost runs on a subscription" =
 let%expect_test "the picker lists what the CLI's login offers, when it says" =
   let h = session () in
   let codex ~id ~name = H.model_json ~provider:"codex" ~id ~name () in
-  (* Before Codex has said: only its default. *)
+  (* Before Codex has said: its placeholder. *)
   H.quiet h (fun () ->
     H.event h {|{"type":"event","event":"models_changed"}|};
     H.reply
       h
       "list_models"
-      (sprintf "[%s]" (codex ~id:"default" ~name:"Default")));
+      (sprintf "[%s]" (codex ~id:"default" ~name:"loading models…")));
   H.key h "l" ~ctrl:true;
   H.names h ~selector:".model-rail-tab";
   H.text h ~selector:".model-list";
@@ -316,7 +316,7 @@ let%expect_test "the picker lists what the CLI's login offers, when it says" =
     Place_popover
     [tab] button "Favourites"
     [tab] button "Codex"
-    Default Alt+1 (Star: into the favourites (Alt+F))
+    loading models… Alt+1 (Star: into the favourites (Alt+F))
     |}];
   (* Codex listed its models (prigh has no OpenAI login): asked again, the
      open menu shows them. *)
@@ -326,16 +326,16 @@ let%expect_test "the picker lists what the CLI's login offers, when it says" =
     "list_models"
     (sprintf
        "[%s,%s,%s]"
-       (codex ~id:"default" ~name:"Default (GPT-6.2-Sol)")
        (codex ~id:"gpt-6.2-sol" ~name:"GPT-6.2-Sol")
-       (codex ~id:"gpt-6.2-mini" ~name:"GPT-6.2-Mini"));
+       (codex ~id:"gpt-6.2-mini" ~name:"GPT-6.2-Mini")
+       (codex ~id:"gpt-6.2-max" ~name:"GPT-6.2-Max"));
   H.text h ~selector:".model-list";
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag Models))
-    Default (GPT-6.2-Sol) Alt+1 (Star: into the favourites (Alt+F))
-    GPT-6.2-Sol Alt+2 (Star: into the favourites (Alt+F))
-    GPT-6.2-Mini Alt+3 (Star: into the favourites (Alt+F))
+    GPT-6.2-Sol Alt+1 (Star: into the favourites (Alt+F))
+    GPT-6.2-Mini Alt+2 (Star: into the favourites (Alt+F))
+    GPT-6.2-Max Alt+3 (Star: into the favourites (Alt+F))
     |}]
 ;;
 
@@ -373,7 +373,7 @@ let%expect_test
           (H.model_json
              ~thinking:false
              ~provider:"acp:antigravity"
-             ~id:"default"
+             ~id:"flash"
              ~name:"Gemini 3.8 Flash"
              ()) )
     ]
@@ -395,7 +395,7 @@ let%expect_test
          (H.model_json
             ~thinking:false
             ~provider:"acp:antigravity"
-            ~id:"default"
+            ~id:"flash"
             ~name:"Gemini 3.8 Flash"
             ())
          (H.model_json
@@ -450,7 +450,7 @@ let%expect_test
                  , Jsonaf.of_string
                      (H.model_json
                         ~provider:"codex"
-                        ~id:"default"
+                        ~id:"gpt-6.2-sol"
                         ~name:"GPT-6.2-Sol"
                         ()) )
                ])
@@ -461,7 +461,7 @@ let%expect_test
     "list_models"
     (sprintf
        "[%s]"
-       (H.model_json ~provider:"codex" ~id:"default" ~name:"GPT-6.2-Sol" ()));
+       (H.model_json ~provider:"codex" ~id:"gpt-6.2-sol" ~name:"GPT-6.2-Sol" ()));
   picker ();
   [%expect
     {|
@@ -555,7 +555,7 @@ let%expect_test "the model menu's foot switches the engine" =
        (H.model_json
           ~thinking:false
           ~provider:"acp:antigravity"
-          ~id:"default"
+          ~id:"flash"
           ~name:"Gemini 3.8 Flash"
           ()));
   H.text h ~selector:".model-menu-main";
@@ -652,7 +652,7 @@ let%expect_test "an agent CLI's reply names its model in the footer" =
               (H.model_json
                  ~thinking:false
                  ~provider:"acp:antigravity"
-                 ~id:"default"
+                 ~id:"flash"
                  ~name:"Gemini 3.8 Flash"
                  ()) )
         ]
@@ -668,7 +668,7 @@ let%expect_test "an agent CLI's reply names its model in the footer" =
          (H.model_json
             ~thinking:false
             ~provider:"acp:antigravity"
-            ~id:"default"
+            ~id:"flash"
             ~name:"Gemini 3.8 Flash"
             ())
          (H.model_json
@@ -685,7 +685,7 @@ let%expect_test "an agent CLI's reply names its model in the footer" =
            {|{"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"No."}],"stop_reason":{"type":"end_turn"},"usage":{"input":1200,"output":30,"cache_read":0},"model":"%s"}}|}
            model))
   in
-  reply "acp:antigravity/default";
+  reply "acp:antigravity/flash";
   reply "acp:antigravity/sonnet";
   reply "acp:antigravity/gone";
   H.text h ~selector:".meta";

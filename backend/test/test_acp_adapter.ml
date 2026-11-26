@@ -714,7 +714,7 @@ let%expect_test
   prompt agent "two";
   [%expect
     {|
-    model acp:opencode/default "\226\128\166", window 0; recorded acp:opencode/default
+    model acp:opencode/default "loading models\226\128\166", window 0; recorded acp:opencode/default
     spawn #1: opencode acp
     agent got initialize
     agent got session/new session=- mcp=[]

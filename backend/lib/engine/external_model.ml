@@ -91,7 +91,7 @@ let placeholder ~adapter ~name =
   | _ -> model ~adapter ~name default_id
 ;;
 
-let pending ~adapter = placeholder ~adapter ~name:"…"
+let pending ~adapter = placeholder ~adapter ~name:"loading models…"
 let unlisted ~adapter = placeholder ~adapter ~name:"its own model"
 let is_placeholder (m : Model.t) = String.equal m.id default_id
 ;;
