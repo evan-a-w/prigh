@@ -36,6 +36,9 @@ type t =
   ; mutable before_plan : string option (* the mode plan mode replaced *)
   ; mutable model : string option (* the model last set *)
   ; mutable agent_default : string option (* its model before we set one *)
+  ; mutable login : Antigravity_login.t option
+    (* prigh's login, when the process runs on it (Antigravity's) *)
+  ; mutable refused : bool (* a turn was refused with its token *)
   ; mutable plan : bool option
     (* prigh's plan mode as last applied: the agent may leave plan mode
        itself (Grok, its plan approved) and is not put back *)
@@ -163,15 +166,32 @@ let create
     ;;
 
     let native_questions = agent.quirks.xai_extensions
+    let takes_login = String.equal agent.name "antigravity"
 
     let launch (start : Adapter.Start.t) : Adapter.Launch.t =
-      { argv = agent.command
-      ; env_set = []
-      ; env_unset = []
-      ; cwd = start.cwd
-      ; mcp = true
-      ; secret = None
-      }
+      match start.login with
+      | Some login when takes_login ->
+        let l =
+          Antigravity_login.launch
+            login
+            ~refused:start.login_refused
+            ~command:agent.command
+        in
+        { argv = l.argv
+        ; env_set = l.env_set
+        ; env_unset = l.env_unset
+        ; cwd = start.cwd
+        ; mcp = true
+        ; secret = l.secret
+        }
+      | Some _ | None ->
+        { argv = agent.command
+        ; env_set = []
+        ; env_unset = []
+        ; cwd = start.cwd
+        ; mcp = true
+        ; secret = None
+        }
     ;;
 
     let refused what (r : Codec.Response.t) =
@@ -260,6 +280,8 @@ let create
         ; model = None
         ; agent_default = None
         ; plan = None
+        ; login = None
+        ; refused = false
         }
       in
       Adapter.Driver.run
@@ -309,6 +331,14 @@ let create
             agent.display_name
         | r -> refused "to start" r >>| fun () -> []
       in
+      if takes_login
+      then
+        Option.iter start.login ~f:(fun credential ->
+          match
+            Antigravity_login.of_launch credential ~refused:start.login_refused
+          with
+          | Ok login -> t.login <- Some login
+          | Error why -> Adapter.Driver.push driver (Notice why));
       let mcp_servers = List.filter_map start.mcp_servers ~f:mcp_server in
       let caps = Codec.agent_capabilities codec in
       let can_load =
@@ -359,7 +389,10 @@ let create
       let%map () =
         match opened with
         | Failed { code = -32000; _ } ->
-          Or_error.error_string (not_logged_in agent auth_methods)
+          (match t.login with
+           | Some login ->
+             Or_error.error_string (Antigravity_login.refused_hint login)
+           | None -> Or_error.error_string (not_logged_in agent auth_methods))
         | r -> refused "to open a session" r
       in
       t.agent_default
@@ -373,7 +406,23 @@ let create
       t
     ;;
 
-    let next_event t = Adapter.Driver.next_event t.driver
+    let next_event t : Adapter_event.t =
+      match Adapter.Driver.next_event t.driver, t.login with
+      | ( Turn_end { turn_id; stop = Failed { kind = Auth_required _; message } }
+        , Some login ) ->
+        t.refused <- true;
+        Turn_end
+          { turn_id
+          ; stop =
+              Failed
+                { kind =
+                    Auth_required
+                      { hint = Antigravity_login.refused_hint login }
+                ; message
+                }
+          }
+      | event, _ -> event
+    ;;
 
     let set_mode t mode_id =
       match Codec.set_mode t.codec ~mode_id with
@@ -579,8 +628,19 @@ let create
     let cost_total t = Codec.cost_total t.codec
     let in_turn t = Adapter.Driver.in_turn t.driver
     let alive t = Adapter.Driver.alive t.driver
-    let login _ = None
-    let renewal _ = None
+    let login t = Option.map t.login ~f:Antigravity_login.credential
+
+    let renewal t : Adapter.Login_renewal.t option =
+      match t.login with
+      | None -> None
+      | Some login when t.refused ->
+        Some (Refused (Antigravity_login.token login))
+      | Some login ->
+        Option.some_if
+          (Antigravity_login.expiring login ~now_ms:(Credential.now_ms ()))
+          Adapter.Login_renewal.Expiring
+    ;;
+
     let stop t = Adapter.Driver.stop t.driver
   end)
 ;;

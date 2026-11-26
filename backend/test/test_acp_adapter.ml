@@ -177,7 +177,14 @@ let print_event (e : Agent.Event.t) =
   | _ -> ()
 ;;
 
-let with_acp ?(agent = opencode) ?(approval : Approval_mode.t option) ~peer f =
+let with_acp
+      ?(agent = opencode)
+      ?(approval : Approval_mode.t option)
+      ?(on_launch = ignore)
+      ?start
+      ~peer
+      f
+  =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -192,8 +199,16 @@ let with_acp ?(agent = opencode) ?(approval : Approval_mode.t option) ~peer f =
       ~adapter
       ~spawn:(fun (launch : Adapter.Launch.t) ->
         incr launches;
-        printf "spawn #%d: %s\n" !launches (String.concat ~sep:" " launch.argv);
+        printf
+          "spawn #%d: %s\n"
+          !launches
+          (String.concat
+             ~sep:" "
+             (List.map launch.argv ~f:(fun a ->
+                if String.mem a '\n' then "<script>" else a)));
+        on_launch launch;
         Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
+      ?start
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
       ()
   in
@@ -975,5 +990,198 @@ let%expect_test
     assistant (acp:grok/default, End_turn): "Changed it.Done."
     agent got session/prompt "now build"
     assistant (acp:grok/default, End_turn): "Built."
+    |}]
+;;
+
+(* prigh's Antigravity login [g]: [ya29.N], expiring in [expires_min.(N-1)]
+   minutes. *)
+let antigravity_login ?(fail = false) ~expires_min () =
+  let n = ref 0 in
+  Cli_credential.create
+    ~provider:Google_antigravity
+    ~account:(Own (Account_id.of_string "g" |> Or_error.ok_exn))
+    ~label:"g"
+    ~fetch:(fun ?refused ?valid_for_ms () ->
+      incr n;
+      printf
+        "prigh fetches a token valid for %s min%s\n"
+        (Option.value_map valid_for_ms ~default:"?" ~f:(fun ms ->
+           Int.to_string (ms / 60_000)))
+        (Option.value_map refused ~default:"" ~f:(sprintf ", refused %s"));
+      if fail
+      then Or_error.error_string "refreshing failed: /login google-antigravity"
+      else
+        Ok
+          { Provider_auth.Resolved.token = sprintf "ya29.%d" !n
+          ; method_ = Oauth
+          ; account_id = None
+          ; source = "oauth"
+          ; account = None
+          ; expires_ms =
+              Some
+                (Credential.now_ms ()
+                 + (60_000 * List.nth_exn expires_min (!n - 1)))
+          })
+    ~record:(fun usage ~cost_usd ->
+      printf
+        "recorded on g: %s, $%.2f\n"
+        (Sexp.to_string [%sexp (usage : Usage.t)])
+        cost_usd)
+    ()
+;;
+
+let print_agy_launch (launch : Adapter.Launch.t) =
+  let token =
+    Option.map launch.secret ~f:(fun s ->
+      match Json.parse s.value with
+      | Ok json ->
+        let token = Option.value (Json.member "token" json) ~default:`Null in
+        sprintf
+          "%s %s on %s (else %s)"
+          (Option.value_map
+             (Json.member "access_token" token)
+             ~default:"?"
+             ~f:Json.to_string)
+          (Option.value_map
+             (Json.member "auth_method" json)
+             ~default:"?"
+             ~f:Json.to_string)
+          s.fd_env
+          s.env
+      | Error _ -> "?")
+  in
+  printf
+    "  %sunset %s; %s\n"
+    (if
+       List.mem
+         launch.argv
+         Antigravity_login.For_testing.wrapper
+         ~equal:String.equal
+     then "the wrapper; "
+     else "")
+    (String.concat ~sep:" " launch.env_unset)
+    (Option.value token ~default:"agy's own login")
+;;
+
+let antigravity = Option.value_exn (Acp_agent.find_known "antigravity")
+
+let agy_turn ?(refuse = false) p ~session =
+  let prompt = P.expect p "session/prompt" in
+  if refuse
+  then P.error p prompt ~code:(-32000) "Authentication required"
+  else (
+    P.text p session "ok";
+    P.result
+      p
+      prompt
+      {|{"stopReason":"end_turn","usage":{"inputTokens":3,"outputTokens":1,"totalTokens":4}}|})
+;;
+
+let%expect_test "Antigravity on prigh's login: a token file, renewed, refused" =
+  let login = antigravity_login ~expires_min:[ 15; 60; 60 ] () in
+  with_acp
+    ~agent:antigravity
+    ~on_launch:print_agy_launch
+    ~start:(fun ~cwd ->
+      { (Adapter.Start.default ~cwd) with login = Some login })
+    ~peer:(fun n p ->
+      P.initialize p;
+      (match n with
+       | 1 -> P.new_session p "s1"
+       | _ ->
+         let load = P.expect p "session/load" in
+         P.result p load "{}");
+      let rec turns i =
+        match n, i with
+        | 2, 2 | 3, _ ->
+          agy_turn p ~session:"s1" ~refuse:true;
+          turns (i + 1)
+        | _ ->
+          agy_turn p ~session:"s1";
+          turns (i + 1)
+      in
+      try turns 1 with
+      | _ -> ())
+  @@ fun agent _ ->
+  prompt agent "hi";
+  [%expect
+    {|
+    prigh fetches a token valid for 40 min
+    spawn #1: bash -c <script> agy agy acp
+      the wrapper; unset GEMINI_API_KEY GOOGLE_API_KEY GOOGLE_APPLICATION_CREDENTIALS GOOGLE_GENAI_USE_VERTEXAI GOOGLE_CLOUD_PROJECT ANTIGRAVITY_PROJECT_ID; "ya29.1" "consumer" on PRIGH_AGY_TOKEN_FD (else PRIGH_AGY_TOKEN)
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "hi"
+    recorded on g: ((input 3)(output 1)(cache_read 0)), $0.00
+    assistant (acp:antigravity/default, End_turn): "ok"
+    |}];
+  (* expires within 20 minutes: a new process, loading the session *)
+  prompt agent "again";
+  [%expect
+    {|
+    prigh fetches a token valid for 40 min
+    spawn #2: bash -c <script> agy agy acp
+      the wrapper; unset GEMINI_API_KEY GOOGLE_API_KEY GOOGLE_APPLICATION_CREDENTIALS GOOGLE_GENAI_USE_VERTEXAI GOOGLE_CLOUD_PROJECT ANTIGRAVITY_PROJECT_ID; "ya29.2" "consumer" on PRIGH_AGY_TOKEN_FD (else PRIGH_AGY_TOKEN)
+    agent got initialize
+    agent got session/load session=s1 mcp=[]
+    agent got session/prompt "again"
+    recorded on g: ((input 3)(output 1)(cache_read 0)), $0.00
+    assistant (acp:antigravity/default, End_turn): "ok"
+    |}];
+  (* refused: a newer token, then (refused again) agy's own login *)
+  prompt agent "refused";
+  [%expect
+    {|
+    agent got session/prompt "refused"
+    assistant (acp:antigravity/default, (Error"Authentication required: Google refused prigh's Antigravity login \"g\": prigh refreshes it and restarts agy on your next message (/login google-antigravity if it is refused again)")): ""
+    |}];
+  prompt agent "once more";
+  [%expect
+    {|
+    prigh fetches a token valid for 40 min, refused ya29.2
+    spawn #3: bash -c <script> agy agy acp
+      the wrapper; unset GEMINI_API_KEY GOOGLE_API_KEY GOOGLE_APPLICATION_CREDENTIALS GOOGLE_GENAI_USE_VERTEXAI GOOGLE_CLOUD_PROJECT ANTIGRAVITY_PROJECT_ID; "ya29.3" "consumer" on PRIGH_AGY_TOKEN_FD (else PRIGH_AGY_TOKEN)
+    agent got initialize
+    agent got session/load session=s1 mcp=[]
+    agent got session/prompt "once more"
+    assistant (acp:antigravity/default, (Error"Authentication required: Google refused prigh's Antigravity login \"g\": prigh refreshes it and restarts agy on your next message (/login google-antigravity if it is refused again)")): ""
+    |}];
+  prompt agent "last";
+  [%expect
+    {|
+    notice: Antigravity was refused prigh's Antigravity (Google) login "g" again, after a refresh: this session runs on Antigravity's own login on its tool host from now on (/login google-antigravity logs in again, for new sessions).
+    spawn #4: agy acp
+      unset ; agy's own login
+    agent got initialize
+    agent got session/load session=s1 mcp=[]
+    agent got session/prompt "last"
+    assistant (acp:antigravity/default, End_turn): "ok"
+    |}]
+;;
+
+let%expect_test "Antigravity: no token for agy, so its own login, saying so" =
+  with_acp
+    ~agent:antigravity
+    ~on_launch:print_agy_launch
+    ~start:(fun ~cwd ->
+      { (Adapter.Start.default ~cwd) with
+        login = Some (antigravity_login ~fail:true ~expires_min:[] ())
+      })
+    ~peer:(fun _ p ->
+      P.initialize p;
+      P.new_session p "s1";
+      agy_turn p ~session:"s1")
+  @@ fun agent _ ->
+  prompt agent "hi";
+  [%expect
+    {|
+    prigh fetches a token valid for 40 min
+    spawn #1: agy acp
+      unset ; agy's own login
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    notice: prigh's Antigravity login "g" has no token for agy (refreshing failed: /login google-antigravity): this session runs on agy's own login on its tool host (agy acp --login there).
+    agent got session/prompt "hi"
+    assistant (acp:antigravity/default, End_turn): "ok"
     |}]
 ;;
