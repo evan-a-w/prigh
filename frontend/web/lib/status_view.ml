@@ -139,10 +139,9 @@ let note_classes cls =
     ~class_:
       (String.concat
          ~sep:" "
-         [ "status-item link loon"
+         [ "status-item link loon cursor-pointer max-w-[24ch] hover:bg-muted \
+            hover:text-foreground narrow:h-11 narrow:text-sm"
          ; cls
-         ; "cursor-pointer max-w-[24ch] hover:bg-muted hover:text-foreground \
-            narrow:h-11 narrow:text-sm"
          ; tone
          ])
     ()
@@ -246,26 +245,47 @@ let transfers (m : App.Model.t) =
       [ Html.lamp (); Node.text text ]
 ;;
 
-let modes (m : App.Model.t) ~inject =
-  let chip ?(cls = "") ~title ~command text =
+(* The plan's chip: [Plan: current step…], cut at its end (one flex item,
+   [truncate]: the badge's centred flex box would clip both ends, with no
+   ellipsis); the progress and the whole plan in its title, and a tap opens
+   it (/todos). *)
+let plan_chip (plan : Plan.t) ~inject =
+  let total = List.length plan.steps in
+  let completed = Plan.completed plan in
+  if completed >= total
+  then Node.none
+  else (
+    let running =
+      List.count plan.steps ~f:(fun s -> Plan.Status.equal s.status In_progress)
+    in
+    let step =
+      Option.value_map (Plan.current plan) ~default:"" ~f:(fun s -> s.step)
+      ^ if running > 1 then sprintf " (+%d running)" (running - 1) else ""
+    in
+    let count = sprintf "%d/%d" completed total in
     Node.button
       ~attrs:
-        [ Attr.class_ (note_classes ("mode " ^ cls))
+        [ Attr.class_
+            (note_classes
+               "mode plan justify-start max-w-[36ch] narrow:max-w-full")
         ; Attr.type_ "button"
-        ; Attr.title title
-        ; Attr.on_click (fun _ -> inject (Action.Run command))
+        ; Attr.title
+            (String.concat
+               ~sep:"\n"
+               (sprintf "Plan %s (/todos)" count :: Plan_view.lines plan))
+        ; Attr.on_click (fun _ -> inject (Action.Run "/todos"))
         ]
-      [ Node.text text ]
-  in
-  [ (match
-       Option.bind m.state ~f:(fun s -> Option.bind s.plan ~f:Plan_view.status)
-     with
-     | Some text ->
-       chip
-         ~cls:"plan"
-         ~title:"The model's plan (/todos)"
-         ~command:"/todos"
-         text
+      [ Node.span
+          ~attrs:[ Attr.class_ "plan-text min-w-0 truncate" ]
+          [ span ~cls:"plan-label font-semibold" "Plan:"
+          ; Node.text (" " ^ step)
+          ]
+      ])
+;;
+
+let modes (m : App.Model.t) ~inject =
+  [ (match Option.bind m.state ~f:(fun s -> s.plan) with
+     | Some plan -> plan_chip plan ~inject
      | None -> Node.none)
   ]
 ;;

@@ -735,7 +735,6 @@ kbd {
 .status-item.link:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
 .status-item.link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .status-item.queued, .status-item.mode { color: var(--primary); }
-.status-item.mode.plan { color: var(--muted-foreground); display: inline-block; min-width: 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 .status-item.background.active { color: var(--primary); gap: 7px; }
 .status-item.transfers { color: var(--primary); gap: 7px; min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
 .status-item.transfers .lamp { margin-right: 7px; vertical-align: 1px; }
