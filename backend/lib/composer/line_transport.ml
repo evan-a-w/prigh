@@ -5,6 +5,9 @@ module Mcp = struct
   type t =
     { bridge : Injected_tools.Bridge.t
     ; serve : Injected_tools.t -> unit
+    ; route :
+        (string -> Injected_tools.t -> Injected_tools.Bridge.t * (unit -> unit))
+          option
     }
 end
 

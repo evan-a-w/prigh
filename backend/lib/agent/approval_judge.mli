@@ -29,6 +29,9 @@ module Input : sig
     ; session_host : string (** the name of the session's own host *)
     ; hosts : string list (** the connected hosts' names *)
     ; cwd : string
+    ; worktrees : string list
+      (** recorded git worktrees of this session on the active host (part of
+          the project alongside [cwd]) *)
     ; requests : string list
       (** the user's messages, oldest first (see {!requests}) *)
     ; task : string option

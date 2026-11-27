@@ -123,6 +123,7 @@ let decide
       ~(mode : Approval_mode.t)
       ~plan
       ?(host_permitted = true)
+      ?(worktrees = [])
       ~(rules : Rules.t)
       ~session
       ~cwd
@@ -166,10 +167,12 @@ let decide
       | Auto_edit -> if is_edit call.tool then Allow else ask ()
       | Auto -> Allow
       | Smart ->
+        let dirs = cwd :: worktrees in
         if
           is_edit call.tool
           && (not (List.is_empty call.paths))
-          && List.for_all call.paths ~f:(in_project ~dir:cwd)
+          && List.for_all call.paths ~f:(fun path ->
+            List.exists dirs ~f:(fun dir -> in_project ~dir path))
         then Allow
         else Judge { rules = Approval_rule.suggest call })
 ;;

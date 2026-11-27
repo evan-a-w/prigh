@@ -3,17 +3,31 @@ open! Import
 
 type live = Live : (module Adapter.S with type t = 'a) * 'a -> live
 
+module Warming = struct
+  type t =
+    { host : string
+    ; cwd : string
+    ; done_ : unit Promise.t
+    ; cancel : Cancellation.t
+    }
+end
+
 type t =
   { sw : Switch.t
   ; adapter : Adapter.t
-  ; spawn : Adapter.Launch.t -> Line_transport.t Or_error.t
+  ; spawn : Adapter.Start.t -> Adapter.Launch.t -> Line_transport.t Or_error.t
   ; start : cwd:string -> Adapter.Start.t
   ; interrupt_grace : Time_float.Span.t option
   ; request_timeout : Time_float.Span.t option
-  ; steer_poll : Time_float.Span.t
   ; host : unit -> string
+  ; host_id : string option
+  ; home : (unit -> string option) option
+  ; depth : int
+  ; agent_id : string option
+  ; wake : unit -> Message.t list
   ; mutable live : live option
   ; mutable live_host : string option
+  ; mutable live_cwd : string option
   ; mutable live_login : Account_ref.t option
     (** the login of prigh's the live process was given ([Start.login]) *)
   ; mutable login_refused : string option
@@ -29,6 +43,8 @@ type t =
   ; mutable thread_model : string option (* the model the CLI said it runs *)
   ; on_thread : string -> unit
   ; on_start : Adapter.Start.t -> unit Or_error.t -> unit
+  ; on_prewarm : Adapter.Start.t -> Adapter.Catalog.t Or_error.t -> unit
+  ; mutable on_title : (string -> unit) option
   ; checkpoint : (Json.t -> Tool.Result.t) option (* runs [Checkpoint.op] *)
   ; mutable not_git : (string * string) option
     (* a cwd whose files have no checkpoints, and why *)
@@ -46,7 +62,16 @@ type t =
   ; mutable known : Capabilities.t option (* the last process's *)
   ; catalog : unit -> Adapter.Catalog.t option
   ; on_change : unit -> unit
-  ; mutable warming : unit Promise.t option (* a [prewarm] starting *)
+  ; on_autonomous : (unit -> unit) option
+  ; injected_errors : string Queue.t String.Table.t
+    (* failed injected MCP tool texts in the current turn, by tool name, in
+       case the harness drops the error text on [Tool_end] *)
+  ; extra_dirs : unit -> string list
+  ; mutable preapproved : (string * Json.t) list
+    (** injected prigh MCP calls already approved in this turn's outer CLI
+        permission check, consumed once by {!injected} to avoid prompting
+        twice *)
+  ; mutable warming : Warming.t option (* a [prewarm] starting *)
   ; mutable epoch : int (* [close]s: a start that outlived one stops *)
   }
 
@@ -54,29 +79,45 @@ let create
       ~sw
       ~adapter
       ~spawn
+      ?spawn_start
       ?(start = fun ~cwd -> Adapter.Start.default ~cwd)
       ?interrupt_grace
       ?request_timeout
-      ?(steer_poll = Time_float.Span.of_sec 0.2)
       ?(on_thread = ignore)
       ?(on_start = fun _ _ -> ())
+      ?(on_prewarm = fun _ _ -> ())
       ?(host = fun () -> "local")
+      ?host_id
+      ?home
+      ?(depth = 0)
+      ?agent_id
+      ?(wake = fun () -> [])
       ?handoff_from
       ?checkpoint
       ?(catalog = fun () -> None)
       ?(on_change = ignore)
+      ?on_autonomous
+      ?(extra_dirs = fun () -> [])
       ()
   =
   { sw
   ; adapter
-  ; spawn
+  ; spawn =
+      (match spawn_start with
+       | Some f -> f
+       | None -> fun _start launch -> spawn launch)
   ; start
   ; interrupt_grace
   ; request_timeout
-  ; steer_poll
   ; host
+  ; host_id
+  ; home
+  ; depth
+  ; agent_id
+  ; wake
   ; live = None
   ; live_host = None
+  ; live_cwd = None
   ; live_login = None
   ; login_refused = None
   ; login_dropped = None
@@ -89,6 +130,8 @@ let create
   ; thread_model = None
   ; on_thread
   ; on_start
+  ; on_prewarm
+  ; on_title = None
   ; checkpoint
   ; not_git = None
   ; checkpoint_noted = false
@@ -104,6 +147,10 @@ let create
   ; known = None
   ; catalog
   ; on_change
+  ; on_autonomous
+  ; injected_errors = String.Table.create ()
+  ; extra_dirs
+  ; preapproved = []
   ; warming = None
   ; epoch = 0
   }
@@ -111,15 +158,38 @@ let create
 
 let thread_id t = t.thread_id
 
+let has_open_work t =
+  match t.live with
+  | Some (Live ((module L), a)) -> L.alive a && L.has_open_work a
+  | None -> false
+;;
+
+let alive t =
+  match t.live with
+  | Some (Live ((module L), a)) -> L.alive a
+  | None -> false
+;;
+
+let await_exit t =
+  match t.live with
+  | Some (Live ((module L), a)) -> L.await_exit a
+  | None -> ()
+;;
+
 let close t =
   t.epoch <- t.epoch + 1;
+  Option.iter t.warming ~f:(fun w -> Cancellation.cancel w.cancel);
+  t.warming <- None;
   Option.iter t.live ~f:(fun (Live ((module A), a)) ->
     t.known <- Some (A.current_capabilities a);
     A.stop a);
-  t.live <- None
+  t.live <- None;
+  t.live_cwd <- None;
+  t.models <- []
 ;;
 
 let context
+      t
       (s : Engine_intf.Services.t)
       ~cancel
       ?(cwd = s.cwd)
@@ -127,11 +197,20 @@ let context
       ?agent_id
       ()
   =
+  let agent_id =
+    match t.agent_id, agent_id with
+    | None, p -> p
+    | Some a, None -> Some a
+    | Some a, Some p -> Some (a ^ "/" ^ p)
+  in
   Tool.Context.create
     ~cancel
     ~execute:s.execute
     ~call_id
+    ~depth:t.depth
     ?agent_id
+    ?host:t.host_id
+    ?home:t.home
     ~tools:s.tools
     ~emit:s.emit
     ~background:s.background
@@ -145,6 +224,19 @@ let context
 ;;
 
 let mcp_calls = ref 0
+
+let take_preapproved t ~tool ~args =
+  let key = Json.to_string args in
+  let rec remove acc = function
+    | [] -> false
+    | (name, a) :: rest
+      when String.equal name tool && String.equal (Json.to_string a) key ->
+      t.preapproved <- List.rev_append acc rest;
+      true
+    | item :: rest -> remove (item :: acc) rest
+  in
+  remove [] t.preapproved
+;;
 
 (* prigh's tools called over MCP: approved and run as the harness engine's
    calls are. *)
@@ -160,23 +252,40 @@ let injected t (s : Engine_intf.Services.t) =
         incr mcp_calls;
         let run_cancel = t.run_cancel in
         let ctx =
-          context s ~cancel:t.cancel ~call_id:(sprintf "mcp-%d" !mcp_calls) ()
+          context t s ~cancel:t.cancel ~call_id:(sprintf "mcp-%d" !mcp_calls) ()
         in
-        (match s.approve ctx tool args with
+        let refusal =
+          if take_preapproved t ~tool:(Tool.name tool) ~args
+          then None
+          else s.approve ctx tool args
+        in
+        (match refusal with
          | Some refused -> refused
          | None
            when Cancellation.is_cancelled ctx.cancel
                 || Cancellation.is_cancelled run_cancel ->
            (* Approved after its turn ended: nobody waits for it now. *)
            Tool_result.error "[cancelled]: its turn ended"
-         | None -> s.execute ctx tool args))
+         | None ->
+           let result = s.execute ctx tool args in
+           if result.is_error && not (String.is_empty result.text)
+           then (
+             let q =
+               Hashtbl.find_or_add
+                 t.injected_errors
+                 (Tool.name tool)
+                 ~default:Queue.create
+             in
+             Queue.enqueue q result.text);
+           result))
 ;;
 
-let settings (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
+let settings t (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
   { model = input.model
   ; thinking = input.thinking
   ; approval = input.approval
   ; plan = input.plan
+  ; extra_dirs = t.extra_dirs ()
   }
 ;;
 
@@ -218,7 +327,7 @@ let note_thread
 let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
   let (module A) = t.adapter in
   let launch = Turn_timings.phase "launch" (fun () -> A.launch start) in
-  match Turn_timings.phase "spawn" (fun () -> t.spawn launch) with
+  match Turn_timings.phase "spawn" (fun () -> t.spawn start launch) with
   | Error e -> Error (`Spawn e)
   | Ok transport ->
     Option.iter (Line_transport.notice transport) ~f:(fun notice ->
@@ -375,124 +484,119 @@ let renew_login t (s : Engine_intf.Services.t) ~login =
 ;;
 
 let live_now
+      ?(on_result = fun _ _ -> ())
       t
       (s : Engine_intf.Services.t)
       (input : Engine_intf.Turn.Input.t)
       ~starting
   =
-  let host = t.host () in
-  (* The session moved to another tool host: its harness runs there now,
-     on a thread of its own there. *)
-  (match t.live with
-   | Some (Live ((module A), a))
-     when not (Option.equal String.equal t.live_host (Some host)) ->
-     A.stop a;
-     t.live <- None;
-     t.thread_id <- None
-   | Some _ | None -> ());
-  let base =
-    Turn_timings.phase "login" (fun () ->
-      let base = t.start ~cwd:s.cwd in
-      renew_login t s ~login:base.login;
-      base)
-  in
-  let base =
-    match base.login, t.login_dropped with
-    | Some login, Some dropped
-      when Account_ref.equal (Cli_credential.account login) dropped ->
-      { base with login = None }
-    | _ -> base
-  in
-  let login = Option.map base.login ~f:Cli_credential.account in
-  (* The user chose another login for the harness: a process on it, on the
-     same thread. *)
-  (match t.live with
-   | Some (Live ((module A), a))
-     when not (Option.equal Account_ref.equal t.live_login login) ->
-     A.stop a;
-     t.live <- None
-   | Some _ | None -> ());
-  match t.live with
-  | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
+  t.on_title <- Some s.set_title;
+  match input.kind, t.live with
+  | Autonomous, Some (Live ((module A), a) as live) when A.alive a -> Ok live
   | _ ->
-    starting ();
-    Turn_timings.phase "process"
-    @@ fun () ->
-    let epoch = t.epoch in
-    let (module A) = t.adapter in
-    let resume =
-      match Option.first_some t.thread_id base.resume with
-      | Some thread when compacted_since s.session ~thread ->
-        t.thread_id <- None;
-        t.fresh <- true;
-        None
-      | resume -> resume
+    let host = t.host () in
+    (* The session moved to another tool host: its harness runs there now,
+     on a thread of its own there. *)
+    (match t.live with
+     | Some (Live ((module A), a))
+       when not (Option.equal String.equal t.live_host (Some host)) ->
+       A.stop a;
+       t.live <- None;
+       t.live_cwd <- None;
+       t.thread_id <- None;
+       t.models <- []
+     | Some (Live ((module A), a))
+       when A.starts_early
+            && not (Option.equal String.equal t.live_cwd (Some s.cwd)) ->
+       A.stop a;
+       t.live <- None;
+       t.live_cwd <- None
+     | Some _ | None -> ());
+    let base =
+      Turn_timings.phase "login" (fun () ->
+        let base = t.start ~cwd:s.cwd in
+        renew_login t s ~login:base.login;
+        base)
     in
-    let fork = base.fork && Option.is_none t.thread_id in
-    let resume, at, revert =
-      if fork
-      then resume, base.at, None
-      else (
-        match rollback_plan t s.session ~resume with
-        | `Whole -> resume, None, None
-        | `At at -> resume, Some at, None
-        | `Revert before_turn_id -> resume, None, Some before_turn_id
-        | `Nothing ->
-          t.fresh <- true;
-          None, None, None)
+    let base =
+      match base.login, t.login_dropped with
+      | Some login, Some dropped
+        when Account_ref.equal (Cli_credential.account login) dropped ->
+        { base with login = None }
+      | _ -> base
     in
-    let start =
-      { base with
-        cost_total =
-          Option.first_some
-            (Option.bind resume ~f:(cost_total_of s.session))
-            base.cost_total
-      ; model = input.model
-      ; thinking = input.thinking
-      ; approval = input.approval
-      ; plan = input.plan
-      ; resume
-      ; fork = fork && Option.is_some resume
-      ; at
-      ; login_refused = t.login_refused
-      }
-    in
-    let started =
-      match start_process t s start, resume with
-      | Error (`Start e), Some thread ->
-        (* Its thread cannot be continued (gone, or in use elsewhere): a new
+    let login = Option.map base.login ~f:Cli_credential.account in
+    (* The user chose another login for the harness: a process on it, on the
+     same thread. *)
+    (match t.live with
+     | Some (Live ((module A), a))
+       when not (Option.equal Account_ref.equal t.live_login login) ->
+       A.stop a;
+       t.live <- None;
+       t.live_cwd <- None;
+       t.models <- []
+     | Some _ | None -> ());
+    (match t.live with
+     | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
+     | _ ->
+       starting ();
+       Turn_timings.phase "process"
+       @@ fun () ->
+       let epoch = t.epoch in
+       let (module A) = t.adapter in
+       let resume =
+         match Option.first_some t.thread_id base.resume with
+         | Some thread when compacted_since s.session ~thread ->
+           t.thread_id <- None;
+           t.fresh <- true;
+           None
+         | resume -> resume
+       in
+       let fork = base.fork && Option.is_none t.thread_id in
+       let resume, at, revert =
+         if fork
+         then resume, base.at, None
+         else (
+           match rollback_plan t s.session ~resume with
+           | `Whole -> resume, None, None
+           | `At at -> resume, Some at, None
+           | `Revert before_turn_id -> resume, None, Some before_turn_id
+           | `Nothing ->
+             t.fresh <- true;
+             None, None, None)
+       in
+       let start =
+         { base with
+           cost_total =
+             Option.first_some
+               (Option.bind resume ~f:(cost_total_of s.session))
+               base.cost_total
+         ; model = input.model
+         ; thinking = input.thinking
+         ; approval = input.approval
+         ; plan = input.plan
+         ; resume
+         ; fork = fork && Option.is_some resume
+         ; at
+         ; login_refused = t.login_refused
+         ; extra_dirs =
+             List.dedup_and_sort
+               (base.extra_dirs @ t.extra_dirs ())
+               ~compare:String.compare
+         }
+       in
+       let started =
+         match start_process t s start, resume with
+         | Error (`Start e), Some thread ->
+           (* Its thread cannot be continued (gone, or in use elsewhere): a new
            one, handed the whole session. *)
-        s.notice
-          (sprintf
-             "%s could not continue its thread %s (%s): starting a new one, \
-              with the session handed over"
-             A.display_name
-             thread
-             (Error.to_string_hum e));
-        t.thread_id <- None;
-        t.fresh <- true;
-        start_process
-          t
-          s
-          { start with
-            resume = None
-          ; fork = false
-          ; at = None
-          ; cost_total = None
-          }
-      | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
-        (* The session was rewound: its thread drops the runs it lost. *)
-        (match L.revert a ~before_turn_id:(Option.value_exn revert) with
-         | Ok () -> Ok (Live ((module L), a))
-         | Error e ->
            s.notice
              (sprintf
-                "%s could not roll its thread %s back to the rewound session \
-                 (%s): starting a new one, with the session handed over"
+                "%s could not continue its thread %s (%s): starting a new one, \
+                 with the session handed over"
                 A.display_name
                 thread
                 (Error.to_string_hum e));
-           L.stop a;
            t.thread_id <- None;
            t.fresh <- true;
            start_process
@@ -503,59 +607,135 @@ let live_now
              ; fork = false
              ; at = None
              ; cost_total = None
-             })
-      | started, _ -> started
-    in
-    (match started with
-     | Ok (Live ((module L), a)) when t.epoch <> epoch ->
-       (* Closed while it started (the session was left): nobody runs it. *)
-       L.stop a;
-       Or_error.errorf "%s was stopped while it started" A.display_name
-     | Ok (Live ((module L), a) as live) ->
-       L.on_change a (fun () ->
-         (match L.models a with
-          | [] -> ()
-          | models -> t.models <- models);
-         t.on_change ());
-       t.live <- Some live;
-       t.on_change ();
-       t.live_host <- Some host;
-       t.live_login <- login;
-       Ok live
-     | Error (`Spawn e | `Start e) -> Error e)
+             }
+         | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
+           (* The session was rewound: its thread drops the runs it lost. *)
+           (match L.revert a ~before_turn_id:(Option.value_exn revert) with
+            | Ok () -> Ok (Live ((module L), a))
+            | Error e ->
+              s.notice
+                (sprintf
+                   "%s could not roll its thread %s back to the rewound \
+                    session (%s): starting a new one, with the session handed \
+                    over"
+                   A.display_name
+                   thread
+                   (Error.to_string_hum e));
+              L.stop a;
+              t.thread_id <- None;
+              t.fresh <- true;
+              start_process
+                t
+                s
+                { start with
+                  resume = None
+                ; fork = false
+                ; at = None
+                ; cost_total = None
+                })
+         | started, _ -> started
+       in
+       (match started with
+        | Ok (Live ((module L), a)) when t.epoch <> epoch ->
+          (* Closed while it started (the session was left): nobody runs it. *)
+          L.stop a;
+          Or_error.errorf "%s was stopped while it started" A.display_name
+        | Ok (Live ((module L), a) as live) ->
+          (match L.models a with
+           | [] -> ()
+           | models -> t.models <- models);
+          L.on_change a (fun () ->
+            (match L.models a with
+             | [] -> ()
+             | models -> t.models <- models);
+            t.on_change ());
+          Option.iter t.on_autonomous ~f:(L.on_autonomous a);
+          L.on_title a (fun title ->
+            Option.iter t.on_title ~f:(fun f -> f title));
+          t.live <- Some live;
+          t.live_host <- Some host;
+          t.live_cwd <- Some s.cwd;
+          t.live_login <- login;
+          on_result
+            start
+            (Ok { Adapter.Catalog.models = L.models a; limits = L.limits a });
+          t.on_change ();
+          Ok live
+        | Error (`Spawn e | `Start e) ->
+          if t.epoch = epoch then on_result start (Error e);
+          Error e))
 ;;
 
 (* A process [prewarm] is starting for the session is this turn's. *)
 let live t s input ~starting =
-  Option.iter t.warming ~f:(fun warming ->
-    Turn_timings.phase "warming_up" (fun () -> Promise.await warming));
+  Option.iter t.warming ~f:(fun (w : Warming.t) ->
+    Turn_timings.phase "warming_up" (fun () -> Promise.await w.done_));
   live_now t s input ~starting
 ;;
 
-let prewarm t s input =
-  let up =
-    match t.live with
-    | Some (Live ((module L), a)) ->
-      L.alive a && Option.equal String.equal t.live_host (Some (t.host ()))
-    | None -> false
-  in
+let prewarm t (s : Engine_intf.Services.t) input =
+  let host = t.host () in
   let (module A) = t.adapter in
-  if
-    A.starts_early
-    && (not up)
-    && Option.is_none t.warming
-    && Option.is_none t.services
+  if A.starts_early && Option.is_none t.services
   then (
-    let warming, warmed = Promise.create () in
-    t.warming <- Some warming;
-    Guarded.fork ~sw:t.sw ~what:"starting an external harness early" (fun () ->
-      Exn.protect
-        ~finally:(fun () ->
+    let up =
+      match t.live with
+      | Some (Live ((module L), a)) ->
+        L.alive a
+        && Option.equal String.equal t.live_host (Some host)
+        && Option.equal String.equal t.live_cwd (Some s.cwd)
+      | None -> false
+    in
+    if not up
+    then (
+      let already_warming =
+        match t.warming with
+        | Some w when String.equal w.host host && String.equal w.cwd s.cwd ->
+          true
+        | Some w ->
+          t.epoch <- t.epoch + 1;
+          Cancellation.cancel w.cancel;
           t.warming <- None;
-          Promise.resolve warmed ())
-        ~f:(fun () ->
-          (* What goes wrong is said by the turn, which tries again. *)
-          ignore (live_now t s input ~starting:ignore : live Or_error.t))))
+          false
+        | None -> false
+      in
+      if not already_warming
+      then (
+        Option.iter t.live ~f:(fun (Live ((module L), a)) ->
+          L.stop a;
+          t.live <- None;
+          t.live_cwd <- None;
+          if not (Option.equal String.equal t.live_host (Some host))
+          then (
+            t.thread_id <- None;
+            t.models <- []));
+        let done_, warmed = Promise.create () in
+        let cancel = Cancellation.create () in
+        let w = { Warming.host; cwd = s.cwd; done_; cancel } in
+        t.warming <- Some w;
+        Guarded.fork
+          ~sw:t.sw
+          ~what:"starting an external harness early"
+          (fun () ->
+             Exn.protect
+               ~finally:(fun () ->
+                 (match t.warming with
+                  | Some cur when phys_equal cur w -> t.warming <- None
+                  | Some _ | None -> ());
+                 Promise.resolve warmed ())
+               ~f:(fun () ->
+                 (* What goes wrong is said by the turn, which tries again. *)
+                 ignore
+                   (Cancellation.protect cancel ~f:(fun () ->
+                      live_now
+                        ~on_result:(fun start result ->
+                          if not (Cancellation.is_cancelled cancel)
+                          then t.on_prewarm start result)
+                        t
+                        s
+                        input
+                        ~starting:ignore)
+                    : live Or_error.t option))))))
 ;;
 
 (* What the harness has not seen of the session, handed to it before the
@@ -775,12 +955,17 @@ let rec run_turn
   t.services <- Some s;
   t.cancel <- turn_cancel;
   t.run_cancel <- cancel;
+  Hashtbl.clear t.injected_errors;
+  t.preapproved <- [];
   (match Turn_timings.current () with
    | Some _ -> fun f -> f ()
    | None -> Turn_timings.with_ (Turn_timings.create ()))
   @@ fun () ->
   Exn.protect
-    ~finally:(fun () -> Cancellation.cancel turn_cancel)
+    ~finally:(fun () ->
+      Hashtbl.clear t.injected_errors;
+      t.preapproved <- [];
+      Cancellation.cancel turn_cancel)
     ~f:(fun () ->
       match run_turn' t s ~cancel input with
       | added -> added
@@ -836,12 +1021,14 @@ and run_turn'
           ]))
   in
   (* The files are checkpointed while the harness starts: it is sent
-     nothing before they are. *)
+     nothing before they are. Skipped for adapters that cannot roll back. *)
   let before_checkpoint =
-    match input.kind, t.checkpoint, t.not_git with
-    | Compact _, _, _ | Prompt, None, _ -> None
-    | Prompt, Some _, Some (cwd, _) when String.equal cwd s.cwd -> None
-    | Prompt, Some _, _ ->
+    match input.kind, A.rollback, t.checkpoint, t.not_git with
+    | (Compact _ | Autonomous), _, _, _
+    | Prompt, Unsupported, _, _
+    | Prompt, _, None, _ -> None
+    | Prompt, _, Some _, Some (cwd, _) when String.equal cwd s.cwd -> None
+    | Prompt, _, Some _, _ ->
       Some
         (Fiber.fork_promise ~sw:t.sw (fun () ->
            Turn_timings.phase ~alongside:true "checkpoint" (fun () ->
@@ -869,7 +1056,7 @@ and run_turn'
        Option.iter
          (List.hd (L.models a))
          ~f:(fun (m : Model.t) -> Composer_recorder.default_model recorder m.id);
-     let settings = settings input in
+     let settings = settings t input in
      let leftover = Queue.create () in
      let handoff =
        ref
@@ -891,11 +1078,13 @@ and run_turn'
      let rec turn ~first messages =
        Composer_recorder.waiting recorder;
        let result =
-         Turn_timings.phase "send" (fun () ->
-           match input.kind with
-           | Compact { instructions } when first ->
-             L.compact a settings ~instructions
-           | Compact _ | Prompt ->
+         match input.kind with
+         | Autonomous when first -> Ok ()
+         | Compact { instructions } when first ->
+           Turn_timings.phase "send" (fun () ->
+             L.compact a settings ~instructions)
+         | Compact _ | Prompt | Autonomous ->
+           Turn_timings.phase "send" (fun () ->
              L.send a settings (with_handoff (input_of messages)))
        in
        match result with
@@ -942,7 +1131,8 @@ and run_turn'
             | Turn_started _
             | Thread_started _
             | Retrying _
-            | Request_withdrawn _ -> ()
+            | Request_withdrawn _
+            | Session_title _ -> ()
             | _ -> output ());
            match event with
            | Turn_end { stop = st; turn_id } as e ->
@@ -989,12 +1179,25 @@ and run_turn'
                      | _ -> None
                    in
                    let tool =
-                     Option.value_or_thunk
+                     Option.first_some
+                       (List.find s.tools ~f:(fun t ->
+                          String.equal (Tool.name t) canonical.name))
                        (Tools.find canonical.name)
-                       ~default:(fun () -> stand_in canonical.name)
+                     |> Option.value_or_thunk ~default:(fun () ->
+                       stand_in canonical.name)
+                   in
+                   let is_injected =
+                     match kind with
+                     | Mcp { server; tool = mcp_tool } ->
+                       Option.is_some
+                         (Injected_tools.canonical_of_mcp
+                            ~server
+                            ~tool:mcp_tool)
+                     | _ -> false
                    in
                    let ctx =
                      context
+                       t
                        s
                        ~cancel:c
                        ?cwd
@@ -1003,7 +1206,13 @@ and run_turn'
                        ()
                    in
                    (match s.approve ctx tool canonical.arguments with
-                    | None -> Allow
+                    | None ->
+                      if is_injected && not (Cancellation.is_cancelled c)
+                      then
+                        t.preapproved
+                        <- (Tool.name tool, canonical.arguments)
+                           :: t.preapproved;
+                      Allow
                     | Some refused -> reply_of_refusal refused)
                in
                if not (Cancellation.is_cancelled c)
@@ -1025,7 +1234,50 @@ and run_turn'
                (Hashtbl.find requests request_id)
                ~f:Cancellation.cancel;
              events ~sw
+           | Session_title title ->
+             s.set_title title;
+             events ~sw
            | e ->
+             let e =
+               match e with
+               | Tool_end ({ id; ok = false; output; _ } as te)
+                 when not (Hashtbl.is_empty t.injected_errors) ->
+                 let matched =
+                   Option.bind
+                     (Composer_recorder.call_canonical recorder ~tool_id:id)
+                     ~f:(fun canonical ->
+                       let matches_tool name =
+                         String.equal canonical.name name
+                         || String.is_substring
+                              canonical.native_name
+                              ~substring:
+                                (sprintf
+                                   "mcp_%s_%s"
+                                   Injected_tools.server_name
+                                   name)
+                         || String.is_substring
+                              canonical.native_name
+                              ~substring:
+                                (Injected_tools.server_name ^ "_" ^ name)
+                         || String.equal canonical.native_name name
+                       in
+                       Hashtbl.keys t.injected_errors
+                       |> List.find ~f:matches_tool
+                       |> Option.bind ~f:(fun name ->
+                         Option.bind
+                           (Hashtbl.find t.injected_errors name)
+                           ~f:(fun q ->
+                             let text = Queue.dequeue q in
+                             if Queue.is_empty q
+                             then Hashtbl.remove t.injected_errors name;
+                             text)))
+                 in
+                 (match matched with
+                  | Some err_text when String.is_empty output ->
+                    Adapter_event.Tool_end { te with output = err_text }
+                  | Some _ | None -> e)
+               | _ -> e
+             in
              (match e with
               | Thread_started { model = Some model; _ } ->
                 t.thread_model <- Some model
@@ -1046,17 +1298,18 @@ and run_turn'
          in
          let steer () =
            let rec loop () =
-             Eio_unix.sleep (Time_float.Span.to_sec t.steer_poll);
-             (match s.steer () with
-              | [] -> ()
-              | messages ->
-                (match L.steer a (input_of messages) with
-                 | Ok () ->
-                   List.iter
-                     messages
-                     ~f:(Composer_recorder.user_message recorder)
-                 | Error _ -> Queue.enqueue_all leftover messages));
-             loop ()
+             match s.steer () with
+             | [] ->
+               s.await_steer ();
+               loop ()
+             | messages ->
+               (match L.steer a (input_of messages) with
+                | Ok () ->
+                  List.iter
+                    messages
+                    ~f:(Composer_recorder.user_message recorder)
+                | Error _ -> Queue.enqueue_all leftover messages);
+               loop ()
            in
            loop ()
          in
@@ -1069,6 +1322,11 @@ and run_turn'
           | Some Done when not (Cancellation.is_cancelled cancel) ->
             let next = Queue.to_list leftover @ s.steer () in
             Queue.clear leftover;
+            let next =
+              if List.is_empty next && Option.is_none (s.halt ())
+              then t.wake ()
+              else next
+            in
             if (not (List.is_empty next)) && Option.is_none (s.halt ())
             then (
               List.iter next ~f:(Composer_recorder.user_message recorder);
@@ -1093,7 +1351,7 @@ and run_turn'
    let tokens =
      match input.kind with
      | Compact _ -> tokens
-     | Prompt ->
+     | Prompt | Autonomous ->
        Option.first_some
          tokens
          (let estimate = Message.estimate_tokens (Session.messages s.session) in

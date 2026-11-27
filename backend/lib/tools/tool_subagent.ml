@@ -27,20 +27,24 @@ let fork_advice =
 let background_description =
   "Start a subagent on a task, in the background. "
   ^ fork_advice
-  ^ " Give it a subset of your tools, a different model, a working directory \
-     or extra context as needed. Returns at once with the agent id; its final \
-     report arrives later as a message starting with [subagent <id> finished]. \
-     Keep working on what does not depend on it, or end your turn: you are \
-     woken by the report. One that runs out of turns can be given more with \
-     subagent_continue."
+  ^ " Defaults to this session's engine, model and tool host. Only pass \
+     engine, host or a different model when the user explicitly asks for that \
+     engine, machine or model. Give it a subset of your tools, a working \
+     directory or extra context as needed. Returns at once with the agent id; \
+     its final report arrives later as a message starting with [subagent <id> \
+     finished]. Keep working on what does not depend on it, or end your turn: \
+     you are woken by the report. One that runs out of turns can be given more \
+     with subagent_continue."
 ;;
 
 let sync_description =
   "Delegate a task to a subagent. "
   ^ fork_advice
-  ^ " Give it a subset of your tools, a different model, a working directory \
-     or extra context as needed. Blocks until it finishes and returns its \
-     final report; it cannot delegate any further."
+  ^ " Defaults to this agent's engine, model and tool host. Only pass engine, \
+     host or a different model when the user explicitly asked for it. Give it \
+     a subset of your tools, a working directory or extra context as needed. \
+     Blocks until it finishes and returns its final report; it cannot delegate \
+     any further."
 ;;
 
 let spec =
@@ -74,10 +78,19 @@ let spec =
           , `Array (`Object [ "type", `String "string" ])
           , "Subset of this agent's tool names to give the subagent (default: \
              all of them)" )
+        ; ( "engine"
+          , `String
+          , "Engine or adapter to run the subagent on (e.g. \"harness\", \
+             \"codex\", \"claude\", \"acp:antigravity\"). Defaults to this \
+             agent's engine. Only set this when the user explicitly asked for \
+             that engine or adapter" )
         ; ( "model"
           , `String
-          , "Model key, id, name or unambiguous prefix (default: this agent's \
-             model)" )
+          , "Model for the subagent: on the harness, a model key, id, name or \
+             unambiguous prefix; on an external engine, one of that engine's \
+             model ids or names (default: this agent's model on the same \
+             engine, else the target engine's default). Only pass a different \
+             model when the user explicitly asked for it" )
         ; ( "thinking"
           , `String
           , "Thinking: off, default (the provider's) or an effort level the \
@@ -86,8 +99,8 @@ let spec =
         ; ( "host"
           , `String
           , "A connected tool host (by name or id) for it to work on: all its \
-             tools run there (default: where yours run). Only when the user \
-             asked for work on that machine" )
+             tools run there (default: where yours run). Only set this when \
+             the user explicitly asked for work on that machine" )
         ; ( "cwd"
           , `String
           , "Working directory (default: this agent's; with host, that host's \
@@ -110,13 +123,83 @@ let spec =
   }
 ;;
 
-module Fork = struct
+module External = struct
+  type run_result =
+    { messages : Message.t list
+    ; cost_usd : float
+    }
+
   type t =
-    { conversation : Conversation.t
+    { deployed : Engines.t
+    ; current : unit -> Engine_choice.t
+    ; harness_model : unit -> Model.t
+    ; external_models : host:string -> Adapter_id.t -> Model.t list option
+    ; parent_messages : unit -> Message.t list
+    ; approval_mode : unit -> Approval_mode.t
+    ; plan_mode : unit -> bool
+    ; add_spend : usage:Usage.t -> cost_usd:float -> unit
+    ; run :
+        adapter:Adapter_id.t
+        -> host_id:string
+        -> host_name:string
+        -> cwd:string
+        -> model:string option
+        -> thinking:Thinking.t
+        -> approval:Approval_mode.t
+        -> plan:bool
+        -> developer_instructions:string option
+        -> resume:string option
+        -> handoff_from:Engine_choice.t option
+        -> session:Session.t
+        -> on_thread:(string -> unit)
+        -> depth:int
+        -> agent_id:string
+        -> home:(unit -> string option)
+        -> tools:Tool.t list
+        -> context:Tool.Context.t
+        -> emit:(Agent_event.t -> unit)
+        -> steer:(unit -> Message.t list)
+        -> await_steer:(unit -> unit)
+        -> wake:(unit -> Message.t list)
+        -> cancel:Cancellation.t
+        -> prompts:Message.t list
+        -> run_result
+    }
+end
+
+module Fork = struct
+  type source =
+    | Conversation of Conversation.t
+    | Messages of Message.t list
+
+  type t =
+    { source : source
     ; shared : bool
       (** with its caller's system prompt and tools, for the prompt cache *)
     ; refused : string list (** of those tools *)
     }
+end
+
+module Target = struct
+  type t =
+    | Harness of { model : Model.t }
+    | External of
+        { adapter : Adapter_id.t
+        ; model : string option
+        ; display_model : string
+        ; host_id : string
+        ; host_name : string
+        }
+
+  let display_model = function
+    | Harness { model } -> model.id
+    | External { display_model; _ } -> display_model
+  ;;
+
+  let trace_model = function
+    | Harness { model } -> Model.key model
+    | External { display_model; _ } -> display_model
+  ;;
 end
 
 module Prepared = struct
@@ -124,7 +207,12 @@ module Prepared = struct
     { task : string
     ; name : string
     ; named : bool (** [name] was given *)
-    ; model : Model.t
+    ; choice : Engine_choice.t
+    ; session_engine : Engine_choice.t
+    ; engine_label : string option
+      (** [Some (Engine_choice.key choice)] when different from the session's
+          engine *)
+    ; target : Target.t
     ; thinking : Thinking.t
     ; cwd : string
     ; turn_limit : int
@@ -160,6 +248,15 @@ let wants_worktree args =
   | exception Tool_args.Invalid _ -> false
 ;;
 
+let wanted_engine args =
+  match Tool_args.string_opt args "engine" with
+  | Some s ->
+    let s = String.strip s in
+    Option.some_if (not (String.is_empty s)) s
+  | None -> None
+  | exception Tool_args.Invalid _ -> None
+;;
+
 (* [agent/<the name's first words>]. *)
 let auto_branch name =
   let words =
@@ -174,6 +271,11 @@ let auto_branch name =
 let or_invalid = function
   | Ok x -> x
   | Error message -> raise (Tool_args.Invalid message)
+;;
+
+let or_invalid_e = function
+  | Ok x -> x
+  | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e))
 ;;
 
 (* The host it works on ([None]: the session's active one), and whether that
@@ -194,11 +296,46 @@ let host_of ~hosts (context : Tool.Context.t) args =
     Option.some_if (not host.active) host, moves
 ;;
 
+let resolve_engine ~engines_opt ~default_engine args =
+  match wanted_engine args with
+  | None -> default_engine
+  | Some raw ->
+    (match engines_opt with
+     | Some (ext : External.t) ->
+       let choice = or_invalid_e (Engines.resolve ext.deployed raw) in
+       (match Engines.unavailable ext.deployed choice with
+        | Some why -> raise (Tool_args.Invalid why)
+        | None -> choice)
+     | None ->
+       if
+         String.Caseless.equal raw "harness"
+         || String.Caseless.equal raw "prigh harness"
+       then Engine_choice.harness
+       else
+         raise
+           (Tool_args.Invalid
+              (sprintf
+                 "no engine %S here: this backend runs harness only (start \
+                  prigh serve with -engines harness,composer)"
+                 raw)))
+;;
+
+let is_harness_choice (c : Engine_choice.t) =
+  match c with
+  | { engine = Harness; _ } | { engine = Composer; adapter = Some Prigh } ->
+    true
+  | { engine = Composer; adapter = Some (Codex | Claude | Acp _) | None } ->
+    false
+;;
+
 let prepare
       ~models
       ~hosts
+      ~engines_opt
+      ~default_engine
       ~current_model
       ~current_thinking
+      ~make_nested
       (context : Tool.Context.t)
       args
   =
@@ -207,38 +344,38 @@ let prepare
     Option.bind (Tool_args.string_opt args "name") ~f:Subagent_name.of_given
   in
   let only = Tool_args.string_list_opt args "tools" in
-  let conversation =
-    match Tool_args.bool_opt args "fork", context.conversation with
-    | (None | Some false), _ -> None
-    | Some true, Some conversation -> Some conversation
-    | Some true, None ->
+  let session_engine =
+    Option.value_map
+      engines_opt
+      ~default:Engine_choice.harness
+      ~f:(fun (e : External.t) -> e.current ())
+  in
+  let default_engine = Option.value default_engine ~default:session_engine in
+  let choice = resolve_engine ~engines_opt ~default_engine args in
+  let same_engine = Engine_choice.equal choice session_engine in
+  let engine_label =
+    if same_engine then None else Some (Engine_choice.key choice)
+  in
+  let fork_source =
+    match Tool_args.bool_opt args "fork", context.conversation, engines_opt with
+    | (None | Some false), _, _ -> None
+    | Some true, Some conversation, _ -> Some (Fork.Conversation conversation)
+    | Some true, None, Some (ext : External.t) ->
+      (match ext.parent_messages () with
+       | [] ->
+         raise
+           (Tool_args.Invalid
+              "fork is not available here (there is no conversation to fork): \
+               call subagent without it, with a self-contained task")
+       | msgs -> Some (Fork.Messages msgs))
+    | Some true, None, None ->
       raise
         (Tool_args.Invalid
            "fork is not available here (there is no conversation to fork): \
             call subagent without it, with a self-contained task")
   in
-  let model =
-    match Tool_args.string_opt args "model", conversation with
-    | None, Some conversation -> conversation.model
-    | None, None -> current_model ()
-    | Some name, _ ->
-      (match Model_registry.resolve models name with
-       | Ok model -> model
-       | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
-  in
-  let thinking =
-    match Tool_args.string_opt args "thinking", conversation with
-    | None, Some conversation ->
-      Model.clamp_thinking model conversation.thinking
-    | None, None -> Model.clamp_thinking model (current_thinking ())
-    | Some name, _ ->
-      (match
-         Or_error.bind (Thinking.of_string name) ~f:(Model.check_thinking model)
-       with
-       | Ok thinking -> thinking
-       | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
-  in
-  let host, moves = host_of ~hosts:(hosts ()) context args in
+  let all_hosts = hosts () in
+  let host, moves = host_of ~hosts:all_hosts context args in
   let cwd =
     match Tool_args.string_opt args "cwd", host with
     | cwd, Some host when moves -> or_invalid (Tool_on_host.cwd_on host cwd)
@@ -246,42 +383,166 @@ let prepare
       (* back to the session's active host *)
       or_invalid
         (Tool_on_host.cwd_on
-           (List.find_exn (hosts ()) ~f:(fun (h : Tool_on_host.Host.t) ->
+           (List.find_exn all_hosts ~f:(fun (h : Tool_on_host.Host.t) ->
               h.active))
            cwd)
     | None, _ -> context.cwd
     | Some cwd, _ -> Tool.resolve_path context cwd
+  in
+  let target, thinking =
+    if is_harness_choice choice
+    then (
+      let fallback_model () =
+        match engines_opt with
+        | Some (ext : External.t) -> ext.harness_model ()
+        | None -> current_model ()
+      in
+      let model =
+        match Tool_args.string_opt args "model", fork_source with
+        | None, Some (Conversation conv)
+          when not (External_model.is_external (Model.key conv.model)) ->
+          conv.model
+        | None, _ ->
+          let cur = current_model () in
+          if same_engine && not (External_model.is_external (Model.key cur))
+          then cur
+          else fallback_model ()
+        | Some name, _ ->
+          (match Model_registry.resolve models name with
+           | Ok model -> model
+           | Error e ->
+             let hint =
+               match engines_opt, String.lsplit2 name ~on:'/' with
+               | Some ext, Some (prefix, rest) ->
+                 (match Engines.resolve ext.deployed prefix with
+                  | Ok c when not (is_harness_choice c) ->
+                    sprintf
+                      " (to run on %s, pass engine: %S and model: %S)"
+                      (Engine_choice.display_name c)
+                      (Engine_choice.key c)
+                      rest
+                  | Ok _ | Error _ -> "")
+               | _ -> ""
+             in
+             raise (Tool_args.Invalid (Error.to_string_hum e ^ hint)))
+      in
+      let thinking =
+        match Tool_args.string_opt args "thinking", fork_source with
+        | None, Some (Conversation conv) when same_engine ->
+          Model.clamp_thinking model conv.thinking
+        | None, _ ->
+          let base =
+            if same_engine then current_thinking () else Thinking.default
+          in
+          Model.clamp_thinking model base
+        | Some name, _ ->
+          or_invalid_e
+            (Or_error.bind
+               (Thinking.of_string name)
+               ~f:(Model.check_thinking model))
+      in
+      Target.Harness { model }, thinking)
+    else (
+      let adapter =
+        match choice.adapter with
+        | Some a -> a
+        | None ->
+          raise
+            (Tool_args.Invalid
+               "the composer engine needs an adapter (e.g. codex, claude, \
+                acp:antigravity)")
+      in
+      let ext =
+        match engines_opt with
+        | Some ext -> ext
+        | None ->
+          raise
+            (Tool_args.Invalid
+               (sprintf
+                  "cannot run %s here: external engines are not configured"
+                  (Adapter_id.label adapter)))
+      in
+      let host_id, host_name =
+        match host with
+        | Some h -> h.id, h.name
+        | None ->
+          (match
+             List.find all_hosts ~f:(fun (h : Tool_on_host.Host.t) -> h.active)
+           with
+           | Some h -> h.id, h.name
+           | None -> "backend", "local")
+      in
+      let adapter_name = Adapter_id.to_string adapter in
+      let catalog_models = ext.external_models ~host:host_id adapter in
+      let ext_model =
+        match Tool_args.string_opt args "model" with
+        | None ->
+          if same_engine && not moves
+          then External_model.native_id (current_model ())
+          else None
+        | Some query ->
+          Some
+            (or_invalid_e
+               (External_model.resolve
+                  ~adapter:adapter_name
+                  ~models:catalog_models
+                  query))
+      in
+      let matched_model =
+        match ext_model, catalog_models with
+        | Some id, Some ms ->
+          List.find ms ~f:(fun (m : Model.t) -> String.equal m.id id)
+        | None, Some ms ->
+          List.find ms ~f:(Fn.non External_model.is_placeholder)
+        | _, None -> None
+      in
+      let display_model =
+        match ext_model, matched_model with
+        | Some id, _ -> External_model.name ~adapter:adapter_name (Some id)
+        | None, Some m -> External_model.name ~adapter:adapter_name (Some m.id)
+        | None, None -> External_model.name ~adapter:adapter_name None
+      in
+      let thinking =
+        match Tool_args.string_opt args "thinking" with
+        | None -> if same_engine then current_thinking () else Thinking.default
+        | Some name ->
+          let parsed = or_invalid_e (Thinking.of_string name) in
+          (match matched_model with
+           | Some m when not (List.is_empty m.thinking_levels) ->
+             or_invalid_e (Model.check_thinking m parsed)
+           | Some _ | None -> parsed)
+      in
+      ( Target.External
+          { adapter; model = ext_model; display_model; host_id; host_name }
+      , thinking ))
   in
   let turn_limit =
     Option.value (Tool_args.int_opt args "max_turns") ~default:max_turns
   in
   let depth = context.depth + 1 in
   let shared =
-    match conversation with
-    | Some conversation ->
+    match fork_source, target with
+    | Some (Conversation conversation), Harness { model } ->
       Option.is_none only
       && (not moves)
+      && same_engine
       && String.equal (Model.key model) (Model.key conversation.model)
-    | None -> false
+    | _ -> false
   in
   let tools, refused =
     if shared
     then Subagent_fork.shared_tools context.tools ~depth
     else (
-      match
-        Tools.for_context
-          ~parent:(Tools.for_model model context.tools)
-          ~depth
-          ?only
-          ()
-      with
+      let parent_tools =
+        match target with
+        | Harness { model } -> Tools.for_model model context.tools
+        | External _ -> context.tools
+      in
+      match Tools.for_context ~parent:parent_tools ~depth ?only () with
       | Ok tools ->
         ( List.map tools ~f:(fun (tool : Tool.t) ->
             if String.equal (Tool.name tool) spec.name
-            then
-              { tool with
-                spec = { tool.spec with description = sync_description }
-              }
+            then make_nested ~default_engine:choice
             else tool)
         , [] )
       | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
@@ -299,7 +560,10 @@ let prepare
       Option.value_or_thunk given ~default:(fun () ->
         Subagent_name.of_task task)
   ; named = Option.is_some given
-  ; model
+  ; choice
+  ; session_engine
+  ; engine_label
+  ; target
   ; thinking
   ; cwd
   ; turn_limit
@@ -310,8 +574,7 @@ let prepare
   ; worktree = worktree_arg args
   ; created = None
   ; fork =
-      Option.map conversation ~f:(fun conversation ->
-        { Fork.conversation; shared; refused })
+      Option.map fork_source ~f:(fun source -> { Fork.source; shared; refused })
   }
 ;;
 
@@ -406,8 +669,42 @@ let feeds ~(context : Tool.Context.t) ~jobs inbox =
   steer, wake
 ;;
 
-(* A subagent across its runs: it runs again from [messages] when continued
-   after running out of turns. Its totals cover every run. *)
+(* [steer], [await_steer] and [wake] for an external harness subagent (no prigh shell jobs). *)
+let ext_feeds ~(context : Tool.Context.t) inbox =
+  let steer () =
+    Option.value_map inbox ~default:[] ~f:Subagent_inbox.take_steers
+  in
+  let await_steer () =
+    match inbox with
+    | Some inbox -> Subagent_inbox.await_steer inbox
+    | None -> Fiber.await_cancel ()
+  in
+  let rec wake () =
+    match Option.value_map inbox ~default:[] ~f:Subagent_inbox.take_all with
+    | _ :: _ as messages -> messages
+    | [] ->
+      (match inbox with
+       | Some inbox
+         when (not (Cancellation.is_cancelled context.cancel))
+              && not (Subagent_inbox.close_if_empty inbox) -> wake ()
+       | Some _ | None -> [])
+  in
+  steer, await_steer, wake
+;;
+
+module Ext_state = struct
+  type t =
+    { external_ : External.t
+    ; session : Session.t
+    ; developer_instructions : string option
+    ; mutable thread_id : string option
+    ; mutable handoff_from : Engine_choice.t option
+    }
+end
+
+(* A subagent across its runs: it runs again from [messages] (or its
+   external thread) when continued after running out of turns or chatted
+   with by the user. Its totals cover every run. *)
 module State = struct
   type t =
     { context : Tool.Context.t
@@ -415,7 +712,8 @@ module State = struct
           [cancel] and [emit]) *)
     ; prepared : Prepared.t
     ; agent_id : string
-    ; config : Agent_loop.Config.t
+    ; config : Agent_loop.Config.t option
+    ; ext : Ext_state.t option
     ; worktree : Agent_worktree.t option
     ; mutable messages : Message.t list
     ; mutable turns : int
@@ -508,7 +806,8 @@ let run_once
     ~track:("subagent " ^ agent_id)
     ~attrs:
       [ "agent_id", String agent_id
-      ; "model", String (Model.key p.model)
+      ; "model", String (Target.trace_model p.target)
+      ; "engine", String (Engine_choice.key p.choice)
       ; "background", Bool background
       ; "forked", Bool (Option.is_some p.fork)
       ; "continued", Bool continued
@@ -520,10 +819,14 @@ let run_once
        ; agent_id
        ; task = p.task
        ; name = p.name
-       ; model = p.model.id
+       ; model = Target.display_model p.target
        ; thinking = p.thinking
-       ; tools = List.map p.tools ~f:Tool.name
+       ; tools =
+           (match p.target with
+            | Harness _ -> List.map p.tools ~f:Tool.name
+            | External _ -> [])
        ; host = Option.map p.host ~f:(fun h -> h.name)
+       ; engine = p.engine_label
        ; cwd = p.cwd
        ; worktree = state.worktree
        ; forked = Option.is_some p.fork
@@ -554,52 +857,108 @@ let run_once
          ; result
          })
   in
-  let added, left =
-    with_jobs context ~emit
-    @@ fun jobs ->
-    let steer, wake = feeds ~context ~jobs inbox in
-    match
-      Agent_loop.run
-        ~env:context.env
-        ~background:jobs
-        ~steer
-        ~wake
-        ~provider
-        ~config:{ state.config with max_turns = Some turn_limit }
-        ~cwd:p.cwd
-        ~cancel:context.cancel
-        ~chat:context.chat
-        ?host:context.host
-        ~execute:context.execute
-        ~approve:context.approve
-        ~depth:p.depth
-        ~agent_id
-        ~emit
-        ~halt:context.halt
-        ~on_context:(fun messages -> state.messages <- messages)
-        ~context:state.messages
-        ~prompts
-        ()
-    with
-    | added -> added
-    | exception exn ->
-      (* The start always gets an end, or frontends would show the subagent
-         running forever. *)
-      let text =
-        match exn with
-        | Eio.Cancel.Cancelled _ -> "[cancelled]"
-        | exn -> "subagent failed: " ^ Exn.to_string exn
+  let added, left, ext_cost =
+    match p.target, state.config, state.ext with
+    | Harness _, Some config, _ ->
+      let added, left =
+        with_jobs context ~emit
+        @@ fun jobs ->
+        let steer, wake = feeds ~context ~jobs inbox in
+        match
+          Agent_loop.run
+            ~env:context.env
+            ~background:jobs
+            ~steer
+            ~wake
+            ~provider
+            ~config:{ config with max_turns = Some turn_limit }
+            ~cwd:p.cwd
+            ~cancel:context.cancel
+            ~chat:context.chat
+            ?host:context.host
+            ~execute:context.execute
+            ~approve:context.approve
+            ~depth:p.depth
+            ~agent_id
+            ~emit
+            ~halt:context.halt
+            ~on_context:(fun messages -> state.messages <- messages)
+            ~context:state.messages
+            ~prompts
+            ()
+        with
+        | added -> added
+        | exception exn ->
+          (* The start always gets an end, or frontends would show the subagent
+             running forever. *)
+          let text =
+            match exn with
+            | Eio.Cancel.Cancelled _ -> "[cancelled]"
+            | exn -> "subagent failed: " ^ Exn.to_string exn
+          in
+          Eio.Cancel.protect (fun () -> end_ (Tool.Result.error text));
+          raise exn
       in
-      Eio.Cancel.protect (fun () -> end_ (Tool.Result.error text));
-      raise exn
+      added, left, 0.
+    | External { adapter; model; host_id; host_name; _ }, _, Some ext_state ->
+      let steer, await_steer, wake = ext_feeds ~context inbox in
+      let { External.messages; cost_usd } =
+        match
+          ext_state.external_.run
+            ~adapter
+            ~host_id
+            ~host_name
+            ~cwd:p.cwd
+            ~model
+            ~thinking:p.thinking
+            ~approval:(ext_state.external_.approval_mode ())
+            ~plan:(ext_state.external_.plan_mode ())
+            ~developer_instructions:ext_state.developer_instructions
+            ~resume:ext_state.thread_id
+            ~handoff_from:ext_state.handoff_from
+            ~session:ext_state.session
+            ~on_thread:(fun tid ->
+              ext_state.thread_id <- Some tid;
+              ext_state.handoff_from <- None)
+            ~depth:p.depth
+            ~agent_id
+            ~home:context.home
+            ~tools:p.tools
+            ~context
+            ~emit
+            ~steer
+            ~await_steer
+            ~wake
+            ~cancel:context.cancel
+            ~prompts
+        with
+        | result -> result
+        | exception exn ->
+          let text =
+            match exn with
+            | Eio.Cancel.Cancelled _ -> "[cancelled]"
+            | exn -> "subagent failed: " ^ Exn.to_string exn
+          in
+          Eio.Cancel.protect (fun () -> end_ (Tool.Result.error text));
+          raise exn
+      in
+      messages, [], cost_usd
+    | _ -> assert false
   in
-  List.iter added ~f:(function
-    | Message.Assistant assistant ->
-      state.local_usage <- Usage.add state.local_usage assistant.usage;
-      state.local_cost_usd
-      <- state.local_cost_usd
-         +. Model.cost_usd state.prepared.model assistant.usage
-    | User _ | Tool_result _ -> ());
+  (match p.target with
+   | Harness { model } ->
+     List.iter added ~f:(function
+       | Message.Assistant assistant ->
+         state.local_usage <- Usage.add state.local_usage assistant.usage;
+         state.local_cost_usd
+         <- state.local_cost_usd +. Model.cost_usd model assistant.usage
+       | User _ | Tool_result _ -> ())
+   | External _ ->
+     List.iter added ~f:(function
+       | Message.Assistant assistant ->
+         state.local_usage <- Usage.add state.local_usage assistant.usage
+       | User _ | Tool_result _ -> ());
+     state.local_cost_usd <- state.local_cost_usd +. ext_cost);
   let usage = State.usage state in
   let last_assistant =
     List.rev added
@@ -608,13 +967,15 @@ let run_once
       | User _ | Tool_result _ -> None)
   in
   let out_of_turns =
-    match last_assistant with
-    | Some ({ stop_reason = End_turn | Tool_use | Length; _ } as assistant) ->
+    match p.target, last_assistant with
+    | ( Harness _
+      , Some ({ stop_reason = End_turn | Tool_use | Length; _ } as assistant) )
+      ->
       !run_turns >= turn_limit
       && (not (List.is_empty (Message.Assistant.tool_calls assistant)))
       && (not (Cancellation.is_cancelled context.cancel))
       && Option.is_none (context.halt ())
-    | Some _ | None -> false
+    | External _, _ | Harness _, (Some _ | None) -> false
   in
   let hint =
     if out_of_turns
@@ -680,12 +1041,21 @@ let run_once
             else Tool.Result.ok body))
   in
   end_ result;
-  result, out_of_turns && Option.is_some hint
+  ( result
+  , out_of_turns && Option.is_some hint
+  , Cancellation.is_cancelled context.cancel )
+;;
+
+let fork_messages (source : Fork.source) ~call_id =
+  match source with
+  | Conversation conv -> Subagent_fork.context conv ~call_id
+  | Messages msgs -> msgs
 ;;
 
 let execute
       ?inbox
       ~provider
+      ~engines_opt
       ~compaction
       ~home
       ~user_info
@@ -708,87 +1078,143 @@ let execute
   let home =
     Option.value (Option.bind p.host ~f:(fun h -> h.home)) ~default:home
   in
-  let own_system () =
-    let base =
-      match p.extra_context with
-      | Some extra when Option.is_none p.fork -> extra ^ "\n\n" ^ instructions
-      | Some _ | None -> instructions
-    in
-    let { Host_ops.Instructions.files; nix; skills } =
-      if context.chat
-      then { Host_ops.Instructions.files = []; nix = false; skills = [] }
-      else
-        Host_ops.instructions_of_result
-          (Tool.execute_via
-             { context with cwd = p.cwd; on_output = ignore }
-             Host_ops.instructions_tool
-             (Host_ops.instructions_args ~home))
-    in
-    Some
-      (base
-       ^ "\n\n"
-       ^ System_prompt.build
-           ~chat:context.chat
-           ~instructions:files
-           ~nix
-           ~skills
-           ~role:Subagent
-           ?user_info:(user_info ())
-           ~custom_instructions:(custom_instructions ())
-           ?host:(Option.map p.host ~f:(fun h -> h.name))
-           ~cwd:p.cwd
-           ~home
-           ~tools:(Tools.specs p.tools)
-           ())
-  in
-  let system, cache_key =
-    match p.fork with
-    | Some { shared = true; conversation; _ } ->
-      conversation.system, context.cache_key
-    | Some { shared = false; _ } | None ->
-      ( own_system ()
+  let config, ext, messages, prompt =
+    match p.target with
+    | Harness { model } ->
+      let own_system () =
+        let base =
+          match p.extra_context with
+          | Some extra when Option.is_none p.fork ->
+            extra ^ "\n\n" ^ instructions
+          | Some _ | None -> instructions
+        in
+        let { Host_ops.Instructions.files; nix; skills } =
+          if context.chat
+          then { Host_ops.Instructions.files = []; nix = false; skills = [] }
+          else
+            Host_ops.instructions_of_result
+              (Tool.execute_via
+                 { context with cwd = p.cwd; on_output = ignore }
+                 Host_ops.instructions_tool
+                 (Host_ops.instructions_args ~home))
+        in
+        Some
+          (base
+           ^ "\n\n"
+           ^ System_prompt.build
+               ~chat:context.chat
+               ~instructions:files
+               ~nix
+               ~skills
+               ~role:Subagent
+               ?user_info:(user_info ())
+               ~custom_instructions:(custom_instructions ())
+               ?host:(Option.map p.host ~f:(fun h -> h.name))
+               ~cwd:p.cwd
+               ~home
+               ~tools:(Tools.specs p.tools)
+               ())
+      in
+      let system, cache_key =
+        match p.fork with
+        | Some { shared = true; source = Conversation conversation; _ } ->
+          conversation.system, context.cache_key
+        | Some _ | None ->
+          ( own_system ()
+          , Some
+              (match context.cache_key with
+               | Some parent -> parent ^ "/" ^ agent_id
+               | None -> agent_id) )
+      in
+      let config =
+        { Agent_loop.Config.model
+        ; thinking = p.thinking
+        ; system
+        ; tools = p.tools
+        ; max_turns = Some p.turn_limit
+        ; max_tokens = None
+        ; retries = Agent_loop.Config.default_retries
+        ; compaction
+        ; cache_key
+        }
+      in
+      let messages, prompt =
+        match p.fork with
+        | None -> [], Message.user p.task
+        | Some { source; shared; refused } ->
+          ( fork_messages source ~call_id:context.call_id
+          , Subagent_fork.prompt
+              { task = p.task
+              ; extra_context = p.extra_context
+              ; parent_cwd = context.cwd
+              ; cwd = p.cwd
+              ; worktree
+              ; refused
+              ; sync_subagents =
+                  shared
+                  && p.depth = 1
+                  && List.exists p.tools ~f:(fun t ->
+                    String.equal (Tool.name t) spec.name)
+                  && not (List.mem refused spec.name ~equal:String.equal)
+              } )
+      in
+      Some config, None, messages, prompt
+    | External _ ->
+      let external_ = Option.value_exn engines_opt in
+      let session = Session.create ~dir:p.cwd ~cwd:p.cwd ~temporary:true () in
+      let handoff_from, prompt =
+        match p.fork with
+        | None -> None, Message.user p.task
+        | Some { source; _ } ->
+          List.iter (fork_messages source ~call_id:context.call_id) ~f:(fun m ->
+            ignore (Session.append_message session m : Session.Entry.t));
+          ( Some p.session_engine
+          , Subagent_fork.prompt
+              { task = p.task
+              ; extra_context = p.extra_context
+              ; parent_cwd = context.cwd
+              ; cwd = p.cwd
+              ; worktree
+              ; refused = []
+              ; sync_subagents = false
+              } )
+      in
+      let developer_instructions =
+        let parts =
+          [ Some instructions
+          ; (match p.extra_context with
+             | Some extra when Option.is_none p.fork -> Some extra
+             | Some _ | None -> None)
+          ; Option.map worktree ~f:(fun w ->
+              sprintf
+                "You work in a git worktree made for you at %s on branch %s."
+                w.path
+                w.branch)
+          ; System_prompt.user_sections
+              ?user_info:(user_info ())
+              ~custom_instructions:(custom_instructions ())
+              ()
+          ]
+        in
+        Some (String.concat ~sep:"\n\n" (List.filter_opt parts))
+      in
+      ( None
       , Some
-          (match context.cache_key with
-           | Some parent -> parent ^ "/" ^ agent_id
-           | None -> agent_id) )
-  in
-  let config =
-    { Agent_loop.Config.model = p.model
-    ; thinking = p.thinking
-    ; system
-    ; tools = p.tools
-    ; max_turns = Some p.turn_limit
-    ; max_tokens = None
-    ; retries = Agent_loop.Config.default_retries
-    ; compaction
-    ; cache_key
-    }
-  in
-  let messages, prompt =
-    match p.fork with
-    | None -> [], Message.user p.task
-    | Some { conversation; shared; refused } ->
-      ( Subagent_fork.context conversation ~call_id:context.call_id
-      , Subagent_fork.prompt
-          { task = p.task
-          ; extra_context = p.extra_context
-          ; parent_cwd = context.cwd
-          ; cwd = p.cwd
-          ; worktree
-          ; refused
-          ; sync_subagents =
-              shared
-              && p.depth = 1
-              && List.exists p.tools ~f:(fun t ->
-                String.equal (Tool.name t) spec.name)
-              && not (List.mem refused spec.name ~equal:String.equal)
-          } )
+          { Ext_state.external_
+          ; session
+          ; developer_instructions
+          ; thread_id = None
+          ; handoff_from
+          }
+      , []
+      , prompt )
   in
   let state =
     { State.context
     ; prepared = p
     ; agent_id
     ; config
+    ; ext
     ; worktree
     ; messages
     ; turns = 0
@@ -799,7 +1225,7 @@ let execute
     ; children = String.Table.create ()
     }
   in
-  let result, out_of_turns =
+  let result, out_of_turns, cancelled =
     run_once
       ?inbox
       ~provider
@@ -810,7 +1236,7 @@ let execute
       ~turn_limit:p.turn_limit
       ~prompts:[ prompt ]
   in
-  result, state, out_of_turns
+  result, state, out_of_turns, cancelled
 ;;
 
 (* What it is told when continued with a message: like a [subagent_message]
@@ -835,7 +1261,20 @@ let continue_run
       ~max_turns
       ~message
   =
-  let result, out_of_turns =
+  let needs_prompt =
+    Option.is_some state.ext
+    ||
+    match List.last state.messages with
+    | Some (Message.Tool_result _) -> false
+    | Some (User _ | Assistant _) | None -> true
+  in
+  let prompts =
+    match message with
+    | Some m -> [ continue_message m ]
+    | None when needs_prompt -> [ continue_message (Caller, "Continue.") ]
+    | None -> []
+  in
+  let result, out_of_turns, cancelled =
     run_once
       ?inbox
       ~provider
@@ -844,9 +1283,9 @@ let continue_run
       state
       context
       ~turn_limit:(Option.value max_turns ~default:state.prepared.turn_limit)
-      ~prompts:(Option.to_list (Option.map message ~f:continue_message))
+      ~prompts
   in
-  result, state, out_of_turns
+  result, state, out_of_turns, cancelled
 ;;
 
 let outcome_of (result : Tool.Result.t) ~parked =
@@ -861,42 +1300,47 @@ let outcome_of (result : Tool.Result.t) ~parked =
   }
 ;;
 
-(* Parks a background subagent under its task's id when it ends: out of
-   turns, for [subagent_continue]; otherwise for the user to carry on
-   with. *)
-let rec background_outcome ~provider background ~id (result, state, out_of_turns)
+(* Parks a non-cancelled background subagent under its task's id when it ends,
+   for [subagent_continue] (or the user to carry on with). *)
+let rec background_outcome
+          ~provider
+          background
+          ~id
+          (result, state, out_of_turns, cancelled)
   =
-  Background_tasks.park
-    background
-    id
-    ~out_of_turns
-    (fun ~max_turns ~message ~inbox ~call_id:_ ~cancel ~emit ->
-       background_outcome
-         ~provider
-         background
-         ~id
-         (continue_run
-            ?inbox
-            ~provider
-            ~resumable:Background
-            state
-            { state.context with cancel; emit; on_output = ignore }
-            ~max_turns
-            ~message));
+  if not cancelled
+  then
+    Background_tasks.park
+      background
+      id
+      ~out_of_turns
+      (fun ~max_turns ~message ~inbox ~call_id:_ ~cancel ~emit ->
+         background_outcome
+           ~provider
+           background
+           ~id
+           (continue_run
+              ?inbox
+              ~provider
+              ~resumable:Background
+              state
+              { state.context with cancel; emit; on_output = ignore }
+              ~max_turns
+              ~message));
   outcome_of result ~parked:out_of_turns
 ;;
 
-(* A synchronous one is parked in its caller's tasks, which run it again
-   from [subagent_continue] (in the caller's run, with that call's
+(* A non-cancelled synchronous subagent is parked in its caller's tasks, which
+   run it again from [subagent_continue] (in the caller's run, with that call's
    [cancel] and [emit]). *)
-let rec park_sync ~provider tasks (state : State.t) =
+let rec park_sync ~provider tasks ~out_of_turns (state : State.t) =
   Background_tasks.park
     tasks
     state.agent_id
-    ~out_of_turns:true
+    ~out_of_turns
     (fun ~max_turns ~message ~inbox:_ ~call_id ~cancel ~emit ->
        let call_id = Option.value call_id ~default:state.context.call_id in
-       let result, state, out_of_turns =
+       let result, state, out_of_turns, cancelled =
          continue_run
            ~provider
            ~resumable:(Sync tasks)
@@ -905,27 +1349,58 @@ let rec park_sync ~provider tasks (state : State.t) =
            ~max_turns
            ~message
        in
-       if out_of_turns then park_sync ~provider tasks state;
+       if not cancelled then park_sync ~provider tasks ~out_of_turns state;
        outcome_of result ~parked:out_of_turns)
 ;;
 
-let create
+let rec create_with
+          ?name_task
+          ~models
+          ~worktrees_dir
+          ~compaction
+          ~user_info
+          ~custom_instructions
+          ~hosts
+          ~engines
+          ~default_engine
+          ~(spec : Tool_spec.t)
+          ~provider
+          ~current_model
+          ~current_thinking
+          ~home
+          ()
+  =
+  let make_nested ~default_engine =
+    create_with
       ?name_task
-      ?(models = Model_registry.builtin ())
-      ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
-      ?(compaction = fun () -> Compaction_settings.window_only)
-      ?(user_info = fun () -> None)
-      ?(custom_instructions = fun () -> [])
-      ?(hosts = fun () -> [])
+      ~models
+      ~worktrees_dir
+      ~compaction
+      ~user_info
+      ~custom_instructions
+      ~hosts
+      ~engines
+      ~default_engine:(Some default_engine)
+      ~spec:{ spec with description = sync_description }
       ~provider
       ~current_model
       ~current_thinking
       ~home
       ()
-  =
+  in
   let run (context : Tool.Context.t) args =
+    let engines_opt = engines () in
     let prepared =
-      prepare ~models ~hosts ~current_model ~current_thinking context args
+      prepare
+        ~models
+        ~hosts
+        ~engines_opt
+        ~default_engine
+        ~current_model
+        ~current_thinking
+        ~make_nested
+        context
+        args
     in
     (* From here on, its host's: its worktree, instructions and tools. *)
     let context =
@@ -977,6 +1452,7 @@ let create
                  (execute
                     ~inbox
                     ~provider
+                    ~engines_opt
                     ~compaction
                     ~home
                     ~user_info
@@ -986,13 +1462,24 @@ let create
                     prepared
                     ~agent_id:id))
          in
+         let where =
+           List.filter_opt
+             [ Option.map prepared.engine_label ~f:(fun _ ->
+                 Engine_choice.display_name prepared.choice)
+             ; Option.map prepared.host ~f:(fun h -> h.name)
+             ]
+         in
+         let where_text =
+           match where with
+           | [] -> ""
+           | parts -> " on " ^ String.concat ~sep:", " parts
+         in
          Tool.Result.ok
            (sprintf
               "started agent %s%s (%s%s); its result will be delivered to you \
                when it finishes: keep working or end your turn meanwhile"
               id
-              (Option.value_map prepared.host ~default:"" ~f:(fun h ->
-                 " on " ^ h.name))
+              where_text
               (if Option.is_some prepared.fork then "forked: " else "")
               (Background_tasks.short_task prepared.task))
        | _, resumable ->
@@ -1001,9 +1488,10 @@ let create
            | None -> context.call_id
            | Some parent -> parent ^ "/" ^ context.call_id
          in
-         let result, state, out_of_turns =
+         let result, state, out_of_turns, cancelled =
            execute
              ~provider
+             ~engines_opt
              ~compaction
              ~home
              ~user_info
@@ -1014,11 +1502,45 @@ let create
              ~agent_id
          in
          (match resumable with
-          | Sync tasks when out_of_turns -> park_sync ~provider tasks state
+          | Sync tasks when not cancelled ->
+            park_sync ~provider tasks ~out_of_turns state
           | Background | Sync _ | No -> ());
          result)
   in
   { Tool.spec; run }
+;;
+
+let create
+      ?name_task
+      ?(models = Model_registry.builtin ())
+      ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
+      ?(compaction = fun () -> Compaction_settings.window_only)
+      ?(user_info = fun () -> None)
+      ?(custom_instructions = fun () -> [])
+      ?(hosts = fun () -> [])
+      ?(engines = fun () -> None)
+      ~provider
+      ~current_model
+      ~current_thinking
+      ~home
+      ()
+  =
+  create_with
+    ?name_task
+    ~models
+    ~worktrees_dir
+    ~compaction
+    ~user_info
+    ~custom_instructions
+    ~hosts
+    ~engines
+    ~default_engine:None
+    ~spec
+    ~provider
+    ~current_model
+    ~current_thinking
+    ~home
+    ()
 ;;
 
 let background_of (context : Tool.Context.t) =
@@ -1117,20 +1639,21 @@ let continue_tool =
     control_spec
       ~name:continue_name
       ~description:
-        "Give a subagent that ran out of turns more turns: it carries on from \
-         where it stopped, with its context, under the same id. A background \
-         one runs in the background again and its report arrives as usual; \
-         your own synchronous subagent's runs now and returns its report."
+        "Continue a finished, failed, or out-of-turns subagent: it carries on \
+         from where it stopped, with its context (or external thread), under \
+         the same id. A background one runs in the background again and its \
+         report arrives as usual; your own synchronous subagent runs now and \
+         returns its report."
       (Tool_args.schema
          ~required:[ "id" ]
-         [ "id", `String, "Agent id (its out-of-turns report names it)"
+         [ "id", `String, "Agent id"
          ; ( "max_turns"
            , `Integer
            , "How many more turns (default: its limit when it started)" )
          ; ( "message"
            , `String
-           , "Something to tell it first, as from its caller (e.g. what to \
-              focus on)" )
+           , "Follow-up message to send it, as from its caller (e.g. what to \
+              do next or focus on)" )
          ])
   in
   let run (context : Tool.Context.t) args =

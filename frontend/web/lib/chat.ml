@@ -39,6 +39,8 @@ and subagent =
   { agent_id : string
   ; task : string
   ; model : string
+  ; host : string option [@sexp.option]
+  ; engine : string option [@sexp.option]
   ; forked : bool
   ; chat : t
   ; turns : int
@@ -58,6 +60,8 @@ module Subagent = struct
     { agent_id : string
     ; task : string
     ; model : string
+    ; host : string option [@sexp.option]
+    ; engine : string option [@sexp.option]
     ; forked : bool
     ; chat : t
     ; turns : int
@@ -424,7 +428,8 @@ let rec apply t (event : Event.t) =
      | None -> allow t
      | Some agent_id ->
        map_subagent t agent_id ~f:(fun s -> { s with chat = allow s.chat }))
-  | Subagent_start { call_id; agent_id; task; model; forked; continued; _ } ->
+  | Subagent_start
+      { call_id; agent_id; task; model; host; engine; forked; continued; _ } ->
     update_tool t call_id ~f:(fun tool ->
       { tool with
         subagent =
@@ -437,6 +442,8 @@ let rec apply t (event : Event.t) =
                { agent_id
                ; task
                ; model
+               ; host
+               ; engine
                ; forked
                ; chat = empty
                ; turns = 0

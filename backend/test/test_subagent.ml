@@ -308,6 +308,7 @@ let%expect_test "Rpc_json encodes nested subagent events" =
       ; thinking = Thinking.default
       ; tools = [ "read"; "ls" ]
       ; host = None
+      ; engine = None
       ; cwd = "/w"
       ; worktree = None
       ; forked = false
@@ -357,6 +358,7 @@ let%expect_test
        ; thinking = Thinking.default
        ; tools = []
        ; host = None
+       ; engine = None
        ; cwd = "/w"
        ; worktree = None
        ; forked = false

@@ -152,6 +152,7 @@ module Request_kind = struct
     | New_session
     | Load_session
     | Resume_session
+    | Close_session
     | Prompt
     | Set_mode
     | Set_config_option
@@ -171,6 +172,7 @@ module Response = struct
         ; session_id : string
         ; config : Session_config.t
         }
+    | Session_closed
     | Mode_set of string
     | Config_set of Config_option.t list
     | Failed of
@@ -230,6 +232,7 @@ module Pending = struct
     | New_session
     | Load_session of string
     | Resume_session of string
+    | Close_session
     | Prompt
     | Steer (* a message for the running turn *)
     | Set_mode of string
@@ -243,6 +246,7 @@ module Pending = struct
     | New_session -> New_session
     | Load_session _ -> Load_session
     | Resume_session _ -> Resume_session
+    | Close_session -> Close_session
     | Prompt | Steer -> Prompt
     | Set_mode _ -> Set_mode
     | Set_config_option _ | Set_model _ -> Set_config_option
@@ -253,11 +257,18 @@ module Tool = struct
   type t =
     { acp_kind : string
     ; kind : Adapter_event.Tool_kind.t
+    ; native_name : string
+    ; title : string
+    ; input : Json.t
     ; mutable output : string
     ; mutable changes : Adapter_event.Change.t list
     ; mutable images : Image.t list
     ; mutable running : bool (* said to be [in_progress] *)
     ; mutable ended : bool
+    ; mutable backgrounded : bool
+      (* still running across [end_turn Done]: settled in the prior turn so
+         its recorder closes cleanly, kept in [t.tools] so [has_open_work]
+         stays true and a later update re-opens it in the next turn *)
     }
 end
 
@@ -286,6 +297,8 @@ module Turn = struct
   type t =
     { id : string
     ; mutable cancelled : bool
+    ; mutable autonomous : bool
+    ; mutable saw_text : bool
     ; mutable text : Open_item.t option
     ; mutable thought : Open_item.t option
     ; mutable items : int
@@ -438,6 +451,21 @@ let resume_session t ~session_id ~cwd ~mcp_servers =
     ~mcp_servers
 ;;
 
+let close_session_for t ~session_id =
+  request
+    t
+    Close_session
+    "session/close"
+    (`Object [ "sessionId", `String session_id ])
+;;
+
+let close_session t =
+  match t.session_id, t.capabilities with
+  | Some session_id, Some { close_session = true; _ } ->
+    Some (close_session_for t ~session_id)
+  | _ -> None
+;;
+
 let content_block : Input.t -> Json.t = function
   | Text text -> `Object [ "type", `String "text"; "text", `String text ]
   | Image { mime_type; data } ->
@@ -458,8 +486,25 @@ let refuses_images t inputs =
 let prompt t inputs =
   match t.session_id, t.turn with
   | None, _ -> Or_error.error_string "no ACP session yet"
-  | Some _, Some turn ->
+  | Some _, Some ({ autonomous = false; _ } as turn) ->
     Or_error.error_s [%message "a turn is already running" ~turn:turn.id]
+  | Some session_id, Some ({ autonomous = true; _ } as turn) ->
+    if refuses_images t inputs
+    then Or_error.error_string "this agent does not take images"
+    else (
+      turn.autonomous <- false;
+      turn.prompts <- turn.prompts + 1;
+      let line =
+        request
+          t
+          Prompt
+          "session/prompt"
+          (`Object
+              [ "sessionId", `String session_id
+              ; "prompt", `Array (List.map inputs ~f:content_block)
+              ])
+      in
+      Ok [ Output.Send line ])
   | Some session_id, None ->
     if refuses_images t inputs
     then Or_error.error_string "this agent does not take images"
@@ -468,6 +513,8 @@ let prompt t inputs =
       let turn =
         { Turn.id = sprintf "turn-%d" t.turns
         ; cancelled = false
+        ; autonomous = false
+        ; saw_text = false
         ; text = None
         ; thought = None
         ; items = 0
@@ -499,6 +546,7 @@ let steer t inputs =
   | Some _, Some _, _ when refuses_images t inputs ->
     Or_error.error_string "this agent does not take images"
   | Some session_id, Some turn, Prompt ->
+    turn.autonomous <- false;
     turn.prompts <- turn.prompts + 1;
     Ok
       [ Output.Send
@@ -1109,6 +1157,32 @@ module Tool_class = struct
   ;;
 end
 
+let mcp_of_name name =
+  match String.chop_prefix name ~prefix:"mcp__" with
+  | Some rest ->
+    (match String.substr_index rest ~pattern:"__" with
+     | Some i ->
+       Some
+         (Adapter_event.Tool_kind.Mcp
+            { server = String.prefix rest i
+            ; tool = String.drop_prefix rest (i + 2)
+            })
+     | None -> None)
+  | None ->
+    (match
+       String.chop_prefix
+         name
+         ~prefix:("mcp_" ^ Injected_tools.server_name ^ "_")
+     with
+     | Some tool
+       when Option.is_some
+              (Injected_tools.canonical_of_mcp
+                 ~server:Injected_tools.server_name
+                 ~tool) ->
+       Some (Mcp { server = Injected_tools.server_name; tool })
+     | Some _ | None -> None)
+;;
+
 (* What a call is, and the name it goes by: when not sure, [Other] with the
    agent's own title, rather than a wrong prigh tool. *)
 let tool_kind ~acp_kind ~name ~meta ~title ~raw_input
@@ -1116,33 +1190,38 @@ let tool_kind ~acp_kind ~name ~meta ~title ~raw_input
   =
   let tool_name = Tool_class.tool_name ~name ~meta ~title in
   let native default = Option.value tool_name ~default in
-  let classified =
-    match acp_kind with
-    | "search" | "fetch" | "other" ->
-      let by_name = Option.bind tool_name ~f:Tool_class.of_name in
-      (match by_name, acp_kind with
-       | Some c, _ -> Some c
-       | None, "other" -> None
-       | None, _ ->
-         Option.first_some
-           (Tool_class.of_input raw_input)
-           (Option.first_some
-              (Tool_class.of_title title)
-              (Option.some_if
-                 (String.equal acp_kind "fetch")
-                 Tool_class.Web_fetch)))
-    | _ -> None
-  in
-  match classified, acp_kind with
-  | Some (Web_search | Web_fetch), _ -> Web_search, native acp_kind
-  | Some Code_search, _ -> Search, native acp_kind
-  | None, "read" -> Read, native acp_kind
-  | None, ("edit" | "delete" | "move") -> File_change, native acp_kind
-  | None, "execute" -> Command, native acp_kind
-  | None, ("think" | "switch_mode") -> Other acp_kind, native acp_kind
-  | None, _ ->
-    let native = native title in
-    Other native, native
+  match
+    Option.first_some (Option.bind tool_name ~f:mcp_of_name) (mcp_of_name title)
+  with
+  | Some mcp -> mcp, native title
+  | None ->
+    let classified =
+      match acp_kind with
+      | "search" | "fetch" | "other" ->
+        let by_name = Option.bind tool_name ~f:Tool_class.of_name in
+        (match by_name, acp_kind with
+         | Some c, _ -> Some c
+         | None, "other" -> None
+         | None, _ ->
+           Option.first_some
+             (Tool_class.of_input raw_input)
+             (Option.first_some
+                (Tool_class.of_title title)
+                (Option.some_if
+                   (String.equal acp_kind "fetch")
+                   Tool_class.Web_fetch)))
+      | _ -> None
+    in
+    (match classified, acp_kind with
+     | Some (Web_search | Web_fetch), _ -> Web_search, native acp_kind
+     | Some Code_search, _ -> Search, native acp_kind
+     | None, "read" -> Read, native acp_kind
+     | None, ("edit" | "delete" | "move") -> File_change, native acp_kind
+     | None, "execute" -> Command, native acp_kind
+     | None, ("think" | "switch_mode") -> Other acp_kind, native acp_kind
+     | None, _ ->
+       let native = native title in
+       Other native, native)
 ;;
 
 let next_item (turn : Turn.t) prefix =
@@ -1172,12 +1251,37 @@ let close_items t =
   | Some turn -> close_text turn @ close_thought turn
 ;;
 
+(* When the agent resumes on its own between prompts (e.g. woken by a
+   background task), open an autonomous turn so its streaming updates, tool
+   calls and approvals are not dropped. *)
+let ensure_autonomous_turn t =
+  match t.turn, t.session_id with
+  | None, Some _ when not t.loading ->
+    t.turns <- t.turns + 1;
+    let turn =
+      { Turn.id = sprintf "turn-%d" t.turns
+      ; cancelled = false
+      ; autonomous = true
+      ; saw_text = false
+      ; text = None
+      ; thought = None
+      ; items = 0
+      ; prompts = 0
+      ; usage = None
+      }
+    in
+    t.turn <- Some turn;
+    [ Output.Event (Turn_started { turn_id = turn.id }) ]
+  | _ -> []
+;;
+
 (* Appends to the open item of the kind, opening one (and closing the other
    kind's) when there is none or the agent's message id changed. *)
 let chunk t ~thought ~message_id text =
   match t.turn with
   | None -> []
   | Some turn ->
+    if not thought then turn.saw_text <- true;
     let current = if thought then turn.thought else turn.text in
     let continues =
       match current, message_id with
@@ -1216,7 +1320,28 @@ let chunk t ~thought ~message_id text =
       ]
 ;;
 
-let tool_input ~(kind : Adapter_event.Tool_kind.t) ~title raw : Json.t =
+let first_location_path update =
+  List.find_map (items "locations" update) ~f:(fun loc -> str "path" loc)
+;;
+
+let has_path_field fields =
+  List.exists fields ~f:(fun (k, _) ->
+    List.mem
+      [ "file_path"; "path"; "notebook_path" ]
+      (String.lowercase k)
+      ~equal:String.equal)
+;;
+
+let has_command_field fields =
+  List.exists fields ~f:(fun (k, _) ->
+    List.mem
+      [ "command"; "command_line"; "commandline" ]
+      (String.lowercase k)
+      ~equal:String.equal)
+;;
+
+let tool_input ?location ~(kind : Adapter_event.Tool_kind.t) ~title raw : Json.t
+  =
   let fields =
     match raw with
     | Some (`Object fields) -> fields
@@ -1224,8 +1349,13 @@ let tool_input ~(kind : Adapter_event.Tool_kind.t) ~title raw : Json.t =
     | Some other -> [ "input", other ]
   in
   match kind with
-  | Command when not (List.Assoc.mem fields ~equal:String.equal "command") ->
+  | Command when not (has_command_field fields) ->
     `Object (fields @ [ "command", `String title ])
+  | Read | File_change ->
+    (match location with
+     | Some path when not (has_path_field fields) ->
+       `Object (fields @ [ "path", `String path ])
+     | Some _ | None -> `Object fields)
   | _ -> `Object fields
 ;;
 
@@ -1250,9 +1380,35 @@ let change ~acp_kind diff : Adapter_event.Change.t option =
   | _ -> None
 ;;
 
+let error_field_text = function
+  | Some (`String s) when not (String.is_empty s) -> Some s
+  | Some (`Object _ as o) -> Option.first_some (str "message" o) (str "error" o)
+  | _ -> None
+;;
+
+let content_texts blocks =
+  List.filter_map blocks ~f:(fun b ->
+    match str "type" b with
+    | Some "content" -> block_text (obj (field "content" b))
+    | _ -> block_text b)
+;;
+
 let raw_output_text = function
   | None | Some `Null -> None
-  | Some (`String s) -> Some s
+  | Some (`String s) -> Option.some_if (not (String.is_empty s)) s
+  | Some (`Object _ as json) ->
+    (match field "content" json with
+     | Some (`Array blocks) ->
+       (match content_texts blocks with
+        | _ :: _ as texts -> Some (String.concat ~sep:"\n" texts)
+        | [] ->
+          Option.first_some
+            (error_field_text (field "error" json))
+            (Some (Json.to_string json)))
+     | _ ->
+       Option.first_some
+         (error_field_text (field "error" json))
+         (Some (Json.to_string json)))
   | Some json -> Some (Json.to_string json)
 ;;
 
@@ -1268,25 +1424,27 @@ let apply_tool t id (tool : Tool.t) update =
     match content with
     | None -> []
     | Some blocks ->
-      let texts =
+      let texts = content_texts blocks in
+      let output = String.concat ~sep:"\n" texts in
+      let changes =
         List.filter_map blocks ~f:(fun b ->
           match str "type" b with
-          | Some "content" -> block_text (obj (field "content" b))
+          | Some "diff" -> change ~acp_kind:tool.acp_kind b
           | _ -> None)
       in
-      let output = String.concat ~sep:"\n" texts in
-      tool.changes
-      <- List.filter_map blocks ~f:(fun b ->
-           match str "type" b with
-           | Some "diff" -> change ~acp_kind:tool.acp_kind b
-           | _ -> None);
-      tool.images
-      <- List.filter_map blocks ~f:(fun b ->
-           match str "type" b with
-           | Some "content" -> block_image (obj (field "content" b))
-           | _ -> None);
+      let images =
+        List.filter_map blocks ~f:(fun b ->
+          match str "type" b with
+          | Some "content" -> block_image (obj (field "content" b))
+          | _ -> block_image b)
+      in
+      if not (List.is_empty blocks)
+      then (
+        tool.changes <- changes;
+        tool.images <- images);
       let previous = tool.output in
-      tool.output <- output;
+      if (not (List.is_empty texts)) || String.is_empty previous
+      then tool.output <- output;
       if
         String.length output > String.length previous
         && String.is_prefix output ~prefix:previous
@@ -1316,7 +1474,10 @@ let apply_tool t id (tool : Tool.t) update =
       let output =
         if String.is_empty tool.output
         then
-          Option.value (raw_output_text (field "rawOutput" update)) ~default:""
+          Option.first_some
+            (raw_output_text (field "rawOutput" update))
+            (error_field_text (field "error" update))
+          |> Option.value ~default:""
         else tool.output
       in
       [ Output.Event
@@ -1334,12 +1495,27 @@ let apply_tool t id (tool : Tool.t) update =
   running @ updates @ ended
 ;;
 
-(* The call [update] names, started (with [Tool_start]) if it is new. *)
+(* The call [update] names, started (with [Tool_start]) if it is new or
+   re-opening in a new turn after staying open across [end_turn Done]. *)
 let tool_of_update t update =
   match str "toolCallId" update with
   | None -> None
   | Some id ->
     (match Hashtbl.find t.tools id with
+     | Some tool when tool.backgrounded ->
+       tool.backgrounded <- false;
+       let start =
+         Output.Event
+           (Tool_start
+              { id
+              ; kind = tool.kind
+              ; native_name = tool.native_name
+              ; title = tool.title
+              ; input = tool.input
+              ; parent = None
+              })
+       in
+       Some (id, tool, close_items t @ [ start ])
      | Some tool -> Some (id, tool, [])
      | None ->
        let acp_kind = Option.value (str "kind" update) ~default:"other" in
@@ -1353,27 +1529,31 @@ let tool_of_update t update =
            ~title
            ~raw_input
        in
+       let input =
+         tool_input
+           ?location:(first_location_path update)
+           ~kind
+           ~title
+           raw_input
+       in
        let tool =
          { Tool.acp_kind
          ; kind
+         ; native_name
+         ; title
+         ; input
          ; output = ""
          ; changes = []
          ; images = []
          ; running = false
          ; ended = false
+         ; backgrounded = false
          }
        in
        Hashtbl.set t.tools ~key:id ~data:tool;
        let start =
          Output.Event
-           (Tool_start
-              { id
-              ; kind
-              ; native_name
-              ; title
-              ; input = tool_input ~kind ~title raw_input
-              ; parent = None
-              })
+           (Tool_start { id; kind; native_name; title; input; parent = None })
        in
        Some (id, tool, close_items t @ [ start ]))
 ;;
@@ -1488,17 +1668,27 @@ let on_update t params =
   | Some "agent_message_chunk" ->
     (match block_text (obj (field "content" update)) with
      | Some text when not (String.is_empty text) ->
-       chunk t ~thought:false ~message_id:(str "messageId" update) text
+       ensure_autonomous_turn t
+       @ chunk t ~thought:false ~message_id:(str "messageId" update) text
      | _ -> [])
   | Some "agent_thought_chunk" ->
     (match block_text (obj (field "content" update)) with
      | Some text when not (String.is_empty text) ->
-       chunk t ~thought:true ~message_id:(str "messageId" update) text
+       ensure_autonomous_turn t
+       @ chunk t ~thought:true ~message_id:(str "messageId" update) text
      | _ -> [])
-  | Some ("tool_call" | "tool_call_update") when Option.is_none t.turn ->
-    (* After its prompt was answered: no turn to show it in. *)
-    []
-  | Some ("tool_call" | "tool_call_update") -> on_tool_update t update
+  | Some ("tool_call" | "tool_call_update") ->
+    let opened = ensure_autonomous_turn t in
+    (match t.turn with
+     | None -> []
+     | Some turn ->
+       let events = on_tool_update t update in
+       if
+         List.exists events ~f:(function
+           | Output.Event (Tool_start _) -> true
+           | _ -> false)
+       then turn.saw_text <- false;
+       opened @ events)
   | Some "plan" -> on_plan (items "entries" update)
   | Some "usage_update" -> on_usage t update
   | Some "notice" ->
@@ -1541,22 +1731,42 @@ let on_update t params =
   | _ -> []
 ;;
 
-let settle_tools t =
+let settle_tools ~(stop : Adapter_event.Stop.t) t =
   let open_ =
     Hashtbl.to_alist t.tools
-    |> List.filter ~f:(fun (_, (tool : Tool.t)) -> not tool.ended)
+    |> List.filter ~f:(fun (_, (tool : Tool.t)) ->
+      (not tool.ended) && not tool.backgrounded)
     |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
   in
-  Hashtbl.clear t.tools;
-  List.map open_ ~f:(fun (id, (tool : Tool.t)) ->
-    Output.Event
-      (Tool_end
-         { id
-         ; ok = false
-         ; output = tool.output
-         ; changes = tool.changes
-         ; images = tool.images
-         }))
+  match stop with
+  | Done ->
+    Hashtbl.filter_inplace t.tools ~f:(fun (tool : Tool.t) -> not tool.ended);
+    List.map open_ ~f:(fun (id, (tool : Tool.t)) ->
+      tool.backgrounded <- true;
+      let output =
+        if String.is_empty tool.output
+        then "[running in background]"
+        else sprintf "%s\n[running in background]" (String.rstrip tool.output)
+      in
+      Output.Event
+        (Tool_end
+           { id
+           ; ok = true
+           ; output
+           ; changes = tool.changes
+           ; images = tool.images
+           }))
+  | Interrupted | Failed _ ->
+    Hashtbl.clear t.tools;
+    List.map open_ ~f:(fun (id, (tool : Tool.t)) ->
+      Output.Event
+        (Tool_end
+           { id
+           ; ok = false
+           ; output = tool.output
+           ; changes = tool.changes
+           ; images = tool.images
+           }))
 ;;
 
 let end_turn t (stop : Adapter_event.Stop.t) =
@@ -1564,7 +1774,7 @@ let end_turn t (stop : Adapter_event.Stop.t) =
   | None -> []
   | Some turn ->
     let closed = close_items t in
-    let settled = settle_tools t in
+    let settled = settle_tools ~stop t in
     let withdrawn = withdraw_permissions t ~reply:false in
     let unasked = withdraw_questions t in
     t.turn <- None;
@@ -1573,6 +1783,31 @@ let end_turn t (stop : Adapter_event.Stop.t) =
     @ withdrawn
     @ unasked
     @ [ Output.Event (Turn_end { turn_id = Some turn.id; stop }) ]
+;;
+
+let is_autonomous_turn t =
+  match t.turn with
+  | Some { autonomous = true; _ } -> true
+  | Some _ | None -> false
+;;
+
+let autonomous_has_text t =
+  match t.turn with
+  | Some { autonomous = true; saw_text; _ } -> saw_text
+  | Some _ | None -> false
+;;
+
+let has_open_work t =
+  Hashtbl.exists t.tools ~f:(fun (tool : Tool.t) -> not tool.ended)
+  || Hashtbl.length t.permissions > 0
+  || Hashtbl.length t.questions > 0
+;;
+
+let finish_autonomous t =
+  match t.turn with
+  | Some { autonomous = true; cancelled; _ } ->
+    end_turn t (if cancelled then Interrupted else Done)
+  | Some _ | None -> []
 ;;
 
 let known_stop_reasons =
@@ -1702,6 +1937,9 @@ let on_response t ~id ~result ~error =
              let config = parse_session_config t result in
              t.config <- config;
              [ Output.Response (Session_opened { kind; session_id; config }) ])
+        | Close_session ->
+          t.session_id <- None;
+          [ Output.Response Session_closed ]
         | Steer -> []
         | Prompt when steered t ->
           note_usage t result;
@@ -1772,6 +2010,7 @@ let on_permission t ~id params =
        cancelled. *)
     [ Output.Send (result_line id cancelled_outcome) ]
   | _ ->
+    let opened = ensure_autonomous_turn t in
     Hashtbl.set
       t.permissions
       ~key:request_id
@@ -1782,14 +2021,20 @@ let on_permission t ~id params =
       | None -> [], Other "other", None
     in
     let title = Option.value (str "title" tool_call) ~default:"" in
-    started
+    opened
+    @ started
     @ [ Output.Event
           (Approval_request
              { request_id
              ; tool_id
              ; kind
              ; summary = title
-             ; input = tool_input ~kind ~title (field "rawInput" tool_call)
+             ; input =
+                 tool_input
+                   ?location:(first_location_path tool_call)
+                   ~kind
+                   ~title
+                   (field "rawInput" tool_call)
              ; offers_always =
                  List.exists options ~f:(fun (_, k) ->
                    String.equal k "allow_always")

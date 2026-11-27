@@ -16,7 +16,9 @@ let default_names ~native_questions =
   ; Tool_worktree.name
   ; Tool_review_reply.name
   ; Goal.tool_name
+  ; Tool_subagent.name
   ]
+  @ List.map Tool_subagent.control_tools ~f:Tool.name
   @ if native_questions then [] else [ Tool_ask_user.name ]
 ;;
 
@@ -108,14 +110,32 @@ let initialize params =
       , `String
           "prigh's tools for the user's session: components shown in the chat, \
            the user's memory, other sessions, pull requests, issues and CI \
-           through the user's sign-in, and worktrees." )
+           through the user's sign-in, worktrees, and subagents. Always use \
+           prigh's subagent (and subagent_*) tools — not your own built-in or \
+           native subagent, agent, task or swarm tools — when spawning or \
+           managing subagents, so they run in prigh's UI with live progress, \
+           worktree tracking and steering (defaults to this session's engine, \
+           model and host; only switch engine, model or host when the user \
+           explicitly asks)." )
     ]
 ;;
 
+let subagent_mcp_prefix =
+  "PREFERRED: Always use this prigh subagent tool (and subagent_*) instead of \
+   any built-in or native subagent, invoke_subagent, Agent, Task or swarm \
+   tool, so subagents appear in prigh's UI with live progress, worktree \
+   tracking and steering. "
+;;
+
 let tool_json (tool : Tool.t) =
+  let description =
+    if String.equal tool.spec.name Tool_subagent.name
+    then subagent_mcp_prefix ^ tool.spec.description
+    else tool.spec.description
+  in
   `Object
     [ "name", `String tool.spec.name
-    ; "description", `String tool.spec.description
+    ; "description", `String description
     ; "inputSchema", tool.spec.parameters
     ]
 ;;
@@ -224,6 +244,16 @@ module Bridge = struct
     { command = prigh
     ; args = [ "mcp-bridge" ]
     ; env = [ Mcp_bridge.socket_env, socket; Mcp_bridge.token_env, token ]
+    }
+  ;;
+
+  let with_route t ~route =
+    { t with
+      env =
+        List.map t.env ~f:(fun (k, v) ->
+          if String.equal k Mcp_bridge.token_env
+          then k, v ^ ":" ^ route
+          else k, v)
     }
   ;;
 

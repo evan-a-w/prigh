@@ -10,6 +10,7 @@ module Settings = struct
     ; plan : bool
     ; efforts : string list option
     ; sandbox : bool
+    ; writable_roots : string list
     }
   [@@deriving sexp_of]
 end
@@ -28,6 +29,7 @@ module Thread_options = struct
     ; mcp_servers : (string * Json.t) list
     ; dynamic_tools : Dynamic_tool.t list
     ; config : (string * Json.t) list
+    ; ephemeral : bool
     }
 
   let empty =
@@ -35,6 +37,7 @@ module Thread_options = struct
     ; mcp_servers = []
     ; dynamic_tools = []
     ; config = []
+    ; ephemeral = false
     }
   ;;
 end
@@ -317,14 +320,18 @@ let sandbox_mode (s : Settings.t) =
 ;;
 
 let sandbox_policy (s : Settings.t) =
-  let type_ =
-    match s.approval with
-    | _ when not s.sandbox -> "dangerFullAccess"
-    | Ask -> "readOnly"
-    | Auto_edit | Smart -> "workspaceWrite"
-    | Auto -> "dangerFullAccess"
-  in
-  `Object [ "type", `String type_ ]
+  match s.approval with
+  | _ when not s.sandbox -> `Object [ "type", `String "dangerFullAccess" ]
+  | Ask -> `Object [ "type", `String "readOnly" ]
+  | Auto_edit | Smart ->
+    let roots =
+      match s.writable_roots with
+      | [] -> []
+      | roots ->
+        [ "writableRoots", `Array (List.map roots ~f:(fun r -> `String r)) ]
+    in
+    `Object (("type", `String "workspaceWrite") :: roots)
+  | Auto -> `Object [ "type", `String "dangerFullAccess" ]
 ;;
 
 (* Codex's efforts, lowest first. *)
@@ -365,10 +372,19 @@ let thread_params
       (o : Thread_options.t)
   =
   let config =
-    ("tools.update_plan.enabled", `True)
-    :: (List.map o.mcp_servers ~f:(fun (name, server) ->
-          "mcp_servers." ^ name, server)
-        @ o.config)
+    let writable_roots =
+      match s.writable_roots, sandbox_mode s with
+      | (_ :: _ as roots), "workspace-write" ->
+        [ ( "sandbox_workspace_write.writable_roots"
+          , `Array (List.map roots ~f:(fun r -> `String r)) )
+        ]
+      | _ -> []
+    in
+    (if o.ephemeral then [] else [ "tools.update_plan.enabled", `True ])
+    @ writable_roots
+    @ List.map o.mcp_servers ~f:(fun (name, server) ->
+      "mcp_servers." ^ name, server)
+    @ o.config
   in
   let dynamic_tools =
     match o.dynamic_tools with
@@ -390,6 +406,9 @@ let thread_params
     [ opt "threadId" (fun id -> `String id) thread_id
     ; opt "lastTurnId" (fun id -> `String id) last_turn_id
     ; Option.map thread_id ~f:(fun _ -> "excludeTurns", `True)
+    ; Option.some_if
+        (o.ephemeral && Option.is_none thread_id)
+        ("ephemeral", `True)
     ; Some ("cwd", `String s.cwd)
     ; opt "model" (fun m -> `String m) s.model
     ; Some ("approvalPolicy", approval_policy)
@@ -1457,6 +1476,17 @@ let notification t method_ params =
   | "thread/tokenUsage/updated" ->
     (match owner t params with
      | `Main -> token_usage t params
+     | `Subagent _ | `Unknown -> [])
+  | "thread/name/updated" ->
+    (match owner t params with
+     | `Main ->
+       (match
+          Option.first_some (str "threadName" params) (str "name" params)
+          |> Option.map ~f:String.strip
+        with
+        | Some title when not (String.is_empty title) ->
+          [ event (Session_title title) ]
+        | _ -> [])
      | `Subagent _ | `Unknown -> [])
   | "error" ->
     (match owner t params with

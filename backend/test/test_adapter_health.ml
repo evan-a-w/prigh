@@ -643,9 +643,19 @@ let script t name body =
 
 let with_path t f =
   let old_path = Sys.getenv "PATH" in
+  let has_cli dir =
+    List.exists [ "codex"; "claude"; "agy"; "grok" ] ~f:(fun name ->
+      Sys_unix.file_exists_exn (Filename.concat dir name))
+  in
+  let clean_old =
+    Option.value_map old_path ~default:[] ~f:(fun p ->
+      String.split p ~on:':'
+      |> List.filter ~f:(fun dir ->
+        (not (String.is_empty dir)) && not (has_cli dir)))
+  in
   Core_unix.putenv
     ~key:"PATH"
-    ~data:(Filename.concat t.dir "bin" ^ ":" ^ Option.value old_path ~default:"");
+    ~data:(String.concat ~sep:":" (Filename.concat t.dir "bin" :: clean_old));
   Exn.protect ~f ~finally:(fun () ->
     Option.iter old_path ~f:(fun data -> Core_unix.putenv ~key:"PATH" ~data))
 ;;

@@ -19,6 +19,7 @@ let settings ?(approval = Approval_mode.Auto) ?model () =
   ; plan = false
   ; efforts = None
   ; sandbox = true
+  ; writable_roots = []
   }
 ;;
 
@@ -1374,7 +1375,8 @@ let%expect_test "what a thread and a turn are started with" =
     (C.start_thread
        codec
        (settings ~approval:Ask ~model:"gpt-5.5" ())
-       { developer_instructions = Some "Be brief."
+       { Codex_codec.Thread_options.empty with
+         developer_instructions = Some "Be brief."
        ; mcp_servers =
            [ ( "prigh"
              , `Object
@@ -1426,6 +1428,31 @@ let%expect_test "what a thread and a turn are started with" =
     -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"workspaceWrite"},"effort":"low","summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":"low","developer_instructions":null}}}}
     -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"workspaceWrite"},"summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":null,"developer_instructions":null}}}}
     -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"dangerFullAccess"},"effort":"xhigh","summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":"xhigh","developer_instructions":null}}}}
+    |}]
+;;
+
+let%expect_test "writable_roots apply to workspaceWrite sandbox only" =
+  let roots =
+    [ "/home/u/.prigh/worktrees"; "/home/u/.prigh/worktrees/app/feat" ]
+  in
+  List.iter [ Approval_mode.Ask; Smart; Auto ] ~f:(fun approval ->
+    let codec = C.create () in
+    let s = { (settings ~approval ()) with writable_roots = roots } in
+    print_line (C.start_thread codec s C.Thread_options.empty);
+    ignore
+      (C.handle_line
+         codec
+         {|{"id":0,"result":{"thread":{"id":"th-1"},"model":"gpt-5.5"}}|}
+       : C.Output.t list);
+    print_line (Or_error.ok_exn (C.start_turn codec s [ Text "go" ])));
+  [%expect
+    {|
+    -> {"id":0,"method":"thread/start","params":{"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":"read-only","config":{"tools.update_plan.enabled":true}}}
+    -> {"id":1,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"go"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"readOnly"},"summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":null,"developer_instructions":null}}}}
+    -> {"id":0,"method":"thread/start","params":{"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":"workspace-write","config":{"tools.update_plan.enabled":true,"sandbox_workspace_write.writable_roots":["/home/u/.prigh/worktrees","/home/u/.prigh/worktrees/app/feat"]}}}
+    -> {"id":1,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"go"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"workspaceWrite","writableRoots":["/home/u/.prigh/worktrees","/home/u/.prigh/worktrees/app/feat"]},"summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":null,"developer_instructions":null}}}}
+    -> {"id":0,"method":"thread/start","params":{"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":"danger-full-access","config":{"tools.update_plan.enabled":true}}}
+    -> {"id":1,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"go"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"dangerFullAccess"},"summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":null,"developer_instructions":null}}}}
     |}]
 ;;
 
@@ -1999,5 +2026,31 @@ let%expect_test "the effort sent is one the model supports" =
     ((On ()) ((low)) -> ())
     (Off () -> (none))
     ((On (Xhigh)) (()) -> (xhigh))
+    |}]
+;;
+
+let%expect_test "thread/name/updated emits Session_title for main thread only" =
+  let codec = started () in
+  let thread = Option.value_exn (C.thread_id codec) in
+  let show label params =
+    printf "%s:\n" label;
+    feed codec [ notify "thread/name/updated" (`Object params) ]
+  in
+  show
+    "threadName"
+    [ "threadId", `String thread; "threadName", `String "  Fix parser bug  " ];
+  show "name" [ "threadId", `String thread; "name", `String "Refine tests" ];
+  show "blank" [ "threadId", `String thread; "threadName", `String "   " ];
+  show
+    "other thread"
+    [ "threadId", `String "other-thread"; "threadName", `String "Ignored" ];
+  [%expect
+    {|
+    threadName:
+    (Session_title "Fix parser bug")
+    name:
+    (Session_title "Refine tests")
+    blank:
+    other thread:
     |}]
 ;;

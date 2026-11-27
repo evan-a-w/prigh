@@ -57,6 +57,9 @@ module Up : sig
         ; mcp_socket : string option
         ; mcp_token : string option
           (** what a bridge presents first, else the socket closes *)
+        ; mcp_routes : bool
+          (** the listener accepts [token:route] and announces each routed
+              connection with {!Mcp_open} *)
         ; secret : bool
           (** it got [secret] on its descriptor (a host predating that, or
               unable to, does not say so) *)
@@ -67,6 +70,10 @@ module Up : sig
         }
     | Err of string
     | Err_dropped of int (** bytes of stderr not forwarded *)
+    | Mcp_open of
+        { conn : int
+        ; route : string
+        } (** a routed MCP connection authenticated with [token:route] *)
     | Mcp of
         { conn : int
         ; line : string

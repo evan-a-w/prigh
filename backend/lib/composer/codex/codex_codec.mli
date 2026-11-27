@@ -31,6 +31,9 @@ module Settings : sig
     ; sandbox : bool
       (** Codex's sandbox for the mode; [false] where it cannot run: none,
           Codex still asking before what it does not know to be read-only *)
+    ; writable_roots : string list
+      (** extra absolute directories writable in [workspaceWrite] mode
+          alongside [cwd] (e.g. session worktrees under [worktrees_dir]) *)
     }
   [@@deriving sexp_of]
 end
@@ -54,6 +57,9 @@ module Thread_options : sig
         http_headers}] *)
     ; dynamic_tools : Dynamic_tool.t list
     ; config : (string * Json.t) list (** more dotted config overrides *)
+    ; ephemeral : bool
+      (** [true] for one-shot completions: passes [ephemeral: true] on
+          [thread/start] and omits [tools.update_plan.enabled] *)
     }
 
   val empty : t

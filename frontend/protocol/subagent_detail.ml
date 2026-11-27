@@ -8,6 +8,7 @@ type t =
   ; name : string option
   ; model : string
   ; host : string option
+  ; engine : string option [@sexp.option]
   ; turns : int
   ; result : Event.Subagent_result.t option
   ; messages : Message.t list
@@ -24,6 +25,7 @@ let of_json json =
   let%bind name = Json.string_opt_field summary "name" in
   let%bind model = Json.string_field summary "model" in
   let%bind host = Json.string_opt_field summary "host" in
+  let%bind engine = Json.string_opt_field summary "engine" in
   let%bind turns = Json.int_field summary "turns" in
   let%bind result =
     match Json.field summary "result" with
@@ -31,5 +33,16 @@ let of_json json =
     | Some r -> Or_error.map (Event.Subagent_result.of_json r) ~f:Option.some
   in
   let%map messages = Json.list_field json "messages" ~f:Message.of_json in
-  { id; call_id; parent; task; name; model; host; turns; result; messages }
+  { id
+  ; call_id
+  ; parent
+  ; task
+  ; name
+  ; model
+  ; host
+  ; engine
+  ; turns
+  ; result
+  ; messages
+  }
 ;;

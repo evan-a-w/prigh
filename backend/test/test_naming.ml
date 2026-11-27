@@ -279,3 +279,167 @@ let%expect_test "name_subagent: by the naming model, told its siblings' names" =
     deepseek/deepseek-flash You name the subagents a coding agent st
     |}]
 ;;
+
+let%expect_test
+    "external harness auto_describe: live auth fallback, no repeat failures, \
+     resets on auth_changed and replace_session"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let requests = Queue.create () in
+  let provider =
+    Faux_provider.create
+      ~on_request:(fun (r : Provider.Request.t) ->
+        Queue.enqueue requests (Model.key r.model))
+      [ Reply.text "Dynamic anthropic title"
+      ; Reply.error "no credentials"
+      ; Reply.text "Recovered after auth"
+      ; Reply.text "Fresh session title"
+      ]
+  in
+  let anthropic_ready = ref true in
+  let opencode = Option.value_exn (Acp_agent.find_known "opencode") in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.05) opencode
+  in
+  let make_composer () =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             let read () =
+               Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+                 Jsonaf.parse l |> Or_error.ok_exn)
+             in
+             let reply j result =
+               Line_transport.Peer.write_line
+                 p
+                 (Jsonaf.to_string
+                    (`Object
+                        [ "jsonrpc", `String "2.0"
+                        ; "id", Option.value_exn (Jsonaf.member "id" j)
+                        ; "result", Jsonaf.parse result |> Or_error.ok_exn
+                        ]))
+             in
+             let rec loop () =
+               match read () with
+               | None -> ()
+               | Some j ->
+                 (match
+                    Option.bind (Jsonaf.member "method" j) ~f:Jsonaf.string
+                  with
+                  | Some "initialize" ->
+                    reply j {|{"protocolVersion":1,"agentCapabilities":{}}|}
+                  | Some "session/new" -> reply j {|{"sessionId":"s1"}|}
+                  | Some "session/prompt" ->
+                    Line_transport.Peer.write_line
+                      p
+                      {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"ok"}}}}|};
+                    reply j {|{"stopReason":"end_turn"}|}
+                  | _ -> ());
+                 loop ()
+             in
+             loop ())))
+      ()
+  in
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider
+      ~provider_configured:(function
+        | Provider_id.Anthropic -> !anthropic_ready
+        | _ -> false)
+      ~tools:[]
+      ~sessions_dir
+      ~home:t.dir
+      ~auto_describe:true
+      ~cwd:t.dir
+      ()
+  in
+  Agent.subscribe agent ~f:(function
+    | Notice n -> print_endline ("notice: " ^ n)
+    | _ -> ());
+  let attach_external () =
+    let composer = make_composer () in
+    Agent.set_engine
+      agent
+      { engine = Composer; adapter = Some (Acp "opencode") };
+    Agent.set_runner agent (Some (Composer_runner.runner composer));
+    composer
+  in
+  let take_requests () =
+    let xs = Queue.to_list requests in
+    Queue.clear requests;
+    xs
+  in
+  (* 1. harness_model is deepseek (unconfigured), Anthropic is configured:
+     auto_describe dynamically picks Anthropic's default model. *)
+  let c1 = attach_external () in
+  Or_error.ok_exn (Agent.prompt agent "hello");
+  Agent.wait_idle agent;
+  print_s
+    [%message
+      "live-auth-fallback"
+        ~reqs:(take_requests () : string list)
+        ~desc:(Session.description (Agent.session agent) : string option)];
+  Composer_runner.close c1;
+  (* 2. New session with NO configured provider: fails once with a notice,
+     then skips repeat attempts on subsequent turns. *)
+  anthropic_ready := false;
+  Agent.new_session agent;
+  let c2 = attach_external () in
+  Or_error.ok_exn (Agent.prompt agent "turn 1");
+  Agent.wait_idle agent;
+  print_s
+    [%message
+      "fail-once"
+        ~reqs:(take_requests () : string list)
+        ~desc:(Session.description (Agent.session agent) : string option)];
+  Or_error.ok_exn (Agent.prompt agent "turn 2");
+  Agent.wait_idle agent;
+  print_s
+    [%message
+      "no-repeat-failure"
+        ~reqs:(take_requests () : string list)
+        ~desc:(Session.description (Agent.session agent) : string option)];
+  (* 3. auth_changed resets aux_noted so the next turn retries and succeeds. *)
+  anthropic_ready := true;
+  Agent.auth_changed agent;
+  Or_error.ok_exn (Agent.prompt agent "turn 3");
+  Agent.wait_idle agent;
+  print_s
+    [%message
+      "after-auth-changed"
+        ~reqs:(take_requests () : string list)
+        ~desc:(Session.description (Agent.session agent) : string option)];
+  (* 4. new_session (replace_session) also resets aux_noted. *)
+  Agent.new_session agent;
+  let c3 = attach_external () in
+  Or_error.ok_exn (Agent.prompt agent "fresh turn");
+  Agent.wait_idle agent;
+  print_s
+    [%message
+      "after-replace-session"
+        ~reqs:(take_requests () : string list)
+        ~desc:(Session.description (Agent.session agent) : string option)];
+  Composer_runner.close c2;
+  Composer_runner.close c3;
+  [%expect
+    {|
+    (live-auth-fallback (reqs (anthropic/claude-opus-4-6))
+     (desc ("Dynamic anthropic title")))
+    notice: naming the session failed: no credentials; this session is not described (name it with /name, or pick a model prigh can call with /naming model)
+    (fail-once (reqs (deepseek/deepseek-flash)) (desc ()))
+    (no-repeat-failure (reqs ()) (desc ()))
+    (after-auth-changed (reqs (anthropic/claude-opus-4-6))
+     (desc ("Recovered after auth")))
+    (after-replace-session (reqs (anthropic/claude-opus-4-6))
+     (desc ("Fresh session title")))
+    |}]
+;;

@@ -101,6 +101,7 @@ type t =
       ; model : string
       ; tools : string list
       ; host : string option
+      ; engine : string option [@sexp.option]
       ; worktree : Agent_worktree.t option
         (** a worktree made for it, which it works in *)
       ; forked : bool (** it started from its caller's conversation *)
@@ -292,6 +293,7 @@ let rec of_json j =
     let%bind model = Json.string_field j "model" in
     let%bind tools = Json.list_field j "tools" ~f:Json.to_string_or_error in
     let%bind host = Json.string_opt_field j "host" in
+    let%bind engine = Json.string_opt_field j "engine" in
     let%bind worktree =
       match Json.field j "worktree" with
       | None -> Ok None
@@ -307,6 +309,7 @@ let rec of_json j =
       ; model
       ; tools
       ; host
+      ; engine
       ; worktree
       ; forked
       ; continued

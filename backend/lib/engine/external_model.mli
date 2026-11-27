@@ -13,8 +13,18 @@ open! Import
 (** [ADAPTER/MODEL]. *)
 val name : adapter:string -> string option -> string
 
+(** Whether [adapter] is an external harness adapter name ([codex], [claude],
+    or [acp:<name>]). *)
+val is_adapter : string -> bool
+
 (** Whether a recorded model name is an external harness's. *)
 val is_external : string -> bool
+
+(** Parses an external model spec ([codex/<id>], [claude/<id>],
+    [acp:<name>/<id>], or bare [acp:<name>] as [default]). Returns [None] for
+    non-external names (direct HTTP models), [Some (Error _)] for malformed
+    external specs (empty model id or malformed [acp:] prefix). *)
+val parse_spec : string -> (Adapter_id.t * string) Or_error.t option
 
 (** The placeholder's id: the harness picks. *)
 val default_id : string
@@ -64,3 +74,14 @@ val restore : adapter:string -> models:Model.t list -> string -> Model.t option
     lowercased with [claude-] dropped, or one is the other with a date or a
     bracketed note added ([sonnet-4] is not [sonnet-4-5]). *)
 val same_model : string -> string -> bool
+
+(** Resolves a model query (id, [adapter/id], display name, or unambiguous
+    prefix) against [adapter]'s known [models]. When [models] is [None] or
+    has only placeholders (the harness has not listed its models yet, or
+    lists none), the trimmed query (with any [adapter/] prefix stripped) is
+    passed through as-is. *)
+val resolve
+  :  adapter:string
+  -> models:Model.t list option
+  -> string
+  -> string Or_error.t

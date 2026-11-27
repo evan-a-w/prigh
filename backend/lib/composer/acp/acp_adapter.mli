@@ -19,6 +19,9 @@ open! Import
 val create
   :  ?load_quiet:Time_float.Span.t
   -> ?load_timeout:Time_float.Span.t (** 90s *)
+  -> ?autonomous_quiet:Time_float.Span.t
+       (** how long an autonomous turn stays open after its last text with no
+           open tools or permissions (default 5s) *)
   -> Acp_agent.t
   -> Adapter.t
 

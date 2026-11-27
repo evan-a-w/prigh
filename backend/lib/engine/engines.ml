@@ -129,6 +129,65 @@ let default_choice t : Engine_choice.t =
   | Composer -> { engine = Composer; adapter = List.hd t.adapters }
 ;;
 
+let choices t =
+  List.concat_map t.engines ~f:(function
+    | Harness -> [ Engine_choice.harness ]
+    | Composer ->
+      List.map t.adapters ~f:(fun adapter ->
+        { Engine_choice.engine = Composer; adapter = Some adapter }))
+;;
+
+let resolve t raw =
+  let arg = String.lowercase (String.strip raw) in
+  let all = choices t in
+  let keys = String.concat ~sep:", " (List.map all ~f:Engine_choice.key) in
+  if String.is_empty arg
+  then Or_error.errorf "empty engine name: this backend runs %s" keys
+  else if String.equal arg "composer"
+  then (
+    match
+      List.filter all ~f:(fun (c : Engine_choice.t) ->
+        Engine_id.equal c.engine Composer)
+    with
+    | [ one ] -> Ok one
+    | [] ->
+      Or_error.errorf
+        "this backend does not run the composer engine (it runs %s): start one \
+         with prigh serve -engines composer"
+        keys
+    | many ->
+      Or_error.errorf
+        "composer needs an adapter: this backend drives %s"
+        (String.concat ~sep:", " (List.map many ~f:Engine_choice.key)))
+  else (
+    let exact (c : Engine_choice.t) =
+      String.equal arg (String.lowercase (Engine_choice.key c))
+      || String.equal arg (String.lowercase (Engine_choice.display_name c))
+      || List.exists (Engine_choice.names c) ~f:(fun n ->
+        String.equal arg (String.lowercase n))
+    in
+    match List.filter all ~f:exact with
+    | c :: _ -> Ok c
+    | [] ->
+      let prefix (c : Engine_choice.t) =
+        String.is_prefix (String.lowercase (Engine_choice.key c)) ~prefix:arg
+        || String.is_prefix
+             (String.lowercase (Engine_choice.display_name c))
+             ~prefix:arg
+        || List.exists (Engine_choice.names c) ~f:(fun n ->
+          String.is_prefix (String.lowercase n) ~prefix:arg)
+      in
+      (match List.filter all ~f:prefix with
+       | [ c ] -> Ok c
+       | _ :: _ as several ->
+         Or_error.errorf
+           "%S matches several engines (%s): name one of them"
+           raw
+           (String.concat ~sep:", " (List.map several ~f:Engine_choice.key))
+       | [] ->
+         Or_error.errorf "no engine %S here: this backend runs %s" raw keys))
+;;
+
 let deployed t = String.concat ~sep:"," (engine_strings t)
 
 let choose t ~engine ~adapter =

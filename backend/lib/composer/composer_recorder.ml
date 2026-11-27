@@ -237,6 +237,7 @@ let start_call t (c : Call.t) =
            ; thinking = Thinking.default
            ; tools = []
            ; host = None
+           ; engine = None
            ; cwd = t.cwd
            ; worktree = None
            ; forked = false
@@ -587,8 +588,11 @@ let feed t (event : Adapter_event.t) =
          message)
   | Notice message -> t.notice message
   | Turn_end { turn_id = _; stop } -> turn_end t stop
-  | Turn_diff _ | Approval_request _ | User_question _ | Request_withdrawn _ ->
-    ()
+  | Turn_diff _
+  | Approval_request _
+  | User_question _
+  | Request_withdrawn _
+  | Session_title _ -> ()
 ;;
 
 let finish t =
@@ -612,4 +616,8 @@ let call_started t ~tool_id =
   | Some c ->
     if not c.ended then ensure_started t c;
     Some (c.canonical, c.parent)
+;;
+
+let call_canonical t ~tool_id =
+  Option.map (Hashtbl.find t.calls tool_id) ~f:(fun c -> c.canonical)
 ;;

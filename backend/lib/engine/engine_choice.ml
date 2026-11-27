@@ -37,3 +37,29 @@ let label t =
   | Some a ->
     sprintf "%s (%s)" (Engine_id.to_string t.engine) (Adapter_id.label a)
 ;;
+
+let key t =
+  match t.adapter with
+  | Some a -> Adapter_id.to_string a
+  | None -> Engine_id.to_string t.engine
+;;
+
+let display_name t =
+  match t.adapter with
+  | Some a -> Adapter_id.label a
+  | None ->
+    (match t.engine with
+     | Harness -> "prigh harness"
+     | Composer -> "composer")
+;;
+
+let names t =
+  match t.engine, t.adapter with
+  | Harness, _ | Composer, Some Prigh -> [ "harness"; "prigh harness" ]
+  | Composer, Some Codex -> [ "codex" ]
+  | Composer, Some Claude -> [ "claude"; "claude code" ]
+  | Composer, Some (Acp name) ->
+    let base = [ name; "acp:" ^ name; Adapter_id.label (Acp name) ] in
+    if String.equal name "antigravity" then "agy" :: base else base
+  | Composer, None -> [ "composer" ]
+;;

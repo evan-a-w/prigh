@@ -908,9 +908,18 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
     | Agent_view.Status.Failed _ -> "✗ failed"
   in
   let task = Text_width.truncate (Agent_view.title a) ~width:40 in
+  let engine_label =
+    Option.map a.engine ~f:(fun key ->
+      if String.equal key "harness"
+      then "prigh harness"
+      else P.Session_engine.adapter_label key)
+  in
   [ span
       ~style:(Style.bold (Style.fg Cyan))
       (sprintf "◆ subagent %d/%d" index total)
+  ; span
+      ~style:(Style.fg Magenta)
+      (Option.value_map engine_label ~default:"" ~f:(sprintf "  %s"))
   ; span ~style:dim (sprintf "  %s" a.model)
   ; span
       ~style:(Style.fg Yellow)
@@ -1667,9 +1676,18 @@ let sidebar (m : App.Model.t) ~width ~rows : Content.t =
         ~name:(sprintf "%d %s" (i + 1) (first_line (Agent_view.title a)))
         ~state
         ~meta:
-          (match a.host with
-           | Some host -> sprintf "on %s · %s" host meta
-           | None -> meta))
+          (let where =
+             List.filter_opt
+               [ Option.map a.engine ~f:(fun key ->
+                   if String.equal key "harness"
+                   then "prigh harness"
+                   else P.Session_engine.adapter_label key)
+               ; Option.map a.host ~f:(fun host -> "on " ^ host)
+               ]
+           in
+           match where with
+           | [] -> meta
+           | parts -> sprintf "%s · %s" (String.concat ~sep:" " parts) meta))
   in
   let jobs =
     Option.value_map m.state ~default:[] ~f:(fun s -> s.jobs)

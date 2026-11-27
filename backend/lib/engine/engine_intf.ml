@@ -25,11 +25,16 @@ module Services = struct
     ; steer : unit -> Message.t list
       (** what arrived for the running turn: steering messages, deliveries,
         mail, reminders and mode notes *)
+    ; await_steer : unit -> unit
+      (** blocks until [steer] may have messages to return *)
     ; halt : unit -> string option
       (** [Some reason]: stop before the next turn *)
     ; add_spend : usage:Usage.t -> cost_usd:float -> unit
       (** records spend the session's messages do not price: what an
           external harness reported its replies cost *)
+    ; set_title : string -> unit
+      (** records a native title reported by an external harness, unless the
+          user has manually named the session *)
     }
 end
 
@@ -39,6 +44,9 @@ module Turn = struct
       | Prompt (** answer the prompts *)
       | Compact of { instructions : string option }
       (** compact the context ([/compact]); there are no prompts *)
+      | Autonomous
+      (** an external harness resumed on its own (e.g. a background task
+          woke it between turns); there are no prompts to send *)
   end
 
   module Input = struct

@@ -471,15 +471,25 @@ module Exec = struct
           running; the token tells this absence from later ones *)
   end
 
+  module Target = struct
+    type t =
+      | Agent of Agent.t
+      | Direct of
+          { on_output : string -> unit
+          ; resolve : Tool.Result.t -> unit
+          }
+  end
+
   type t =
     { host : string
-    ; agent : Agent.t
+    ; target : Target.t
     ; mutable holder : Holder.t
     }
 end
 
 type t =
-  { login : Login_manager.t
+  { env : Env.t
+  ; login : Login_manager.t
   ; member : Account_shares.Member.t option
     (** the user and the logins shared among users ([-tokens]) *)
   ; ledger : Account_ledger.t option (** what ran on the user's logins *)
@@ -500,6 +510,9 @@ type t =
     (** whether Codex's own sandbox can run, by host *)
   ; catalogs : Adapter_catalog.t
     (** the composer's CLIs' models and usage limits, by host *)
+  ; harness_pool : Harness_pool.t
+    (** shared long-lived ACP / Codex harness server processes *)
+  ; mutable pool_exec_seq : int
   ; spawn_external :
       (Agent.t
        -> host:string
@@ -555,6 +568,9 @@ type t =
   ; usage_http : Subscription_usage.Http.t
   ; temporaries : Temporary.t String.Table.t (** by session id *)
   ; temporary_grace : float
+  ; external_idle : unit ref String.Table.t
+    (** pending idle-eviction timers for sessions with a live external harness *)
+  ; external_idle_grace : float
   ; ledger_dir : string
   }
 
@@ -915,29 +931,63 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
            ])))
 ;;
 
+let cancel_external_idle t agent =
+  Hashtbl.remove t.external_idle (session_id agent)
+;;
+
+let can_evict t agent =
+  (* a stale agent of a session reopened since is not the live one *)
+  Option.exists (Hashtbl.find t.agents (session_id agent)) ~f:(phys_equal agent)
+  && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
+  && (not (Agent.is_running agent))
+  && (not (Agent.has_running_background agent))
+  && (not (Agent.resume_pending agent))
+  && List.is_empty (clients_of t agent)
+;;
+
+let evict_now t agent =
+  let id = session_id agent in
+  Hashtbl.remove t.external_idle id;
+  Hashtbl.remove t.agents id;
+  Hashtbl.remove t.listed id;
+  Agent.stop_engine agent;
+  let session = Agent.session agent in
+  if Session.persisted session && not (Session.gone session)
+  then (
+    File_cache.set t.loaded (Session.path session) session;
+    (* No longer live. *)
+    sessions_changed t ~changed:[ session ])
+;;
+
+(* An idle session whose external harness process is still alive (e.g. an ACP
+   agent with background tasks or subagents waiting to wake it) stays up for
+   [external_idle_grace] after its last client leaves or its last turn ends,
+   rather than being terminated at once. Any client attaching or autonomous
+   turn waking resets the timer. *)
+let await_external_idle t agent =
+  let id = session_id agent in
+  if not (Hashtbl.mem t.external_idle id)
+  then (
+    let token = ref () in
+    Hashtbl.set t.external_idle ~key:id ~data:token;
+    Fiber.fork_daemon ~sw:t.sw (fun () ->
+      t.sleep t.external_idle_grace;
+      (match Hashtbl.find t.external_idle id with
+       | Some token' when phys_equal token token' ->
+         Hashtbl.remove t.external_idle id;
+         if can_evict t agent then evict_now t agent
+       | Some _ | None -> ());
+      `Stop_daemon))
+;;
+
 let maybe_evict t agent =
   if Agent.temporary agent
   then (if List.is_empty (clients_of t agent) then await_return t agent)
-  else if
-    (* a stale agent of a session reopened since is not the live one *)
-    Option.exists
-      (Hashtbl.find t.agents (session_id agent))
-      ~f:(phys_equal agent)
-    && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
-    && (not (Agent.is_running agent))
-    && (not (Agent.has_running_background agent))
-    && (not (Agent.resume_pending agent))
-    && List.is_empty (clients_of t agent)
-  then (
-    Hashtbl.remove t.agents (session_id agent);
-    Hashtbl.remove t.listed (session_id agent);
-    Agent.stop_engine agent;
-    let session = Agent.session agent in
-    if Session.persisted session && not (Session.gone session)
-    then (
-      File_cache.set t.loaded (Session.path session) session;
-      (* No longer live. *)
-      sessions_changed t ~changed:[ session ]))
+  else if can_evict t agent
+  then
+    if Agent.external_live agent && Float.(t.external_idle_grace > 0.)
+    then await_external_idle t agent
+    else evict_now t agent
 ;;
 
 (* Only for changes: what is shown at [register] is the baseline. *)
@@ -1236,7 +1286,7 @@ let route t agent (event : Agent.Event.t) =
         Hashtbl.set
           t.execs
           ~key:exec_id
-          ~data:{ Exec.host; agent; holder = Client c.id };
+          ~data:{ Exec.host; target = Agent agent; holder = Client c.id };
         c.send json
       | None ->
         ignore
@@ -1268,7 +1318,7 @@ let route t agent (event : Agent.Event.t) =
   match event with
   | State_changed { running; _ } ->
     note_catalog_key t agent;
-    if not running then maybe_evict t agent;
+    if running then cancel_external_idle t agent else maybe_evict t agent;
     (* A host's session name may have changed; [set_hosts] is a no-op when
        nothing did, so this does not loop. *)
     publish_hosts t
@@ -1371,6 +1421,232 @@ let active_host_label agent =
     if String.is_empty name then id else name
 ;;
 
+(* The harness on [host] (named [host_name]), in [launch.cwd]. *)
+let host_spawn_on agent ~sw ~host ~host_name (launch : Adapter.Launch.t) =
+  Host_transport.spawn
+    ~sw
+    ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
+      Agent.host_call_on
+        agent
+        ~stdin
+        ~cancel
+        ~on_output
+        ~host
+        ~cwd:launch.cwd
+        ~name
+        args)
+    ~host:host_name
+    launch
+;;
+
+(* Runs a host op directly on [host] without tying its lifetime to any single
+   session's [Agent.t] (used for long-lived pooled harness servers). *)
+let server_host_exec t ~host ~cwd : Host_stream.Exec.t =
+  fun ~stdin ~cancel ~on_output ~name arguments ->
+  if String.equal host Agent.Host.backend_id && t.backend_host
+  then
+    Host_ops.execute
+      ~mcp:None
+      ~env:t.env
+      ~stdin
+      ~cancel
+      ~on_output
+      ~cwd
+      ~name
+      ~arguments
+      ()
+  else (
+    match host_client t host with
+    | None -> Tool.Result.error (sprintf "tool host %S is not connected" host)
+    | Some c ->
+      t.pool_exec_seq <- t.pool_exec_seq + 1;
+      let exec_id = sprintf "pool/%d" t.pool_exec_seq in
+      let promise, resolver = Promise.create () in
+      let resolve result =
+        if not (Promise.is_resolved promise)
+        then Promise.resolve resolver result
+      in
+      let exec_input = List.mem c.features "exec_input" ~equal:String.equal in
+      let stdin_opt =
+        if exec_input
+        then Some stdin
+        else (
+          Stdin_feed.refuse
+            stdin
+            (sprintf
+               "tool host %S runs an older prigh that cannot pass input to \
+                jobs: update prigh there and restart its TUI or tool-host"
+               c.name);
+          None)
+      in
+      Hashtbl.set
+        t.execs
+        ~key:exec_id
+        ~data:
+          { Exec.host
+          ; target = Direct { on_output; resolve }
+          ; holder = Client c.id
+          };
+      c.send
+        (Rpc_json.event
+           (Tool_exec
+              { host
+              ; session_id = "pool"
+              ; exec_id
+              ; call_id = exec_id
+              ; name
+              ; arguments
+              ; cwd
+              ; stdin = Option.is_some stdin_opt
+              }));
+      let result =
+        Switch.run (fun sw ->
+          Option.iter stdin_opt ~f:(fun feed ->
+            Fiber.fork_daemon ~sw (fun () ->
+              let rec loop () =
+                match Stdin_feed.take feed with
+                | Data data ->
+                  Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
+                    c.send
+                      (Rpc_json.event
+                         (Tool_exec_input { host; exec_id; data; close = false })));
+                  loop ()
+                | Close ->
+                  Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
+                    c.send
+                      (Rpc_json.event
+                         (Tool_exec_input
+                            { host; exec_id; data = ""; close = true })));
+                  `Stop_daemon
+              in
+              loop ()));
+          Cancellation.protect cancel ~f:(fun () -> Promise.await promise))
+      in
+      Option.iter stdin_opt ~f:Stdin_feed.finish;
+      Hashtbl.remove t.execs exec_id;
+      (match result with
+       | Some r -> r
+       | None ->
+         Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
+           c.send (Rpc_json.event (Tool_exec_cancel { host; exec_id })));
+         Tool.Result.error "[cancelled]"))
+;;
+
+let pool_cwd t ~host ~fallback =
+  if String.equal host Agent.Host.backend_id
+  then t.cwd
+  else (
+    match host_client t host with
+    | Some c ->
+      Option.value c.cwd ~default:(Option.value c.home ~default:fallback)
+    | None -> fallback)
+;;
+
+let pool_protocol_of
+      t
+      ~(adapter_id : Adapter_id.t)
+      ~(start : Adapter.Start.t)
+      ~(launch : Adapter.Launch.t)
+  =
+  match adapter_id with
+  | Acp name ->
+    let xai =
+      Option.value_map
+        (Engines.acp_agent t.engines name)
+        ~default:false
+        ~f:(fun (a : Acp_agent.t) -> a.quirks.xai_extensions)
+    in
+    let login_fallback =
+      String.equal name "antigravity"
+      && Option.is_some start.login
+      && Option.is_none launch.secret
+    in
+    if xai || login_fallback then None else Some Harness_mux.Protocol.Acp
+  | Codex -> Some Harness_mux.Protocol.Codex
+  | Claude | Prigh -> None
+;;
+
+let acquire_external
+      t
+      agent
+      ~sw
+      ~host
+      ~host_name
+      ~(adapter_id : Adapter_id.t)
+      ~(start : Adapter.Start.t)
+      ~(launch : Adapter.Launch.t)
+  =
+  let spawn_direct () =
+    match t.spawn_external with
+    | Some spawn -> spawn agent ~host launch
+    | None -> host_spawn_on agent ~sw ~host ~host_name launch
+  in
+  match pool_protocol_of t ~adapter_id ~start ~launch with
+  | None -> spawn_direct ()
+  | Some protocol ->
+    let member =
+      Option.first_some
+        (Option.map t.member ~f:(fun (m : Account_shares.Member.t) -> m.user))
+        t.namespace
+    in
+    let login_key =
+      Option.map start.login ~f:(fun cred ->
+        Provider_id.to_string (Cli_credential.provider cred)
+        ^ "/"
+        ^ Account_ref.to_string (Cli_credential.account cred))
+    in
+    let key : Harness_pool.Key.t =
+      { host
+      ; adapter = Adapter_id.to_string adapter_id
+      ; member
+      ; login_key
+      ; no_sandbox = Option.is_some start.no_sandbox
+      ; argv = launch.argv
+      ; env_set = launch.env_set
+      ; env_unset = launch.env_unset
+      }
+    in
+    let token_info =
+      match adapter_id, start.login with
+      | Acp "antigravity", Some cred ->
+        (match
+           Antigravity_login.of_launch cred ~refused:start.login_refused
+         with
+         | Error _ -> None
+         | Ok agy_login ->
+           let secret_digest =
+             Option.map launch.secret ~f:(fun s ->
+               Digestif.SHA256.to_raw_string
+                 (Digestif.SHA256.digest_string s.value))
+           in
+           Some
+             { Harness_pool.Token_info.token = Antigravity_login.token agy_login
+             ; expiring = Antigravity_login.expiring agy_login
+             ; secret_digest
+             })
+      | _ -> None
+    in
+    let spawn_pooled ~sw =
+      match t.spawn_external with
+      | Some spawn -> spawn agent ~host launch
+      | None ->
+        let cwd = pool_cwd t ~host ~fallback:launch.cwd in
+        Host_transport.spawn
+          ~sw
+          ~exec:(server_host_exec t ~host ~cwd)
+          ~host:host_name
+          launch
+    in
+    Harness_pool.acquire
+      t.harness_pool
+      ~protocol
+      ~key
+      ?token_info
+      ?login_refused:start.login_refused
+      ~spawn:spawn_pooled
+      ()
+;;
+
 (* The harness on the session's active tool host, in its cwd. *)
 let host_spawn t agent launch =
   Host_transport.spawn
@@ -1381,29 +1657,33 @@ let host_spawn t agent launch =
     launch
 ;;
 
-(* [adapter]'s harness failed to start on the session's host: what was
-   known of it there is checked again, and the frontends told. *)
-let recheck_adapter t agent adapter =
-  let host = Agent.active_host agent in
+(* [adapter]'s harness failed to start on [host]: what was known of it there
+   is checked again, and the frontends told. *)
+let recheck_adapter_on t agent ~host ~host_name ~cwd adapter =
   Adapter_health.Cache.forget t.adapter_health ~host adapter;
   Codex_sandbox.Cache.forget_host t.codex_sandbox ~host;
   Fiber.fork ~sw:t.sw (fun () ->
     let statuses =
       Adapter_health.probe
         ~exec:(fun ~name arguments ->
-          Agent.host_call_on
-            agent
-            ~host
-            ~cwd:(Session.cwd (Agent.session agent))
-            ~name
-            arguments)
+          Agent.host_call_on agent ~host ~cwd ~name arguments)
         [ adapter ]
         ~host
-        ~host_name:(active_host_label agent)
+        ~host_name
         ~now:(t.now ())
     in
     Adapter_health.Cache.set t.adapter_health statuses;
     adapters_changed t ~hosts:(Agent.state agent).hosts)
+;;
+
+let recheck_adapter t agent adapter =
+  recheck_adapter_on
+    t
+    agent
+    ~host:(Agent.active_host agent)
+    ~host_name:(active_host_label agent)
+    ~cwd:(Session.cwd (Agent.session agent))
+    adapter
 ;;
 
 (* The harness [adapter] said its catalog on [host], on the login [login]:
@@ -1453,6 +1733,37 @@ let catalog_login_error (adapter_id : Adapter_id.t) credential e =
   | Some (Ok _) | None -> e
 ;;
 
+(* Why [adapter]'s own sandbox cannot run on [host], found out once per host
+   and binary: Codex runs without it there. Not for a harness [spawn_external]
+   runs, which is not the host's. *)
+let no_sandbox t agent ~host ~host_name ~cwd (adapter : Adapter_id.t) =
+  let installed () =
+    match Adapter_health.Cache.find t.adapter_health ~host adapter with
+    | Some { install = Installed { path; _ }; _ } -> `Path path
+    | Some { install = Not_installed _; _ } -> `None
+    | Some { install = Unknown _; _ } | None -> `Unknown
+  in
+  match adapter, t.spawn_external with
+  | (Claude | Prigh | Acp _), _ | Codex, Some _ -> None
+  | Codex, None ->
+    (match installed () with
+     | `None -> None
+     | (`Path _ | `Unknown) as installed ->
+       (match
+          Codex_sandbox.Cache.status
+            t.codex_sandbox
+            ~host
+            ~installed:
+              (match installed with
+               | `Path path -> Some path
+               | `Unknown -> None)
+            ~exec:(fun ~name arguments ->
+              Agent.host_call_on agent ~host ~cwd ~name arguments)
+        with
+        | Unavailable why -> Some (sprintf "%s (%s)" host_name why)
+        | Works | Unknown _ -> None))
+;;
+
 (* Runs [adapter]'s harness on the tool host [host] (named [host_name]), in
    [cwd], only to ask its catalog ({!Adapter.S.catalog}), on prigh's login
    [login] (else its own: then what that shows of its own login is
@@ -1469,27 +1780,24 @@ let fetch_catalog
       ()
   =
   let login = force login in
-  let start = { (Adapter.Start.default ~cwd) with login } in
+  let start =
+    { (Adapter.Start.default ~cwd) with
+      login
+    ; no_sandbox = no_sandbox t agent ~host ~host_name ~cwd adapter_id
+    }
+  in
   let launch = A.launch start in
   let result =
     let%bind.Or_error transport =
-      match t.spawn_external with
-      | Some spawn -> spawn agent ~host launch
-      | None ->
-        Host_transport.spawn
-          ~sw:t.sw
-          ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
-            Agent.host_call_on
-              agent
-              ~stdin
-              ~cancel
-              ~on_output
-              ~host
-              ~cwd
-              ~name
-              args)
-          ~host:host_name
-          launch
+      acquire_external
+        t
+        agent
+        ~sw:t.sw
+        ~host
+        ~host_name
+        ~adapter_id
+        ~start
+        ~launch
     in
     Switch.run (fun sw ->
       Exn.protect
@@ -1554,15 +1862,19 @@ let ensure_catalog ?force ?(max_age = 1800.) t agent =
   | _ -> ()
 ;;
 
-(* The session's harness's catalog, as asked on its tool host on its
-   login. *)
-let find_catalog t agent (a : Adapter_id.t) =
+let catalog_on t ~host (a : Adapter_id.t) =
   let adapter = Adapter_id.to_string a in
   Adapter_catalog.find
     t.catalogs
-    ~host:(Agent.active_host agent)
+    ~host
     ~login:(catalog_login t ~adapter)
     adapter
+;;
+
+(* The session's harness's catalog, as asked on its tool host on its
+   login. *)
+let find_catalog t agent (a : Adapter_id.t) =
+  catalog_on t ~host:(Agent.active_host agent) a
 ;;
 
 (* The session's harness listed no models when asked last (Goose): it
@@ -1633,35 +1945,36 @@ let harness_usage t agent : Subscription_usage.Harness_usage.t list =
   | _ -> []
 ;;
 
-(* Why [adapter]'s own sandbox cannot run on [host], found out once per host
-   and binary: Codex runs without it there. Not for a harness [spawn_external]
-   runs, which is not the host's. *)
-let no_sandbox t agent ~host ~host_name ~cwd (adapter : Adapter_id.t) =
-  let installed () =
-    match Adapter_health.Cache.find t.adapter_health ~host adapter with
-    | Some { install = Installed { path; _ }; _ } -> `Path path
-    | Some { install = Not_installed _; _ } -> `None
-    | Some { install = Unknown _; _ } | None -> `Unknown
+let composer_subagent_instructions =
+  "Subagents: always use prigh's MCP `subagent` (and `subagent_*`) tools \
+   rather than any built-in or native subagent, Agent, Task or swarm tool, so \
+   subagents appear in prigh's UI with live progress, worktree tracking and \
+   steering. Default to this session's engine, model and tool host; only pass \
+   a different engine, model or host when the user explicitly asks. Use \
+   prigh's `worktree` tool (or `subagent`'s `worktree` option) for git \
+   worktrees."
+;;
+
+let composer_instructions agent =
+  match Agent.user_instructions agent with
+  | None -> Some composer_subagent_instructions
+  | Some user -> Some (composer_subagent_instructions ^ "\n\n" ^ user)
+;;
+
+let composer_extra_dirs agent ~cwd =
+  let worktrees_dir =
+    match Agent.active_host_home agent with
+    | Some home ->
+      Some (Tool.resolve ~home ~cwd (Agent.config agent).worktrees_dir)
+    | None ->
+      let raw = (Agent.config agent).worktrees_dir in
+      if String.mem raw '~' then None else Some (Tool.resolve ~cwd raw)
   in
-  match adapter, t.spawn_external with
-  | (Claude | Prigh | Acp _), _ | Codex, Some _ -> None
-  | Codex, None ->
-    (match installed () with
-     | `None -> None
-     | (`Path _ | `Unknown) as installed ->
-       (match
-          Codex_sandbox.Cache.status
-            t.codex_sandbox
-            ~host
-            ~installed:
-              (match installed with
-               | `Path path -> Some path
-               | `Unknown -> None)
-            ~exec:(fun ~name arguments ->
-              Agent.host_call_on agent ~host ~cwd ~name arguments)
-        with
-        | Unavailable why -> Some (sprintf "%s (%s)" host_name why)
-        | Works | Unknown _ -> None))
+  let recorded =
+    List.map (Session.worktrees (Agent.session agent)) ~f:(fun w -> w.path)
+  in
+  List.filter (Option.to_list worktrees_dir @ recorded) ~f:Filename.is_absolute
+  |> List.dedup_and_sort ~compare:String.compare
 ;;
 
 (* A composer session's runner, driving its adapter's harness on the
@@ -1700,7 +2013,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
         resume
       ; fork
       ; at
-      ; developer_instructions = Agent.user_instructions agent
+      ; developer_instructions = composer_instructions agent
       ; login = cli_credential t agent ~adapter:adapter_name
       ; no_sandbox =
           no_sandbox
@@ -1710,6 +2023,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
             ~host_name:(active_host_label agent)
             ~cwd
             adapter_id
+      ; extra_dirs = composer_extra_dirs agent ~cwd
       }
     in
     let on_thread thread_id =
@@ -1736,6 +2050,20 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
            in
            if Result.is_error spawned then recheck_adapter t agent adapter_id;
            spawned)
+         ~spawn_start:(fun start launch ->
+           let spawned =
+             acquire_external
+               t
+               agent
+               ~sw:t.sw
+               ~host:(Agent.active_host agent)
+               ~host_name:(active_host_label agent)
+               ~adapter_id
+               ~start
+               ~launch
+           in
+           if Result.is_error spawned then recheck_adapter t agent adapter_id;
+           spawned)
          ~start
          ~on_thread
          ~on_start:(fun (start : Adapter.Start.t) result ->
@@ -1744,12 +2072,29 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
              Option.is_none start.login
              && note_seen t ~host:(Agent.active_host agent) adapter_id result
            then adapters_changed t ~hosts:(hosts t))
+         ~on_prewarm:(fun (start : Adapter.Start.t) result ->
+           let host = Agent.active_host agent in
+           let login = catalog_login t ~adapter:adapter_name in
+           let result =
+             match start.login with
+             | None -> result
+             | Some credential ->
+               Result.map_error
+                 result
+                 ~f:(catalog_login_error adapter_id credential)
+           in
+           Adapter_catalog.record t.catalogs ~host ~login adapter_name result;
+           if Result.is_error result
+           then catalog_changed t ~host ~login adapter_name)
          ~checkpoint:(fun args ->
            Agent.host_call agent ~name:Checkpoint.op args)
          ~host:(fun () -> Agent.active_host agent)
          ?handoff_from
          ~catalog:(fun () -> find_catalog t agent adapter_id)
          ~on_change:(fun () -> models_changed t agent)
+         ~on_autonomous:(fun () -> Agent.external_woke agent)
+         ~extra_dirs:(fun () ->
+           composer_extra_dirs agent ~cwd:(Session.cwd session))
          ())
 ;;
 
@@ -1764,11 +2109,174 @@ let attach_engine t agent =
   | _ -> ()
 ;;
 
+let subagent_engines t agent =
+  Composer_subagent.create
+    ~engines:t.engines
+    ~current:(fun () -> Agent.engine_choice agent)
+    ~harness_model:(fun () -> Agent.harness_model agent)
+    ~external_models:(fun ~host adapter ->
+      let same_host = String.equal host (Agent.active_host agent) in
+      let same_adapter =
+        match Agent.engine_choice agent with
+        | { engine = Composer; adapter = Some a } -> Adapter_id.equal a adapter
+        | _ -> false
+      in
+      match
+        if same_host && same_adapter then Agent.external_models agent else None
+      with
+      | Some (_ :: _ as models) -> Some models
+      | Some [] | None ->
+        Option.map (catalog_on t ~host adapter) ~f:(fun c -> c.models))
+    ~parent_messages:(fun () -> Agent.messages agent)
+    ~approval_mode:(fun () -> (Agent.state agent).approval_mode)
+    ~plan_mode:(fun () -> (Agent.state agent).plan_mode)
+    ~add_spend:(Agent.add_spend agent)
+    ~notice:(Agent.notice agent)
+    ~spawn:(fun ~sw ~host ~host_name ~adapter launch ->
+      let spawned =
+        match t.spawn_external with
+        | Some spawn -> spawn agent ~host launch
+        | None -> host_spawn_on agent ~sw ~host ~host_name launch
+      in
+      if Result.is_error spawned
+      then recheck_adapter_on t agent ~host ~host_name ~cwd:launch.cwd adapter;
+      spawned)
+    ~spawn_start:(fun ~sw ~host ~host_name ~adapter start launch ->
+      let spawned =
+        acquire_external
+          t
+          agent
+          ~sw
+          ~host
+          ~host_name
+          ~adapter_id:adapter
+          ~start
+          ~launch
+      in
+      if Result.is_error spawned
+      then recheck_adapter_on t agent ~host ~host_name ~cwd:launch.cwd adapter;
+      spawned)
+    ~on_start:(fun ~host ~adapter (start : Adapter.Start.t) result ->
+      if Option.is_none start.login && note_seen t ~host adapter result
+      then adapters_changed t ~hosts:(hosts t))
+    ~login:(fun ~adapter -> cli_credential t agent ~adapter)
+    ~no_sandbox:(fun ~host ~host_name ~cwd adapter ->
+      no_sandbox t agent ~host ~host_name ~cwd adapter)
+    ~catalog:(fun ~host adapter -> catalog_on t ~host adapter)
+    ()
+;;
+
+let direct_available t (model : Model.t) =
+  match model.provider with
+  | Google_antigravity -> false
+  | Custom name ->
+    (not (External_model.is_adapter name))
+    && Option.is_some
+         (Model_registry.find_provider (Login_manager.models t.login) name)
+  | (Anthropic | Openai | Openai_codex | Deepseek) as provider ->
+    let store = Login_manager.store t.login in
+    let getenv = Login_manager.getenv t.login in
+    let has_own =
+      match Provider_auth.status ~getenv store with
+      | Error _ -> false
+      | Ok statuses ->
+        List.exists statuses ~f:(fun (s : Provider_auth.Status.t) ->
+          Provider_id.equal s.provider provider && Option.is_some s.configured)
+    in
+    has_own
+    || Option.value_map t.member ~default:false ~f:(fun member ->
+      match Login_choice.list ~member store provider with
+      | Ok (_ :: _) -> true
+      | Ok [] | Error _ -> false)
+;;
+
+let external_complete
+      t
+      agent
+      ~adapter:adapter_id
+      ~model
+      ~system
+      ~prompt
+      ~cwd
+      ~cancel
+      ~on_delta
+  =
+  match Composer_adapters.find t.engines adapter_id with
+  | Error _ as e -> e
+  | Ok adapter ->
+    let host = Agent.active_host agent in
+    let host_name = active_host_label agent in
+    let adapter_name = Adapter_id.to_string adapter_id in
+    let catalog_models =
+      match Agent.engine_choice agent with
+      | { engine = Composer; adapter = Some a }
+        when Adapter_id.equal a adapter_id ->
+        (match Agent.external_models agent with
+         | Some (_ :: _ as models) -> models
+         | Some [] | None ->
+           Option.value_map
+             (find_catalog t agent adapter_id)
+             ~default:[]
+             ~f:(fun c -> c.models))
+      | _ ->
+        Option.value_map
+          (find_catalog t agent adapter_id)
+          ~default:[]
+          ~f:(fun c -> c.models)
+    in
+    let login = cli_credential t agent ~adapter:adapter_name in
+    let no_sandbox = no_sandbox t agent ~host ~host_name ~cwd adapter_id in
+    let (module A : Adapter.S) = adapter in
+    Switch.run (fun sw ->
+      let spawn launch =
+        let start = { (Adapter.Start.default ~cwd) with login; no_sandbox } in
+        let launch =
+          match pool_protocol_of t ~adapter_id ~start ~launch with
+          | Some _ -> A.launch start
+          | None -> launch
+        in
+        let spawned =
+          acquire_external
+            t
+            agent
+            ~sw
+            ~host
+            ~host_name
+            ~adapter_id
+            ~start
+            ~launch
+        in
+        if Result.is_error spawned
+        then
+          recheck_adapter_on t agent ~host ~host_name ~cwd:launch.cwd adapter_id;
+        spawned
+      in
+      External_complete.run
+        ~adapter
+        ~spawn
+        ?login
+        ?no_sandbox
+        ~catalog_models
+        ~on_delta
+        ~cancel
+        ~cwd
+        ~model
+        ~system
+        ~prompt
+        ())
+;;
+
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
 let register t agent =
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
+  Agent.set_subagent_engines agent (Some (subagent_engines t agent));
+  Agent.set_external_complete agent (Some (external_complete t agent));
+  Agent.set_direct_available agent (direct_available t);
+  Agent.set_known_adapter agent (function
+    | Prigh -> false
+    | a -> Engines.drivable t.engines a);
   Agent.set_hosts agent (hosts t) ~returning:(returning t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
@@ -1902,6 +2410,7 @@ let send_accounts_changed t =
    pinned to one no longer shared go back to the default login. *)
 let shares_changed t =
   send_accounts_changed t;
+  Hashtbl.iter t.agents ~f:Agent.auth_changed;
   Option.iter t.member ~f:(fun { shares; user } ->
     Hashtbl.iter t.agents ~f:(fun agent ->
       let state = Agent.state agent in
@@ -1932,6 +2441,7 @@ let create
       ?token
       ?(host_grace = 60.)
       ?(temporary_grace = 120.)
+      ?(external_idle_grace = 3600.)
       ?sleep
       ?(host_timeout = 30.)
       ?heartbeat_clock
@@ -1970,7 +2480,8 @@ let create
         ()
   in
   let t =
-    { login
+    { env
+    ; login
     ; member
     ; ledger
     ; forges
@@ -1989,6 +2500,8 @@ let create
         Adapter_catalog.create
           ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
           ()
+    ; harness_pool = Harness_pool.create ~sw ()
+    ; pool_exec_seq = 0
     ; spawn_external
     ; catalog_keys = String.Table.create ()
     ; agents = String.Table.create ()
@@ -2050,6 +2563,8 @@ let create
           Subscription_usage.Http.real ~env)
     ; temporaries = String.Table.create ()
     ; temporary_grace
+    ; external_idle = String.Table.create ()
+    ; external_idle_grace
     ; ledger_dir = Temporary_ledger.dir ~sessions_dir
     }
   in
@@ -2086,6 +2601,7 @@ let create
   (* Recipients see a login's new label, or that it is gone. *)
   Login_manager.subscribe login ~f:(function
     | Done _ | Logged_out _ | Accounts_changed ->
+      Hashtbl.iter t.agents ~f:Agent.auth_changed;
       Option.iter t.member ~f:(fun { shares; user } ->
         Account_shares.changed shares ~owner:user)
     | _ -> ());
@@ -2106,6 +2622,7 @@ let preferred_host t (client : Client.t) =
 
 let attach t (client : Client.t) agent =
   let previous = client.agent in
+  cancel_external_idle t agent;
   Option.iter
     (Hashtbl.find t.temporaries (session_id agent))
     ~f:(fun temp -> temp.away <- None);
@@ -2280,6 +2797,22 @@ let connect ?signed_in ?(close = fun _ -> ()) ?send_shared t ~send =
   client
 ;;
 
+let deliver_exec_result (e : Exec.t) ~exec_id result =
+  match e.target with
+  | Agent agent -> Agent.tool_exec_result agent ~exec_id result
+  | Direct { resolve; _ } ->
+    resolve result;
+    Ok ()
+;;
+
+let deliver_exec_output (e : Exec.t) ~exec_id ~chunk =
+  match e.target with
+  | Agent agent -> Agent.tool_exec_output agent ~exec_id ~chunk
+  | Direct { on_output; _ } ->
+    on_output chunk;
+    Ok ()
+;;
+
 (* Fails the executions on [host] that [f] selects. *)
 let fail_execs t ~host ~text ~f =
   Hashtbl.filteri t.execs ~f:(fun ~key ~data:(e : Exec.t) ->
@@ -2287,14 +2820,15 @@ let fail_execs t ~host ~text ~f =
   |> Hashtbl.iteri ~f:(fun ~key:exec_id ~data:(e : Exec.t) ->
     Hashtbl.remove t.execs exec_id;
     ignore
-      (Agent.tool_exec_result e.agent ~exec_id (Tool.Result.error text)
+      (deliver_exec_result e ~exec_id (Tool.Result.error text)
        : unit Or_error.t))
 ;;
 
 (* Fails what is in flight on [client] as the host it is now. *)
 let release_host_id t (client : Client.t) ~text =
   fail_execs t ~host:client.host_id ~text ~f:(fun _ _ -> true);
-  Terminal_relay.host_gone t.terminals ~host:client.host_id
+  Terminal_relay.host_gone t.terminals ~host:client.host_id;
+  Harness_pool.evict_host t.harness_pool ~host:client.host_id
 ;;
 
 (* A host whose connection dropped may still run what it was given (a TUI
@@ -2316,11 +2850,10 @@ let await_host t (client : Client.t) =
     |> Hashtbl.iteri ~f:(fun ~key:exec_id ~data:(e : Exec.t) ->
       Hashtbl.remove t.execs exec_id;
       ignore
-        (Agent.tool_exec_result
-           e.agent
-           ~exec_id
-           (Tool.Result.error host_disconnected)
+        (deliver_exec_result e ~exec_id (Tool.Result.error host_disconnected)
          : unit Or_error.t));
+    if Option.is_none (host_client t client.host_id)
+    then Harness_pool.evict_host t.harness_pool ~host:client.host_id;
     `Stop_daemon)
 ;;
 
@@ -2372,6 +2905,7 @@ let shutdown t =
   List.iter agents ~f:Agent.shutdown;
   Login_manager.cancel t.login;
   List.iter agents ~f:Agent.wait_idle;
+  Harness_pool.shutdown t.harness_pool;
   Login_manager.wait t.login
 ;;
 
@@ -3118,6 +3652,7 @@ let new_session
   Agent.set_engine agent engine;
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
+  Agent.prewarm agent;
   match attached_state t client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])
@@ -3309,6 +3844,7 @@ let delete_saved ?leaving t client (summary : Session.Summary.t) =
       let bytes = Session.disk_usage summary.path in
       Session.delete_files summary.path;
       let agent = Hashtbl.find t.agents summary.id in
+      Hashtbl.remove t.external_idle summary.id;
       Hashtbl.remove t.agents summary.id;
       Hashtbl.remove t.listed summary.id;
       Hashtbl.remove t.catalog_keys summary.id;
@@ -3439,7 +3975,7 @@ let set_pinned t ~key ~pinned =
 let exec_param t params =
   Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->
     match Hashtbl.find t.execs exec_id with
-    | Some e -> Ok (exec_id, e.agent)
+    | Some e -> Ok (exec_id, e)
     | None -> Or_error.errorf "no tool execution %S" exec_id)
 ;;
 
@@ -4140,6 +4676,7 @@ let set_adapter_login t params =
     match Agent.engine_choice agent with
     | { engine = Composer; adapter = Some a }
       when String.equal (Adapter_id.to_string a) adapter ->
+      if not (Agent.is_running agent) then Agent.stop_engine agent;
       route t agent (State_changed (Agent.state agent))
     | _ -> ());
   `Object [ "adapter_logins", adapter_logins_json t ]
@@ -4554,20 +5091,20 @@ let dispatch_server t (client : Client.t) ~meth ~params
                ~f:Dir_change.Outcome.to_json))))
   | "tool_exec_output" ->
     Some
-      (Or_error.bind (exec_param t params) ~f:(fun (exec_id, agent) ->
+      (Or_error.bind (exec_param t params) ~f:(fun (exec_id, exec) ->
          Or_error.bind (string_param params "chunk") ~f:(fun chunk ->
-           unit_result (Agent.tool_exec_output agent ~exec_id ~chunk))))
+           unit_result (deliver_exec_output exec ~exec_id ~chunk))))
   | "tool_exec_result" ->
     Some
-      (Or_error.bind (exec_param t params) ~f:(fun (exec_id, agent) ->
+      (Or_error.bind (exec_param t params) ~f:(fun (exec_id, exec) ->
          let open Or_error.Let_syntax in
          let%bind text = string_param params "text" in
          let%bind is_error = bool_param params "is_error" ~default:false in
          let%bind images = tool_images_param params in
          Hashtbl.remove t.execs exec_id;
          unit_result
-           (Agent.tool_exec_result
-              agent
+           (deliver_exec_result
+              exec
               ~exec_id
               { Tool_result.text; is_error; images })))
   | "get_prefs" | "set_prefs" | "push_pref" ->

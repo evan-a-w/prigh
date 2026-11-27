@@ -1043,3 +1043,166 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       agent_end (16 new messages)
     |}]
 ;;
+
+let%expect_test
+    "open tool across end_turn Done stays in has_open_work and re-opens on \
+     update"
+  =
+  let t = started () in
+  ok (C.prompt t [ Text "build it" ]);
+  ignore ([%expect.output] : string);
+  recv
+    t
+    {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call","toolCallId":"bg1","title":"dune build","kind":"execute","status":"in_progress","rawInput":{"command":"dune build"}}}}|};
+  recv t {|{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}|};
+  printf
+    "after end_turn: in_turn=%b has_open_work=%b\n"
+    (C.in_turn t)
+    (C.has_open_work t);
+  (* Later, the background tool completes: opens an autonomous turn, re-emits
+     Tool_start for the new recorder, and clears has_open_work. *)
+  recv
+    t
+    {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call_update","toolCallId":"bg1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"build ok"}}]}}}|};
+  printf
+    "after completion: autonomous=%b has_open_work=%b\n"
+    (C.is_autonomous_turn t)
+    (C.has_open_work t);
+  List.iter (C.finish_autonomous t) ~f:print_output;
+  [%expect
+    {|
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call","toolCallId":"bg1","title":"dune build","kind":"execute","status":"in_progress","rawInput":{"command":"dune build"}}}}
+    (Tool_start (id bg1) (kind Command) (native_name execute)
+     (title "dune build") (input (Object ((command (String "dune build")))))
+     (parent ()))
+    (Tool_update (id bg1) (output ""))
+    < {"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}
+    (Tool_end (id bg1) (ok true) (output "[running in background]") (changes ())
+     (images ()))
+    (Turn_end (turn_id (turn-1)) (stop Done))
+    after end_turn: in_turn=false has_open_work=true
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call_update","toolCallId":"bg1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"build ok"}}]}}}
+    (Turn_started (turn_id turn-2))
+    (Tool_start (id bg1) (kind Command) (native_name execute)
+     (title "dune build") (input (Object ((command (String "dune build")))))
+     (parent ()))
+    (Tool_update (id bg1) (output "build ok"))
+    (Tool_end (id bg1) (ok true) (output "build ok") (changes ()) (images ()))
+    after completion: autonomous=true has_open_work=false
+    (Turn_end (turn_id (turn-2)) (stop Done))
+    |}]
+;;
+
+let%expect_test
+    "failed tool_call_update extracts unwrapped content, error field, \
+     rawOutput, and preserves prior output"
+  =
+  let t = started () in
+  ok (C.prompt t [ Text "go" ]);
+  ignore ([%expect.output] : string);
+  let update u =
+    recv
+      t
+      (sprintf
+         {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":%s}}|}
+         u)
+  in
+  update
+    {|{"sessionUpdate":"tool_call","toolCallId":"e1","title":"mcp_prigh_subagent_continue","kind":"other","status":"failed","content":[{"type":"text","text":"unwrapped error"}]}|};
+  update
+    {|{"sessionUpdate":"tool_call","toolCallId":"e2","title":"mcp_prigh_subagent_continue","kind":"other","status":"failed","error":"direct error"}|};
+  update
+    {|{"sessionUpdate":"tool_call","toolCallId":"e3","title":"mcp_prigh_subagent_continue","kind":"other","status":"failed","error":{"message":"structured error"}}|};
+  update
+    {|{"sessionUpdate":"tool_call","toolCallId":"e4","title":"mcp_prigh_subagent_continue","kind":"other","status":"failed","rawOutput":{"content":[{"type":"text","text":"mcp rawOutput error"}],"isError":true}}|};
+  update
+    {|{"sessionUpdate":"tool_call","toolCallId":"e5","title":"cmd","kind":"execute","status":"in_progress","content":[{"type":"content","content":{"type":"text","text":"partial failure output"}}]}|};
+  update
+    {|{"sessionUpdate":"tool_call_update","toolCallId":"e5","status":"failed","content":[]}|};
+  [%expect
+    {|
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call","toolCallId":"e1","title":"mcp_prigh_subagent_continue","kind":"other","status":"failed","content":[{"type":"text","text":"unwrapped error"}]}}}
+    (Tool_start (id e1) (kind (Mcp (server prigh) (tool subagent_continue)))
+     (native_name mcp_prigh_subagent_continue)
+     (title mcp_prigh_subagent_continue) (input (Object ())) (parent ()))
+    (Tool_update (id e1) (output "unwrapped error"))
+    (Tool_end (id e1) (ok false) (output "unwrapped error") (changes ())
+     (images ()))
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call","toolCallId":"e2","title":"mcp_prigh_subagent_continue","kind":"other","status":"failed","error":"direct error"}}}
+    (Tool_start (id e2) (kind (Mcp (server prigh) (tool subagent_continue)))
+     (native_name mcp_prigh_subagent_continue)
+     (title mcp_prigh_subagent_continue) (input (Object ())) (parent ()))
+    (Tool_end (id e2) (ok false) (output "direct error") (changes ())
+     (images ()))
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call","toolCallId":"e3","title":"mcp_prigh_subagent_continue","kind":"other","status":"failed","error":{"message":"structured error"}}}}
+    (Tool_start (id e3) (kind (Mcp (server prigh) (tool subagent_continue)))
+     (native_name mcp_prigh_subagent_continue)
+     (title mcp_prigh_subagent_continue) (input (Object ())) (parent ()))
+    (Tool_end (id e3) (ok false) (output "structured error") (changes ())
+     (images ()))
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call","toolCallId":"e4","title":"mcp_prigh_subagent_continue","kind":"other","status":"failed","rawOutput":{"content":[{"type":"text","text":"mcp rawOutput error"}],"isError":true}}}}
+    (Tool_start (id e4) (kind (Mcp (server prigh) (tool subagent_continue)))
+     (native_name mcp_prigh_subagent_continue)
+     (title mcp_prigh_subagent_continue) (input (Object ())) (parent ()))
+    (Tool_end (id e4) (ok false) (output "mcp rawOutput error") (changes ())
+     (images ()))
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call","toolCallId":"e5","title":"cmd","kind":"execute","status":"in_progress","content":[{"type":"content","content":{"type":"text","text":"partial failure output"}}]}}}
+    (Tool_start (id e5) (kind Command) (native_name execute) (title cmd)
+     (input (Object ((command (String cmd))))) (parent ()))
+    (Tool_update (id e5) (output "partial failure output"))
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"tool_call_update","toolCallId":"e5","status":"failed","content":[]}}}
+    (Tool_end (id e5) (ok false) (output "partial failure output") (changes ())
+     (images ()))
+    |}]
+;;
+
+let%expect_test
+    "ACP tool_kind and Canonical_tool handle prigh MCP tools, Antigravity \
+     edit_file/run_command, and locations"
+  =
+  let codec = C.create () in
+  let step line =
+    List.iter (C.handle_line codec line) ~f:(function
+      | Event (Tool_start { kind; native_name; input; _ }) ->
+        let c = Canonical_tool.of_start ~kind ~native_name ~input in
+        printf
+          "tool_start kind=%s -> %s %s\n"
+          (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
+          c.name
+          (Jsonaf.to_string c.arguments)
+      | Event (Approval_request { kind; input; _ }) ->
+        let c = Canonical_tool.of_start ~kind ~native_name:"perm" ~input in
+        printf
+          "approval kind=%s -> %s %s\n"
+          (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
+          c.name
+          (Jsonaf.to_string c.arguments)
+      | _ -> ())
+  in
+  ignore (C.new_session codec ~cwd:"/work" ~mcp_servers:[] : string);
+  step {|{"jsonrpc":"2.0","id":0,"result":{"sessionId":"s1"}}|};
+  ignore (Or_error.ok_exn (C.prompt codec [ Text "go" ]) : C.Output.t list);
+  (* Antigravity MCP tool permission request for prigh's worktree tool *)
+  step
+    {|{"jsonrpc":"2.0","id":10,"method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc-1","kind":"other","title":"mcp_prigh_worktree","rawInput":{"action":"list"}},"options":[{"optionId":"a","kind":"allow_once"}]}}|};
+  (* Antigravity edit_file with Path/Target/Replacement *)
+  step
+    {|{"jsonrpc":"2.0","id":11,"method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc-2","kind":"edit","title":"edit_file","rawInput":{"Path":"/home/u/.prigh/worktrees/app/feat/a.ml","Target":"old","Replacement":"new"}},"options":[{"optionId":"a","kind":"allow_once"}]}}|};
+  (* ACP edit permission with path only in locations *)
+  step
+    {|{"jsonrpc":"2.0","id":12,"method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc-3","kind":"edit","title":"Edit","locations":[{"path":"/home/u/.prigh/worktrees/app/feat/b.ml"}],"rawInput":{}},"options":[{"optionId":"a","kind":"allow_once"}]}}|};
+  (* Antigravity run_command with CommandLine *)
+  step
+    {|{"jsonrpc":"2.0","id":13,"method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc-4","kind":"execute","title":"Run command","rawInput":{"CommandLine":"dune build @runtest"}},"options":[{"optionId":"a","kind":"allow_once"}]}}|};
+  [%expect
+    {|
+    tool_start kind=(Mcp(server prigh)(tool worktree)) -> worktree {"action":"list"}
+    approval kind=(Mcp(server prigh)(tool worktree)) -> worktree {"action":"list"}
+    tool_start kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/a.ml","edits":[{"old_text":"old","new_text":"new"}]}
+    approval kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/a.ml","edits":[{"old_text":"old","new_text":"new"}]}
+    tool_start kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/b.ml"}
+    approval kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/b.ml"}
+    tool_start kind=Command -> bash {"command":"dune build @runtest"}
+    approval kind=Command -> bash {"command":"dune build @runtest"}
+    |}]
+;;

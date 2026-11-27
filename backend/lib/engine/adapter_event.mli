@@ -157,6 +157,9 @@ type t =
       ; message : string
       }
   | Notice of string
+  | Session_title of string
+  (** a session title the harness itself reported (ACP [session_info_update],
+      Codex [thread/name/updated]) *)
   | Turn_end of
       { turn_id : string option
       ; stop : Stop.t

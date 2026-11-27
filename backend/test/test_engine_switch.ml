@@ -357,7 +357,7 @@ let%expect_test "switching adapters hands each what it has not seen" =
   [%expect
     {|
     ok: engine composer, adapter claude
-    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --input-format stream-json
+    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --add-dir $DIR/.prigh/worktrees --input-format stream-json
     claude got:
     Context handoff (the session so far):
     prigh session <id> moves from Codex to you (Claude Code) on host <host>, working directory $DIR.
@@ -388,7 +388,6 @@ let%expect_test "switching adapters hands each what it has not seen" =
   [%expect
     {|
     ok: engine composer, adapter codex
-    spawn codex app-server
     codex: thread/resume codex-thread
     codex got:
     Context handoff (since your last turn: your own thread has what came before):
@@ -436,8 +435,8 @@ let%expect_test "switching adapters hands each what it has not seen" =
     engine composer codex
     user "fourth"
     handoff claude -> codex
-    assistant "codex reply 1"
-    external turn codex-thread tu-1
+    assistant "codex reply 3"
+    external turn codex-thread tu-3
     |}]
 ;;
 
@@ -461,7 +460,7 @@ let%expect_test "a thread that cannot be continued gets the whole session" =
 
     first
     ok: engine composer, adapter claude
-    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --input-format stream-json
+    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --add-dir $DIR/.prigh/worktrees --input-format stream-json
     claude got:
     Context handoff (the session so far):
     prigh session <id> moves from Codex to you (Claude Code) on host <host>, working directory $DIR.
@@ -479,9 +478,7 @@ let%expect_test "a thread that cannot be continued gets the whole session" =
 
     second
     ok: engine composer, adapter codex
-    spawn codex app-server
     codex: thread/resume codex-thread refused
-    spawn codex app-server
     codex: thread/start
     codex got:
     Context handoff (the session so far):
@@ -527,7 +524,6 @@ let%expect_test
 
     first
     ok: engine composer, adapter codex
-    spawn codex app-server
     codex: thread/fork codex-thread at tu-1
     codex got:
     in the fork
@@ -543,8 +539,8 @@ let%expect_test
     user "in the fork"
     external turn codex-fork tu-1
     thread codex codex-fork
-    assistant "codex reply 1"
-    external turn codex-fork tu-1
+    assistant "codex reply 2"
+    external turn codex-fork tu-2
     |}]
 ;;
 

@@ -1121,3 +1121,365 @@ let%expect_test "claude: no token, or an apiKeyHelper: its own login, saying so"
     assistant (claude/claude-sonnet-4-6, End_turn): "ok"
     |}]
 ;;
+
+let%expect_test "codex: steer wakes immediately without polling delay" =
+  let in_turn, mark_in_turn = Eio.Promise.create () in
+  let steer_recorded, mark_steer_recorded = Eio.Promise.create () in
+  let steered_at = ref None in
+  with_composer
+    ~adapter:(module Codex_adapter)
+    ~peer:(fun _ p ->
+      let read () =
+        Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+          Json.parse l |> Or_error.ok_exn)
+      in
+      let write j = Line_transport.Peer.write_line p (Json.to_string j) in
+      let reply j result =
+        write
+          (`Object
+              [ "id", Option.value_exn (Json.member "id" j); "result", result ])
+      in
+      let rec loop () =
+        match read () with
+        | None -> ()
+        | Some j ->
+          (match Option.bind (Json.member "method" j) ~f:Json.string with
+           | Some "initialize" ->
+             reply j (`Object [ "userAgent", `String "codex/0.166.0" ])
+           | Some "thread/start" ->
+             reply
+               j
+               (`Object
+                   [ "thread", `Object [ "id", `String "th-1" ]
+                   ; "model", `String "gpt-5"
+                   ])
+           | Some "turn/start" ->
+             reply
+               j
+               (`Object
+                   [ ( "turn"
+                     , `Object
+                         [ "id", `String "tu-1"
+                         ; "status", `String "inProgress"
+                         ] )
+                   ]);
+             write
+               (`Object
+                   [ "method", `String "turn/started"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; "turn", `Object [ "id", `String "tu-1" ]
+                         ] )
+                   ]);
+             Eio.Promise.resolve mark_in_turn ()
+           | Some "turn/steer" ->
+             steered_at := Some (Time_float.now ());
+             reply j (`Object [ "turnId", `String "tu-1" ]);
+             Eio.Promise.await steer_recorded;
+             write
+               (`Object
+                   [ "method", `String "item/completed"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; ( "item"
+                           , `Object
+                               [ "type", `String "agentMessage"
+                               ; "id", `String "m1"
+                               ; "text", `String "Steered!"
+                               ] )
+                         ] )
+                   ]);
+             write
+               (`Object
+                   [ "method", `String "turn/completed"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; ( "turn"
+                           , `Object
+                               [ "id", `String "tu-1"
+                               ; "status", `String "completed"
+                               ] )
+                         ] )
+                   ])
+           | Some _ | None -> ());
+          loop ()
+      in
+      loop ())
+  @@ fun _ agent _ ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Message_end (User u)) when String.equal u.text "pivot now" ->
+      ignore (Eio.Promise.try_resolve mark_steer_recorded () : bool)
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "start");
+  Eio.Promise.await in_turn;
+  let sent_at = Time_float.now () in
+  Or_error.ok_exn (Agent.steer agent "pivot now");
+  Agent.wait_idle agent;
+  let fast =
+    match !steered_at with
+    | Some at ->
+      Float.(Time_float.Span.to_ms (Time_float.diff at sent_at) < 150.)
+    | None -> false
+  in
+  printf "steered_fast=%b\n" fast;
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nstart"
+    spawn #1: codex app-server
+    user: "pivot now"
+    assistant (codex/gpt-5, End_turn): "Steered!"
+    steered_fast=true
+    |}]
+;;
+
+let%expect_test
+    "codex: thread/name/updated sets native session description, preserving \
+     manual name"
+  =
+  let send_between, trigger_between = Eio.Promise.create () in
+  let between_sent, mark_between_sent = Eio.Promise.create () in
+  let send_after_manual, trigger_after_manual = Eio.Promise.create () in
+  let after_manual_sent, mark_after_manual_sent = Eio.Promise.create () in
+  with_composer
+    ~adapter:(module Codex_adapter)
+    ~peer:(fun _ p ->
+      let read () =
+        Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+          Json.parse l |> Or_error.ok_exn)
+      in
+      let write j = Line_transport.Peer.write_line p (Json.to_string j) in
+      let reply j result =
+        write
+          (`Object
+              [ "id", Option.value_exn (Json.member "id" j); "result", result ])
+      in
+      let notify_title title =
+        write
+          (`Object
+              [ "method", `String "thread/name/updated"
+              ; ( "params"
+                , `Object
+                    [ "threadId", `String "th-1"; "threadName", `String title ]
+                )
+              ])
+      in
+      let rec loop () =
+        match read () with
+        | None -> ()
+        | Some j ->
+          (match Option.bind (Json.member "method" j) ~f:Json.string with
+           | Some "initialize" ->
+             reply j (`Object [ "userAgent", `String "codex/0.166.0" ])
+           | Some "thread/start" ->
+             reply
+               j
+               (`Object
+                   [ "thread", `Object [ "id", `String "th-1" ]
+                   ; "model", `String "gpt-5"
+                   ])
+           | Some "turn/start" ->
+             reply
+               j
+               (`Object
+                   [ ( "turn"
+                     , `Object
+                         [ "id", `String "tu-1"
+                         ; "status", `String "inProgress"
+                         ] )
+                   ]);
+             write
+               (`Object
+                   [ "method", `String "turn/started"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; "turn", `Object [ "id", `String "tu-1" ]
+                         ] )
+                   ]);
+             notify_title "Initial Codex title";
+             write
+               (`Object
+                   [ "method", `String "item/completed"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; ( "item"
+                           , `Object
+                               [ "type", `String "agentMessage"
+                               ; "id", `String "m1"
+                               ; "text", `String "Done."
+                               ] )
+                         ] )
+                   ]);
+             write
+               (`Object
+                   [ "method", `String "turn/completed"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; ( "turn"
+                           , `Object
+                               [ "id", `String "tu-1"
+                               ; "status", `String "completed"
+                               ] )
+                         ] )
+                   ]);
+             Eio.Promise.await send_between;
+             notify_title "Refined Codex title";
+             Eio.Promise.resolve mark_between_sent ();
+             Eio.Promise.await send_after_manual;
+             notify_title "Should not overwrite manual";
+             Eio.Promise.resolve mark_after_manual_sent ()
+           | Some _ | None -> ());
+          loop ()
+      in
+      loop ())
+  @@ fun _ agent _ ->
+  let title_updated = Eio.Condition.create () in
+  Agent.subscribe agent ~f:(function
+    | State_changed _ -> Eio.Condition.broadcast title_updated
+    | _ -> ());
+  prompt agent "fix bug";
+  let show label =
+    let s = Agent.session agent in
+    printf
+      "%s: name=%s desc=%s native=%b wanted=%b\n"
+      label
+      (Option.value (Session.name s) ~default:"-")
+      (Option.value (Session.description s) ~default:"-")
+      (Session_description.has_native s)
+      (Session_description.wanted s)
+  in
+  show "in-turn";
+  Eio.Promise.resolve trigger_between ();
+  Eio.Promise.await between_sent;
+  while
+    not
+      (Option.equal
+         String.equal
+         (Session.description (Agent.session agent))
+         (Some "Refined Codex title"))
+  do
+    Eio.Condition.await_no_mutex title_updated
+  done;
+  show "between-turns";
+  ignore
+    (Session.set_name (Agent.session agent) ~name:"My manual name"
+     : Session.Entry.t);
+  Eio.Promise.resolve trigger_after_manual ();
+  Eio.Promise.await after_manual_sent;
+  Eio.Fiber.yield ();
+  Eio.Fiber.yield ();
+  show "after-manual";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nfix bug"
+    spawn #1: codex app-server
+    assistant (codex/gpt-5, End_turn): "Done."
+    in-turn: name=- desc=Initial Codex title native=true wanted=false
+    between-turns: name=- desc=Refined Codex title native=true wanted=false
+    after-manual: name=My manual name desc=Refined Codex title native=true wanted=false
+    |}]
+;;
+
+let%expect_test
+    "claude: injected prigh MCP tools use real tool spec and are never \
+     approved twice"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let fake_worktree =
+    { Tool.spec = (Tool_worktree.create ()).spec
+    ; run =
+        (fun _ args -> Tool_result.ok ("ran worktree " ^ Json.to_string args))
+    }
+  in
+  let confirms = ref 0 in
+  let peer (p : Line_transport.Peer.t) =
+    let read () =
+      Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+        Json.parse l |> Or_error.ok_exn)
+    in
+    let req_id j = Option.bind (Json.member "request_id" j) ~f:Json.string in
+    (match read () with
+     | Some init ->
+       Line_transport.Peer.write_line
+         p
+         (sprintf
+            {|{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"claude_code_version":"2.1.268","models":[],"commands":[]}}}|}
+            (Option.value (req_id init) ~default:""))
+     | None -> ());
+    ignore (read () : Json.t option);
+    Line_transport.Peer.write_line
+      p
+      {|{"type":"system","subtype":"init","session_id":"s1","model":"claude-sonnet-4-6"}|};
+    let send_and_expect label line =
+      Line_transport.Peer.write_line p line;
+      match read () with
+      | Some reply -> printf "%s -> %s\n" label (Json.to_string reply)
+      | None -> printf "%s -> EOF\n" label
+    in
+    (* 1. worktree(action=list): read-only, must NOT ask in Ask mode *)
+    send_and_expect
+      "can_use_tool list"
+      {|{"type":"control_request","request_id":"perm-1","request":{"subtype":"can_use_tool","tool_name":"mcp__prigh__worktree","tool_use_id":"tu-1","input":{"action":"list"}}}|};
+    send_and_expect
+      "mcp list"
+      {|{"type":"control_request","request_id":"mcp-1","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"worktree","arguments":{"action":"list"}}}}}|};
+    (* 2. worktree(action=remove): destructive, must ask ONCE (not twice) *)
+    send_and_expect
+      "can_use_tool remove"
+      {|{"type":"control_request","request_id":"perm-2","request":{"subtype":"can_use_tool","tool_name":"mcp__prigh__worktree","tool_use_id":"tu-2","input":{"action":"remove","path":"/wt/a"}}}|};
+    send_and_expect
+      "mcp remove"
+      {|{"type":"control_request","request_id":"mcp-2","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"worktree","arguments":{"action":"remove","path":"/wt/a"}}}}}|};
+    Line_transport.Peer.write_line
+      p
+      {|{"type":"result","subtype":"success","is_error":false,"result":"done","session_id":"s1","usage":{"input_tokens":1,"output_tokens":1}}|}
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter:(module Claude_adapter)
+      ~spawn:(fun _ -> Ok (Line_transport.Peer.spawn ~sw peer))
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:(fake_worktree :: Tools.interaction)
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some Claude };
+  Agent.set_mode agent ~approval:Ask;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; agent_id; name; summary; _ }) ->
+      incr confirms;
+      printf "confirm #%d %s %s: %s\n" !confirms call_id name summary;
+      Or_error.ok_exn (Agent.respond_confirm ?agent_id agent ~call_id Allow)
+    | _ -> ());
+  prompt agent "tidy worktrees";
+  Composer_runner.close composer;
+  printf "total confirms = %d\n" !confirms;
+  [%expect
+    {|
+    can_use_tool list -> {"type":"control_response","response":{"subtype":"success","request_id":"perm-1","response":{"behavior":"allow","updatedInput":{"action":"list"}}}}
+    mcp list -> {"type":"control_response","response":{"subtype":"success","request_id":"mcp-1","response":{"mcp_response":{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ran worktree {\"action\":\"list\"}"}],"isError":false}}}}}
+    confirm #1 tu-2 worktree: remove /wt/a
+    can_use_tool remove -> {"type":"control_response","response":{"subtype":"success","request_id":"perm-2","response":{"behavior":"allow","updatedInput":{"action":"remove","path":"/wt/a"}}}}
+    mcp remove -> {"type":"control_response","response":{"subtype":"success","request_id":"mcp-2","response":{"mcp_response":{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"ran worktree {\"action\":\"remove\",\"path\":\"/wt/a\"}"}],"isError":false}}}}}
+    total confirms = 1
+    |}]
+;;

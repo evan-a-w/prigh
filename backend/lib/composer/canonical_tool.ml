@@ -120,7 +120,14 @@ let unwrap_shell s =
 ;;
 
 let command input =
-  match field input "command" with
+  let raw =
+    Option.first_some
+      (field input "command")
+      (Option.first_some
+         (field input "command_line")
+         (field input "commandline"))
+  in
+  match raw with
   | Some (`String s) -> Some (unwrap_shell s)
   | Some (`Array parts) ->
     let parts =
@@ -250,29 +257,41 @@ let file_change ~native_name input =
   in
   let old_new json =
     match
-      ( first_string json [ "old_string"; "old_text" ]
-      , first_string json [ "new_string"; "new_text" ] )
+      ( first_string json [ "old_string"; "old_text"; "target" ]
+      , first_string json [ "new_string"; "new_text"; "replacement" ] )
     with
     | Some o, Some n -> Some (o, n)
     | _ -> None
   in
+  let content = first_string input [ "content"; "new_content" ] in
   match path, old_new input, list_field input "edits", patch_files input with
   | Some path, Some edit_, _, _ -> edit ~path [ edit_ ]
   | Some path, None, Some edits, _ ->
     edit ~path (List.filter_map edits ~f:old_new)
-  | Some path, None, None, _ when Option.is_some (field input "content") ->
+  | Some path, None, None, _ when Option.is_some content ->
     { name = "write"
     ; arguments =
         `Object
           [ "path", str path
-          ; ( "content"
-            , str (Option.value (string_field input "content") ~default:"") )
+          ; "content", str (Option.value content ~default:"")
           ]
     ; native_name
     }
   | _, _, _, Some files ->
     { name = "apply_patch"
     ; arguments = `Object [ "input", str (patch_of_files files) ]
+    ; native_name
+    }
+  | Some path, None, None, None ->
+    let rest =
+      match input with
+      | `Object fields ->
+        List.filter fields ~f:(fun (k, _) ->
+          not (String.Caseless.equal k "path"))
+      | _ -> []
+    in
+    { name = "edit"
+    ; arguments = `Object (("path", str path) :: rest)
     ; native_name
     }
   | _ -> { name = native_name; arguments = input; native_name }

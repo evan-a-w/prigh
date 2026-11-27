@@ -235,6 +235,30 @@ module Pending_question : sig
   [@@deriving sexp_of]
 end
 
+(** Result of a one-shot tool-less completion ({!complete}). *)
+module Completion : sig
+  type t =
+    { text : string
+    ; model : string (** model key that answered *)
+    ; cost_usd : float
+    }
+  [@@deriving sexp_of]
+end
+
+(** One-shot tool-less completion through an external harness adapter
+    (wired by [Rpc_server] or {!create}). *)
+module External_complete_fn : sig
+  type t =
+    adapter:Adapter_id.t
+    -> model:string option
+    -> system:string
+    -> prompt:string
+    -> cwd:string
+    -> cancel:Cancellation.t
+    -> on_delta:(string -> unit)
+    -> Adapter.Completion.t Or_error.t
+end
+
 type t
 
 val create
@@ -246,6 +270,12 @@ val create
            a usage limit carries on with the next one that allows
            fallback before handing over to [fallback_models] (default:
            none) *)
+  -> ?provider_configured:(Provider_id.t -> bool)
+       (** whether a direct provider currently has usable credentials
+           (stored login, shared account, env var, or custom provider):
+           consulted dynamically when resolving an auxiliary model for an
+           external harness session (default: non-empty [accounts] or a
+           custom provider) *)
   -> tools:Tool.t list
   -> sessions_dir:string
   -> home:string
@@ -302,6 +332,16 @@ val create
   -> ?runner:Runner.t
        (** the engine that does the session's runs; default: the harness, the
            agent loop on [provider] with [tools] *)
+  -> ?external_complete:External_complete_fn.t
+       (** runs one-shot text completions (naming, drafting) on external
+           harness adapters ([acp:*], [codex], [claude]) *)
+  -> ?direct_available:(Model.t -> bool)
+       (** whether a direct HTTP provider model has credentials configured;
+           default: [true] *)
+  -> ?known_adapter:(Adapter_id.t -> bool)
+       (** which external adapters are accepted in [config.naming_model] and
+           [config.generate_model]; default: [codex], [claude], and built-in
+           ACP agents *)
   -> cwd:string
   -> unit
   -> t
@@ -343,6 +383,20 @@ val prewarm : t -> unit
 (** Stops the external harness's process, if one runs: a later run starts
     it again. *)
 val stop_engine : t -> unit
+
+(** Called when the user's available provider logins or shared accounts
+    changed, so auxiliary requests (such as auto-description on an external
+    session) can retry against live auth. *)
+val auth_changed : t -> unit
+
+(** Records a native session title reported by an external harness, unless
+    the user has manually named the session. *)
+val set_external_title : t -> string -> unit
+
+(** Called when the session's live external harness begins a turn of its own
+    between prompts (e.g. woken by a background task): drives and records
+    that turn as a run. *)
+val external_woke : t -> unit
 
 (** prigh's own harness on the session's provider and model, whatever
     runner the session has (for the composer's [prigh] adapter). *)
@@ -982,8 +1036,9 @@ val name_subagent
 
 (** One tool-less request without thinking, outside the conversation:
     [system] and the one user message [user]; [on_delta] receives the
-    streamed text. The cost counts towards the session's. Returns the
-    reply's text and its cost. *)
+    streamed text. The cost counts towards the session's. Routes external
+    models (and unauthenticated external sessions) through the external
+    completion hook when configured. *)
 val complete
   :  t
   -> model:Model.t
@@ -992,7 +1047,7 @@ val complete
   -> max_tokens:int
   -> cancel:Cancellation.t
   -> on_delta:(string -> unit)
-  -> (string * float) Or_error.t
+  -> Completion.t Or_error.t
 
 (** In-place session replacement for a single-agent embedding (the CLI and
     tests); background subagents are cancelled and their reports dropped.
@@ -1153,6 +1208,38 @@ val hosts : t -> Host.t list
 
 (** [hosts] as [on_host] lists them. *)
 val tool_hosts : t -> Tool_on_host.Host.t list
+
+(** How [subagent] runs on the backend's deployed engines (set by
+    [Rpc_server] when the session is registered). *)
+val set_subagent_engines : t -> Tool_subagent.External.t option -> unit
+
+val subagent_engines : t -> Tool_subagent.External.t option
+
+(** Sets the one-shot completion hook for external harnesses (set by
+    [Rpc_server] when the session is registered). *)
+val set_external_complete : t -> External_complete_fn.t option -> unit
+
+(** Sets the predicate saying whether a direct HTTP provider model has
+    credentials configured (used to choose external completion on external
+    sessions when [naming_model]/[generate_model] is unset). *)
+val set_direct_available : t -> (Model.t -> bool) -> unit
+
+(** Sets the predicate saying which external adapters are accepted in
+    [config.naming_model] and [config.generate_model]. *)
+val set_known_adapter : t -> (Adapter_id.t -> bool) -> unit
+
+(** The session's prigh harness model (kept even while the session runs on
+    an external composer adapter). *)
+val harness_model : t -> Model.t
+
+(** Records spend reported outside the harness's messages (e.g. a composer
+    subagent's reported cost). *)
+val add_spend : t -> usage:Usage.t -> cost_usd:float -> unit
+
+(** Whether [agent_id] is a background subagent managed by this agent's
+    {!Background_tasks} (running or parked), and so can be steered even on
+    a composer session. *)
+val has_managed_subagent : t -> agent_id:string -> bool
 
 val active_host : t -> string
 

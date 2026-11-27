@@ -105,6 +105,12 @@ let await t =
   done
 ;;
 
+let await_steer t =
+  while List.is_empty (Steer_queue.items t.queue Steer) do
+    Eio.Condition.await_no_mutex t.changed
+  done
+;;
+
 let close_if_empty t =
   if Steer_queue.is_empty t.queue then t.closed <- true;
   t.closed

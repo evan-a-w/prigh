@@ -692,6 +692,22 @@ let present
       | Some (s : Chat.Subagent.t) -> Some s.model
       | None -> Tool_args.string args "model"
     in
+    let engine =
+      let key =
+        match subagent with
+        | Some (s : Chat.Subagent.t) -> s.engine
+        | None -> Tool_args.string args "engine"
+      in
+      Option.map key ~f:(fun key ->
+        if String.equal key "harness"
+        then "prigh harness"
+        else Session_engine.adapter_label key)
+    in
+    let host =
+      match subagent with
+      | Some (s : Chat.Subagent.t) -> s.host
+      | None -> Tool_args.string args "host"
+    in
     let started =
       match result with
       | Some { is_error = false; text; _ } -> Subagent_report.started text
@@ -710,6 +726,8 @@ let present
     ; details =
         List.filter_opt
           [ Option.map agent_id ~f:(fun id -> "agent " ^ id)
+          ; engine
+          ; Option.map host ~f:(fun h -> "on " ^ h)
           ; Option.some_if
               (Option.exists subagent ~f:(fun s -> s.forked)
                || Option.value (Tool_args.bool args "fork") ~default:false)

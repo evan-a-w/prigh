@@ -399,8 +399,8 @@ let%expect_test
 ;;
 
 let%expect_test
-    "subagent_continue still takes only a subagent out of turns, not one that \
-     finished"
+    "subagent_continue continues a finished subagent and reports back to the \
+     main agent"
   =
   with_agent
     ~main:
@@ -412,8 +412,9 @@ let%expect_test
           ~arguments:{|{"id":"a1","message":"more"}|}
           ()
       ; Reply.text "ok"
+      ; Reply.text "got more"
       ]
-    [ "work", [ Reply.text "done" ] ]
+    [ "work", [ Reply.text "done"; Reply.text "more done" ] ]
   @@ fun _t agent ->
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
@@ -434,8 +435,17 @@ let%expect_test
     agent_start
     user: [subagent a1 finished] work | done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_continue{"id":"a1","message":"more"}
-    tool_result subagent_continue: invalid arguments: a1 finished and cannot be continued: only a subagent that ran out of turns can (those that can: none); start a new subagent for more work
+    subagent_start a1: work
+    state: running=true subagents=[a1 running]
+    tool_result subagent_continue: continuing a1; its report will be delivered to you when it finishes: keep working or end your turn meanwhile
+    subagent_end a1: ok more done | [subagent: 2 turns, 20 in / 10 out tokens, $0.0000]
+    state: running=true subagents=[a1 done]
     assistant: ok
+    agent_end
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | more done | [subagent: 2 turns, 20 in / 10 out tokens, $0.0000]
+    assistant: got more
     agent_end
     state: running=false subagents=[]
     |}]

@@ -55,6 +55,15 @@ val adapter_strings : t -> string list
 (** The engine (and adapter) of a new session that names none. *)
 val default_choice : t -> Engine_choice.t
 
+(** Every deployed choice (the harness, and each of the composer's adapters),
+    in deployment order. *)
+val choices : t -> Engine_choice.t list
+
+(** The deployed choice named by [arg] (its {!Engine_choice.key}, display
+    name, ACP short name, or an unambiguous prefix); else an error listing
+    what this backend runs. *)
+val resolve : t -> string -> Engine_choice.t Or_error.t
+
 (** A new session's engine from the request's [engine] and [adapter]:
     either may be left out (the default engine; the composer's first
     adapter); one this backend does not deploy is an error saying what it

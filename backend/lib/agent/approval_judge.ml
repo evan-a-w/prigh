@@ -17,6 +17,7 @@ module Input = struct
     ; session_host : string
     ; hosts : string list
     ; cwd : string
+    ; worktrees : string list
     ; requests : string list
     ; task : string option
     ; goal : string option
@@ -80,10 +81,10 @@ let system_prompt =
 
 You never block a call yourself: "ask" only hands the decision to the user, so when in doubt, ask.
 
-Allow routine, reversible work inside the project that the user asked for or that plainly serves it: building, testing, linting and formatting; reading and searching anywhere; editing, creating, moving and deleting files the agent is working on inside the project (the working directory); deleting build output and caches inside the project; git status, diff, log, add, commit, stash, switching and creating branches, and pushing a branch other than main/master to the project's own remote; installing dependencies into the project (npm install, cargo add, pip install in a virtualenv); starting local dev servers; read-only network requests (fetching docs, package metadata).
+Allow routine, reversible work inside the project that the user asked for or that plainly serves it: building, testing, linting and formatting; reading and searching anywhere; editing, creating, moving and deleting files the agent is working on inside the project (the working directory or any session worktree listed in the environment); deleting build output and caches inside the project; git status, diff, log, add, commit, stash, switching and creating branches, creating git worktrees, removing a clean session worktree without force (its branch stays), and pushing a branch other than main/master to the project's own remote; installing dependencies into the project (npm install, cargo add, pip install in a virtualenv); starting local dev servers; read-only network requests (fetching docs, package metadata).
 
 Ask for anything destructive, hard to undo, outside the project, or not asked for:
-- deleting or overwriting files outside the project or the agent's own temporary files (rm -rf of anything but build output or temporary directories it made), mass deletions, deleting files that existed before the session that the user did not ask to delete;
+- deleting or overwriting files outside the project (its working directory and session worktrees) or the agent's own temporary files (rm -rf of anything but build output or temporary directories it made), mass deletions, deleting files that existed before the session that the user did not ask to delete, force-removing a worktree with uncommitted changes;
 - git push --force, pushing to main/master or a release/deploy branch, deleting branches or tags, git reset --hard, git clean, git checkout -- ., discarding uncommitted work, rewriting published history;
 - merging, closing or approving pull requests, publishing packages or releases, production deploys, migrations, infrastructure or DNS changes;
 - sudo or anything needing root, changing system configuration, services or packages system-wide, writing outside the project and the user's own tool configuration;
@@ -132,7 +133,7 @@ let prompt (input : Input.t) =
               "session's own host: %s\n\
                connected hosts: %s\n\
                call runs on: %s%s\n\
-               working directory: %s"
+               working directory: %s%s"
               input.session_host
               (match input.hosts with
                | [] -> "(none)"
@@ -143,7 +144,14 @@ let prompt (input : Input.t) =
                  " (not the session's own host: the agent reaches it with \
                   on_host)"
                else " (the session's own host)")
-              input.cwd))
+              input.cwd
+              (match input.worktrees with
+               | [] -> ""
+               | worktrees ->
+                 "\nsession worktrees (part of this project):\n"
+                 ^ String.concat
+                     ~sep:"\n"
+                     (List.map worktrees ~f:(fun path -> "- " ^ path)))))
     ; Some
         (section
            "tool_call"

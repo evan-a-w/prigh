@@ -44,6 +44,7 @@ module Up = struct
         ; prigh : string
         ; mcp_socket : string option
         ; mcp_token : string option
+        ; mcp_routes : bool
         ; secret : bool
         }
     | Out of
@@ -52,6 +53,10 @@ module Up = struct
         }
     | Err of string
     | Err_dropped of int
+    | Mcp_open of
+        { conn : int
+        ; route : string
+        }
     | Mcp of
         { conn : int
         ; line : string
@@ -60,7 +65,7 @@ module Up = struct
   [@@deriving sexp_of, equal]
 
   let to_line = function
-    | Started { pid; path; prigh; mcp_socket; mcp_token; secret } ->
+    | Started { pid; path; prigh; mcp_socket; mcp_token; mcp_routes; secret } ->
       frame
         ([ "t", `String "started"
          ; "pid", number pid
@@ -68,10 +73,14 @@ module Up = struct
          ; "prigh", `String prigh
          ]
          @ (if secret then [ "secret", `True ] else [])
+         @ (if mcp_routes then [ "mcp_routes", `True ] else [])
          @ Option.value_map mcp_socket ~default:[] ~f:(fun s ->
            [ "mcp_socket", `String s ])
          @ Option.value_map mcp_token ~default:[] ~f:(fun s ->
            [ "mcp_token", `String s ]))
+    | Mcp_open { conn; route } ->
+      frame
+        [ "t", `String "mcp_open"; "conn", number conn; "route", `String route ]
     | Mcp { conn; line } ->
       frame [ "t", `String "mcp"; "conn", number conn; "line", `String line ]
     | Mcp_closed conn ->
@@ -97,6 +106,10 @@ module Up = struct
           ; prigh
           ; mcp_socket = string_field json "mcp_socket"
           ; mcp_token = string_field json "mcp_token"
+          ; mcp_routes =
+              (match field json "mcp_routes" with
+               | Some `True -> true
+               | _ -> false)
           ; secret =
               (match field json "secret" with
                | Some `True -> true
@@ -108,6 +121,10 @@ module Up = struct
         Out { seq; line }
       | "err" -> string_field json "text" >>| fun text -> Err text
       | "err_dropped" -> int_field json "bytes" >>| fun n -> Err_dropped n
+      | "mcp_open" ->
+        let%bind conn = int_field json "conn" in
+        let%map route = string_field json "route" in
+        Mcp_open { conn; route }
       | "mcp" ->
         let%bind conn = int_field json "conn" in
         let%map line = string_field json "line" in
@@ -601,16 +618,25 @@ module Mcp_listener = struct
         try f () with
         | End_of_file | Eio.Buf_read.Buffer_limit_exceeded | Eio.Io _ -> ()
       in
-      (* A bridge presents the token first: other processes that find the
-         socket (the program's own commands) get nothing. *)
-      let authentic =
+      (* A bridge presents the token first (optionally [token:route] for
+         per-session routing on a pooled server): other processes that find
+         the socket (the program's own commands) get nothing. *)
+      let auth =
         match Eio.Buf_read.line reader with
-        | line -> digest_equal line t.token
+        | line ->
+          (match String.lsplit2 line ~on:':' with
+           | Some (tok, route)
+             when (not (String.is_empty route)) && digest_equal tok t.token ->
+             `Ok (Some route)
+           | _ when digest_equal line t.token -> `Ok None
+           | _ -> `Denied)
         | exception (End_of_file | Eio.Buf_read.Buffer_limit_exceeded | Eio.Io _)
-          -> false
+          -> `Denied
       in
-      if authentic
-      then (
+      match auth with
+      | `Ok route ->
+        Option.iter route ~f:(fun route ->
+          send (Up.to_line (Mcp_open { conn = id; route })));
         lines (fun () ->
           let rec loop () =
             let line = Eio.Buf_read.line reader in
@@ -619,8 +645,8 @@ module Mcp_listener = struct
           in
           loop ());
         Hashtbl.remove t.conns id;
-        send (Up.to_line (Mcp_closed id)))
-      else Hashtbl.remove t.conns id
+        send (Up.to_line (Mcp_closed id))
+      | `Denied -> Hashtbl.remove t.conns id
     in
     Fiber.fork_daemon ~sw (fun () ->
       let rec accept () =
@@ -832,6 +858,7 @@ let run ~env ~self ~outer ~cancel ~on_output ~cwd (args : Arguments.t) =
                    ; prigh = self
                    ; mcp_socket = socket
                    ; mcp_token = Option.map mcp ~f:(fun mcp -> mcp.token)
+                   ; mcp_routes = Option.is_some mcp
                    ; secret = Option.is_some secret
                    })))
          ~on_stdout:(Lines.add lines)

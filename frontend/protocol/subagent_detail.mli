@@ -11,6 +11,8 @@ type t =
   ; host : string option
     (** the tool host it works on (its name), when not the session's
       active one *)
+  ; engine : string option [@sexp.option]
+    (** the engine/adapter key it runs on, when not the session's own *)
   ; turns : int
   ; result : Event.Subagent_result.t option (** [None] while it runs *)
   ; messages : Message.t list

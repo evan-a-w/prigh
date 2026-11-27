@@ -10,10 +10,15 @@ open! Import
 (** How many of the user's messages make a session worth naming again. *)
 val refine_after : int
 
+(** True when the latest [Description] entry came from the session's external
+    harness itself (so prigh's auto-description should not overwrite it). *)
+val has_native : Session.t -> bool
+
 (** True when the model has replied with text (a turn that failed has
-    nothing to name) and the session has no description yet and a message
-    from the user, or when its description predates the user's {!refine_after}th
-    message and the conversation has reached it. *)
+    nothing to name), the session does not already have a native title from
+    its harness ({!has_native}), and either it has no description yet and a
+    message from the user, or its description predates the user's
+    {!refine_after}th message and the conversation has reached it. *)
 val wanted : Session.t -> bool
 
 (** Asks [model] for the title ({!instructions}, {!conversation}), appends it
@@ -21,6 +26,18 @@ val wanted : Session.t -> bool
 val describe
   :  provider:Provider.t
   -> model:Model.t
+  -> ?cancel:Cancellation.t
+  -> Session.t
+  -> string Or_error.t
+
+(** Like {!describe}, delegating the underlying completion to [complete]. *)
+val describe_with
+  :  complete:
+       (system:string
+        -> user:string
+        -> max_tokens:int
+        -> cancel:Cancellation.t
+        -> (string, [ `Aborted | `Error of string ]) Result.t)
   -> ?cancel:Cancellation.t
   -> Session.t
   -> string Or_error.t

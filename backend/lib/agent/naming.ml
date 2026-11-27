@@ -53,6 +53,16 @@ let clean ?(max_length = 60) text =
   shorten (String.capitalize line) ~max_length
 ;;
 
+let ask_with ~complete ?(cancel = Cancellation.never) ~what ~system user =
+  match complete ~system ~user ~max_tokens:60 ~cancel with
+  | Error (`Error e) -> Or_error.errorf "%s failed: %s" what e
+  | Error `Aborted -> Or_error.errorf "%s aborted" what
+  | Ok text ->
+    (match clean text with
+     | "" -> Or_error.errorf "%s failed: empty reply" what
+     | title -> Ok title)
+;;
+
 let ask
       ~(provider : Provider.t)
       ~model
@@ -61,23 +71,23 @@ let ask
       ~system
       user
   =
-  let request =
-    { Provider.Request.model
-    ; system = Some system
-    ; messages = [ Message.user user ]
-    ; tools = []
-    ; thinking = Off
-    ; max_tokens = Some 60
-    ; cache_key = None
-    ; account = None
-    }
+  let complete ~system ~user ~max_tokens ~cancel =
+    let request =
+      { Provider.Request.model
+      ; system = Some system
+      ; messages = [ Message.user user ]
+      ; tools = []
+      ; thinking = Off
+      ; max_tokens = Some max_tokens
+      ; cache_key = None
+      ; account = None
+      }
+    in
+    let reply = provider.stream request ~cancel ~on_event:ignore in
+    match reply.stop_reason with
+    | Error e -> Error (`Error e)
+    | Aborted -> Error `Aborted
+    | End_turn | Tool_use | Length -> Ok (Message.Assistant.text reply)
   in
-  let reply = provider.stream request ~cancel ~on_event:ignore in
-  match reply.stop_reason with
-  | Error e -> Or_error.errorf "%s failed: %s" what e
-  | Aborted -> Or_error.errorf "%s aborted" what
-  | End_turn | Tool_use | Length ->
-    (match clean (Message.Assistant.text reply) with
-     | "" -> Or_error.errorf "%s failed: empty reply" what
-     | title -> Ok title)
+  ask_with ~complete ~cancel ~what ~system user
 ;;

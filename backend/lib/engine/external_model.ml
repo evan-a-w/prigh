@@ -20,6 +20,28 @@ let is_external name =
   | None -> false
 ;;
 
+let parse_spec s =
+  let s = String.strip s in
+  match String.lsplit2 s ~on:'/' with
+  | Some (adapter, id) when is_adapter adapter ->
+    let id = String.strip id in
+    if String.is_empty id
+    then Some (Or_error.errorf "empty model name for %s" adapter)
+    else (
+      match Adapter_id.of_string adapter with
+      | Ok ((Codex | Claude | Acp _) as adapter_id) ->
+        Some (Ok (adapter_id, id))
+      | Ok Prigh -> None
+      | Error _ as e -> Some e)
+  | Some _ -> None
+  | None when String.is_prefix s ~prefix:"acp:" ->
+    (match Adapter_id.of_string s with
+     | Ok (Acp _ as adapter_id) -> Some (Ok (adapter_id, default_id))
+     | Ok (Codex | Claude | Prigh) -> None
+     | Error _ as e -> Some e)
+  | None -> None
+;;
+
 (* The windows of the model families harnesses run, by a word of their id
    or name (the first that matches): Gemini 3.x has 1M tokens, Claude 4.x 200k, GPT-OSS 128k. *)
 let known_windows =
@@ -140,4 +162,70 @@ let same_model a b =
   let a = slug a
   and b = slug b in
   String.equal a b || longer_by a b || longer_by b a
+;;
+
+let resolve ~adapter ~models query =
+  let raw = String.strip query in
+  let q =
+    Option.value (String.chop_prefix raw ~prefix:(adapter ^ "/")) ~default:raw
+    |> String.strip
+  in
+  if String.is_empty q
+  then Or_error.errorf "empty model name for %s" adapter
+  else (
+    let real =
+      Option.value models ~default:[] |> List.filter ~f:(Fn.non is_placeholder)
+    in
+    match real with
+    | [] -> Ok q
+    | real ->
+      let lower = String.lowercase q in
+      let find_first preds =
+        List.find_map preds ~f:(fun pred -> List.find real ~f:pred)
+      in
+      (match
+         find_first
+           [ (fun (m : Model.t) -> String.Caseless.equal m.id q)
+           ; (fun (m : Model.t) -> String.Caseless.equal m.name q)
+           ; (fun (m : Model.t) -> same_model m.id q || same_model m.name q)
+           ]
+       with
+       | Some m -> Ok m.id
+       | None ->
+         let matches =
+           List.filter real ~f:(fun (m : Model.t) ->
+             String.is_prefix (String.lowercase m.id) ~prefix:lower
+             || String.is_prefix (String.lowercase m.name) ~prefix:lower)
+         in
+         (match matches with
+          | [ m ] -> Ok m.id
+          | _ :: _ as several ->
+            Or_error.errorf
+              "model %S is ambiguous on %s (%s): name one of them"
+              query
+              adapter
+              (String.concat
+                 ~sep:", "
+                 (List.map several ~f:(fun (m : Model.t) -> m.id)))
+          | [] ->
+            let closest =
+              List.stable_sort real ~compare:(fun (a : Model.t) b ->
+                Int.compare
+                  (Int.min
+                     (Edit_distance.caseless a.id q)
+                     (Edit_distance.caseless a.name q))
+                  (Int.min
+                     (Edit_distance.caseless b.id q)
+                     (Edit_distance.caseless b.name q)))
+            in
+            Or_error.errorf
+              "unknown model %S for %s (available: %s)"
+              query
+              adapter
+              (String.concat
+                 ~sep:", "
+                 (List.map closest ~f:(fun (m : Model.t) ->
+                    if String.equal m.name m.id
+                    then m.id
+                    else sprintf "%s (%s)" m.id m.name))))))
 ;;

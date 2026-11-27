@@ -53,17 +53,44 @@ val create
   :  sw:Switch.t
   -> adapter:Adapter.t
   -> spawn:(Adapter.Launch.t -> Line_transport.t Or_error.t)
+  -> ?spawn_start:
+       (Adapter.Start.t -> Adapter.Launch.t -> Line_transport.t Or_error.t)
+       (** When provided, called instead of [spawn] with both [Start.t] and
+           [Launch.t] (e.g. to acquire a pooled server transport keyed by
+           login/sandbox metadata). *)
   -> ?start:(cwd:string -> Adapter.Start.t)
   -> ?interrupt_grace:Time_float.Span.t
   -> ?request_timeout:Time_float.Span.t
-  -> ?steer_poll:Time_float.Span.t
   -> ?on_thread:(string -> unit)
   -> ?on_start:(Adapter.Start.t -> unit Or_error.t -> unit)
+  -> ?on_prewarm:(Adapter.Start.t -> Adapter.Catalog.t Or_error.t -> unit)
+       (** called when {!Runner.prewarm} finishes starting (or fails to start)
+           the process, unless cancelled first *)
   -> ?host:(unit -> string)
+  -> ?host_id:string
+       (** [Tool.Context.host] for approvals and injected MCP tools, when this
+           runner works on another host than the session's active one (a
+           subagent) *)
+  -> ?home:(unit -> string option)
+       (** [Tool.Context.home] for approvals and injected MCP tools *)
+  -> ?depth:int (** nesting depth (default [0]; [>= 1] for a subagent) *)
+  -> ?agent_id:string
+       (** owning subagent's id, prefixed onto approvals and injected calls *)
+  -> ?wake:(unit -> Message.t list)
+       (** called when a turn finishes normally with no pending steers: any
+           messages returned run as the next turn on the same live process *)
   -> ?handoff_from:Engine_choice.t
   -> ?checkpoint:(Json.t -> Tool.Result.t)
   -> ?catalog:(unit -> Adapter.Catalog.t option)
   -> ?on_change:(unit -> unit)
+  -> ?on_autonomous:(unit -> unit)
+       (** called when the live external harness begins a turn of its own
+           between prompts (e.g. a background task woke it), so the session
+           can drive and record it as an [Autonomous] run *)
+  -> ?extra_dirs:(unit -> string list)
+       (** additional workspace directories the harness may access and write
+           alongside [cwd] (e.g. the session's git worktrees under
+           [worktrees_dir]) *)
   -> unit
   -> t
 
@@ -71,6 +98,17 @@ val runner : t -> Runner.t
 
 (** The harness's thread, once it has one: what a later process resumes. *)
 val thread_id : t -> string option
+
+(** Whether the live external harness still has in-flight work after its last
+    turn ended (e.g. an ACP background tool call still open). *)
+val has_open_work : t -> bool
+
+(** Whether the live external harness process is still running. *)
+val alive : t -> bool
+
+(** Blocks until the live external harness process exits, or returns at once
+    when none is running. *)
+val await_exit : t -> unit
 
 (** Stops the harness's process, if it runs; a turn it runs ends at once. *)
 val close : t -> unit

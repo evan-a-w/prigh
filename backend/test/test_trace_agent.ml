@@ -771,7 +771,7 @@ let%expect_test "the summary and the Perfetto export of a session" =
       {"name":"stream","cat":"stream","ph":"X","ts":600000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"tool subagent","cat":"tool","ph":"X","ts":1100000,"dur":0,"pid":1,"tid":1,"args":{"status":"ok","tool":"subagent","call_id":"c1","where":"local","result_bytes":119,"is_error":false}}
       {"name":"tool work","cat":"tool","ph":"X","ts":1100000,"dur":3000000,"pid":1,"tid":1,"args":{"status":"ok","tool":"work","call_id":"w2","where":"local","result_bytes":9,"is_error":false}}
-      {"name":"subagent a1","cat":"subagent","ph":"X","ts":1100000,"dur":2300000,"pid":1,"tid":3,"args":{"status":"ok","agent_id":"a1","model":"deepseek/deepseek-flash","background":true,"forked":false,"continued":false}}
+      {"name":"subagent a1","cat":"subagent","ph":"X","ts":1100000,"dur":2300000,"pid":1,"tid":3,"args":{"status":"ok","agent_id":"a1","model":"deepseek/deepseek-flash","engine":"harness","background":true,"forked":false,"continued":false}}
       {"name":"tool work","cat":"tool","ph":"X","ts":1100000,"dur":2000000,"pid":1,"tid":2,"args":{"status":"ok","tool":"work","call_id":"w1","where":"local","result_bytes":9,"is_error":false}}
       {"name":"turn 1","cat":"turn","ph":"X","ts":1100000,"dur":1700000,"pid":1,"tid":3,"args":{"status":"ok","turn":1,"tool_calls":1}}
       {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":1100000,"dur":700000,"pid":1,"tid":3,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"off","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}

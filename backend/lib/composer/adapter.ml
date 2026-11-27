@@ -30,7 +30,11 @@ module Driver = struct
     ; mutable orphan : Orphan.t option
     ; idle : Eio.Condition.t (* the orphan turn ended, or the process *)
     ; mutable on_orphan_request : Adapter_event.t -> unit
+    ; mutable on_autonomous : (unit -> unit) option
+    ; mutable on_title : (string -> unit) option
     ; mutable exit : Line_transport.Exit.t option
+    ; exited : unit Promise.t
+    ; resolve_exit : unit Promise.u
     }
 
   let create
@@ -40,6 +44,7 @@ module Driver = struct
         ?(request_timeout = Time_float.Span.of_sec 60.)
         transport
     =
+    let exited, resolve_exit = Promise.create () in
     { sw
     ; name
     ; transport
@@ -54,13 +59,20 @@ module Driver = struct
     ; orphan = None
     ; idle = Eio.Condition.create ()
     ; on_orphan_request = ignore
+    ; on_autonomous = None
+    ; on_title = None
     ; exit = None
+    ; exited
+    ; resolve_exit
     }
   ;;
 
   let alive t = t.alive && not t.stopping
+  let await_exit t = Promise.await t.exited
   let write t line = if alive t then Line_transport.write_line t.transport line
   let on_orphan_request t f = t.on_orphan_request <- f
+  let on_autonomous t f = t.on_autonomous <- Some f
+  let on_title t f = t.on_title <- Some f
 
   (* Events that belong to no turn in particular go to whoever reads. *)
   let of_no_turn : Adapter_event.t -> bool = function
@@ -69,7 +81,8 @@ module Driver = struct
     | Notice _
     | Compacted _
     | Retrying _
-    | Request_withdrawn _ -> true
+    | Request_withdrawn _
+    | Session_title _ -> true
     | Turn_started _
     | Text_delta _
     | Text_done _
@@ -107,25 +120,36 @@ module Driver = struct
     | Turn_end _ when t.in_turn ->
       t.in_turn <- false;
       Eio.Stream.add t.events event
+    | Session_title title when not t.in_turn ->
+      (match t.on_title with
+       | Some f -> f title
+       | None -> Eio.Stream.add t.events event)
     | _ when t.in_turn || of_no_turn event -> Eio.Stream.add t.events event
     | Turn_end _ ->
       (* A turn of its own ended, or one that was ended for it already (an
          ignored interrupt) ended late. *)
       Option.iter t.orphan ~f:(orphan_ended t)
     | _ ->
-      let orphan =
-        match t.orphan with
-        | Some o -> o
-        | None ->
-          let o = { Orphan.text = None } in
-          t.orphan <- Some o;
-          o
-      in
-      (match event with
-       | Text_done { text; _ } when not (String.is_empty (String.strip text)) ->
-         orphan.text <- Some text
-       | Approval_request _ | User_question _ -> t.on_orphan_request event
-       | _ -> ())
+      (match t.on_autonomous with
+       | Some wake when not t.stopping ->
+         t.in_turn <- true;
+         t.turns <- t.turns + 1;
+         Eio.Stream.add t.events event;
+         wake ()
+       | Some _ | None ->
+         let orphan =
+           match t.orphan with
+           | Some o -> o
+           | None ->
+             let o = { Orphan.text = None } in
+             t.orphan <- Some o;
+             o
+         in
+         (match event with
+          | Text_done { text; _ } when not (String.is_empty (String.strip text))
+            -> orphan.text <- Some text
+          | Approval_request _ | User_question _ -> t.on_orphan_request event
+          | _ -> ()))
   ;;
 
   let next_event t = Eio.Stream.take t.events
@@ -272,6 +296,7 @@ module Driver = struct
       t.alive <- false;
       t.orphan <- None;
       Eio.Condition.broadcast t.idle;
+      ignore (Promise.try_resolve t.resolve_exit () : bool);
       let waiters = t.waiters in
       t.waiters <- [];
       List.iter waiters ~f:(fun w ->

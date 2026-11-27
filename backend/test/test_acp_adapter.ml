@@ -1339,3 +1339,806 @@ let%expect_test "start timings, as the trace says them" =
   [%expect
     {| login 0.0 s, process 3.2 s (spawn 0.4 s, handshake 2.8 s (initialize 0.1 s, session/resume 2.7 s)), send 0.0 s, first_output 1.8 s, checkpoint 0.6 s (alongside) |}]
 ;;
+
+let%expect_test
+    "ACP autonomous wakeup after end_turn: tool, approval, text, and settle"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let wake_peer, trigger_wake = Eio.Promise.create () in
+  let wake_ran, mark_wake_ran = Eio.Promise.create () in
+  let agent_ref = ref None in
+  let adapter =
+    Acp_adapter.create
+      ~load_quiet:(Time_float.Span.of_sec 0.2)
+      ~autonomous_quiet:(Time_float.Span.of_sec 0.03)
+      opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             P.new_session p "ses_1";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_1" "Started background task.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             Eio.Promise.await wake_peer;
+             (* Agent wakes autonomously after its background task finishes:
+                runs a tool needing approval, then reports the result. *)
+             P.update
+               p
+               "ses_1"
+               {|{"sessionUpdate":"tool_call","toolCallId":"bg1","title":"bash","kind":"execute","status":"in_progress","rawInput":{"command":"echo ok"}}|};
+             P.write
+               p
+               [ "jsonrpc", `String "2.0"
+               ; "id", `Number "99"
+               ; "method", `String "session/request_permission"
+               ; ( "params"
+                 , `Object
+                     [ "sessionId", `String "ses_1"
+                     ; ( "toolCall"
+                       , `Object
+                           [ "toolCallId", `String "bg1"
+                           ; "title", `String "echo ok"
+                           ; "kind", `String "execute"
+                           ] )
+                     ; ( "options"
+                       , `Array
+                           [ `Object
+                               [ "optionId", `String "allow"
+                               ; "name", `String "Allow"
+                               ; "kind", `String "allow_once"
+                               ]
+                           ] )
+                     ] )
+               ];
+             P.answer p;
+             P.update
+               p
+               "ses_1"
+               {|{"sessionUpdate":"tool_call_update","toolCallId":"bg1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"ok"}}]}|};
+             P.text p "ses_1" "Background task finished!";
+             Eio.Promise.resolve mark_wake_ran ();
+             ignore (P.read p : Json.t option))))
+      ~on_autonomous:(fun () -> Option.iter !agent_ref ~f:Agent.external_woke)
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  agent_ref := Some agent;
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.set_mode agent ~approval:Ask;
+  let auton_ended, mark_auton_ended = Eio.Promise.create () in
+  let seen_turns = ref 0 in
+  Agent.subscribe agent ~f:(fun e ->
+    print_event e;
+    match e with
+    | Loop (Tool_confirm { call_id; name; summary; _ }) ->
+      printf "confirm %s: %s\n" name summary;
+      Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
+    | Loop (Agent_end _) ->
+      incr seen_turns;
+      if !seen_turns = 2 then Eio.Promise.resolve mark_auton_ended ()
+    | _ -> ());
+  prompt agent "start work";
+  Eio.Promise.resolve trigger_wake ();
+  Eio.Promise.await wake_ran;
+  Eio.Promise.await auton_ended;
+  Agent.wait_idle agent;
+  Composer_runner.close composer;
+  printf "messages in session: %d\n" (List.length (Agent.messages agent));
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "start work"
+    assistant (acp:opencode/default, End_turn): "Started background task."
+    assistant (acp:opencode/default, Tool_use): ""
+    tool_start bash
+    confirm bash: echo ok
+    agent got answer {"outcome":{"outcome":"selected","optionId":"allow"}}
+    tool_end bash -> "ok"
+    assistant (acp:opencode/default, End_turn): "Background task finished!"
+    messages in session: 5
+    |}]
+;;
+
+let%expect_test "aborting an ACP autonomous turn ends it cleanly" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let wake_peer, trigger_wake = Eio.Promise.create () in
+  let tool_seen, mark_tool_seen = Eio.Promise.create () in
+  let agent_ref = ref None in
+  let adapter =
+    Acp_adapter.create
+      ~load_quiet:(Time_float.Span.of_sec 0.2)
+      ~autonomous_quiet:(Time_float.Span.of_sec 5.)
+      opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             P.new_session p "ses_1";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_1" "Waiting.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             Eio.Promise.await wake_peer;
+             P.update
+               p
+               "ses_1"
+               {|{"sessionUpdate":"tool_call","toolCallId":"bg2","title":"bash","kind":"execute","status":"in_progress","rawInput":{"command":"sleep 99"}}|};
+             ignore (P.expect p "session/cancel" : Json.t);
+             ignore (P.read p : Json.t option))))
+      ~on_autonomous:(fun () -> Option.iter !agent_ref ~f:Agent.external_woke)
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  agent_ref := Some agent;
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.subscribe agent ~f:(fun e ->
+    print_event e;
+    match e with
+    | Loop (Tool_start _) ->
+      ignore (Eio.Promise.try_resolve mark_tool_seen () : bool)
+    | _ -> ());
+  prompt agent "go";
+  Eio.Promise.resolve trigger_wake ();
+  Eio.Promise.await tool_seen;
+  ignore (Agent.abort agent : string list);
+  Agent.wait_idle agent;
+  Composer_runner.close composer;
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "go"
+    assistant (acp:opencode/default, End_turn): "Waiting."
+    assistant (acp:opencode/default, Tool_use): ""
+    tool_start bash
+    agent got session/cancel
+    tool_end bash -> ERROR "[failed]"
+    |}]
+;;
+
+let%expect_test
+    "Rpc_server keeps an idle external harness alive across disconnect for \
+     external_idle_grace and survives autonomous wakeups"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let sleeps = Queue.create () in
+  let sleep _seconds =
+    let p, r = Eio.Promise.create () in
+    Queue.enqueue sleeps r;
+    Eio.Promise.await p
+  in
+  let wake_peer, trigger_wake = Eio.Promise.create () in
+  let thread_closed, mark_thread_closed = Eio.Promise.create () in
+  let peer_stopped, mark_peer_stopped = Eio.Promise.create () in
+  let engines =
+    Or_error.ok_exn
+      (Engines.create ~engines:[ Harness; Composer ] ~adapters:[ Codex ] ())
+  in
+  let new_agent ?session ~cwd () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir
+      ~home:t.dir
+      ?session
+      ~cwd
+      ()
+  in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~external_idle_grace:1800.
+      ~sleep
+      ~login:
+        (Login_manager.create
+           ~env:t.env
+           ~sw
+           ~getenv:(fun _ -> None)
+           ~store:(Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+           ())
+      ~sessions_dir
+      ~cwd:t.dir
+      ~engines
+      ~spawn_external:(fun _agent ~host:_ _launch ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             let read () =
+               Option.map (Line_transport.Peer.read_line p) ~f:(fun line ->
+                 Json.parse line |> Or_error.ok_exn)
+             in
+             let reply j result =
+               Line_transport.Peer.write_line
+                 p
+                 (Json.to_string
+                    (`Object
+                        [ "id", Option.value_exn (Json.member "id" j)
+                        ; "result", result
+                        ]))
+             in
+             let rec wait_turn () =
+               match read () with
+               | None -> ()
+               | Some j ->
+                 (match Option.bind (Json.member "method" j) ~f:Json.string with
+                  | Some "initialize" ->
+                    reply j (`Object [ "userAgent", `String "codex/0.166.0" ]);
+                    wait_turn ()
+                  | Some "thread/start" ->
+                    reply
+                      j
+                      (`Object
+                          [ "thread", `Object [ "id", `String "th-1" ]
+                          ; "model", `String "gpt-5"
+                          ]);
+                    wait_turn ()
+                  | Some "turn/start" ->
+                    reply
+                      j
+                      (`Object
+                          [ ( "turn"
+                            , `Object
+                                [ "id", `String "tu-1"
+                                ; "status", `String "inProgress"
+                                ] )
+                          ])
+                  | Some _ when Option.is_some (Json.member "id" j) ->
+                    reply j (`Object []);
+                    wait_turn ()
+                  | _ -> wait_turn ())
+             in
+             wait_turn ();
+             List.iter
+               ~f:(Line_transport.Peer.write_line p)
+               [ {|{"method":"turn/started","params":{"threadId":"th-1","turn":{"id":"tu-1","items":[],"status":"inProgress"}}}|}
+               ; {|{"method":"item/completed","params":{"threadId":"th-1","turnId":"tu-1","item":{"type":"agentMessage","id":"m1","text":"first reply"}}}|}
+               ; {|{"method":"turn/completed","params":{"threadId":"th-1","turn":{"id":"tu-1","items":[],"status":"completed"}}}|}
+               ];
+             Eio.Promise.await wake_peer;
+             (* Autonomous turn while no clients are attached. *)
+             List.iter
+               ~f:(Line_transport.Peer.write_line p)
+               [ {|{"method":"turn/started","params":{"threadId":"th-1","turn":{"id":"tu-2","items":[],"status":"inProgress"}}}|}
+               ; {|{"method":"item/completed","params":{"threadId":"th-1","turnId":"tu-2","item":{"type":"agentMessage","id":"m2","text":"woke up while away"}}}|}
+               ; {|{"method":"turn/completed","params":{"threadId":"th-1","turn":{"id":"tu-2","items":[],"status":"completed"}}}|}
+               ];
+             let rec drain () =
+               match Line_transport.Peer.read_line p with
+               | Some line ->
+                 (match Json.parse line with
+                  | Ok j
+                    when Option.equal
+                           String.equal
+                           (Option.bind (Json.member "method" j) ~f:Json.string)
+                           (Some "thread/unsubscribe") ->
+                    ignore
+                      (Eio.Promise.try_resolve mark_thread_closed () : bool)
+                  | _ -> ());
+                 drain ()
+               | None ->
+                 ignore (Eio.Promise.try_resolve mark_peer_stopped () : bool)
+             in
+             drain ())))
+      ~new_agent
+      ()
+  in
+  let client = Rpc_server.connect server ~send:ignore in
+  let call ?(params = "{}") meth =
+    ignore
+      (Rpc_server.handle
+         server
+         client
+         (Json.of_string
+            (sprintf {|{"id":"r","method":%S,"params":%s}|} meth params))
+       : Json.t)
+  in
+  call "hello";
+  call ~params:{|{"adapter":"codex"}|} "new_session";
+  let agent = Rpc_server.agent_of_client server client in
+  let seen = ref 0 in
+  let second_done, mark_second_done = Eio.Promise.create () in
+  Agent.subscribe agent ~f:(function
+    | Loop (Agent_end _) ->
+      incr seen;
+      if !seen = 2 then Eio.Promise.resolve mark_second_done ()
+    | _ -> ());
+  call ~params:{|{"text":"start"}|} "prompt";
+  Agent.wait_idle agent;
+  (* Disconnect the only client: live external harness must stay alive! *)
+  Rpc_server.disconnect server client;
+  Eio.Fiber.yield ();
+  printf
+    "after disconnect: live=%b stopped=%b timers=%d\n"
+    (Agent.external_live agent)
+    (Eio.Promise.is_resolved peer_stopped)
+    (Queue.length sleeps);
+  (* External harness wakes autonomously while disconnected. *)
+  Eio.Promise.resolve trigger_wake ();
+  Eio.Promise.await second_done;
+  Agent.wait_idle agent;
+  Eio.Fiber.yield ();
+  (* Firing the first timer (from before the wakeup) does NOT evict it. *)
+  Eio.Promise.resolve (Queue.dequeue_exn sleeps) ();
+  Eio.Fiber.yield ();
+  printf
+    "after wakeup + stale timer: live=%b stopped=%b messages=%d\n"
+    (Agent.external_live agent)
+    (Eio.Promise.is_resolved peer_stopped)
+    (List.length (Agent.messages agent));
+  (* Reconnecting a client cancels the pending eviction timer too. *)
+  let client2 = Rpc_server.connect server ~send:ignore in
+  ignore
+    (Rpc_server.handle
+       server
+       client2
+       (Json.of_string
+          (sprintf
+             {|{"id":"r2","method":"hello","params":{"session":%S}}|}
+             (Session.id (Agent.session agent))))
+     : Json.t);
+  Eio.Promise.resolve (Queue.dequeue_exn sleeps) ();
+  Eio.Fiber.yield ();
+  printf
+    "after reconnect + stale timer: live=%b stopped=%b\n"
+    (Agent.external_live agent)
+    (Eio.Promise.is_resolved peer_stopped);
+  (* Disconnecting again and letting the new grace period elapse evicts the
+     session (unsubscribing the thread while the pooled server stays warm)
+     and shutdown stops the physical server. *)
+  Rpc_server.disconnect server client2;
+  Eio.Fiber.yield ();
+  Eio.Promise.resolve (Queue.dequeue_exn sleeps) ();
+  Eio.Promise.await thread_closed;
+  printf
+    "after grace elapsed: live=%b unsubscribed=%b stopped=%b\n"
+    (Agent.external_live agent)
+    (Eio.Promise.is_resolved thread_closed)
+    (Eio.Promise.is_resolved peer_stopped);
+  Rpc_server.shutdown server;
+  Eio.Promise.await peer_stopped;
+  printf "after shutdown: stopped=%b\n" (Eio.Promise.is_resolved peer_stopped);
+  [%expect
+    {|
+    after disconnect: live=true stopped=false timers=1
+    after wakeup + stale timer: live=true stopped=false messages=3
+    after reconnect + stale timer: live=true stopped=false
+    after grace elapsed: live=false unsubscribed=true stopped=false
+    after shutdown: stopped=true
+    |}]
+;;
+
+let%expect_test "ACP skips git checkpoints when rollback is Unsupported" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let checkpoint_calls = ref 0 in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.05) opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~checkpoint:(fun _ ->
+        incr checkpoint_calls;
+        Tool.Result.ok "{}")
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             P.new_session p "ses_1";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_1" "No checkpoint needed.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             ignore (P.read p : Json.t option))))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.subscribe agent ~f:print_event;
+  prompt agent "hi";
+  Composer_runner.close composer;
+  printf "checkpoint_calls=%d\n" !checkpoint_calls;
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "hi"
+    assistant (acp:opencode/default, End_turn): "No checkpoint needed."
+    checkpoint_calls=0
+    |}]
+;;
+
+let%expect_test
+    "ACP prewarm applies initial mode, model and thinking before first prompt"
+  =
+  let prewarmed, mark_prewarmed = Eio.Promise.create () in
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.05) opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~on_prewarm:(fun _ _ ->
+        ignore (Eio.Promise.try_resolve mark_prewarmed () : bool))
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             let ns = P.expect p "session/new" in
+             P.result
+               p
+               ns
+               (sprintf
+                  {|{"sessionId":"ses_1",%s,
+                     "models":{"currentModelId":"gemini-flash","availableModels":[
+                       {"modelId":"gemini-flash","name":"Gemini Flash"},
+                       {"modelId":"sonnet","name":"Sonnet"}]},
+                     "configOptions":[{"id":"effort","name":"Effort","category":"thought_level",
+                       "type":"select","currentValue":"medium","options":[
+                         {"value":"low","name":"Low"},{"value":"medium","name":"Medium"},
+                         {"value":"high","name":"High"}]}]}|}
+                  P.modes);
+             let m = P.expect p "session/set_mode" in
+             P.result p m "{}";
+             let md = P.expect p "session/set_model" in
+             P.result p md "{}";
+             let th = P.expect p "session/set_config_option" in
+             P.result p th "{}";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_1" "Zero extra roundtrips.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             ignore (P.read p : Json.t option))))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.set_mode agent ~plan:true;
+  Agent.set_model
+    agent
+    (External_model.model
+       ~adapter:"acp:opencode"
+       ~name:"Sonnet"
+       ~thinking_levels:[ Low; Medium; High ]
+       ~can_disable_thinking:false
+       "sonnet");
+  Or_error.ok_exn (Agent.set_thinking agent (On (Some High)));
+  Agent.subscribe agent ~f:print_event;
+  print_endline "--- prewarm ---";
+  Agent.prewarm agent;
+  Eio.Promise.await prewarmed;
+  print_endline "--- first prompt ---";
+  prompt agent "go";
+  Composer_runner.close composer;
+  [%expect
+    {|
+    --- prewarm ---
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/set_mode plan
+    agent got session/set_model sonnet
+    agent got session/set_config_option effort=high
+    --- first prompt ---
+    agent got session/prompt "go"
+    assistant (acp:opencode/sonnet, End_turn): "Zero extra roundtrips."
+    |}]
+;;
+
+let%expect_test
+    "ACP session/load quiet-wait finishes promptly without overshoot"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let quiet = 0.06 in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec quiet) opencode
+  in
+  let load_started = ref None in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~start:(fun ~cwd ->
+        { (Adapter.Start.default ~cwd) with resume = Some "ses_prev" })
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             ignore (P.expect p "session/load" : Json.t);
+             load_started := Some (Time_float.now ());
+             (* Replay a chunk 20ms in, then go quiet and never answer session/load. *)
+             Eio_unix.sleep 0.02;
+             P.text p "ses_prev" "old replay";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_prev" "Resumed.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             ignore (P.read p : Json.t option))))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.subscribe agent ~f:print_event;
+  prompt agent "continue";
+  let elapsed_ms =
+    Time_float.Span.to_ms
+      (Time_float.diff (Time_float.now ()) (Option.value_exn !load_started))
+  in
+  Composer_runner.close composer;
+  (* With 20ms replay + 60ms quiet, ~80ms total (well under 140ms, vs >120ms+
+     full-quiet overshoot on the old loop). *)
+  printf "no_overshoot=%b\n" Float.(elapsed_ms < 150.);
+  [%expect
+    {|
+    agent got initialize
+    agent got session/load session=ses_prev mcp=[]
+    agent got session/prompt "continue"
+    assistant (acp:opencode/default, End_turn): "Resumed."
+    no_overshoot=true
+    |}]
+;;
+
+let%expect_test
+    "ACP session_info_update sets native title in-turn and between turns"
+  =
+  let send_between, trigger_between = Eio.Promise.create () in
+  let between_sent, mark_between_sent = Eio.Promise.create () in
+  let send_after_manual, trigger_after_manual = Eio.Promise.create () in
+  let after_manual_sent, mark_after_manual_sent = Eio.Promise.create () in
+  with_acp ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let req = P.expect p "session/prompt" in
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"session_info_update","title":"ACP in-turn title"}|};
+    P.text p "ses_1" "Hello.";
+    P.result p req {|{"stopReason":"end_turn"}|};
+    Eio.Promise.await send_between;
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"session_info_update","title":"ACP refined title"}|};
+    Eio.Promise.resolve mark_between_sent ();
+    Eio.Promise.await send_after_manual;
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"session_info_update","title":"Ignored after manual"}|};
+    Eio.Promise.resolve mark_after_manual_sent ();
+    ignore (P.read p : Json.t option))
+  @@ fun agent _ ->
+  let state_cond = Eio.Condition.create () in
+  Agent.subscribe agent ~f:(function
+    | State_changed _ -> Eio.Condition.broadcast state_cond
+    | _ -> ());
+  let show label =
+    let s = Agent.session agent in
+    printf
+      "%s: name=%s desc=%s native=%b wanted=%b\n"
+      label
+      (Option.value (Session.name s) ~default:"-")
+      (Option.value (Session.description s) ~default:"-")
+      (Session_description.has_native s)
+      (Session_description.wanted s)
+  in
+  prompt agent "hi";
+  show "in-turn";
+  Eio.Promise.resolve trigger_between ();
+  Eio.Promise.await between_sent;
+  while
+    not
+      (Option.equal
+         String.equal
+         (Session.description (Agent.session agent))
+         (Some "ACP refined title"))
+  do
+    Eio.Condition.await_no_mutex state_cond
+  done;
+  show "between-turns";
+  ignore
+    (Session.set_name (Agent.session agent) ~name:"Manual title"
+     : Session.Entry.t);
+  Eio.Promise.resolve trigger_after_manual ();
+  Eio.Promise.await after_manual_sent;
+  Eio.Fiber.yield ();
+  Eio.Fiber.yield ();
+  show "after-manual";
+  [%expect
+    {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "hi"
+    assistant (acp:opencode/default, End_turn): "Hello."
+    in-turn: name=- desc=ACP in-turn title native=true wanted=false
+    between-turns: name=- desc=ACP refined title native=true wanted=false
+    after-manual: name=Manual title desc=ACP refined title native=true wanted=false
+    |}]
+;;
+
+let%expect_test
+    "failed injected MCP tool substitutes error text when ACP agent omits \
+     output"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let injected_ref = ref None in
+  let mcp_reply_ref = ref "" in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.2) antigravity
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ ->
+        let inner =
+          Line_transport.Peer.spawn ~sw (fun p ->
+            P.initialize p;
+            P.new_session p "ses_mcp";
+            let req = P.expect p "session/prompt" in
+            P.update
+              p
+              "ses_mcp"
+              {|{"sessionUpdate":"tool_call","toolCallId":"m1","title":"Running mcp_prigh_subagent_continue","kind":"other","status":"in_progress","rawInput":{"id":"a9"}}|};
+            (* Agent calls prigh's MCP server; prigh returns isError:true with
+               the real error text. *)
+            let injected = Option.value_exn !injected_ref in
+            mcp_reply_ref
+            := Injected_tools.handle_line
+                 injected
+                 {|{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"subagent_continue","arguments":{"id":"a9"}}}|}
+               |> Option.value_exn;
+            (* Agent drops the MCP error text in its ACP tool_call_update. *)
+            P.update
+              p
+              "ses_mcp"
+              {|{"sessionUpdate":"tool_call_update","toolCallId":"m1","status":"failed"}|};
+            P.text p "ses_mcp" "Done.";
+            P.result p req {|{"stopReason":"end_turn"}|};
+            ignore (P.read p : Json.t option))
+        in
+        let mcp : Line_transport.Mcp.t =
+          { bridge =
+              Injected_tools.Bridge.create
+                ~prigh:"prigh"
+                ~socket:"/tmp/test.sock"
+                ~token:"tok"
+          ; serve = (fun injected -> injected_ref := Some injected)
+          ; route = None
+          }
+        in
+        Ok
+          (Line_transport.create
+             ~read_line:(fun () -> Line_transport.read_line inner)
+             ~write_line:(Line_transport.write_line inner)
+             ~stop:(fun () -> Line_transport.stop inner)
+             ~ended:(fun () -> Line_transport.ended inner)
+             ~is_ended:(fun () -> Line_transport.is_ended inner)
+             ~mcp
+             ()))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:(Tools.interaction @ Tool_subagent.control_tools)
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine
+    agent
+    { engine = Composer; adapter = Some (Acp "antigravity") };
+  Agent.set_mode agent ~approval:Auto;
+  Agent.subscribe agent ~f:print_event;
+  prompt agent "continue a9";
+  printf "mcp reply: %s\n" !mcp_reply_ref;
+  Composer_runner.close composer;
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[prigh]
+    agent got session/prompt "continue a9"
+    assistant (acp:antigravity/default, Tool_use): ""
+    tool_start Running mcp_prigh_subagent_continue
+    tool_end Running mcp_prigh_subagent_continue -> ERROR "invalid arguments: unknown subagent \"a9\": only a finished, failed, or out-of-turns subagent of yours can be continued (those that can: none)"
+    assistant (acp:antigravity/default, End_turn): "Done."
+    mcp reply: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"invalid arguments: unknown subagent \"a9\": only a finished, failed, or out-of-turns subagent of yours can be continued (those that can: none)"}],"isError":true}}
+    |}]
+;;

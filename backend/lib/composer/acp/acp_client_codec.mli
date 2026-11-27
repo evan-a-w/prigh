@@ -157,6 +157,7 @@ module Request_kind : sig
     | New_session
     | Load_session
     | Resume_session
+    | Close_session
     | Prompt
     | Set_mode
     | Set_config_option
@@ -176,6 +177,7 @@ module Response : sig
         ; session_id : string
         ; config : Session_config.t
         }
+    | Session_closed
     | Mode_set of string
     | Config_set of Config_option.t list
     | Failed of
@@ -229,6 +231,14 @@ val resume_session
   -> cwd:string
   -> mcp_servers:Mcp_server.t list
   -> string
+
+(** [session/close] (when {!Agent_capabilities.t.close_session}): closes a
+    specific session without stopping the agent process. *)
+val close_session_for : t -> session_id:string -> string
+
+(** [session/close] when the agent advertised [sessionCapabilities.close] and a
+    session is open; [None] otherwise. *)
+val close_session : t -> string option
 
 (** Starts a turn: the request's line, then [Turn_started]. Errors without a
     session, while a turn runs, or with images the agent does not take. *)
@@ -286,6 +296,21 @@ val process_exited
 val session_id : t -> string option
 val turn_id : t -> string option
 val in_turn : t -> bool
+
+(** Whether the running turn was started by the agent itself between prompts
+    (e.g. a background task woke it), with no open [session/prompt] request. *)
+val is_autonomous_turn : t -> bool
+
+(** Whether an autonomous turn has emitted assistant text since its last
+    started tool call (so a short quiet spell means it finished speaking). *)
+val autonomous_has_text : t -> bool
+
+(** Whether any tool call is still open or any approval/question is waiting. *)
+val has_open_work : t -> bool
+
+(** Ends an autonomous turn cleanly ([Turn_end Done]); nothing otherwise. *)
+val finish_autonomous : t -> Output.t list
+
 val agent_capabilities : t -> Agent_capabilities.t option
 val session_config : t -> Session_config.t
 

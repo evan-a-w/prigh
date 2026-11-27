@@ -366,7 +366,7 @@ let run agent kind target ~cancel ~on_delta =
     | Commit_message | Pr | Branch_name -> Agent.generate_model agent
   in
   let%bind prompt = prompt_with agent kind target ~cancel in
-  let%map reply, cost_usd =
+  let%map { Agent.Completion.text = reply; model = used_model; cost_usd } =
     Agent.complete
       agent
       ~model
@@ -384,5 +384,5 @@ let run agent kind target ~cancel ~on_delta =
       Some title, Some body
     | Commit_message | Branch_name | Session_title -> None, None
   in
-  { Result.text; title; body; model = Model.key model; cost_usd }
+  { Result.text; title; body; model = used_model; cost_usd }
 ;;

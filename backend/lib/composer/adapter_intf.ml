@@ -33,6 +33,10 @@ module Start = struct
       (** the harness's own sandbox cannot run on the tool host: where and
           why (e.g. ["laptop (no user namespaces)"]). It runs without it,
           still asking prigh before what the session's mode asks about. *)
+    ; extra_dirs : string list
+      (** additional workspace directories the harness may access and write
+          alongside [cwd] (e.g. the session's git worktrees under
+          [worktrees_dir]) *)
     }
   [@@deriving sexp_of]
 
@@ -51,6 +55,7 @@ module Start = struct
     ; login = None
     ; login_refused = None
     ; no_sandbox = None
+    ; extra_dirs = []
     }
   ;;
 end
@@ -63,6 +68,7 @@ module Settings = struct
     ; thinking : Thinking.t
     ; approval : Approval_mode.t
     ; plan : bool
+    ; extra_dirs : string list
     }
   [@@deriving sexp_of, equal]
 
@@ -71,6 +77,7 @@ module Settings = struct
     ; thinking = s.thinking
     ; approval = s.approval
     ; plan = s.plan
+    ; extra_dirs = s.extra_dirs
     }
   ;;
 end
@@ -118,6 +125,31 @@ module Catalog = struct
   type t =
     { models : Model.t list
     ; limits : Subscription_usage.Status.t option
+    }
+  [@@deriving sexp_of]
+end
+
+(** Input to a one-shot tool-less text completion ({!S.complete}). *)
+module Complete_input = struct
+  type t =
+    { system : string
+    ; prompt : string
+    ; model : string option
+      (** Adapter-native model id; [None] prefers a fast/cheap model from the
+          adapter's catalog when available, else its default. *)
+    ; catalog_models : Model.t list
+      (** Previously known models for this adapter, if any. *)
+    }
+  [@@deriving sexp_of]
+end
+
+(** Result of a one-shot tool-less text completion ({!S.complete}). *)
+module Completion = struct
+  type t =
+    { text : string
+    ; usage : Usage.t
+    ; cost_usd : float
+    ; model : string option (** External model key that answered, if known. *)
     }
   [@@deriving sexp_of]
 end
@@ -176,6 +208,11 @@ module type S = sig
 
   val launch : Start.t -> Launch.t
 
+  (** How to launch a lightweight process for a one-shot text completion
+      ({!complete}): no MCP side channel, no tools or session persistence
+      where the harness supports turning them off. *)
+  val launch_complete : Start.t -> Launch.t
+
   (** Talks to the process [transport] runs: the handshake, then the thread
       (new, resumed or forked). Fails, saying why, when the process does not
       answer as expected, in time ([request_timeout] for each request, 60s),
@@ -209,6 +246,14 @@ module type S = sig
   (** [f] is called whenever {!models} or {!limits} change. *)
   val on_change : t -> (unit -> unit) -> unit
 
+  (** [f] is called when the harness starts a turn of its own between
+      prompts (e.g. woken by a background task), so the session can drive
+      and record it as a run. *)
+  val on_autonomous : t -> (unit -> unit) -> unit
+
+  (** [f] is called when the harness reports a session title between turns. *)
+  val on_title : t -> (string -> unit) -> unit
+
   (** Runs the process [transport] runs only to ask its {!Catalog}: the
       handshake, its models and its login's limits, opening no thread
       (nothing is recorded with the harness); the caller stops the
@@ -219,6 +264,21 @@ module type S = sig
     -> Line_transport.t
     -> Start.t
     -> Catalog.t Or_error.t
+
+  (** Runs one tool-less text completion over [transport] in an ephemeral
+      session/thread, auto-denying any unexpected approval or question request,
+      streaming text deltas to [on_delta], and stopping cleanly on [cancel],
+      [timeout] or turn end. *)
+  val complete
+    :  sw:Switch.t
+    -> ?timeout:Time_float.Span.t
+    -> ?request_timeout:Time_float.Span.t
+    -> ?on_delta:(string -> unit)
+    -> cancel:Cancellation.t
+    -> Line_transport.t
+    -> Start.t
+    -> Complete_input.t
+    -> Completion.t Or_error.t
 
   (** Compacts the thread's context ([/compact]): runs as a turn, ending
       with [Turn_end]. *)
@@ -261,8 +321,15 @@ module type S = sig
 
   val in_turn : t -> bool
 
+  (** Whether the harness still has in-flight work after its last turn ended
+      (e.g. an ACP background tool call still open and waiting to complete). *)
+  val has_open_work : t -> bool
+
   (** Whether its process still runs. *)
   val alive : t -> bool
+
+  (** Blocks until the process exits. *)
+  val await_exit : t -> unit
 
   (** The login of prigh's its process runs on ([Start.login], unless it
       could not take it); [None]: its own. *)

@@ -33,6 +33,14 @@ type t =
   ; strict_mcp_config : bool
     (** only the [mcp_config] servers start, not the project's [.mcp.json]
         (default) *)
+  ; no_session_persistence : bool
+    (** [--no-session-persistence] for ephemeral one-shot completions *)
+  ; tools : string option
+    (** [--tools]: [Some ""] disables all built-in tools *)
+  ; max_turns : int option (** [--max-turns] *)
+  ; add_dirs : string list
+    (** additional directories Claude Code may access alongside its [cwd]
+        ([--add-dir]) *)
   }
 [@@deriving sexp_of]
 

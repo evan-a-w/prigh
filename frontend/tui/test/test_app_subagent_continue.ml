@@ -13,6 +13,7 @@ let start ~continued =
     ; model = "claude-haiku"
     ; tools = [ "bash" ]
     ; host = None
+    ; engine = None
     ; worktree = None
     ; forked = true
     ; continued
@@ -220,6 +221,56 @@ let%expect_test "a subagent on another host" =
     Subagents  (1)
     / ▏
     ▸* fix the parser  a1  running  claude-haiku  on laptop
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  ctx:0.1%/1.0M  Enter focuses · Esc closes · Ctrl+D cancels
+    |}]
+;;
+
+let%expect_test "a subagent on another engine and host" =
+  let h = Test_app.connected ~width:90 ~height:8 () in
+  H.event h (State (state ~running:true ()));
+  let call =
+    tool_call
+      ~name:"subagent"
+      ~arguments:{|{"task":"fix the parser","engine":"codex","host":"laptop"}|}
+      "c1"
+  in
+  H.event h (Tool_start call);
+  H.event
+    h
+    (match start ~continued:false with
+     | Subagent_start s ->
+       Subagent_start
+         { s with
+           model = "codex/gpt-5"
+         ; host = Some "laptop"
+         ; engine = Some "codex"
+         ; forked = false
+         }
+     | e -> e);
+  H.event h (in_subagent Turn_start);
+  H.event h (State (state ~subagents:[ "a1", "fix the parser", true ] ()));
+  H.next_agent h;
+  H.show h;
+  H.keys h "/agents";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/1  Codex  codex/gpt-5  on laptop  ⠋ running 1 turns  "fix the parser"
+
+
+
+
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏Steer a1 · fix the parser (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  think:off  ctx:0.1%/1.0M  agents:main [1⠋] bg  → a1 · Esc: main agent
+    ◆ subagent 1/1  Codex  codex/gpt-5  on laptop  ⠋ running 1 turns  "fix the parser"
+
+    Subagents  (1)
+    / ▏
+    ▸* fix the parser  a1  running  Codex  codex/gpt-5  on laptop
     ──────────────────────────────────────────────────────────────────────────────────────────
     >
     deepseek-flash  think:off  ctx:0.1%/1.0M  Enter focuses · Esc closes · Ctrl+D cancels

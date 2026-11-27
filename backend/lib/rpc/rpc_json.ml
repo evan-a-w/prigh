@@ -493,34 +493,34 @@ let capabilities (c : Capabilities.t) =
   let bool b = if b then `True else `False in
   `Object
     ([ "fork", history_op c.fork
-    ; "rewind", history_op c.rewind
-    ; "context_edit", bool c.context_edit
-    ; ( "compact"
-      , str
-          (match c.compact with
-           | Unsupported -> "unsupported"
-           | Native -> "native"
-           | Auto_only -> "auto_only"
-           | Command | Summary -> "native") )
-    ; ( "steer"
-      , str
-          (match c.steer with
-           | Between_turns -> "between_turns"
-           | In_run -> "in_run") )
-    ; "plan_mode", bool c.plan_mode
-    ; "btw", bool c.btw
-    ; ( "subagents"
-      , str
-          (match c.subagents with
-           | Unsupported -> "unsupported"
-           | Observe -> "observe"
-           | Full -> "full") )
-    ; "model_fallback", bool c.model_fallback
-    ; "images", bool c.images
-    ; "ask_user", bool c.ask_user
-    ]
-    @ Option.value_map c.rewind_note ~default:[] ~f:(fun note ->
-      [ "rewind_note", str note ]))
+     ; "rewind", history_op c.rewind
+     ; "context_edit", bool c.context_edit
+     ; ( "compact"
+       , str
+           (match c.compact with
+            | Unsupported -> "unsupported"
+            | Native -> "native"
+            | Auto_only -> "auto_only"
+            | Command | Summary -> "native") )
+     ; ( "steer"
+       , str
+           (match c.steer with
+            | Between_turns -> "between_turns"
+            | In_run -> "in_run") )
+     ; "plan_mode", bool c.plan_mode
+     ; "btw", bool c.btw
+     ; ( "subagents"
+       , str
+           (match c.subagents with
+            | Unsupported -> "unsupported"
+            | Observe -> "observe"
+            | Full -> "full") )
+     ; "model_fallback", bool c.model_fallback
+     ; "images", bool c.images
+     ; "ask_user", bool c.ask_user
+     ]
+     @ Option.value_map c.rewind_note ~default:[] ~f:(fun note ->
+       [ "rewind_note", str note ]))
 ;;
 
 (* The harness's sessions (every one from before engines) carry none of
@@ -638,7 +638,8 @@ let entry (e : Session.Entry.t) =
         ]
     | Masked { through } -> [ "kind", str "masked"; "through", str through ]
     | Name { name } -> [ "kind", str "name"; "name", str name ]
-    | Description { text } -> [ "kind", str "description"; "text", str text ]
+    | Description { text; native = _ } ->
+      [ "kind", str "description"; "text", str text ]
     | Cwd { cwd; host = _ } -> [ "kind", str "cwd"; "cwd", str cwd ]
     | System_prompt _ -> [ "kind", str "system_prompt" ]
     | Goal _ -> [ "kind", str "goal" ]
@@ -1012,6 +1013,7 @@ let rec event ?now ?(resync = false) (e : Agent.Event.t) =
            ; thinking = level
            ; tools
            ; host
+           ; engine
            ; cwd
            ; worktree
            ; forked
@@ -1028,6 +1030,8 @@ let rec event ?now ?(resync = false) (e : Agent.Event.t) =
       ; "tools", `Array (List.map tools ~f:str)
       ]
       @ Option.value_map host ~default:[] ~f:(fun host -> [ "host", str host ])
+      @ Option.value_map engine ~default:[] ~f:(fun engine ->
+        [ "engine", str engine ])
       @ Option.value_map worktree ~default:[] ~f:(fun w ->
         [ "worktree", agent_worktree w ])
       @ (if forked then [ "forked", `True ] else [])
@@ -1121,6 +1125,8 @@ let subagent_summary (s : Subagent_log.Summary.t) =
      ; "model", str s.model
      ]
      @ Option.value_map s.host ~default:[] ~f:(fun host -> [ "host", str host ])
+     @ Option.value_map s.engine ~default:[] ~f:(fun engine ->
+       [ "engine", str engine ])
      @ Option.value_map s.thinking ~default:[] ~f:(fun t ->
        [ "thinking", str t ])
      @ Option.value_map s.cwd ~default:[] ~f:(fun cwd -> [ "cwd", str cwd ])

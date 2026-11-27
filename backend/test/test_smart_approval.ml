@@ -934,3 +934,86 @@ let%expect_test
     (judged 4)
     |}]
 ;;
+
+let%expect_test
+    "smart: session worktrees count as in-project for edits and are shown to \
+     the judge"
+  =
+  with_agent
+    ~judge:[ allow "checks status in session worktree" ]
+    [ Reply.tool_call
+        ~id:"e1"
+        ~name:"edit"
+        ~arguments:
+          (Jsonaf.to_string
+             (`Object
+                 [ "path", `String "../worktrees/feat/hello.txt"
+                 ; ( "edits"
+                   , `Array
+                       [ `Object
+                           [ "old_text", `String "before"
+                           ; "new_text", `String "after"
+                           ]
+                       ] )
+                 ]))
+        ()
+    ; bash ~id:"b1" "echo ok > ../worktrees/feat/out.txt"
+    ; Reply.text "done"
+    ]
+  @@ fun t agent judged ->
+  let repo_dir = Filename.concat t.dir "repo" in
+  let wt_dir = Filename.concat t.dir "worktrees/feat" in
+  let wt_file = Filename.concat wt_dir "hello.txt" in
+  Core_unix.mkdir_p repo_dir;
+  Core_unix.mkdir_p wt_dir;
+  Out_channel.write_all wt_file ~data:"before\n";
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:repo_dir)
+     : Dir_change.Outcome.t);
+  ignore
+    (Session.add_worktree
+       (Agent.session agent)
+       { path = wt_dir
+       ; branch = Some "feat"
+       ; root = repo_dir
+       ; source = Created
+       }
+     : Session.Entry.t);
+  run agent "update the worktree";
+  printf "edited=%S\n" (String.strip (In_channel.read_all wt_file));
+  printf "judged=%d\n" (Queue.length judged);
+  let req = Queue.last_exn judged in
+  List.iter req.messages ~f:(function
+    | User u -> print_endline (mask t u.text)
+    | Assistant _ | Tool_result _ -> ());
+  [%expect
+    {|
+    edit {"path":"../worktrees/feat/hello.txt","edits":[{"old_text":" -> --- a/../worktrees/feat/hello.txt
+    allowed b1 by deepseek/deepseek-flash: checks status in session worktree
+    bash {"command":"echo ok > ../worktrees/feat/out.txt"} ->
+    edited="after"
+    judged=1
+    <user_requests>
+    <user_message>
+    update the worktree
+    </user_message>
+    </user_requests>
+
+    <environment>
+    session's own host: <host>
+    connected hosts: <host>
+    call runs on: <host> (the session's own host)
+    working directory: $DIR/repo
+    session worktrees (part of this project):
+    - $DIR/worktrees/feat
+    </environment>
+
+    <tool_call>
+    tool: bash
+    arguments:
+    {
+      "command": "echo ok > ../worktrees/feat/out.txt"
+    }
+    </tool_call>
+    |}]
+;;

@@ -223,10 +223,13 @@ let base ?(chat = false) ~nix ~auto_background ~(role : Role.t) ~tools () =
              independent of your thinking (a reviewer, a second opinion, a \
              fresh investigation): then it sees only the task, so include \
              everything it needs."
-          ; "- Work on another machine: only when the user asks for work on \
-             that machine (a tool host they name), delegate it to a subagent \
-             with host set to it: all its tools (and its worktree) are there. \
-             Do not wrap each call in on_host for such work."
+          ; "- Work on another machine or engine: subagents default to this \
+             session's host, engine and model. Only pass host, engine or a \
+             different model when the user explicitly asks for that specific \
+             machine, engine or model. For work on another machine the user \
+             named, delegate it to a subagent with host set to it (all its \
+             tools and worktree run there) rather than wrapping each call in \
+             on_host."
           ]
         else [])
      @ [ "" ]
