@@ -25,6 +25,7 @@ type t =
   ; no_session_persistence : bool
   ; tools : string option
   ; max_turns : int option
+  ; add_dirs : string list
   }
 [@@deriving sexp_of]
 
@@ -41,6 +42,7 @@ let default =
   ; no_session_persistence = false
   ; tools = None
   ; max_turns = None
+  ; add_dirs = []
   }
 ;;
 
@@ -89,6 +91,7 @@ let argv t =
         "--max-thinking-tokens"
         (Option.map t.max_thinking_tokens ~f:Int.to_string)
     ; eq "--effort" t.effort
+    ; List.concat_map t.add_dirs ~f:(fun dir -> opt "--add-dir" (Some dir))
     ; [ "--input-format"; "stream-json" ]
     ]
 ;;

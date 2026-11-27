@@ -33,6 +33,10 @@ module Start = struct
       (** the harness's own sandbox cannot run on the tool host: where and
           why (e.g. ["laptop (no user namespaces)"]). It runs without it,
           still asking prigh before what the session's mode asks about. *)
+    ; extra_dirs : string list
+      (** additional workspace directories the harness may access and write
+          alongside [cwd] (e.g. the session's git worktrees under
+          [worktrees_dir]) *)
     }
   [@@deriving sexp_of]
 
@@ -51,6 +55,7 @@ module Start = struct
     ; login = None
     ; login_refused = None
     ; no_sandbox = None
+    ; extra_dirs = []
     }
   ;;
 end
@@ -63,6 +68,7 @@ module Settings = struct
     ; thinking : Thinking.t
     ; approval : Approval_mode.t
     ; plan : bool
+    ; extra_dirs : string list
     }
   [@@deriving sexp_of, equal]
 
@@ -71,6 +77,7 @@ module Settings = struct
     ; thinking = s.thinking
     ; approval = s.approval
     ; plan = s.plan
+    ; extra_dirs = s.extra_dirs
     }
   ;;
 end

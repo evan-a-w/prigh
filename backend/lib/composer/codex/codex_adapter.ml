@@ -72,6 +72,7 @@ let settings ~cwd ~sandbox ~models (s : Adapter.Settings.t)
   ; plan = s.plan
   ; efforts = efforts models s
   ; sandbox
+  ; writable_roots = s.extra_dirs
   }
 ;;
 
@@ -399,7 +400,12 @@ let complete
                 ~cwd:start.cwd
                 ~sandbox:t.sandbox
                 ~models
-                { model = chosen; thinking = Off; approval = Ask; plan = false }
+                { model = chosen
+                ; thinking = Off
+                ; approval = Ask
+                ; plan = false
+                ; extra_dirs = []
+                }
             in
             let options : Codex_codec.Thread_options.t =
               { Codex_codec.Thread_options.empty with

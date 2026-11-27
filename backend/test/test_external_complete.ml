@@ -292,8 +292,8 @@ let%expect_test
     launch mcp=false
     acp got initialize
     acp got session/new mcp=0
-    acp got set_config_option model=gemini-3-flash-lite
     acp got set_config_option thought=off
+    acp got set_config_option model=gemini-3-flash-lite
     acp got prompt has_no_tools=true has_system=true has_user=true
     acp permission reply: {"outcome":{"outcome":"selected","optionId":"no"}}
     acp got session/close

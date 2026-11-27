@@ -1067,7 +1067,7 @@ let%expect_test
   Rpc_server.shutdown server;
   [%expect
     {|
-    spawn codex mcp=false cwd=$DIR
+    spawn codex mcp=true cwd=$DIR
     codex got initialize
     codex got model/list
     codex got account/rateLimits/read

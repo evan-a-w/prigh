@@ -1948,7 +1948,9 @@ let host_home t (host : Host.t) =
 ;;
 
 let active_host_home t =
-  Option.bind (find_host t t.active_host) ~f:(host_home t)
+  if String.equal t.active_host Host.backend_id
+  then Some t.home
+  else Option.bind (find_host t t.active_host) ~f:(host_home t)
 ;;
 
 (* Computer use always asks first, whatever the approval mode: once per
@@ -2256,11 +2258,20 @@ let check t (context : Tool.Context.t) tool args : Check.t =
     | [] -> None
     | reasons -> Some (String.concat ~sep:"; " reasons)
   in
+  let worktrees =
+    match elsewhere with
+    | None ->
+      List.map (Session.worktrees t.session) ~f:(fun (w : Session_worktree.t) ->
+        w.path)
+      |> List.dedup_and_sort ~compare:String.compare
+    | Some _ -> []
+  in
   let decide () =
     Approval.decide
       ~mode:t.approval_mode
       ~plan:t.plan_mode
       ~host_permitted:(Option.is_none (held ()))
+      ~worktrees
       ~rules
       ~session
       ~cwd
@@ -2323,6 +2334,7 @@ let check t (context : Tool.Context.t) tool args : Check.t =
          ; session_host = name_of t.active_host
          ; hosts = List.map (hosts t) ~f:(fun (h : Host.t) -> h.name)
          ; cwd = context.cwd
+         ; worktrees
          ; requests = Approval_judge.requests (Session.messages t.session)
          ; task
          ; goal = Option.map t.goal ~f:(fun g -> g.text)

@@ -147,6 +147,7 @@ let drive
       | Request_withdrawn _
       | Compacted _
       | Retrying _
+      | Session_title _
       | Notice _ -> loop ()
     in
     let watcher () =

@@ -584,20 +584,20 @@ let%expect_test "claude: rewinding resumes it at its message; forks fork it" =
   [%expect
     {|
     ok
-    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --input-format stream-json
+    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --add-dir $DIR/.prigh/worktrees --input-format stream-json
     external turn claude-session turn-1 at u1, files checkpointed
     external turn claude-session turn-2 at u2, files checkpointed
     ok
     ./a.txt: two
     ./b.txt: bee
-    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --resume=claude-session --resume-session-at=u1 --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --input-format stream-json
+    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --resume=claude-session --resume-session-at=u1 --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --add-dir $DIR/.prigh/worktrees --input-format stream-json
     |}];
   print_result s (s.call "clone");
   s.prompt "in the fork";
   [%expect
     {|
     ok
-    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --resume=claude-session --fork-session --resume-session-at=u3 --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --input-format stream-json
+    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --resume=claude-session --fork-session --resume-session-at=u3 --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --add-dir $DIR/.prigh/worktrees --input-format stream-json
     |}]
 ;;
 

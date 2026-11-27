@@ -1939,6 +1939,38 @@ let harness_usage t agent : Subscription_usage.Harness_usage.t list =
   | _ -> []
 ;;
 
+let composer_subagent_instructions =
+  "Subagents: always use prigh's MCP `subagent` (and `subagent_*`) tools \
+   rather than any built-in or native subagent, Agent, Task or swarm tool, so \
+   subagents appear in prigh's UI with live progress, worktree tracking and \
+   steering. Default to this session's engine, model and tool host; only pass \
+   a different engine, model or host when the user explicitly asks. Use \
+   prigh's `worktree` tool (or `subagent`'s `worktree` option) for git \
+   worktrees."
+;;
+
+let composer_instructions agent =
+  match Agent.user_instructions agent with
+  | None -> Some composer_subagent_instructions
+  | Some user -> Some (composer_subagent_instructions ^ "\n\n" ^ user)
+;;
+
+let composer_extra_dirs agent ~cwd =
+  let worktrees_dir =
+    match Agent.active_host_home agent with
+    | Some home ->
+      Some (Tool.resolve ~home ~cwd (Agent.config agent).worktrees_dir)
+    | None ->
+      let raw = (Agent.config agent).worktrees_dir in
+      if String.mem raw '~' then None else Some (Tool.resolve ~cwd raw)
+  in
+  let recorded =
+    List.map (Session.worktrees (Agent.session agent)) ~f:(fun w -> w.path)
+  in
+  List.filter (Option.to_list worktrees_dir @ recorded) ~f:Filename.is_absolute
+  |> List.dedup_and_sort ~compare:String.compare
+;;
+
 (* A composer session's runner, driving its adapter's harness on the
    session's tool host and continuing the thread the session recorded there
    (each process records the threads it starts). *)
@@ -1975,7 +2007,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
         resume
       ; fork
       ; at
-      ; developer_instructions = Agent.user_instructions agent
+      ; developer_instructions = composer_instructions agent
       ; login = cli_credential t agent ~adapter:adapter_name
       ; no_sandbox =
           no_sandbox
@@ -1985,6 +2017,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
             ~host_name:(active_host_label agent)
             ~cwd
             adapter_id
+      ; extra_dirs = composer_extra_dirs agent ~cwd
       }
     in
     let on_thread thread_id =
@@ -2054,6 +2087,8 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
          ~catalog:(fun () -> find_catalog t agent adapter_id)
          ~on_change:(fun () -> models_changed t agent)
          ~on_autonomous:(fun () -> Agent.external_woke agent)
+         ~extra_dirs:(fun () ->
+           composer_extra_dirs agent ~cwd:(Session.cwd session))
          ())
 ;;
 

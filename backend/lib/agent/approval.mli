@@ -51,14 +51,15 @@ val names_host : string -> names:string list -> bool
     session's) covering it allows it; plan mode asks for every other
     destructive tool; then the mode decides for destructive tools ([Ask]
     asks, [Auto_edit] asks unless it is an edit, [Auto] allows, [Smart]
-    allows edits of files under [cwd] (not in a [.git] directory) and has
-    the approval model judge the rest), and non-destructive ones run. In
-    plan mode, [Smart] has the approval model judge what the other modes ask
-    about. *)
+    allows edits of files under [cwd] or any directory in [worktrees] (not
+    in a [.git] directory) and has the approval model judge the rest), and
+    non-destructive ones run. In plan mode, [Smart] has the approval model
+    judge what the other modes ask about. *)
 val decide
   :  mode:Approval_mode.t
   -> plan:bool
   -> ?host_permitted:bool
+  -> ?worktrees:string list
   -> rules:Rules.t
   -> session:Approval_rule.t list
   -> cwd:string

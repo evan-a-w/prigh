@@ -778,7 +778,6 @@ let%expect_test
 let with_acp_subagents
       ?(open_work_timeout = Time_float.Span.of_sec 5.)
       ?(autonomous_quiet = Time_float.Span.of_sec 0.02)
-      ?(steer_poll = Time_float.Span.of_sec 0.01)
       ~peer
       ~main
       f
@@ -831,7 +830,6 @@ let with_acp_subagents
       ~notice:(Agent.notice agent)
       ~autonomous_quiet
       ~open_work_timeout
-      ~steer_poll
       ~spawn:(fun ~sw ~host:_ ~host_name:_ ~adapter:_ _launch ->
         Ok (Line_transport.Peer.spawn ~sw peer))
       ()

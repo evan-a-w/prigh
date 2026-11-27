@@ -66,6 +66,11 @@ type t =
   ; injected_errors : string Queue.t String.Table.t
     (* failed injected MCP tool texts in the current turn, by tool name, in
        case the harness drops the error text on [Tool_end] *)
+  ; extra_dirs : unit -> string list
+  ; mutable preapproved : (string * Json.t) list
+    (** injected prigh MCP calls already approved in this turn's outer CLI
+        permission check, consumed once by {!injected} to avoid prompting
+        twice *)
   ; mutable warming : Warming.t option (* a [prewarm] starting *)
   ; mutable epoch : int (* [close]s: a start that outlived one stops *)
   }
@@ -92,6 +97,7 @@ let create
       ?(catalog = fun () -> None)
       ?(on_change = ignore)
       ?on_autonomous
+      ?(extra_dirs = fun () -> [])
       ()
   =
   { sw
@@ -143,6 +149,8 @@ let create
   ; on_change
   ; on_autonomous
   ; injected_errors = String.Table.create ()
+  ; extra_dirs
+  ; preapproved = []
   ; warming = None
   ; epoch = 0
   }
@@ -217,6 +225,19 @@ let context
 
 let mcp_calls = ref 0
 
+let take_preapproved t ~tool ~args =
+  let key = Json.to_string args in
+  let rec remove acc = function
+    | [] -> false
+    | (name, a) :: rest
+      when String.equal name tool && String.equal (Json.to_string a) key ->
+      t.preapproved <- List.rev_append acc rest;
+      true
+    | item :: rest -> remove (item :: acc) rest
+  in
+  remove [] t.preapproved
+;;
+
 (* prigh's tools called over MCP: approved and run as the harness engine's
    calls are. *)
 let injected t (s : Engine_intf.Services.t) =
@@ -233,7 +254,12 @@ let injected t (s : Engine_intf.Services.t) =
         let ctx =
           context t s ~cancel:t.cancel ~call_id:(sprintf "mcp-%d" !mcp_calls) ()
         in
-        (match s.approve ctx tool args with
+        let refusal =
+          if take_preapproved t ~tool:(Tool.name tool) ~args
+          then None
+          else s.approve ctx tool args
+        in
+        (match refusal with
          | Some refused -> refused
          | None
            when Cancellation.is_cancelled ctx.cancel
@@ -254,11 +280,12 @@ let injected t (s : Engine_intf.Services.t) =
            result))
 ;;
 
-let settings (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
+let settings t (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
   { model = input.model
   ; thinking = input.thinking
   ; approval = input.approval
   ; plan = input.plan
+  ; extra_dirs = t.extra_dirs ()
   }
 ;;
 
@@ -552,6 +579,10 @@ let live_now
          ; fork = fork && Option.is_some resume
          ; at
          ; login_refused = t.login_refused
+         ; extra_dirs =
+             List.dedup_and_sort
+               (base.extra_dirs @ t.extra_dirs ())
+               ~compare:String.compare
          }
        in
        let started =
@@ -925,6 +956,7 @@ let rec run_turn
   t.cancel <- turn_cancel;
   t.run_cancel <- cancel;
   Hashtbl.clear t.injected_errors;
+  t.preapproved <- [];
   (match Turn_timings.current () with
    | Some _ -> fun f -> f ()
    | None -> Turn_timings.with_ (Turn_timings.create ()))
@@ -932,6 +964,7 @@ let rec run_turn
   Exn.protect
     ~finally:(fun () ->
       Hashtbl.clear t.injected_errors;
+      t.preapproved <- [];
       Cancellation.cancel turn_cancel)
     ~f:(fun () ->
       match run_turn' t s ~cancel input with
@@ -1023,7 +1056,7 @@ and run_turn'
        Option.iter
          (List.hd (L.models a))
          ~f:(fun (m : Model.t) -> Composer_recorder.default_model recorder m.id);
-     let settings = settings input in
+     let settings = settings t input in
      let leftover = Queue.create () in
      let handoff =
        ref
@@ -1146,9 +1179,21 @@ and run_turn'
                      | _ -> None
                    in
                    let tool =
-                     Option.value_or_thunk
+                     Option.first_some
+                       (List.find s.tools ~f:(fun t ->
+                          String.equal (Tool.name t) canonical.name))
                        (Tools.find canonical.name)
-                       ~default:(fun () -> stand_in canonical.name)
+                     |> Option.value_or_thunk ~default:(fun () ->
+                       stand_in canonical.name)
+                   in
+                   let is_injected =
+                     match kind with
+                     | Mcp { server; tool = mcp_tool } ->
+                       Option.is_some
+                         (Injected_tools.canonical_of_mcp
+                            ~server
+                            ~tool:mcp_tool)
+                     | _ -> false
                    in
                    let ctx =
                      context
@@ -1161,7 +1206,13 @@ and run_turn'
                        ()
                    in
                    (match s.approve ctx tool canonical.arguments with
-                    | None -> Allow
+                    | None ->
+                      if is_injected && not (Cancellation.is_cancelled c)
+                      then
+                        t.preapproved
+                        <- (Tool.name tool, canonical.arguments)
+                           :: t.preapproved;
+                      Allow
                     | Some refused -> reply_of_refusal refused)
                in
                if not (Cancellation.is_cancelled c)

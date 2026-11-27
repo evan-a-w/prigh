@@ -38,6 +38,9 @@ type t =
   ; tools : string option
     (** [--tools]: [Some ""] disables all built-in tools *)
   ; max_turns : int option (** [--max-turns] *)
+  ; add_dirs : string list
+    (** additional directories Claude Code may access alongside its [cwd]
+        ([--add-dir]) *)
   }
 [@@deriving sexp_of]
 

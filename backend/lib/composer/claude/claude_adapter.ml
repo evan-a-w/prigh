@@ -189,6 +189,7 @@ let launch_config ~injected (start : Adapter.Start.t) : Claude_launch.t =
   ; mcp_config = mcp_config ~injected start
   ; max_thinking_tokens = thinking_tokens start.thinking
   ; effort = effort start.thinking
+  ; add_dirs = start.extra_dirs
   }
 ;;
 
@@ -541,7 +542,12 @@ let complete
                 External_model.name ~adapter:id (Some m))
             in
             let settings : Adapter.Settings.t =
-              { model = chosen; thinking = Off; approval = Ask; plan = false }
+              { model = chosen
+              ; thinking = Off
+              ; approval = Ask
+              ; plan = false
+              ; extra_dirs = []
+              }
             in
             let%bind () =
               send t settings { text = input.prompt; images = [] }

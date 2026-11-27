@@ -2096,6 +2096,7 @@ let%expect_test
                 ~socket:"/tmp/test.sock"
                 ~token:"tok"
           ; serve = (fun injected -> injected_ref := Some injected)
+          ; route = None
           }
         in
         Ok

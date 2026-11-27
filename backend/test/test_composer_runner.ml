@@ -1384,3 +1384,102 @@ let%expect_test
     after-manual: name=My manual name desc=Refined Codex title native=true wanted=false
     |}]
 ;;
+
+let%expect_test
+    "claude: injected prigh MCP tools use real tool spec and are never \
+     approved twice"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let fake_worktree =
+    { Tool.spec = (Tool_worktree.create ()).spec
+    ; run =
+        (fun _ args -> Tool_result.ok ("ran worktree " ^ Json.to_string args))
+    }
+  in
+  let confirms = ref 0 in
+  let peer (p : Line_transport.Peer.t) =
+    let read () =
+      Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+        Json.parse l |> Or_error.ok_exn)
+    in
+    let req_id j = Option.bind (Json.member "request_id" j) ~f:Json.string in
+    (match read () with
+     | Some init ->
+       Line_transport.Peer.write_line
+         p
+         (sprintf
+            {|{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"claude_code_version":"2.1.268","models":[],"commands":[]}}}|}
+            (Option.value (req_id init) ~default:""))
+     | None -> ());
+    ignore (read () : Json.t option);
+    Line_transport.Peer.write_line
+      p
+      {|{"type":"system","subtype":"init","session_id":"s1","model":"claude-sonnet-4-6"}|};
+    let send_and_expect label line =
+      Line_transport.Peer.write_line p line;
+      match read () with
+      | Some reply -> printf "%s -> %s\n" label (Json.to_string reply)
+      | None -> printf "%s -> EOF\n" label
+    in
+    (* 1. worktree(action=list): read-only, must NOT ask in Ask mode *)
+    send_and_expect
+      "can_use_tool list"
+      {|{"type":"control_request","request_id":"perm-1","request":{"subtype":"can_use_tool","tool_name":"mcp__prigh__worktree","tool_use_id":"tu-1","input":{"action":"list"}}}|};
+    send_and_expect
+      "mcp list"
+      {|{"type":"control_request","request_id":"mcp-1","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"worktree","arguments":{"action":"list"}}}}}|};
+    (* 2. worktree(action=remove): destructive, must ask ONCE (not twice) *)
+    send_and_expect
+      "can_use_tool remove"
+      {|{"type":"control_request","request_id":"perm-2","request":{"subtype":"can_use_tool","tool_name":"mcp__prigh__worktree","tool_use_id":"tu-2","input":{"action":"remove","path":"/wt/a"}}}|};
+    send_and_expect
+      "mcp remove"
+      {|{"type":"control_request","request_id":"mcp-2","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"worktree","arguments":{"action":"remove","path":"/wt/a"}}}}}|};
+    Line_transport.Peer.write_line
+      p
+      {|{"type":"result","subtype":"success","is_error":false,"result":"done","session_id":"s1","usage":{"input_tokens":1,"output_tokens":1}}|}
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter:(module Claude_adapter)
+      ~spawn:(fun _ -> Ok (Line_transport.Peer.spawn ~sw peer))
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:(fake_worktree :: Tools.interaction)
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some Claude };
+  Agent.set_mode agent ~approval:Ask;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; agent_id; name; summary; _ }) ->
+      incr confirms;
+      printf "confirm #%d %s %s: %s\n" !confirms call_id name summary;
+      Or_error.ok_exn (Agent.respond_confirm ?agent_id agent ~call_id Allow)
+    | _ -> ());
+  prompt agent "tidy worktrees";
+  Composer_runner.close composer;
+  printf "total confirms = %d\n" !confirms;
+  [%expect
+    {|
+    can_use_tool list -> {"type":"control_response","response":{"subtype":"success","request_id":"perm-1","response":{"behavior":"allow","updatedInput":{"action":"list"}}}}
+    mcp list -> {"type":"control_response","response":{"subtype":"success","request_id":"mcp-1","response":{"mcp_response":{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ran worktree {\"action\":\"list\"}"}],"isError":false}}}}}
+    confirm #1 tu-2 worktree: remove /wt/a
+    can_use_tool remove -> {"type":"control_response","response":{"subtype":"success","request_id":"perm-2","response":{"behavior":"allow","updatedInput":{"action":"remove","path":"/wt/a"}}}}
+    mcp remove -> {"type":"control_response","response":{"subtype":"success","request_id":"mcp-2","response":{"mcp_response":{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"ran worktree {\"action\":\"remove\",\"path\":\"/wt/a\"}"}],"isError":false}}}}}
+    total confirms = 1
+    |}]
+;;

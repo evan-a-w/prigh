@@ -87,6 +87,10 @@ val create
        (** called when the live external harness begins a turn of its own
            between prompts (e.g. a background task woke it), so the session
            can drive and record it as an [Autonomous] run *)
+  -> ?extra_dirs:(unit -> string list)
+       (** additional workspace directories the harness may access and write
+           alongside [cwd] (e.g. the session's git worktrees under
+           [worktrees_dir]) *)
   -> unit
   -> t
 

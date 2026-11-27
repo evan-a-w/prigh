@@ -44,10 +44,6 @@ let create
       ()
   : Tool_subagent.External.t
   =
-  let steer_poll_sec =
-    Time_float.Span.to_sec
-      (Option.value steer_poll ~default:(Time_float.Span.of_sec 0.2))
-  in
   let open_work_timeout_sec = Time_float.Span.to_sec open_work_timeout in
   let run
         ~adapter:adapter_id
@@ -209,12 +205,12 @@ let create
           in
           loop ()
         in
-        let await_steer () =
+        let wait_steer () =
           let rec loop () =
             match steer () with
             | _ :: _ as msgs -> `Steer msgs
             | [] ->
-              Eio_unix.sleep steer_poll_sec;
+              await_steer ();
               loop ()
           in
           loop ()
@@ -233,7 +229,7 @@ let create
         in
         Fiber.any
           [ await_autonomous
-          ; await_steer
+          ; wait_steer
           ; await_exit
           ; await_cancel
           ; await_timeout
