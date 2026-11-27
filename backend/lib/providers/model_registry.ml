@@ -290,18 +290,24 @@ let unknown_compaction_model t ~home =
 ;;
 
 let unknown_naming_model t ~home =
+  let warn e =
+    [ sprintf
+        "naming_model in %s is ignored, so sessions and subagents are named by \
+         generate_model or the session's model (/naming model MODEL sets \
+         another): %s"
+        (Config.path ~home)
+        (Error.to_string_hum e)
+    ]
+  in
   match Config.load ~home with
   | Ok { naming_model = Some name; _ } ->
-    (match resolve t name with
-     | Ok _ -> []
-     | Error e ->
-       [ sprintf
-           "naming_model in %s is ignored, so sessions and subagents are named \
-            by generate_model or the session's model (/naming model MODEL sets \
-            another): %s"
-           (Config.path ~home)
-           (Error.to_string_hum e)
-       ])
+    (match External_model.parse_spec name with
+     | Some (Ok _) -> []
+     | Some (Error e) -> warn e
+     | None ->
+       (match resolve t name with
+        | Ok _ -> []
+        | Error e -> warn e))
   | Ok _ | Error _ -> []
 ;;
 

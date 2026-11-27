@@ -172,6 +172,7 @@ module Response = struct
         ; session_id : string
         ; config : Session_config.t
         }
+    | Session_closed
     | Mode_set of string
     | Config_set of Config_option.t list
     | Failed of
@@ -450,12 +451,19 @@ let resume_session t ~session_id ~cwd ~mcp_servers =
     ~mcp_servers
 ;;
 
-let close_session t ~session_id =
+let close_session_for t ~session_id =
   request
     t
     Close_session
     "session/close"
     (`Object [ "sessionId", `String session_id ])
+;;
+
+let close_session t =
+  match t.session_id, t.capabilities with
+  | Some session_id, Some { close_session = true; _ } ->
+    Some (close_session_for t ~session_id)
+  | _ -> None
 ;;
 
 let content_block : Input.t -> Json.t = function
@@ -1866,7 +1874,9 @@ let on_response t ~id ~result ~error =
              let config = parse_session_config t result in
              t.config <- config;
              [ Output.Response (Session_opened { kind; session_id; config }) ])
-        | Close_session -> []
+        | Close_session ->
+          t.session_id <- None;
+          [ Output.Response Session_closed ]
         | Steer -> []
         | Prompt when steered t ->
           note_usage t result;

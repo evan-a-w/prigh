@@ -1374,7 +1374,8 @@ let%expect_test "what a thread and a turn are started with" =
     (C.start_thread
        codec
        (settings ~approval:Ask ~model:"gpt-5.5" ())
-       { developer_instructions = Some "Be brief."
+       { Codex_codec.Thread_options.empty with
+         developer_instructions = Some "Be brief."
        ; mcp_servers =
            [ ( "prigh"
              , `Object

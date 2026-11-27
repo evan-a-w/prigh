@@ -48,6 +48,10 @@ let launch (start : Adapter.Start.t) : Adapter.Launch.t =
   }
 ;;
 
+let launch_complete (start : Adapter.Start.t) : Adapter.Launch.t =
+  { (launch start) with mcp = false }
+;;
+
 (* The model's efforts in Codex's names, once Codex has listed its models. *)
 let efforts models (s : Adapter.Settings.t) =
   (match s.model with
@@ -342,6 +346,120 @@ let catalog ~sw ?request_timeout transport (start : Adapter.Start.t) =
   let models = list_models t.driver t.codec in
   let limits = read_limits t in
   { Adapter.Catalog.models; limits }
+;;
+
+let complete
+      ~sw:_
+      ?(timeout = External_complete.default_timeout)
+      ?request_timeout
+      ?on_delta
+      ~cancel
+      transport
+      (start : Adapter.Start.t)
+      (input : Adapter.Complete_input.t)
+  =
+  Switch.run (fun sw ->
+    Exn.protect
+      ~finally:(fun () -> Line_transport.stop transport)
+      ~f:(fun () ->
+        let open Or_error.Let_syntax in
+        let%bind t, s, reported_model =
+          External_complete.with_cancel_timeout ~cancel ~timeout (fun () ->
+            let%bind t =
+              open_process
+                ~sw
+                ?request_timeout
+                ~sandbox:(Option.is_none start.no_sandbox)
+                transport
+                ~cwd:start.cwd
+            in
+            Option.iter start.login ~f:(fun login ->
+              hand_login t (Codex_login.create login));
+            let models =
+              if not (List.is_empty input.catalog_models)
+              then input.catalog_models
+              else if Option.is_some input.model
+              then []
+              else list_models t.driver t.codec
+            in
+            t.models <- models;
+            let chosen =
+              match input.model with
+              | Some req ->
+                let resolved =
+                  External_model.resolve ~adapter:id ~models:(Some models) req
+                  |> Result.ok
+                  |> Option.value ~default:req
+                in
+                Some resolved
+              | None -> External_complete.pick_fast_model models
+            in
+            let s =
+              settings
+                ~cwd:start.cwd
+                ~sandbox:t.sandbox
+                ~models
+                { model = chosen; thinking = Off; approval = Ask; plan = false }
+            in
+            let options : Codex_codec.Thread_options.t =
+              { Codex_codec.Thread_options.empty with
+                developer_instructions =
+                  Some (External_complete.system_with_no_tools input.system)
+              ; mcp_servers = []
+              ; ephemeral = true
+              }
+            in
+            let%bind thread =
+              Adapter.Driver.request
+                t.driver
+                (Codex_codec.start_thread t.codec s options)
+                ~matches:(function
+                | Thread _ | Failed { kind = Thread_start; _ } -> true
+                | _ -> false)
+            in
+            let%map () = failed thread ~what:"the thread" in
+            let thread_model =
+              match thread with
+              | Thread { model; _ } -> model
+              | _ -> None
+            in
+            let reported_model =
+              Option.first_some chosen thread_model
+              |> Option.map ~f:(fun m ->
+                External_model.name ~adapter:id (Some m))
+            in
+            t, s, reported_model)
+        in
+        Exn.protect
+          ~finally:(fun () -> Adapter.Driver.stop t.driver)
+          ~f:(fun () ->
+            let%bind line =
+              Codex_codec.start_turn
+                t.codec
+                s
+                [ Codex_codec.Input.Text input.prompt ]
+            in
+            Adapter.Driver.begin_turn t.driver;
+            Adapter.Driver.write t.driver line;
+            External_complete.drive
+              ~timeout
+              ?on_delta
+              ~cancel
+              ~next_event:(fun () -> Adapter.Driver.next_event t.driver)
+              ~interrupt:(fun () ->
+                match Codex_codec.interrupt t.codec with
+                | `Send line -> Adapter.Driver.write t.driver line
+                | `Deferred | `Idle -> ())
+              ~reply_approval:(fun ~request_id reply ->
+                Option.iter
+                  (Codex_codec.reply_approval t.codec ~request_id reply)
+                  ~f:(Adapter.Driver.write t.driver))
+              ~answer:(fun ~request_id reply ->
+                Option.iter
+                  (Codex_codec.answer_question t.codec ~request_id reply)
+                  ~f:(Adapter.Driver.write t.driver))
+              ~model:reported_model
+              ())))
 ;;
 
 let start

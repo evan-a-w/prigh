@@ -346,7 +346,7 @@ let%expect_test
   @@ fun sw ->
   (* 1. ACP codec close_session frame. *)
   let codec = Acp_client_codec.create () in
-  print_endline (Acp_client_codec.close_session codec ~session_id:"ses-42");
+  print_endline (Acp_client_codec.close_session_for codec ~session_id:"ses-42");
   (* 2. Agent without sessionCapabilities.close is not poolable. *)
   let check_poolable init_result =
     let phys =

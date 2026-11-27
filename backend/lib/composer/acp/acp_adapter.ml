@@ -143,6 +143,24 @@ module Thought = struct
       Option.bind wanted ~f:(fun (c : Codec.Config_option.Choice.t) ->
         Option.some_if (not (String.equal c.value current)) (o, c.value)))
   ;;
+
+  (* The lowest thinking setting the agent offers: off/none/disabled, else the
+     smallest thinking level. *)
+  let lowest config =
+    Option.bind (option config) ~f:(fun (o, current, choices) ->
+      let wanted =
+        match List.find choices ~f:is_off with
+        | Some _ as off -> off
+        | None ->
+          List.filter_map choices ~f:(fun c ->
+            Option.map (level c) ~f:(fun l -> l, c))
+          |> List.min_elt ~compare:(fun (a, _) (b, _) ->
+            Thinking.Level.compare a b)
+          |> Option.map ~f:snd
+      in
+      Option.bind wanted ~f:(fun (c : Codec.Config_option.Choice.t) ->
+        Option.some_if (not (String.equal c.value current)) (o, c.value)))
+  ;;
 end
 
 let not_logged_in (agent : Acp_agent.t) methods =
@@ -221,6 +239,10 @@ let create
         ; mcp = true
         ; secret = None
         }
+    ;;
+
+    let launch_complete (start : Adapter.Start.t) : Adapter.Launch.t =
+      { (launch start) with mcp = false }
     ;;
 
     let refused what (r : Codec.Response.t) =
@@ -717,6 +739,168 @@ let create
       let models = models t in
       Adapter.Driver.stop t.driver;
       { Adapter.Catalog.models; limits = None }
+    ;;
+
+    let set_option t ~what (option : Codec.Config_option.t) value =
+      match
+        Codec.set_config_option t.codec ~config_id:option.id (`Id value)
+      with
+      | Error _ as e -> e
+      | Ok line ->
+        let%bind.Or_error r =
+          Adapter.Driver.request t.driver line ~matches:(function
+            | Config_set _ | Failed { kind = Set_config_option; _ } -> true
+            | _ -> false)
+        in
+        refused what r
+    ;;
+
+    let close_session t =
+      if Adapter.Driver.alive t.driver
+      then
+        Option.iter (Codec.close_session t.codec) ~f:(fun line ->
+          try
+            ignore
+              (Adapter.Driver.request
+                 ~timeout:(Time_float.Span.of_sec 2.)
+                 t.driver
+                 line
+                 ~matches:(function
+                 | Session_closed | Failed { kind = Close_session; _ } -> true
+                 | _ -> false)
+               : Codec.Response.t Or_error.t)
+          with
+          | _ -> ())
+    ;;
+
+    let complete
+          ~sw:_
+          ?(timeout = External_complete.default_timeout)
+          ?request_timeout
+          ?on_delta
+          ~cancel
+          transport
+          (s : Adapter.Start.t)
+          (input : Adapter.Complete_input.t)
+      =
+      Switch.run (fun sw ->
+        Exn.protect
+          ~finally:(fun () -> Line_transport.stop transport)
+          ~f:(fun () ->
+            let open Or_error.Let_syntax in
+            let%bind t =
+              External_complete.with_cancel_timeout ~cancel ~timeout (fun () ->
+                start
+                  ~sw
+                  ?request_timeout
+                  transport
+                  { s with
+                    resume = None
+                  ; fork = false
+                  ; mcp_servers = []
+                  ; thinking = Off
+                  ; approval = Ask
+                  ; plan = false
+                  })
+            in
+            Exn.protect
+              ~finally:(fun () ->
+                if
+                  (not (Cancellation.is_cancelled cancel))
+                  && not (Adapter.Driver.in_turn t.driver)
+                then close_session t;
+                Adapter.Driver.stop t.driver)
+              ~f:(fun () ->
+                let advertised = models t in
+                let chosen =
+                  match input.model with
+                  | Some req ->
+                    let resolved =
+                      External_model.resolve
+                        ~adapter:id
+                        ~models:(Some advertised)
+                        req
+                      |> Result.ok
+                      |> Option.value ~default:req
+                    in
+                    Some resolved
+                  | None -> External_complete.pick_fast_model advertised
+                in
+                let config = Codec.session_config t.codec in
+                let%bind () =
+                  External_complete.with_cancel_timeout
+                    ~cancel
+                    ~timeout
+                    (fun () ->
+                       let%bind () =
+                         match
+                           ( chosen
+                           , Codec.Session_config.option
+                               config
+                               ~category:"model" )
+                         with
+                         | ( Some model
+                           , Some
+                               ({ value = Select { current; choices }; _ } as
+                                option) )
+                           when (not (String.equal current model))
+                                && List.exists
+                                     choices
+                                     ~f:
+                                       (fun
+                                         (c : Codec.Config_option.Choice.t) ->
+                                       String.equal c.value model) ->
+                           let%map () =
+                             set_option t ~what:"the model" option model
+                           in
+                           t.model <- Some model
+                         | _ -> Ok ()
+                       in
+                       (match Thought.lowest (Codec.session_config t.codec) with
+                        | Some (option, value) ->
+                          ignore
+                            (set_option
+                               t
+                               ~what:"the thinking level"
+                               option
+                               value
+                             : unit Or_error.t)
+                        | None -> ());
+                       Ok ())
+                in
+                let reported_model =
+                  Option.first_some
+                    t.model
+                    (Option.first_some chosen t.agent_default)
+                  |> Option.map ~f:(fun m ->
+                    External_model.name ~adapter:id (Some m))
+                in
+                let text =
+                  External_complete.combine_prompt
+                    ~system:input.system
+                    ~prompt:input.prompt
+                in
+                let%bind outputs = Codec.prompt t.codec [ Text text ] in
+                Adapter.Driver.begin_turn t.driver;
+                List.iter outputs ~f:(dispatch t);
+                External_complete.drive
+                  ~timeout
+                  ?on_delta
+                  ~cancel
+                  ~next_event:(fun () -> next_event t)
+                  ~interrupt:(fun () ->
+                    if Adapter.Driver.in_turn t.driver
+                    then List.iter (Codec.cancel t.codec) ~f:(dispatch t))
+                  ~reply_approval:(fun ~request_id reply ->
+                    Option.iter
+                      (Codec.reply_approval t.codec ~request_id reply)
+                      ~f:(Adapter.Driver.write t.driver))
+                  ~answer:(fun ~request_id reply ->
+                    Option.iter
+                      (Codec.answer t.codec ~request_id reply)
+                      ~f:(Adapter.Driver.write t.driver))
+                  ~model:reported_model
+                  ())))
     ;;
 
     (* Its compact command, as a prompt. Not with [instructions]: Antigravity

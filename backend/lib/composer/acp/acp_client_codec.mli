@@ -177,6 +177,7 @@ module Response : sig
         ; session_id : string
         ; config : Session_config.t
         }
+    | Session_closed
     | Mode_set of string
     | Config_set of Config_option.t list
     | Failed of
@@ -232,8 +233,12 @@ val resume_session
   -> string
 
 (** [session/close] (when {!Agent_capabilities.t.close_session}): closes a
-    session without stopping the agent process. *)
-val close_session : t -> session_id:string -> string
+    specific session without stopping the agent process. *)
+val close_session_for : t -> session_id:string -> string
+
+(** [session/close] when the agent advertised [sessionCapabilities.close] and a
+    session is open; [None] otherwise. *)
+val close_session : t -> string option
 
 (** Starts a turn: the request's line, then [Turn_started]. Errors without a
     session, while a turn runs, or with images the agent does not take. *)

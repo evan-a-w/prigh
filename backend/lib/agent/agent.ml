@@ -206,6 +206,27 @@ module Run = struct
     }
 end
 
+module Completion = struct
+  type t =
+    { text : string
+    ; model : string
+    ; cost_usd : float
+    }
+  [@@deriving sexp_of]
+end
+
+module External_complete_fn = struct
+  type t =
+    adapter:Adapter_id.t
+    -> model:string option
+    -> system:string
+    -> prompt:string
+    -> cwd:string
+    -> cancel:Cancellation.t
+    -> on_delta:(string -> unit)
+    -> Adapter.Completion.t Or_error.t
+end
+
 module Resume = struct
   type t =
     { at : float
@@ -219,6 +240,9 @@ type t =
   ; provider : Provider.t
   ; mutable runner : Runner.t option
     (** the session's engine when it is not the harness on [provider] *)
+  ; mutable external_complete : External_complete_fn.t option
+  ; mutable direct_available : Model.t -> bool
+  ; mutable known_adapter : Adapter_id.t -> bool
   ; mutable unavailable : string option
   ; accounts : Provider_id.t -> Login_choice.t list
   ; provider_configured : Provider_id.t -> bool
@@ -690,6 +714,75 @@ let engine_choice t =
   Session.engine t.session
   |> Result.ok
   |> Option.value ~default:Engine_choice.harness
+;;
+
+let default_known_adapter : Adapter_id.t -> bool = function
+  | Codex | Claude -> true
+  | Acp name -> Option.is_some (Acp_agent.find_known name)
+  | Prigh -> false
+;;
+
+(* The session's active external harness adapter, if any. *)
+let active_external_adapter t : Adapter_id.t option =
+  match engine_choice t with
+  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as adapter) }
+    -> Some adapter
+  | _ ->
+    (match t.model.provider with
+     | Custom a ->
+       (match Adapter_id.of_string a with
+        | Ok ((Codex | Claude | Acp _) as adapter) -> Some adapter
+        | Ok Prigh | Error _ -> None)
+     | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity -> None)
+;;
+
+(* The session's default model for naming and drafting: on an external harness
+   with no direct HTTP provider configured, route to the session's active
+   external engine (letting it pick a fast model). *)
+let session_aux_model t =
+  match active_external_adapter t with
+  | Some adapter
+    when Option.is_some t.external_complete
+         && not (t.direct_available t.harness_model) ->
+    External_model.model
+      ~adapter:(Adapter_id.to_string adapter)
+      External_model.default_id
+  | _ -> aux_model t
+;;
+
+(* Resolves a [naming_model] / [generate_model] spec: accepts valid external
+   harness models ([acp:antigravity/...], [codex/...], [claude/...]) as well as
+   registry models. *)
+let resolve_aux_model t name =
+  match External_model.parse_spec name with
+  | None -> Model_registry.resolve t.models name
+  | Some (Error _ as e) -> e
+  | Some (Ok (adapter, id)) ->
+    if not (t.known_adapter adapter)
+    then (
+      match adapter with
+      | Acp a -> Or_error.error_string (Engines.unknown_acp a)
+      | Codex | Claude | Prigh ->
+        Or_error.errorf "unknown adapter %S" (Adapter_id.to_string adapter))
+    else (
+      let adapter_name = Adapter_id.to_string adapter in
+      if String.equal id External_model.default_id
+      then
+        Ok
+          (External_model.model ~adapter:adapter_name External_model.default_id)
+      else (
+        let known_models =
+          match active_external_adapter t with
+          | Some active when Adapter_id.equal active adapter ->
+            Option.bind t.runner ~f:Runner.models
+          | Some _ | None -> None
+        in
+        match
+          External_model.resolve ~adapter:adapter_name ~models:known_models id
+        with
+        | Error _ as e -> e
+        | Ok resolved_id ->
+          Ok (External_model.model ~adapter:adapter_name resolved_id)))
 ;;
 
 (* A session that cannot run here (its engine is not deployed) can only be
@@ -1238,7 +1331,7 @@ let set_config ?(session_mode = true) t (config : Config.t) =
     match config.generate_model with
     | None -> Ok None
     | Some name ->
-      Model_registry.resolve t.models name
+      resolve_aux_model t name
       |> Or_error.map ~f:(fun m -> Some (Model.key m))
       |> Result.map_error ~f:(fun e ->
         Error.createf "generate_model: %s" (Error.to_string_hum e))
@@ -1256,7 +1349,7 @@ let set_config ?(session_mode = true) t (config : Config.t) =
     match config.naming_model with
     | None -> Ok None
     | Some name ->
-      Model_registry.resolve t.models name
+      resolve_aux_model t name
       |> Or_error.map ~f:(fun m -> Some (Model.key m))
       |> Result.map_error ~f:(fun e ->
         Error.createf "naming_model: %s" (Error.to_string_hum e))
@@ -3832,9 +3925,9 @@ let run_failed t ~resolve exn =
    models a hand-over chain has used so far (empty for a user's prompt). *)
 let generate_model t =
   match t.config.generate_model with
-  | None -> Ok (aux_model t)
+  | None -> Ok (session_aux_model t)
   | Some name ->
-    Model_registry.resolve t.models name
+    resolve_aux_model t name
     |> Result.map_error ~f:(fun e ->
       Error.createf
         "generate_model: %s (fix it with /generate-model or in config.json)"
@@ -3845,29 +3938,153 @@ let naming_model t =
   match t.config.naming_model with
   | None -> generate_model t
   | Some name ->
-    Model_registry.resolve t.models name
+    resolve_aux_model t name
     |> Result.map_error ~f:(fun e ->
       Error.createf
         "naming_model: %s (fix it with /naming model or in config.json)"
         (Error.to_string_hum e))
 ;;
 
+(* Unified one-shot completion over direct HTTP providers and external harness
+   adapters, shared by [complete], [auto_describe], and [name_subagent]. *)
+let complete_raw
+      t
+      ~model
+      ~allow_external_fallback
+      ~system
+      ~user
+      ~max_tokens
+      ~cancel
+      ~on_delta
+  =
+  let run_external ~adapter ~native_model ~fallback_key =
+    match t.external_complete with
+    | None ->
+      Error
+        (`Error
+            (sprintf
+               "cannot complete with %s: external harnesses are not configured \
+                here"
+               fallback_key))
+    | Some external_complete ->
+      (match
+         external_complete
+           ~adapter
+           ~model:native_model
+           ~system
+           ~prompt:user
+           ~cwd:t.cwd
+           ~cancel
+           ~on_delta
+       with
+       | Ok { text; usage; cost_usd; model = used } ->
+         Ok (text, Option.value used ~default:fallback_key, usage, cost_usd)
+       | Error e ->
+         let msg = Error.to_string_hum e in
+         if Cancellation.is_cancelled cancel || String.equal msg "cancelled"
+         then Error `Aborted
+         else Error (`Error msg))
+  in
+  if is_external model
+  then (
+    match model.provider with
+    | Custom adapter_name ->
+      (match Adapter_id.of_string adapter_name with
+       | Ok ((Codex | Claude | Acp _) as adapter) ->
+         run_external
+           ~adapter
+           ~native_model:(External_model.native_id model)
+           ~fallback_key:(Model.key model)
+       | Ok Prigh | Error _ ->
+         Error (`Error (sprintf "unknown external adapter %S" adapter_name)))
+    | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity ->
+      Error (`Error (sprintf "not an external model: %s" (Model.key model))))
+  else (
+    let emitted = ref false in
+    let request =
+      { Provider.Request.model
+      ; system = Some system
+      ; messages = [ Message.user user ]
+      ; tools = []
+      ; thinking = Off
+      ; max_tokens = Some max_tokens
+      ; cache_key = None
+      ; account = None
+      }
+    in
+    let reply =
+      t.provider.stream request ~cancel ~on_event:(function
+        | Text_delta text ->
+          emitted := true;
+          on_delta text
+        | Thinking_delta _
+        | Thinking_signature _
+        | Tool_call_start _
+        | Tool_call_delta _
+        | Server_tool_use _
+        | Server_tool_result _ -> ())
+    in
+    match reply.stop_reason with
+    | Error e ->
+      (match
+         allow_external_fallback && not !emitted, active_external_adapter t
+       with
+       | true, Some adapter when Option.is_some t.external_complete ->
+         run_external
+           ~adapter
+           ~native_model:None
+           ~fallback_key:
+             (External_model.name ~adapter:(Adapter_id.to_string adapter) None)
+       | _ -> Error (`Error e))
+    | Aborted -> Error `Aborted
+    | End_turn | Tool_use | Length ->
+      Ok
+        ( Message.Assistant.text reply
+        , Model.key model
+        , reply.usage
+        , Model.cost_usd model reply.usage ))
+;;
+
+let complete_for_naming
+      t
+      ~model
+      ~allow_external_fallback
+      ~system
+      ~user
+      ~max_tokens
+      ~cancel
+  =
+  match
+    complete_raw
+      t
+      ~model
+      ~allow_external_fallback
+      ~system
+      ~user
+      ~max_tokens
+      ~cancel
+      ~on_delta:ignore
+  with
+  | Error _ as err -> err
+  | Ok (text, _used_model, _usage, _cost_usd) -> Ok text
+;;
+
 (* A naming model that is unknown or fails hands over to the session's, so
    that a name still comes; the notice says what to fix. *)
 let with_naming_model t ~f =
   let fix = "change it with /naming model, or /naming model off" in
-  let session_model = aux_model t in
+  let session_model = session_aux_model t in
   match naming_model t with
   | Error e ->
     broadcast
       t
       (Notice
          (sprintf "%s; named with the session's model" (Error.to_string_hum e)));
-    f session_model
+    f ~allow_external_fallback:true session_model
   | Ok model when String.equal (Model.key model) (Model.key session_model) ->
-    f model
+    f ~allow_external_fallback:true model
   | Ok model ->
-    (match f model with
+    (match f ~allow_external_fallback:false model with
      | Ok _ as ok -> ok
      | Error e ->
        broadcast
@@ -3878,12 +4095,17 @@ let with_naming_model t ~f =
                (Error.to_string_hum e)
                (Model.key model)
                fix));
-       f session_model)
+       f ~allow_external_fallback:true session_model)
 ;;
 
 let name_subagent t ~task ~siblings ~cancel =
-  with_naming_model t ~f:(fun model ->
-    Subagent_name.ask ~provider:t.provider ~model ~cancel ~task ~siblings ())
+  with_naming_model t ~f:(fun ~allow_external_fallback model ->
+    Subagent_name.ask_with
+      ~complete:(complete_for_naming t ~model ~allow_external_fallback)
+      ~cancel
+      ~task
+      ~siblings
+      ())
   |> Result.ok
 ;;
 
@@ -4485,8 +4707,10 @@ and auto_describe t =
     t.describing <- Some finished;
     Fiber.fork ~sw:t.sw (fun () ->
       Guarded.run ~what:"describing the session" (fun () ->
-        let describe model =
-          Session_description.describe ~provider:t.provider ~model session
+        let describe ~allow_external_fallback model =
+          Session_description.describe_with
+            ~complete:(complete_for_naming t ~model ~allow_external_fallback)
+            session
         in
         match with_naming_model t ~f:describe with
         | Ok _ -> if phys_equal session t.session then state_changed t
@@ -4699,6 +4923,9 @@ let create
       ?user_info
       ?custom_instructions
       ?runner
+      ?external_complete
+      ?(direct_available = fun _ -> true)
+      ?(known_adapter = default_known_adapter)
       ~cwd
       ()
   =
@@ -4757,6 +4984,9 @@ let create
     ; sw
     ; provider
     ; runner
+    ; external_complete
+    ; direct_available
+    ; known_adapter
     ; unavailable = None
     ; accounts
     ; provider_configured
@@ -5067,6 +5297,9 @@ let has_managed_subagent t ~agent_id =
 
 let set_subagent_engines t engines = t.subagent_engines <- engines
 let subagent_engines t = t.subagent_engines
+let set_external_complete t f = t.external_complete <- f
+let set_direct_available t f = t.direct_available <- f
+let set_known_adapter t f = t.known_adapter <- f
 
 let harness_model t =
   if t.provider_configured t.harness_model.provider
@@ -5809,39 +6042,33 @@ let btw t ~question ~cancel ~on_delta =
 
 let complete t ~model ~system ~user ~max_tokens ~cancel ~on_delta =
   let session = t.session in
-  let request =
-    { Provider.Request.model
-    ; system = Some system
-    ; messages = [ Message.user user ]
-    ; tools = []
-    ; thinking = Off
-    ; max_tokens = Some max_tokens
-    ; cache_key = None
-    ; account = None
-    }
+  let model_key = Model.key model in
+  let allow_external_fallback =
+    (not (is_external model))
+    && String.equal model_key (Model.key t.harness_model)
+    && (not
+          (Option.equal String.equal t.config.generate_model (Some model_key)))
+    && not (Option.equal String.equal t.config.naming_model (Some model_key))
   in
-  let reply =
-    t.provider.stream request ~cancel ~on_event:(function
-      | Text_delta text -> on_delta text
-      | Thinking_delta _
-      | Thinking_signature _
-      | Tool_call_start _
-      | Tool_call_delta _
-      | Server_tool_use _
-      | Server_tool_result _ -> ())
-  in
-  let cost_usd = Model.cost_usd model reply.usage in
-  ignore
-    (Session.add_spend session ~usage:reply.usage ~cost_usd : Session.Entry.t);
-  if phys_equal session t.session then state_changed t;
-  match reply.stop_reason with
-  | Error e -> Or_error.errorf "%s: %s" (Model.key model) e
-  | Aborted -> Or_error.error_string "cancelled"
-  | End_turn | Tool_use | Length ->
-    (match String.strip (Message.Assistant.text reply) with
-     | "" ->
-       Or_error.errorf "%s replied with nothing: try again" (Model.key model)
-     | text -> Ok (text, cost_usd))
+  match
+    complete_raw
+      t
+      ~model
+      ~allow_external_fallback
+      ~system
+      ~user
+      ~max_tokens
+      ~cancel
+      ~on_delta
+  with
+  | Error (`Error e) -> Or_error.errorf "%s: %s" (Model.key model) e
+  | Error `Aborted -> Or_error.error_string "cancelled"
+  | Ok (raw, used_model, usage, cost_usd) ->
+    ignore (Session.add_spend session ~usage ~cost_usd : Session.Entry.t);
+    if phys_equal session t.session then state_changed t;
+    (match String.strip raw with
+     | "" -> Or_error.errorf "%s replied with nothing: try again" used_model
+     | text -> Ok { Completion.text; model = used_model; cost_usd })
 ;;
 
 (* With [keep_host] (a new session or a fork) the session carries on where

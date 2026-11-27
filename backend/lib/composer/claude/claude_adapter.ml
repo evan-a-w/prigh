@@ -207,6 +207,34 @@ let launch (start : Adapter.Start.t) : Adapter.Launch.t =
   }
 ;;
 
+let launch_complete (start : Adapter.Start.t) : Adapter.Launch.t =
+  let login : Claude_login.Env.t =
+    match start.login with
+    | None -> { set = []; unset = []; secret = None }
+    | Some login -> Claude_login.env login ~refused:start.login_refused
+  in
+  let config : Claude_launch.t =
+    { Claude_launch.default with
+      model = start.model
+    ; permission_mode = Some Default
+    ; resume = New { session_id = None }
+    ; mcp_config = None
+    ; max_thinking_tokens = Some 0
+    ; effort = None
+    ; no_session_persistence = true
+    ; tools = Some ""
+    ; max_turns = Some 1
+    }
+  in
+  { argv = Claude_launch.argv config
+  ; env_set = Claude_launch.env_set @ login.set
+  ; env_unset = Claude_launch.env_unset @ login.unset
+  ; mcp = false
+  ; cwd = start.cwd
+  ; secret = login.secret
+  }
+;;
+
 let dispatch t (output : Claude_codec.Output.t) =
   match output with
   | Event e -> Adapter.Driver.push t.driver e
@@ -446,6 +474,97 @@ let send t settings (input : Adapter.Input.t) =
          ~images:input.images
          ());
     Ok ())
+;;
+
+let complete
+      ~sw:_
+      ?(timeout = External_complete.default_timeout)
+      ?request_timeout
+      ?on_delta
+      ~cancel
+      transport
+      (start : Adapter.Start.t)
+      (input : Adapter.Complete_input.t)
+  =
+  Switch.run (fun sw ->
+    Exn.protect
+      ~finally:(fun () -> Line_transport.stop transport)
+      ~f:(fun () ->
+        let open Or_error.Let_syntax in
+        let%bind t =
+          External_complete.with_cancel_timeout ~cancel ~timeout (fun () ->
+            open_process
+              ~sw
+              ?request_timeout
+              transport
+              { start with
+                resume = None
+              ; fork = false
+              ; mcp_servers = []
+              ; developer_instructions =
+                  Some (External_complete.system_with_no_tools input.system)
+              ; thinking = Off
+              ; approval = Ask
+              ; plan = false
+              })
+        in
+        Exn.protect
+          ~finally:(fun () -> Adapter.Driver.stop t.driver)
+          ~f:(fun () ->
+            let available =
+              if List.is_empty t.models then input.catalog_models else t.models
+            in
+            let chosen =
+              match input.model with
+              | Some req ->
+                let resolved =
+                  External_model.resolve
+                    ~adapter:id
+                    ~models:(Some available)
+                    req
+                  |> Result.ok
+                  |> Option.value ~default:req
+                in
+                Some resolved
+              | None ->
+                Option.first_some
+                  (External_complete.pick_fast_model t.models)
+                  (External_complete.pick_fast_model input.catalog_models)
+            in
+            let default_model =
+              List.find available ~f:(Fn.non External_model.is_placeholder)
+              |> Option.map ~f:(fun (m : Model.t) -> m.id)
+            in
+            let reported_model =
+              Option.first_some chosen default_model
+              |> Option.map ~f:(fun m ->
+                External_model.name ~adapter:id (Some m))
+            in
+            let settings : Adapter.Settings.t =
+              { model = chosen; thinking = Off; approval = Ask; plan = false }
+            in
+            let%bind () =
+              send t settings { text = input.prompt; images = [] }
+            in
+            External_complete.drive
+              ~timeout
+              ?on_delta
+              ~cancel
+              ~next_event:(fun () -> next_event t)
+              ~interrupt:(fun () ->
+                if Adapter.Driver.in_turn t.driver
+                then
+                  Adapter.Driver.write t.driver (Claude_codec.interrupt t.codec))
+              ~reply_approval:(fun ~request_id reply ->
+                Result.iter
+                  (Claude_codec.respond_approval t.codec ~request_id reply)
+                  ~f:(Adapter.Driver.write t.driver))
+              ~answer:(fun ~request_id reply ->
+                Result.iter
+                  (Claude_codec.answer t.codec ~request_id reply)
+                  ~f:(Adapter.Driver.write t.driver))
+              ~model:reported_model
+              ())))
 ;;
 
 (* A message sent mid-turn is queued as a turn of its own, whose events

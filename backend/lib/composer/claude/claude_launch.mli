@@ -33,6 +33,11 @@ type t =
   ; strict_mcp_config : bool
     (** only the [mcp_config] servers start, not the project's [.mcp.json]
         (default) *)
+  ; no_session_persistence : bool
+    (** [--no-session-persistence] for ephemeral one-shot completions *)
+  ; tools : string option
+    (** [--tools]: [Some ""] disables all built-in tools *)
+  ; max_turns : int option (** [--max-turns] *)
   }
 [@@deriving sexp_of]
 

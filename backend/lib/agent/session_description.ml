@@ -125,6 +125,24 @@ let conversation ?current messages =
   | Some title -> "\n\nCurrent title: " ^ title
 ;;
 
+let describe_with ~complete ?cancel session =
+  let user =
+    conversation
+      ?current:(Session.description session)
+      (Session.messages session)
+  in
+  Or_error.map
+    (Naming.ask_with
+       ~complete
+       ?cancel
+       ~what:"naming the session"
+       ~system:instructions
+       user)
+    ~f:(fun text ->
+      let (_ : Session.Entry.t) = Session.set_description session ~text in
+      text)
+;;
+
 let describe ~provider ~model ?cancel session =
   let user =
     conversation
