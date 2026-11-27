@@ -85,6 +85,10 @@ module Bridge : sig
       over its stdin: commands the CLI runs never see it. *)
   val create : prigh:string -> socket:string -> token:string -> t
 
+  (** A bridge whose token carries a per-session [route] ([token:route]) for
+      multiplexed servers sharing one host MCP socket. *)
+  val with_route : t -> route:string -> t
+
   (** [{command, args, env}]: the stdio server, as {!Adapter.Start.t}'s
       [mcp_servers] take it (named {!server_name}). *)
   val server_json : t -> Json.t

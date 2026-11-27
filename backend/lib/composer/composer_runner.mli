@@ -53,6 +53,11 @@ val create
   :  sw:Switch.t
   -> adapter:Adapter.t
   -> spawn:(Adapter.Launch.t -> Line_transport.t Or_error.t)
+  -> ?spawn_start:
+       (Adapter.Start.t -> Adapter.Launch.t -> Line_transport.t Or_error.t)
+       (** When provided, called instead of [spawn] with both [Start.t] and
+           [Launch.t] (e.g. to acquire a pooled server transport keyed by
+           login/sandbox metadata). *)
   -> ?start:(cwd:string -> Adapter.Start.t)
   -> ?interrupt_grace:Time_float.Span.t
   -> ?request_timeout:Time_float.Span.t

@@ -10,29 +10,51 @@ let exit_of (ended : Host_stream.Ended.t) : Line_transport.Exit.t =
     { code = None; stderr_tail = Host_stream.Ended.to_message ended }
 ;;
 
-(* The MCP side channel: what arrives before the tools are given waits for
-   them; each line is answered in a fiber of its own, until the process
-   ends. *)
+(* The MCP side channel: supports both legacy unrouted connections (which
+   wait for [serve]) and per-session routed connections (announced by [Open],
+   dispatched by route id without cross-talk). Each line is answered in a
+   fiber of its own, until the process ends. *)
 module Mcp_side = struct
   type t =
-    { lines : (int * string) Eio.Stream.t
+    { events : Host_stream.Mcp_event.t Eio.Stream.t
     ; tools : Injected_tools.t Promise.t
     ; set_tools : Injected_tools.t Promise.u
+    ; routes : Injected_tools.t String.Table.t
+    ; conn_route : string Int.Table.t
     }
 
   let create () =
     let tools, set_tools = Promise.create () in
-    { lines = Eio.Stream.create Int.max_value; tools; set_tools }
+    { events = Eio.Stream.create Int.max_value
+    ; tools
+    ; set_tools
+    ; routes = String.Table.create ()
+    ; conn_route = Int.Table.create ()
+    }
   ;;
 
-  let on_mcp t : Host_stream.Mcp_event.t -> unit = function
-    | Line { conn; line } -> Eio.Stream.add t.lines (conn, line)
-    | Closed _ -> ()
-  ;;
+  let on_mcp t event = Eio.Stream.add t.events event
 
   let serve t injected =
     if not (Promise.is_resolved t.tools)
     then Promise.resolve t.set_tools injected
+  ;;
+
+  let register_route t ~stream ~base_bridge route injected =
+    Hashtbl.set t.routes ~key:route ~data:injected;
+    let bridge = Injected_tools.Bridge.with_route base_bridge ~route in
+    let release () =
+      Hashtbl.remove t.routes route;
+      let to_close =
+        Hashtbl.fold t.conn_route ~init:[] ~f:(fun ~key:conn ~data:r acc ->
+          if String.equal r route then conn :: acc else acc)
+      in
+      (* Keep [conn_route] until [Closed conn] arrives so any [Line] already
+         queued on [t.events] still sees the closed route instead of falling
+         through to the legacy unrouted handler. *)
+      List.iter to_close ~f:(fun conn -> Host_stream.mcp_close stream ~conn)
+    in
+    bridge, release
   ;;
 
   let run t ~sw stream =
@@ -42,17 +64,43 @@ module Mcp_side = struct
            ignore
              (Promise.await (Host_stream.ended stream) : Host_stream.Ended.t))
         (fun () ->
-           let injected = Promise.await t.tools in
-           let rec loop () =
-             let conn, line = Eio.Stream.take t.lines in
+           let dispatch ~conn injected line =
              Fiber.fork ~sw (fun () ->
                Option.iter
                  (Injected_tools.handle_line injected line)
                  ~f:(fun reply ->
                    ignore
                      (Host_stream.mcp_write stream ~conn reply
-                      : unit Or_error.t)));
-             loop ()
+                      : unit Or_error.t)))
+           in
+           let rec loop () =
+             match Eio.Stream.take t.events with
+             | Open { conn; route } ->
+               Hashtbl.set t.conn_route ~key:conn ~data:route;
+               if not (Hashtbl.mem t.routes route)
+               then Host_stream.mcp_close stream ~conn;
+               loop ()
+             | Closed conn ->
+               Hashtbl.remove t.conn_route conn;
+               loop ()
+             | Line { conn; line } ->
+               (match Hashtbl.find t.conn_route conn with
+                | Some route ->
+                  (match Hashtbl.find t.routes route with
+                   | Some injected -> dispatch ~conn injected line
+                   | None ->
+                     (* Closed or unknown session route: never cross-talk. *)
+                     Host_stream.mcp_close stream ~conn)
+                | None ->
+                  Fiber.fork ~sw (fun () ->
+                    let injected = Promise.await t.tools in
+                    Option.iter
+                      (Injected_tools.handle_line injected line)
+                      ~f:(fun reply ->
+                        ignore
+                          (Host_stream.mcp_write stream ~conn reply
+                           : unit Or_error.t))));
+               loop ()
            in
            loop ()))
   ;;
@@ -137,11 +185,15 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
       match side, started.mcp_socket, started.mcp_token with
       | Some side, Some socket, Some token ->
         Mcp_side.run side ~sw s;
-        Some
-          { Line_transport.Mcp.bridge =
-              Injected_tools.Bridge.create ~prigh:started.prigh ~socket ~token
-          ; serve = Mcp_side.serve side
-          }
+        let bridge =
+          Injected_tools.Bridge.create ~prigh:started.prigh ~socket ~token
+        in
+        let route =
+          if started.mcp_routes
+          then Some (Mcp_side.register_route side ~stream:s ~base_bridge:bridge)
+          else None
+        in
+        Some { Line_transport.Mcp.bridge; serve = Mcp_side.serve side; route }
       | _ -> None
     in
     Ok

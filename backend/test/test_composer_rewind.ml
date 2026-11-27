@@ -410,7 +410,6 @@ let%expect_test "codex: rewinding puts the files back and reverts its thread" =
   show_turns s;
   [%expect
     {|
-    spawn codex app-server
     codex: thread/resume codex-thread
     codex: thread/revert codex-thread before tu-2
     codex got: "again"
@@ -426,7 +425,6 @@ let%expect_test "codex: rewinding puts the files back and reverts its thread" =
     ok
     ./a.txt: one
     ./b.txt: bee
-    spawn codex app-server
     codex: thread/resume codex-thread
     codex: thread/revert codex-thread before tu-1
     codex got: "from the start"
@@ -561,7 +559,6 @@ let%expect_test "codex: a fork forks its thread at the turn" =
     codex got: "first"
     codex got: "second"
     ok
-    spawn codex app-server
     codex: thread/fork codex-thread at tu-1
     codex got: "in the fork"
     external turn codex-thread tu-1, files not checkpointed

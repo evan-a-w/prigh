@@ -1553,6 +1553,7 @@ let%expect_test
     Eio.Promise.await p
   in
   let wake_peer, trigger_wake = Eio.Promise.create () in
+  let thread_closed, mark_thread_closed = Eio.Promise.create () in
   let peer_stopped, mark_peer_stopped = Eio.Promise.create () in
   let engines =
     Or_error.ok_exn
@@ -1650,7 +1651,17 @@ let%expect_test
                ];
              let rec drain () =
                match Line_transport.Peer.read_line p with
-               | Some _ -> drain ()
+               | Some line ->
+                 (match Json.parse line with
+                  | Ok j
+                    when Option.equal
+                           String.equal
+                           (Option.bind (Json.member "method" j) ~f:Json.string)
+                           (Some "thread/unsubscribe") ->
+                    ignore
+                      (Eio.Promise.try_resolve mark_thread_closed () : bool)
+                  | _ -> ());
+                 drain ()
                | None ->
                  ignore (Eio.Promise.try_resolve mark_peer_stopped () : bool)
              in
@@ -1718,22 +1729,28 @@ let%expect_test
     "after reconnect + stale timer: live=%b stopped=%b\n"
     (Agent.external_live agent)
     (Eio.Promise.is_resolved peer_stopped);
-  (* Disconnecting again and letting the new grace period elapse evicts it. *)
+  (* Disconnecting again and letting the new grace period elapse evicts the
+     session (unsubscribing the thread while the pooled server stays warm)
+     and shutdown stops the physical server. *)
   Rpc_server.disconnect server client2;
   Eio.Fiber.yield ();
   Eio.Promise.resolve (Queue.dequeue_exn sleeps) ();
-  Eio.Promise.await peer_stopped;
+  Eio.Promise.await thread_closed;
   printf
-    "after grace elapsed: live=%b stopped=%b\n"
+    "after grace elapsed: live=%b unsubscribed=%b stopped=%b\n"
     (Agent.external_live agent)
+    (Eio.Promise.is_resolved thread_closed)
     (Eio.Promise.is_resolved peer_stopped);
   Rpc_server.shutdown server;
+  Eio.Promise.await peer_stopped;
+  printf "after shutdown: stopped=%b\n" (Eio.Promise.is_resolved peer_stopped);
   [%expect
     {|
     after disconnect: live=true stopped=false timers=1
     after wakeup + stale timer: live=true stopped=false messages=3
     after reconnect + stale timer: live=true stopped=false
-    after grace elapsed: live=false stopped=true
+    after grace elapsed: live=false unsubscribed=true stopped=false
+    after shutdown: stopped=true
     |}]
 ;;
 

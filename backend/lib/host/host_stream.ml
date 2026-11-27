@@ -75,6 +75,7 @@ module Started = struct
     ; prigh : string
     ; mcp_socket : string option
     ; mcp_token : string option
+    ; mcp_routes : bool
     ; secret : bool
     }
   [@@deriving sexp_of]
@@ -82,6 +83,10 @@ end
 
 module Mcp_event = struct
   type t =
+    | Open of
+        { conn : int
+        ; route : string
+        }
     | Line of
         { conn : int
         ; line : string
@@ -213,12 +218,16 @@ let start
   let frame line =
     match Host_process.Up.of_line line with
     | Error e -> break (Error.to_string_hum e)
-    | Ok (Started { pid; path = _; prigh; mcp_socket; mcp_token; secret }) ->
+    | Ok
+        (Started
+           { pid; path = _; prigh; mcp_socket; mcp_token; mcp_routes; secret })
+      ->
       if not (Promise.is_resolved started)
       then
         Promise.resolve
           started_resolver
-          (Ok { Started.pid; prigh; mcp_socket; mcp_token; secret })
+          (Ok { Started.pid; prigh; mcp_socket; mcp_token; mcp_routes; secret })
+    | Ok (Mcp_open { conn; route }) -> on_mcp (Mcp_event.Open { conn; route })
     | Ok (Mcp { conn; line }) -> on_mcp (Mcp_event.Line { conn; line })
     | Ok (Mcp_closed conn) -> on_mcp (Mcp_event.Closed conn)
     | Ok (Out { seq; line }) ->

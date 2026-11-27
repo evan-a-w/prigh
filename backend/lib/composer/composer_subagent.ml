@@ -32,6 +32,7 @@ let create
       ~add_spend
       ~notice
       ~spawn
+      ?spawn_start
       ?(on_start = fun ~host:_ ~adapter:_ _ _ -> ())
       ?(login = fun ~adapter:_ -> None)
       ?(no_sandbox = fun ~host:_ ~host_name:_ ~cwd:_ _ -> None)
@@ -119,6 +120,9 @@ let create
           ~adapter
           ~spawn:(fun launch ->
             spawn ~sw ~host:host_id ~host_name ~adapter:adapter_id launch)
+          ?spawn_start:
+            (Option.map spawn_start ~f:(fun f start launch ->
+               f ~sw ~host:host_id ~host_name ~adapter:adapter_id start launch))
           ~start
           ?interrupt_grace
           ?request_timeout

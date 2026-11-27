@@ -24,6 +24,14 @@ val create
         -> adapter:Adapter_id.t
         -> Adapter.Launch.t
         -> Line_transport.t Or_error.t)
+  -> ?spawn_start:
+       (sw:Switch.t
+        -> host:string
+        -> host_name:string
+        -> adapter:Adapter_id.t
+        -> Adapter.Start.t
+        -> Adapter.Launch.t
+        -> Line_transport.t Or_error.t)
   -> ?on_start:
        (host:string
         -> adapter:Adapter_id.t

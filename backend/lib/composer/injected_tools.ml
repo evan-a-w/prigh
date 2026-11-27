@@ -231,6 +231,16 @@ module Bridge = struct
     }
   ;;
 
+  let with_route t ~route =
+    { t with
+      env =
+        List.map t.env ~f:(fun (k, v) ->
+          if String.equal k Mcp_bridge.token_env
+          then k, v ^ ":" ^ route
+          else k, v)
+    }
+  ;;
+
   let server_json t =
     `Object
       [ "command", `String t.command
