@@ -8,6 +8,18 @@ val enable : string
 val disable : string
 
 (** The input without the focus reports, and those reports in order ([true]:
-    focused). A report split across two reads is not recognised; terminals
-    write each in one piece. *)
+    focused). *)
 val split : string -> string * bool list
+
+(** Stateful filter for streaming reads: buffers a trailing incomplete CSI
+    focus prefix (["\027"] or ["\027["]) so reports split across two reads are
+    still recognised. *)
+type t
+
+val create : unit -> t
+val feed : t -> string -> string * bool list
+val has_pending : t -> bool
+
+(** Emits and clears any buffered escape prefix (e.g. a standalone Esc key
+    after a short timeout, or on EOF). *)
+val flush : t -> string

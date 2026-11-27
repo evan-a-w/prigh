@@ -5,15 +5,26 @@ let find_backend () =
   match Sys.getenv "PRIGH_BACKEND" with
   | Some path -> path
   | None ->
-    let exe = Core_unix.readlink "/proc/self/exe" in
-    let candidates =
-      List.map
-        [ "../../../../../backend/_build/default/bin/main.exe"
-        ; "../../backend/_build/default/bin/main.exe"
-        ]
-        ~f:(fun rel -> Filename.concat (Filename.dirname exe) rel)
+    let exe =
+      try Some (Core_unix.readlink "/proc/self/exe") with
+      | Core_unix.Unix_error _ ->
+        (try Some (Filename_unix.realpath Sys_unix.executable_name) with
+         | Core_unix.Unix_error _ -> None)
     in
-    List.find candidates ~f:Sys_unix.file_exists_exn
+    let candidates =
+      match exe with
+      | None -> []
+      | Some exe ->
+        List.map
+          [ "../../../../../backend/_build/default/bin/main.exe"
+          ; "../../backend/_build/default/bin/main.exe"
+          ]
+          ~f:(fun rel -> Filename.concat (Filename.dirname exe) rel)
+    in
+    List.find candidates ~f:(fun path ->
+      match Sys_unix.file_exists path with
+      | `Yes -> true
+      | `No | `Unknown -> false)
     |> Option.value ~default:"prigh"
 ;;
 

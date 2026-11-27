@@ -105,7 +105,9 @@ end
 module Connected = struct
   type t =
     { remote : Backend_address.t
+    ; credentials : Web_connect.Credentials.t
     ; relay : Relay.t option (** [None] under [Ui.Remote] *)
+    ; stop_tool_host : (unit -> unit) option
     }
 end
 
@@ -195,6 +197,42 @@ let remote_page ?(here = false) t (remote : Backend_address.t) =
   }
 ;;
 
+let start_tool_host t ~remote ~credentials =
+  match t.config.tools with
+  | Remote -> None
+  | Local ->
+    let stop, trigger_stop = Promise.create () in
+    Fiber.fork ~sw:t.sw (fun () ->
+      Switch.run (fun tool_sw ->
+        Fiber.first
+          (fun () -> Promise.await stop)
+          (fun () ->
+             match
+               Web_connect.start_tool_host
+                 ~env:t.env
+                 ~sw:tool_sw
+                 ~log:t.log
+                 ~wait:t.tool_host_wait
+                 { remote
+                 ; credentials
+                 ; name = t.config.name
+                 ; host_id = t.config.host_id
+                 ; cwd = t.config.cwd
+                 ; computer = t.config.computer
+                 }
+             with
+             | `Connected ->
+               t.log (sprintf "tools run on this machine, in %s" t.config.cwd);
+               Promise.await stop
+             | `Connecting ->
+               t.log
+                 "the tool host is still connecting: tools run on this machine \
+                  once it is";
+               Promise.await stop
+             | `Refused _ -> ())));
+    Some (fun () -> ignore (Promise.try_resolve trigger_stop () : bool))
+;;
+
 (* The page continues signed in at once; the tool host connects in a fiber
    of its own, said in the log once it has (or after [tool_host_wait]), and
    the page picks it up as any host that appears. Without [tool_host] (it would not get past the
@@ -211,37 +249,20 @@ let connected
     | Ok () -> ()
     | Error e ->
       t.log (sprintf "cannot save the connection: %s" (Error.to_string_hum e)));
-  (match t.config.tools with
-   | Remote -> t.log "tools run on the backend (-tools remote)"
-   | Local when not tool_host ->
-     t.log
-       (sprintf
-          "tools cannot run on this machine: its tool host needs the sign-in \
-           to %s too (sign in with the browser for that)"
-          (site remote))
-   | Local ->
-     Fiber.fork ~sw:t.sw (fun () ->
-       match
-         Web_connect.start_tool_host
-           ~env:t.env
-           ~sw:t.sw
-           ~log:t.log
-           ~wait:t.tool_host_wait
-           { remote
-           ; credentials
-           ; name = t.config.name
-           ; host_id = t.config.host_id
-           ; cwd = t.config.cwd
-           ; computer = t.config.computer
-           }
-       with
-       | `Connected ->
-         t.log (sprintf "tools run on this machine, in %s" t.config.cwd)
-       | `Connecting ->
-         t.log
-           "the tool host is still connecting: tools run on this machine once \
-            it is"
-       | `Refused _ -> ()));
+  let stop_tool_host =
+    match t.config.tools with
+    | Remote ->
+      t.log "tools run on the backend (-tools remote)";
+      None
+    | Local when not tool_host ->
+      t.log
+        (sprintf
+           "tools cannot run on this machine: its tool host needs the sign-in \
+            to %s too (sign in with the browser for that)"
+           (site remote));
+      None
+    | Local -> start_tool_host t ~remote ~credentials
+  in
   t.log (sprintf "connected to %s" (Backend_address.to_string remote));
   let relay =
     match t.config.ui with
@@ -259,7 +280,7 @@ let connected
         ; websockets = Web_proxy.websockets ~env:t.env ~log:t.log remote
         }
   in
-  { Connected.remote; relay }
+  { Connected.remote; credentials; relay; stop_tool_host }
 ;;
 
 (* Where the page goes once connected: signed in here, or the backend's. *)
@@ -467,7 +488,7 @@ let rec status t flow ~signin =
           ; "user", string_or_null user
           ; "error", string_or_null error
           ])
-  | Connected { remote; relay = Some { handoff; _ } } ->
+  | Connected { remote; relay = Some { handoff; _ }; _ } ->
     respond_json
       flow
       (`Object
@@ -526,8 +547,18 @@ let granted t (s : Signin.t) (grant : Browser_signin.Grant.t) =
   match s.pending with
   | Connected c ->
     let remote = Backend_address.with_proxy_cookie c.remote cookie in
+    let credentials : Web_connect.Credentials.t =
+      match c.credentials.token with
+      | Some _ -> c.credentials
+      | None ->
+        (match grant.token with
+         | Some _ -> { token = grant.token; user = grant.user }
+         | None -> c.credentials)
+    in
+    Option.iter c.stop_tool_host ~f:(fun stop -> stop ());
+    let stop_tool_host = start_tool_host t ~remote ~credentials in
     remember t remote grant;
-    signed_in_remote t { c with remote }
+    signed_in_remote t { c with remote; credentials; stop_tool_host }
   | Unchecked { remote; credentials; save } ->
     let remote = Backend_address.with_proxy_cookie remote cookie in
     let credentials : Web_connect.Credentials.t =
@@ -812,7 +843,7 @@ let routes t (request : Web_server.Request.t) =
   then Some (handle t)
   else (
     match t.state with
-    | Connected { remote; relay = Some { handoff; _ } } ->
+    | Connected { remote; relay = Some { handoff; _ }; _ } ->
       (match Signin_handoff.route handoff request with
        | Some handler -> Some handler
        | None -> Web_proxy.routes ~env:t.env ~log:t.log remote request)

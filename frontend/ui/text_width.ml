@@ -48,6 +48,28 @@ let take s ~width =
     go (uchars s) 0)
 ;;
 
+let chunks s ~width =
+  let width = Int.max 1 width in
+  let rec go text acc =
+    let head, rest = take text ~width in
+    if String.is_empty rest
+    then List.rev (head :: acc)
+    else if not (String.is_empty head)
+    then go rest (head :: acc)
+    else (
+      match uchars rest with
+      | [] -> List.rev ("" :: acc)
+      | (first, _) :: more ->
+        let combining, tail = List.split_while more ~f:(fun (_, w) -> w = 0) in
+        let piece = String.concat (first :: List.map combining ~f:fst) in
+        let rest = String.concat (List.map tail ~f:fst) in
+        if String.is_empty rest
+        then List.rev (piece :: acc)
+        else go rest (piece :: acc))
+  in
+  go s []
+;;
+
 let truncate ?(ellipsis = "…") s ~width =
   if string s <= width
   then s

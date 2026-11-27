@@ -447,12 +447,7 @@ let editor_row_count m =
   List.sum
     (module Int)
     (Editor.lines m.editor)
-    ~f:(fun line ->
-      let rec count text acc =
-        let _, rest = Text_width.take text ~width:inner in
-        if String.is_empty rest then acc + 1 else count rest (acc + 1)
-      in
-      count line 0)
+    ~f:(fun line -> List.length (Text_width.chunks line ~width:inner))
 ;;
 
 let layout m =
@@ -2830,11 +2825,28 @@ let reset_session m =
   ( follow
       { m with
         commit_draft = None
+      ; btw = None
       ; mode =
           (match m.mode with
-           | Output _ | Pr_form _
-           | Picker { kind = Pull_requests; _ }
-           | Confirm { action = Cd_to_checkout _; _ } -> Editing
+           | Output _ | Pr_form _ | Search _ | Confirm _
+           | Picker
+               { kind =
+                   ( Pull_requests
+                   | Fork _
+                   | Rewind _
+                   | Trim _
+                   | Trim_after _
+                   | Delete_message _
+                   | Tree _
+                   | Jobs
+                   | Skills
+                   | Snippets
+                   | Mcp _ )
+               ; _
+               }
+           | Text_prompt
+               { action = Name | Cd | Mkdir | Export_path | Import_path; _ } ->
+             Editing
            | mode -> mode)
       ; notice = None
       ; skills = Location_cache.empty
@@ -5903,7 +5915,18 @@ let search m (intent : Intent.t) =
      | Down | Submit -> move 1
      | Up -> move (-1)
      | Insert s -> recompute (query ^ s), []
-     | Backspace -> recompute (String.drop_suffix query 1), []
+     | Backspace ->
+       let drop_last_char s =
+         let rec back i =
+           if i > 0 && Char.to_int s.[i] land 0xC0 = 0x80
+           then back (i - 1)
+           else i
+         in
+         if String.is_empty s
+         then s
+         else String.prefix s (back (String.length s - 1))
+       in
+       recompute (drop_last_char query), []
      | _ -> m, [])
   | _ -> m, []
 ;;
@@ -6347,7 +6370,8 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   | Mcp list -> mcp_selected m list item.id
   | Engines { switch } -> engine_chosen m ~switch item.id
   | Auth_select id ->
-    m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
+    ( { m with mode = Editing }
+    , [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ] )
   | Adapter_login adapter ->
     ( notice m "changing the login…"
     , [ call
@@ -7303,7 +7327,7 @@ let auth_event m (e : P.Auth_event.t) =
       Mode.is_dialog m.mode
       && not
            (match m.mode with
-            | Login_prompt _ -> true
+            | Login_prompt _ | Picker { kind = Auth_select _; _ } -> true
             | _ -> false)
     then
       ( warn
@@ -7368,7 +7392,8 @@ let auth_event m (e : P.Auth_event.t) =
   | Done { provider; method_; account = _ } ->
     let m =
       match m.mode with
-      | Login_prompt _ -> { m with mode = Editing }
+      | Login_prompt _ | Picker { kind = Auth_select _; _ } ->
+        { m with mode = Editing }
       | _ -> m
     in
     let m = { m with login_lines = [] } in
@@ -7386,7 +7411,8 @@ let auth_event m (e : P.Auth_event.t) =
   | Failed { provider; error = e } ->
     let m =
       match m.mode with
-      | Login_prompt _ -> { m with mode = Editing }
+      | Login_prompt _ | Picker { kind = Auth_select _; _ } ->
+        { m with mode = Editing }
       | _ -> m
     in
     let m = { m with login_lines = [] } in
@@ -7397,7 +7423,8 @@ let auth_event m (e : P.Auth_event.t) =
   | Forge_done { host; user; method_ } ->
     let m =
       match m.mode with
-      | Login_prompt _ -> { m with mode = Editing }
+      | Login_prompt _ | Picker { kind = Auth_select _; _ } ->
+        { m with mode = Editing }
       | _ -> m
     in
     let m = { m with login_lines = [] } in

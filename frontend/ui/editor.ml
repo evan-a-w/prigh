@@ -185,7 +185,7 @@ let set_text t text =
   }
 ;;
 
-let clear t = { (set_text t "") with history_index = None }
+let clear t = { (set_text t "") with history_index = None; pasted = [] }
 
 let replace_text t text =
   if is_empty t
@@ -563,7 +563,8 @@ let submit ?(secret = false) t =
       | last :: _ when String.equal last text -> t.history
       | _ -> text :: t.history)
   in
-  text, clear { t with history }
+  let next = { (set_text t "") with history; history_index = None } in
+  text, if secret then { next with pasted = [] } else next
 ;;
 
 let history_prev t =

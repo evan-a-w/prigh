@@ -24,6 +24,11 @@ pub const QUIT_URL: &str = "about:blank#prigh-desktop-quit";
 /// clicks a link on a page that quickly).
 pub const LOAD_SETTLE: Duration = Duration::from_millis(500);
 
+/// How long a pending navigation to prigh's site can stay unsettled before
+/// it is treated as stale (e.g. a download, 204 or aborted navigation that
+/// never fires a page-load event), so it cannot hijack later external links.
+pub const PENDING_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// Whatever a site does, a window cannot open it in the default browser
 /// tab after tab: at most [OPEN_BURST] times within this.
 pub const OPEN_GAP: Duration = Duration::from_secs(5);
@@ -123,6 +128,14 @@ pub struct Window {
     /// [LOAD_SETTLE] after that, it is loaded (the window may say so
     /// early, as the navigation starts).
     pending_loaded: Option<Instant>,
+    /// When the pending navigation started in `on_navigation`, for
+    /// [PENDING_TIMEOUT] and concurrent duplicate-navigation deduplication.
+    pending_at: Option<Instant>,
+    /// Whether `on_navigation` has already allowed the current `pending` URL.
+    pending_seen: bool,
+    /// The last URL on one of prigh's sites that finished loading, used to
+    /// recognise same-document `#fragment` navigations.
+    loaded_url: Option<String>,
     /// Signing in on this site, until it is back on prigh's.
     away: Option<String>,
     /// When it went from page to page while away, lately.
@@ -138,7 +151,30 @@ pub struct Window {
     guard: OpenGuard,
 }
 
+/// Whether `next` only sets or changes the `#fragment` of `current`:
+/// same-document navigations never fire a page-load event.
+fn is_fragment_navigation(current: &str, next: &str) -> bool {
+    let Some((next_base, _)) = next.split_once('#') else { return false };
+    let cur_base = current.split('#').next().unwrap_or(current);
+    cur_base == next_base
+}
+
 impl Window {
+    fn clear_pending(&mut self) {
+        self.pending = None;
+        self.pending_loaded = None;
+        self.pending_at = None;
+        self.pending_seen = false;
+    }
+
+    fn settle_pending(&mut self, now: Instant) {
+        let settled = self.pending_loaded.is_some_and(|at| now.saturating_duration_since(at) >= LOAD_SETTLE);
+        let stale = self.pending_at.is_some_and(|at| now.saturating_duration_since(at) >= PENDING_TIMEOUT);
+        if settled || stale {
+            self.clear_pending();
+        }
+    }
+
     /// The user chose to sign in in the window (the sidecar's page said).
     pub fn sign_in_here(&mut self) {
         self.here = true;
@@ -148,6 +184,21 @@ impl Window {
     pub fn loading(&mut self, url: &str) {
         self.pending = Some(url.to_string());
         self.pending_loaded = None;
+        self.pending_at = None;
+        self.pending_seen = false;
+    }
+
+    /// Whether the window is currently loading `url` (not yet loaded).
+    pub fn is_loading(&self, url: &str) -> bool {
+        self.pending.as_deref() == Some(url) && self.pending_loaded.is_none()
+    }
+
+    /// A download started for `url`: it is not a page load, so any pending
+    /// navigation to it will never finish loading.
+    pub fn on_download(&mut self, url: &str) {
+        if self.pending.as_deref().is_some_and(|p| p == url || (origin(p).is_some() && origin(p) == origin(url))) {
+            self.clear_pending();
+        }
     }
 
     /// The site's cookies are the window's now.
@@ -162,7 +213,24 @@ impl Window {
             Decision::Block => Step::Refuse(Some(format!("refused to navigate to {url}"))),
             Decision::Allow => {
                 if origin(url).is_some_and(|o| ours.contains(&o)) {
+                    self.settle_pending(now);
+                    if self.pending.is_none()
+                        && self.loaded_url.as_deref().is_some_and(|cur| is_fragment_navigation(cur, url))
+                    {
+                        self.loaded_url = Some(url.to_string());
+                        return Step::Allow;
+                    }
+                    if self.away.is_none()
+                        && self.pending_seen
+                        && self.pending_loaded.is_none()
+                        && self.pending.as_deref() == Some(url)
+                        && self.pending_at.is_some_and(|at| now.saturating_duration_since(at) < LOAD_SETTLE)
+                    {
+                        return Step::Refuse(None);
+                    }
                     self.loading(url);
+                    self.pending_at = Some(now);
+                    self.pending_seen = true;
                 }
                 Step::Allow
             }
@@ -175,7 +243,7 @@ impl Window {
                     Some(url) if self.hops.len() >= crate::devtools::ROUND_HOPS => {
                         self.hops.clear();
                         self.away = None;
-                        self.pending = None;
+                        self.clear_pending();
                         Step::SignIn { url }
                     }
                     _ => Step::Allow,
@@ -183,9 +251,7 @@ impl Window {
             }
             Decision::External => {
                 let site = origin(url).unwrap_or_else(|| url.to_string());
-                if self.pending_loaded.is_some_and(|at| now.saturating_duration_since(at) >= LOAD_SETTLE) {
-                    self.pending = None;
-                }
+                self.settle_pending(now);
                 let Some(pending) = self.pending.clone() else {
                     return match self.guard.check("", url, now) {
                         Ok(()) => Step::Open(url.to_string()),
@@ -200,10 +266,11 @@ impl Window {
                             && !r.cookies.is_empty() =>
                     {
                         self.cookies_given = Some(r.cookies.clone());
+                        self.pending_seen = false;
                         Step::Cookies { url: pending }
                     }
                     Some(Remote { signin_page: Some(page), .. }) if !self.here => {
-                        self.pending = None;
+                        self.clear_pending();
                         Step::SignIn { url: page.clone() }
                     }
                     _ => {
@@ -229,6 +296,7 @@ impl Window {
         if !ours.contains(&o) {
             return None;
         }
+        self.loaded_url = Some(url.to_string());
         if remote.is_some_and(|r| origin(&r.url).as_ref() == Some(&o)) {
             self.here = false;
         }
@@ -567,5 +635,67 @@ mod tests {
         let r = remote(false);
         let out = walk(&mut w, Some(&r), &[(">https://ai.example.com/", 0), (">https://login.example.com/", 0)]);
         assert_eq!(out[1], "https://login.example.com/: SignIn { url: \"http://127.0.0.1:7780/#desktop=k&signin=1\" }");
+    }
+
+    #[test]
+    fn fragment_navigation_does_not_leave_pending_stuck() {
+        let mut w = Window::default();
+        let r = remote(false);
+        let out = walk(
+            &mut w,
+            Some(&r),
+            &[
+                (">https://ai.example.com/#app=desktop", 0),
+                ("=https://ai.example.com/#app=desktop", 0),
+                // Same-document fragment navigation never fires on_loaded.
+                (">https://ai.example.com/#section-2", 1),
+                (">https://github.com/evan-a-w/prigh", 1),
+            ],
+        );
+        assert_eq!(
+            out,
+            [
+                "https://ai.example.com/#app=desktop: Allow",
+                "loaded https://ai.example.com/#app=desktop: None",
+                "https://ai.example.com/#section-2: Allow",
+                "https://github.com/evan-a-w/prigh: Open(\"https://github.com/evan-a-w/prigh\")",
+            ]
+        );
+    }
+
+    #[test]
+    fn same_origin_download_does_not_leave_pending_stuck() {
+        let mut w = Window::default();
+        let r = remote(false);
+        assert_eq!(w.on_navigation(SITE, &ours(), Some(&r), at(0)), Step::Allow);
+        assert_eq!(w.on_loaded(SITE, &ours(), Some(&r), at(0)), None);
+        // Same-origin download triggers on_navigation, then on_download (never on_loaded).
+        let download_url = "https://ai.example.com/files/report.pdf";
+        assert_eq!(w.on_navigation(download_url, &ours(), Some(&r), at(1)), Step::Allow);
+        w.on_download(download_url);
+        assert_eq!(
+            w.on_navigation("https://github.com/evan-a-w/prigh", &ours(), Some(&r), at(1)),
+            Step::Open("https://github.com/evan-a-w/prigh".to_string())
+        );
+
+        // Even without on_download (e.g. an aborted navigation or 204), stale
+        // pending expires after PENDING_TIMEOUT and does not hijack later links.
+        assert_eq!(w.on_navigation("https://ai.example.com/empty", &ours(), Some(&r), at(2)), Step::Allow);
+        assert_eq!(
+            w.on_navigation("https://example.org/docs", &ours(), Some(&r), at(13)),
+            Step::Open("https://example.org/docs".to_string())
+        );
+    }
+
+    #[test]
+    fn duplicate_concurrent_navigation_is_deduplicated() {
+        let mut w = Window::default();
+        w.loading(SITE);
+        assert!(w.is_loading(SITE));
+        assert_eq!(w.on_navigation(SITE, &ours(), None, at(0)), Step::Allow);
+        // Concurrent second navigation to the same URL is ignored.
+        assert_eq!(w.on_navigation(SITE, &ours(), None, at(0)), Step::Refuse(None));
+        // After LOAD_SETTLE, an explicit reload is allowed again.
+        assert_eq!(w.on_navigation(SITE, &ours(), None, at(1)), Step::Allow);
     }
 }
