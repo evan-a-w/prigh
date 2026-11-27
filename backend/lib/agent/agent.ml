@@ -3840,11 +3840,28 @@ let resume_message =
      where it left off.]"
 ;;
 
-(* After a composer turn that left its agent's context past the compaction
-   threshold, between turns: an agent with a compact command is asked to
-   compact ([compact_turn]); one without is compacted by prigh. Codex and
-   Claude Code compact by themselves. A model whose window is unknown has no
-   threshold. Whether prigh summarised (a new thread follows). *)
+let composer_context_tokens t =
+  match fst (Runner.context (runner t)) with
+  | Some _ as tokens -> tokens
+  | None ->
+    (match Session.context_tokens t.session with
+     | 0 -> None
+     | n -> Some n)
+;;
+
+let composer_over_threshold t ~tokens =
+  let model = shown_model t in
+  Compaction_settings.should_compact
+    (compaction_settings t)
+    model
+    ~input_tokens:tokens
+;;
+
+(* Before or after a composer turn that left its agent's context past the
+   compaction threshold, between turns: an agent with a compact command is
+   asked to compact ([compact_turn]); one without is compacted by prigh.
+   Codex and Claude Code compact by themselves. Whether prigh summarised
+   (a new thread follows). *)
 let composer_auto_compact
       t
       ~(kind : Engine_intf.Turn.Kind.t)
@@ -3853,15 +3870,10 @@ let composer_auto_compact
       ~compact_turn
   =
   let over_threshold () =
-    match kind, last_stop added, fst (Runner.context (runner t)) with
+    match kind, last_stop added, composer_context_tokens t with
     | ( (Prompt | Autonomous)
       , (Some (End_turn | Length | Tool_use) | None)
-      , Some tokens ) ->
-      t.model.context_window > 0
-      && Compaction_settings.should_compact
-           (compaction_settings t)
-           t.model
-           ~input_tokens:tokens
+      , Some tokens ) -> composer_over_threshold t ~tokens
     | Compact _, _, _ | _, Some (Error _ | Aborted), _ | _, _, None -> false
   in
   match (capabilities t).compact with
@@ -4266,15 +4278,7 @@ and run_now ~kind ~tried ~then_ t prompts =
          Turn_timings.phase "mcp_refresh" (fun () ->
            refresh_mcp_for_run t ~cancel);
        let halted = ref None in
-       (* The prompts are in the session (and its file made) before the
-          system prompt is built: that asks the tool host, which may take
-          long to answer or never do. *)
-       let context = Session.messages session in
        broadcast t (Loop Agent_start);
-       List.iter prompts ~f:(fun m ->
-         ignore (Session.append_message session m : Session.Entry.t);
-         broadcast t (Loop (Message_start m));
-         broadcast t (Loop (Message_end m)));
        let recorded m = List.mem prompts m ~equal:phys_equal in
        let services : Engine_intf.Services.t =
          { env = t.env
@@ -4361,18 +4365,61 @@ and run_now ~kind ~tried ~then_ t prompts =
                | _ -> broadcast t (Loop event))
          }
        in
+       (* If an external harness is already past the compaction threshold
+          before this prompt (e.g. a prior auto-compaction failed on quota
+          or the threshold was lowered), compact first so this turn does not
+          run on an oversized context. *)
+       if
+         (not (own_loop t))
+         && phys_equal session t.session
+         && (not (Cancellation.is_cancelled cancel))
+         && not t.shutting_down
+       then
+         ignore
+           (composer_auto_compact
+              t
+              ~kind:
+                (match kind with
+                 | Prompt -> Prompt
+                 | Autonomous | Compact _ -> Compact { instructions = None })
+              ~added:[]
+              ~cancel
+              ~compact_turn:(fun () ->
+                ignore
+                  (Runner.run_turn
+                     (runner t)
+                     services
+                     ~cancel
+                     (turn_input
+                        t
+                        ~context:(Session.messages session)
+                        ~prompts:[]
+                        ~kind:(Compact { instructions = None }))
+                   : Message.t list))
+            : bool);
+       (* The prompts are in the session (and its file made) before the
+          system prompt is built: that asks the tool host, which may take
+          long to answer or never do. *)
+       let context = Session.messages session in
+       List.iter prompts ~f:(fun m ->
+         ignore (Session.append_message session m : Session.Entry.t);
+         broadcast t (Loop (Message_start m));
+         broadcast t (Loop (Message_end m)));
        let added =
-         match
-           Runner.run_turn
-             (runner t)
-             services
-             ~cancel
-             (turn_input t ~context ~prompts ~kind)
-         with
-         | added -> added
-         | exception exn ->
-           broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
-           []
+         if Cancellation.is_cancelled cancel
+         then []
+         else (
+           match
+             Runner.run_turn
+               (runner t)
+               services
+               ~cancel
+               (turn_input t ~context ~prompts ~kind)
+           with
+           | added -> added
+           | exception exn ->
+             broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
+             [])
        in
        (* An external harness says what its models are, and how big the
           context of the one it runs is. *)
