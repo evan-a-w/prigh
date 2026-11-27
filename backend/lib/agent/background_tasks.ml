@@ -637,7 +637,8 @@ let rec take_next ?interrupt t ~cancel =
                 `Interrupted)
        in
        (match Cancellation.protect cancel ~f:wait with
-        | None | Some `Interrupted -> []
+        | None -> []
+        | Some `Interrupted -> take_undelivered t
         | Some `Finished -> take_next ?interrupt t ~cancel))
 ;;
 
@@ -766,16 +767,22 @@ let cancel t ~kind id =
 
 let cancel_and_wait t ~kind id ~cancel =
   Or_error.bind (find t ~kind id) ~f:(fun task ->
+    let was_delivered = task.delivered in
+    task.delivered <- true;
     Cancellation.cancel task.cancel;
     ignore (unpark t id : bool);
     match
       Cancellation.protect cancel ~f:(fun () -> Promise.await task.finished)
     with
     | None ->
+      if not was_delivered
+      then (
+        task.delivered <- false;
+        if not (Task.running task) then t.on_change ());
       Or_error.errorf "interrupted while cancelling %s %s" (Kind.word kind) id
     | Some () ->
       ignore (unpark t id : bool);
-      mark_delivered t [ task ];
+      if not was_delivered then t.on_change ();
       Ok task)
 ;;
 

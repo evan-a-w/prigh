@@ -318,7 +318,6 @@ let%expect_test "subagent_status and subagent_cancel" =
     tool_result subagent_cancel: invalid arguments: unknown subagent "a9"; known: a1, a2
     assistant:  subagent_cancel{"id":"a2"}
     subagent_end a2: error [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
-    state: running=true subagents=[a2 done]
     state: running=true subagents=[]
     tool_result subagent_cancel: [subagent a2 failed] slow | [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}

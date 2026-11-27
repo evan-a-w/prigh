@@ -113,7 +113,7 @@ let create
         ~usage:Usage.zero
     in
     let provider = request.model.provider in
-    let shared ~owner id =
+    let shared ?refused ~owner id =
       match member with
       | None ->
         Or_error.errorf
@@ -127,15 +127,23 @@ let create
              shares
              ~env
              ~cancel
+             ?refused
              ~recipient:user
              provider
              ~owner
              id)
           ~f:(fun r -> Some (r, Some (Account_ref.Shared { owner; id })))
     in
-    let own account =
+    let own ?refused account =
       Or_error.map
-        (Provider_auth.resolve ~env ~cancel ?getenv ?account store provider)
+        (Provider_auth.resolve
+           ~env
+           ~cancel
+           ?getenv
+           ?refused
+           ?account
+           store
+           provider)
         ~f:
           (Option.map ~f:(fun (r : Provider_auth.Resolved.t) ->
              r, Option.map r.account ~f:(fun id -> Account_ref.Own id)))
@@ -162,12 +170,7 @@ let create
             | None -> Ok None)
          | result -> result)
     in
-    let stream_as (p : Provider.t) auth =
-      let account =
-        Option.bind auth ~f:(fun (_, (account : Account_ref.t option)) ->
-          account)
-      in
-      let message = p.stream { request with account } ~cancel ~on_event in
+    let finish_as account (message : Message.Assistant.t) =
       (match account with
        | Some account ->
          Account_shares.record_request
@@ -177,7 +180,7 @@ let create
            account
            message.usage
            ~cost_usd:(Model.cost_usd request.model message.usage)
-       | _ -> ());
+       | None -> ());
       { message with
         account =
           Option.bind account ~f:(fun account ->
@@ -185,6 +188,14 @@ let create
               (not (Account_ref.equal account Account_ref.main))
               (Account_ref.to_string account))
       }
+    in
+    let stream_as (p : Provider.t) auth =
+      let account =
+        Option.bind auth ~f:(fun (_, (account : Account_ref.t option)) ->
+          account)
+      in
+      let message = p.stream { request with account } ~cancel ~on_event in
+      finish_as account message
     in
     match provider with
     | Custom name ->
@@ -227,13 +238,51 @@ let create
                { message with stop_reason = Error (sprintf "%s (%s)" e hint) }
              | _ -> message)))
     | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity ->
+      let run_builtin (resolved : Provider_auth.Resolved.t) account_ref =
+        match builtin_provider ~env ?timeout provider resolved with
+        | Error e -> fail (Error.to_string_hum e)
+        | Ok p ->
+          let message =
+            p.stream { request with account = account_ref } ~cancel ~on_event
+          in
+          let is_oauth =
+            match resolved.method_ with
+            | Oauth -> true
+            | Api_key -> false
+          in
+          let is_401 =
+            match message.stop_reason with
+            | Error e -> String.is_prefix e ~prefix:"HTTP 401"
+            | _ -> false
+          in
+          if
+            is_oauth
+            && is_401
+            && Option.is_some account_ref
+            && List.is_empty message.content
+            && not (Cancellation.is_cancelled cancel)
+          then (
+            let refreshed =
+              match account_ref with
+              | Some (Own id) -> own ~refused:resolved.token (Some id)
+              | Some (Shared { owner; id }) ->
+                shared ~refused:resolved.token ~owner id
+              | None -> Ok None
+            in
+            match refreshed with
+            | Ok (Some ((resolved', _) as auth'))
+              when not (String.equal resolved'.token resolved.token) ->
+              (match builtin_provider ~env ?timeout provider resolved' with
+               | Error e -> fail (Error.to_string_hum e)
+               | Ok p' -> stream_as p' (Some auth'))
+            | Error e -> fail ("auth: " ^ Error.to_string_hum e)
+            | Ok _ -> finish_as account_ref message)
+          else finish_as account_ref message
+      in
       (match resolve () with
        | Error e -> fail ("auth: " ^ Error.to_string_hum e)
        | Ok None -> fail (not_configured_message provider)
-       | Ok (Some ((resolved, _) as auth)) ->
-         (match builtin_provider ~env ?timeout provider resolved with
-          | Error e -> fail (Error.to_string_hum e)
-          | Ok p -> stream_as p (Some auth)))
+       | Ok (Some (resolved, account_ref)) -> run_builtin resolved account_ref)
   in
   { Provider.name = "router"; stream }
 ;;

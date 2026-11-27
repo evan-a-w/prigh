@@ -43,6 +43,9 @@ end
     one. Raises what connecting raises (Eio, Unix and TLS exceptions). *)
 val acquire : t -> env:Env.t -> Uri.t -> Connection.t
 
+(** Always opens a fresh connection, bypassing any idle ones in the pool. *)
+val acquire_fresh : t -> env:Env.t -> Uri.t -> Connection.t
+
 (** Returns a connection whose last response was read to its end and which
     the server keeps open. *)
 val release : t -> Connection.t -> unit

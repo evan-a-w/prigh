@@ -603,13 +603,13 @@ let tell_skipped (client : Client.t) =
 
 let clients_of t agent =
   Hashtbl.data t.clients
-  |> List.filter ~f:(fun (c : Client.t) -> phys_equal c.agent agent)
+  |> List.filter ~f:(fun (c : Client.t) -> c.authed && phys_equal c.agent agent)
 ;;
 
 (* The tool host clients are few: a scan is fine. *)
 let host_client t host_id =
   List.find (Hashtbl.data t.clients) ~f:(fun (c : Client.t) ->
-    c.tools && String.equal c.host_id host_id)
+    c.authed && c.tools && String.equal c.host_id host_id)
 ;;
 
 let terminal_key t ~session =
@@ -628,6 +628,7 @@ let write_ledger t agent =
     then (
       temp.written <- leftovers;
       try Temporary_ledger.write ~dir:t.ledger_dir { id; leftovers } with
+      | Eio.Cancel.Cancelled _ as exn -> raise exn
       | exn ->
         eprintf
           "prigh: the ledger of temporary session %s: %s\n%!"
@@ -725,13 +726,14 @@ let await_return t agent =
     let token = ref () in
     temp.away <- Some token;
     Fiber.fork_daemon ~sw:t.sw (fun () ->
-      t.sleep t.temporary_grace;
-      (match temp.away with
-       | Some token' when phys_equal token token' ->
-         temp.away <- None;
-         if List.is_empty (clients_of t agent)
-         then end_temporary t agent ~notify:[]
-       | Some _ | None -> ());
+      Guarded.run ~what:"waiting for a temporary session's client" (fun () ->
+        t.sleep t.temporary_grace;
+        match temp.away with
+        | Some token' when phys_equal token token' ->
+          temp.away <- None;
+          if List.is_empty (clients_of t agent)
+          then end_temporary t agent ~notify:[]
+        | Some _ | None -> ());
       `Stop_daemon)
 ;;
 
@@ -751,10 +753,15 @@ let load_session t path =
         Eio.Cancel.protect (fun () -> Session.load ~yield:Fiber.yield path)
       with
       | result -> result
+      | exception (Eio.Cancel.Cancelled _ as exn) ->
+        Hashtbl.remove t.loading path;
+        Promise.resolve resolve (Or_error.of_exn exn);
+        raise exn
       | exception exn -> Or_error.of_exn exn
     in
     Hashtbl.remove t.loading path;
     Promise.resolve resolve result;
+    Eio.Fiber.check ();
     result
 ;;
 
@@ -873,7 +880,8 @@ let list_sessions t client =
 (* The clients that have signed in: the namespace's events (its sessions,
    settings, hosts and agent CLIs) are not for a connection that has not. *)
 let iter_authed t ~f =
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> if c.authed then f c)
+  List.iter (List.rev (Hashtbl.data t.clients)) ~f:(fun (c : Client.t) ->
+    if c.authed then f c)
 ;;
 
 let broadcast t json = iter_authed t ~f:(fun (c : Client.t) -> c.send json)
@@ -971,12 +979,13 @@ let await_external_idle t agent =
     let token = ref () in
     Hashtbl.set t.external_idle ~key:id ~data:token;
     Fiber.fork_daemon ~sw:t.sw (fun () ->
-      t.sleep t.external_idle_grace;
-      (match Hashtbl.find t.external_idle id with
-       | Some token' when phys_equal token token' ->
-         Hashtbl.remove t.external_idle id;
-         if can_evict t agent then evict_now t agent
-       | Some _ | None -> ());
+      Guarded.run ~what:"waiting for an idle external harness" (fun () ->
+        t.sleep t.external_idle_grace;
+        match Hashtbl.find t.external_idle id with
+        | Some token' when phys_equal token token' ->
+          Hashtbl.remove t.external_idle id;
+          if can_evict t agent then evict_now t agent
+        | Some _ | None -> ());
       `Stop_daemon))
 ;;
 
@@ -1487,49 +1496,70 @@ let server_host_exec t ~host ~cwd : Host_stream.Exec.t =
           ; target = Direct { on_output; resolve }
           ; holder = Client c.id
           };
-      c.send
-        (Rpc_json.event
-           (Tool_exec
-              { host
-              ; session_id = "pool"
-              ; exec_id
-              ; call_id = exec_id
-              ; name
-              ; arguments
-              ; cwd
-              ; stdin = Option.is_some stdin_opt
-              }));
-      let result =
-        Switch.run (fun sw ->
-          Option.iter stdin_opt ~f:(fun feed ->
-            Fiber.fork_daemon ~sw (fun () ->
-              let rec loop () =
-                match Stdin_feed.take feed with
-                | Data data ->
-                  Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
-                    c.send
-                      (Rpc_json.event
-                         (Tool_exec_input { host; exec_id; data; close = false })));
-                  loop ()
-                | Close ->
-                  Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
-                    c.send
-                      (Rpc_json.event
-                         (Tool_exec_input
-                            { host; exec_id; data = ""; close = true })));
-                  `Stop_daemon
-              in
-              loop ()));
-          Cancellation.protect cancel ~f:(fun () -> Promise.await promise))
+      let finished = ref false in
+      let cleanup () =
+        if not !finished
+        then (
+          finished := true;
+          Option.iter stdin_opt ~f:Stdin_feed.finish;
+          Hashtbl.remove t.execs exec_id)
       in
-      Option.iter stdin_opt ~f:Stdin_feed.finish;
-      Hashtbl.remove t.execs exec_id;
-      (match result with
-       | Some r -> r
-       | None ->
-         Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
-           c.send (Rpc_json.event (Tool_exec_cancel { host; exec_id })));
-         Tool.Result.error "[cancelled]"))
+      let send_cancel () =
+        Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
+          c.send (Rpc_json.event (Tool_exec_cancel { host; exec_id })))
+      in
+      Fun.protect
+        ~finally:(fun () ->
+          Eio.Cancel.protect (fun () ->
+            if not !finished
+            then (
+              send_cancel ();
+              cleanup ())))
+        (fun () ->
+           c.send
+             (Rpc_json.event
+                (Tool_exec
+                   { host
+                   ; session_id = "pool"
+                   ; exec_id
+                   ; call_id = exec_id
+                   ; name
+                   ; arguments
+                   ; cwd
+                   ; stdin = Option.is_some stdin_opt
+                   }));
+           let result =
+             Switch.run (fun sw ->
+               Option.iter stdin_opt ~f:(fun feed ->
+                 Fiber.fork_daemon ~sw (fun () ->
+                   let rec loop () =
+                     match Stdin_feed.take feed with
+                     | Data data ->
+                       Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
+                         c.send
+                           (Rpc_json.event
+                              (Tool_exec_input
+                                 { host; exec_id; data; close = false })));
+                       loop ()
+                     | Close ->
+                       Option.iter (exec_client t ~host exec_id) ~f:(fun c ->
+                         c.send
+                           (Rpc_json.event
+                              (Tool_exec_input
+                                 { host; exec_id; data = ""; close = true })));
+                       `Stop_daemon
+                   in
+                   loop ()));
+               Cancellation.protect cancel ~f:(fun () -> Promise.await promise))
+           in
+           match result with
+           | Some r ->
+             cleanup ();
+             r
+           | None ->
+             send_cancel ();
+             cleanup ();
+             Tool.Result.error "[cancelled]"))
 ;;
 
 let pool_cwd t ~host ~fallback =
@@ -1662,7 +1692,7 @@ let host_spawn t agent launch =
 let recheck_adapter_on t agent ~host ~host_name ~cwd adapter =
   Adapter_health.Cache.forget t.adapter_health ~host adapter;
   Codex_sandbox.Cache.forget_host t.codex_sandbox ~host;
-  Fiber.fork ~sw:t.sw (fun () ->
+  Guarded.fork ~sw:t.sw ~what:"rechecking an adapter" (fun () ->
     let statuses =
       Adapter_health.probe
         ~exec:(fun ~name arguments ->
@@ -1691,7 +1721,7 @@ let recheck_adapter t agent adapter =
 let catalog_changed t ~host ~login adapter =
   if [%equal: string option] login (catalog_login t ~adapter)
   then
-    Hashtbl.iter t.agents ~f:(fun agent ->
+    List.iter (Hashtbl.data t.agents) ~f:(fun agent ->
       match Agent.engine_choice agent with
       | { engine = Composer; adapter = Some a }
         when String.equal (Adapter_id.to_string a) adapter
@@ -2388,7 +2418,7 @@ let mcp_settings_changed (t : t) mcp_settings =
           @ mcp_settings_json entries)
      in
      broadcast t json);
-  Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
+  List.iter (Hashtbl.data t.agents) ~f:Agent.mcp_settings_changed
 ;;
 
 (* A sign-in came back or a token went: the hosts reconnect when the agents
@@ -2398,21 +2428,20 @@ let mcp_auth_changed (t : t) =
     `Object [ "type", `String "event"; "event", `String "mcp_auth_changed" ]
   in
   broadcast t json;
-  Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
+  List.iter (Hashtbl.data t.agents) ~f:Agent.mcp_settings_changed
 ;;
 
 let send_accounts_changed t =
-  let json = Rpc_json.login_event Accounts_changed in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+  broadcast t (Rpc_json.login_event Accounts_changed)
 ;;
 
 (* Another user shared or stopped sharing a login with this one: sessions
    pinned to one no longer shared go back to the default login. *)
 let shares_changed t =
   send_accounts_changed t;
-  Hashtbl.iter t.agents ~f:Agent.auth_changed;
+  List.iter (Hashtbl.data t.agents) ~f:Agent.auth_changed;
   Option.iter t.member ~f:(fun { shares; user } ->
-    Hashtbl.iter t.agents ~f:(fun agent ->
+    List.iter (Hashtbl.data t.agents) ~f:(fun agent ->
       let state = Agent.state agent in
       match state.account with
       | Some (Shared { owner; id } as ref_)
@@ -2601,7 +2630,7 @@ let create
   (* Recipients see a login's new label, or that it is gone. *)
   Login_manager.subscribe login ~f:(function
     | Done _ | Logged_out _ | Accounts_changed ->
-      Hashtbl.iter t.agents ~f:Agent.auth_changed;
+      List.iter (Hashtbl.data t.agents) ~f:Agent.auth_changed;
       Option.iter t.member ~f:(fun { shares; user } ->
         Account_shares.changed shares ~owner:user)
     | _ -> ());
@@ -2626,6 +2655,7 @@ let attach t (client : Client.t) agent =
   Option.iter
     (Hashtbl.find t.temporaries (session_id agent))
     ~f:(fun temp -> temp.away <- None);
+  Stream_sync.reset client.streams;
   if not (phys_equal previous agent)
   then (
     client.agent <- agent;
@@ -2743,8 +2773,10 @@ let restore_resumes ?yield t =
       ->
       (match load_session t summary.path with
        | Ok session ->
-         (* Someone may have opened it while it was read. *)
-         if not (Hashtbl.mem t.agents summary.id)
+         (* Someone may have opened or deleted it while it was read. *)
+         if
+           (not (Hashtbl.mem t.agents summary.id))
+           && Sys_unix.file_exists_exn summary.path
          then ignore (start_agent t session None : Agent.t)
        | Error error ->
          eprintf
@@ -2842,18 +2874,19 @@ let await_host t (client : Client.t) =
     | Client id when String.equal id client.id -> e.holder <- Away token
     | Client _ | Away _ -> ());
   Fiber.fork_daemon ~sw:t.sw (fun () ->
-    t.sleep t.host_grace;
-    Hashtbl.filter t.execs ~f:(fun (e : Exec.t) ->
-      match e.holder with
-      | Away token' -> phys_equal token token'
-      | Client _ -> false)
-    |> Hashtbl.iteri ~f:(fun ~key:exec_id ~data:(e : Exec.t) ->
-      Hashtbl.remove t.execs exec_id;
-      ignore
-        (deliver_exec_result e ~exec_id (Tool.Result.error host_disconnected)
-         : unit Or_error.t));
-    if Option.is_none (host_client t client.host_id)
-    then Harness_pool.evict_host t.harness_pool ~host:client.host_id;
+    Guarded.run ~what:"waiting for a disconnected tool host" (fun () ->
+      t.sleep t.host_grace;
+      Hashtbl.filter t.execs ~f:(fun (e : Exec.t) ->
+        match e.holder with
+        | Away token' -> phys_equal token token'
+        | Client _ -> false)
+      |> Hashtbl.iteri ~f:(fun ~key:exec_id ~data:(e : Exec.t) ->
+        Hashtbl.remove t.execs exec_id;
+        ignore
+          (deliver_exec_result e ~exec_id (Tool.Result.error host_disconnected)
+           : unit Or_error.t));
+      if Option.is_none (host_client t client.host_id)
+      then Harness_pool.evict_host t.harness_pool ~host:client.host_id);
     `Stop_daemon)
 ;;
 
@@ -2880,6 +2913,10 @@ let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
   Hashtbl.iter client.generations ~f:Cancellation.cancel;
+  if Option.equal String.equal t.login_owner (Some client.id)
+  then (
+    t.login_owner <- None;
+    if Login_manager.in_progress t.login then Login_manager.cancel t.login);
   (* A host that went silent is not waited for: whatever it was given fails
      now, and so do new calls until it is back. *)
   if client.tools && client.silent
@@ -2915,13 +2952,35 @@ let session_file t path =
   if t.backend_host
   then Ok path
   else (
-    let real path =
-      try Filename_unix.realpath path with
-      | _ -> path
+    let has_dotdot p =
+      String.split p ~on:'/' |> List.exists ~f:(String.equal "..")
     in
-    if String.is_prefix (real path) ~prefix:(real t.sessions_dir ^ "/")
-    then Ok path
-    else Or_error.errorf "%S is not in the sessions directory" path)
+    let rec resolve p suffix =
+      match Filename_unix.realpath p with
+      | real -> List.fold suffix ~init:real ~f:Filename.concat
+      | exception _ ->
+        let parent = Filename.dirname p in
+        let base = Filename.basename p in
+        if String.equal parent p
+        then List.fold suffix ~init:p ~f:Filename.concat
+        else (
+          let suffix =
+            if String.is_empty base || String.equal base "."
+            then suffix
+            else base :: suffix
+          in
+          resolve parent suffix)
+    in
+    if String.mem path '\000' || has_dotdot path
+    then Or_error.errorf "%S is not in the sessions directory" path
+    else (
+      let dir = resolve t.sessions_dir [] in
+      let prefix =
+        if String.is_suffix dir ~suffix:"/" then dir else dir ^ "/"
+      in
+      if String.is_prefix (resolve path []) ~prefix
+      then Ok path
+      else Or_error.errorf "%S is not in the sessions directory" path))
 ;;
 
 (* Temporary sessions are not found: only [hello] with their key reaches
@@ -2966,13 +3025,24 @@ let find_agent t (client : Client.t) key =
       let session =
         File_cache.find_or_read t.loaded path ~read:(load_session t)
       in
-      (* Another client may have opened it while it was being read. *)
-      match find_live t path with
-      | Some agent -> Ok agent
-      | None ->
-        File_cache.remove t.loaded path;
-        Or_error.map session ~f:(fun session ->
-          start_agent t session (loaded_start t client session)))
+      (* Another client may have opened it while it was being read, or
+         deleted it from disk, or this client may have disconnected. *)
+      match session with
+      | Error _ as err -> err
+      | Ok session ->
+        let id = Session.id session in
+        (match find_live t id with
+         | Some agent -> Ok agent
+         | None ->
+           if not (Hashtbl.mem t.clients client.id)
+           then Or_error.error_string "client disconnected"
+           else if not (Sys_unix.file_exists_exn path)
+           then (
+             File_cache.remove t.loaded path;
+             Or_error.errorf "session %S was deleted" key)
+           else (
+             File_cache.remove t.loaded path;
+             Ok (start_agent t session (loaded_start t client session)))))
 ;;
 
 (* The live session with this id, a temporary one too, else the saved one,
@@ -2990,12 +3060,17 @@ let wake_session t ~session =
          let loaded =
            File_cache.find_or_read t.loaded summary.path ~read:(load_session t)
          in
-         (* A client may have opened it while it was being read. *)
+         (* A client may have opened or deleted it while it was being read. *)
          (match Hashtbl.find t.agents session with
           | Some agent -> Ok agent
           | None ->
-            File_cache.remove t.loaded summary.path;
-            Or_error.map loaded ~f:(fun session -> start_agent t session None)))
+            if not (Sys_unix.file_exists_exn summary.path)
+            then (
+              File_cache.remove t.loaded summary.path;
+              Or_error.errorf "session %S was deleted" session)
+            else (
+              File_cache.remove t.loaded summary.path;
+              Or_error.map loaded ~f:(fun session -> start_agent t session None))))
   in
   Or_error.map agent ~f:Agent.check_mail
 ;;
@@ -3468,7 +3543,7 @@ let hello t (client : Client.t) params =
           if tools
           then
             (* The frontends on its machine that came before it. *)
-            Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+            List.iter (Hashtbl.data t.clients) ~f:(fun (c : Client.t) ->
               if Option.equal String.equal c.prefer_host (Some client.host_id)
               then Agent.prefer_host c.agent client.host_id);
           if tools
@@ -3509,7 +3584,7 @@ let current_config t agent =
    from it. *)
 let config_saved t agent =
   let config = Agent.config agent in
-  Hashtbl.iter t.agents ~f:(fun other ->
+  List.iter (Hashtbl.data t.agents) ~f:(fun other ->
     if not (phys_equal other agent) then Agent.adopt_config other config)
 ;;
 
@@ -3641,6 +3716,7 @@ let new_session
         ~dir:t.ledger_dir
         { id = Session.id session; leftovers = [] }
     with
+    | Eio.Cancel.Cancelled _ as exn -> raise exn
     | exn ->
       eprintf
         "prigh: the ledger of a temporary session: %s\n%!"
@@ -3681,21 +3757,24 @@ let indexed_sessions t = Session_search.indexed t.search
 
 let start_background t =
   Fiber.fork_daemon ~sw:t.sw (fun () ->
-    (* The server serves first: a client starting up waits for none of
-       this, which only starts once a request is answered (or after a
-       quiet second), and yields after each session. *)
-    Fiber.first (fun () -> Promise.await (fst t.served)) (fun () -> t.sleep 1.);
-    Fiber.yield ();
-    restore_resumes ~yield:Fiber.yield t;
-    (match index_sessions t with
-     | () -> ()
-     | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
-     | exception exn ->
-       eprintf
-         "prigh: indexing the sessions for search failed (searches read them \
-          instead): %s\n\
-          %!"
-         (Exn.to_string exn));
+    Guarded.run ~what:"background session startup" (fun () ->
+      (* The server serves first: a client starting up waits for none of
+         this, which only starts once a request is answered (or after a
+         quiet second), and yields after each session. *)
+      Fiber.first
+        (fun () -> Promise.await (fst t.served))
+        (fun () -> t.sleep 1.);
+      Fiber.yield ();
+      restore_resumes ~yield:Fiber.yield t;
+      match index_sessions t with
+      | () -> ()
+      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+      | exception exn ->
+        eprintf
+          "prigh: indexing the sessions for search failed (searches read them \
+           instead): %s\n\
+           %!"
+          (Exn.to_string exn));
     `Stop_daemon)
 ;;
 
@@ -3820,7 +3899,7 @@ let checkpointed_places (summary : Session.Summary.t) =
 let drop_checkpoints t (client : Client.t) id places =
   if not (List.is_empty places)
   then
-    Fiber.fork ~sw:t.sw (fun () ->
+    Guarded.fork ~sw:t.sw ~what:"dropping session checkpoints" (fun () ->
       List.iter places ~f:(fun (host, cwd) ->
         ignore
           (Agent.host_call_on
@@ -3843,6 +3922,7 @@ let delete_saved ?leaving t client (summary : Session.Summary.t) =
     Or_error.try_with (fun () ->
       let bytes = Session.disk_usage summary.path in
       Session.delete_files summary.path;
+      File_cache.remove t.loaded summary.path;
       let agent = Hashtbl.find t.agents summary.id in
       Hashtbl.remove t.external_idle summary.id;
       Hashtbl.remove t.agents summary.id;
@@ -4637,10 +4717,27 @@ let adapter_logins_json t =
            ])))
 ;;
 
+let via_host_token (client : Client.t) =
+  Option.exists client.signed_in ~f:(fun s ->
+    s.User_access.Signed_in.via_host_token)
+;;
+
+(* An agent that has its tool host's token must not be able to log its
+   user in or out, or give their logins away. *)
+let check_manages_logins (client : Client.t) =
+  if via_host_token client
+  then
+    Or_error.error_string
+      "this connection signed in with a host token, which cannot change model \
+       logins: sign in as the user (prigh-web, or the user's own token)"
+  else Ok ()
+;;
+
 (* [login]: a login of prigh's (ref, id or label), or ["own"] / null for the
    CLI's own. The sessions on it show it, and take it at their next turn. *)
-let set_adapter_login t params =
+let set_adapter_login t (client : Client.t) params =
   let open Or_error.Let_syntax in
+  let%bind () = check_manages_logins client in
   let%bind adapter = string_param params "adapter" in
   let%bind login = string_param_opt params "login" in
   let%bind home =
@@ -4672,7 +4769,7 @@ let set_adapter_login t params =
       Cli_login.Prigh found.ref_
   in
   let%map () = Cli_login.save ~home ~adapter choice in
-  Hashtbl.iter t.agents ~f:(fun agent ->
+  List.iter (Hashtbl.data t.agents) ~f:(fun agent ->
     match Agent.engine_choice agent with
     | { engine = Composer; adapter = Some a }
       when String.equal (Adapter_id.to_string a) adapter ->
@@ -4821,22 +4918,6 @@ let list_adapters t (client : Client.t) params =
     ]
 ;;
 
-let via_host_token (client : Client.t) =
-  Option.exists client.signed_in ~f:(fun s ->
-    s.User_access.Signed_in.via_host_token)
-;;
-
-(* An agent that has its tool host's token must not be able to log its
-   user in or out, or give their logins away. *)
-let check_manages_logins (client : Client.t) =
-  if via_host_token client
-  then
-    Or_error.error_string
-      "this connection signed in with a host token, which cannot change model \
-       logins: sign in as the user (prigh-web, or the user's own token)"
-  else Ok ()
-;;
-
 (* The tool host [host] names (id or name; default: the session's active
    one). *)
 let import_host agent host =
@@ -4920,7 +5001,7 @@ let import_adapter_login t (client : Client.t) agent params =
     in
     let%map () = Cli_login.save ~home ~adapter (Prigh (Account_ref.Own id)) in
     send_accounts_changed t;
-    Hashtbl.iter t.agents ~f:(fun agent ->
+    List.iter (Hashtbl.data t.agents) ~f:(fun agent ->
       match Agent.engine_choice agent with
       | { engine = Composer; adapter = Some a }
         when String.equal (Adapter_id.to_string a) adapter ->
@@ -5079,7 +5160,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (Or_error.map (switch_user client params) ~f:(fun user ->
          `Object [ "user", `String user ]))
   | "list_adapters" -> Some (list_adapters t client params)
-  | "set_adapter_login" -> Some (set_adapter_login t params)
+  | "set_adapter_login" -> Some (set_adapter_login t client params)
   | "import_adapter_login" -> Some (import_adapter_login t client agent params)
   | "set_active_host" ->
     Some
@@ -5439,6 +5520,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Option.some
     @@
     let open Or_error.Let_syntax in
+    let%bind () = check_manages_logins client in
     let%bind host =
       string_param_opt params "host" >>| Option.value ~default:"github.com"
     in
@@ -5466,11 +5548,12 @@ let dispatch_server t (client : Client.t) ~meth ~params
     unit_result started
   | "forge_logout" ->
     Option.some
-    @@ Or_error.bind (string_param params "host") ~f:(fun host ->
-      Or_error.bind (Forges.instance t.forges host) ~f:(fun instance ->
-        Or_error.map (Forges.logout t.forges instance.host) ~f:(fun () ->
-          Login_manager.forge_logged_out t.login instance.host;
-          `Object [])))
+    @@ Or_error.bind (check_manages_logins client) ~f:(fun () ->
+      Or_error.bind (string_param params "host") ~f:(fun host ->
+        Or_error.bind (Forges.instance t.forges host) ~f:(fun instance ->
+          Or_error.map (Forges.logout t.forges instance.host) ~f:(fun () ->
+            Login_manager.forge_logged_out t.login instance.host;
+            `Object []))))
   | "pr_checkout" -> Some (checkout_pull t client params)
   | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
@@ -6068,12 +6151,14 @@ let dispatch
       `Array
         (List.map statuses ~f:(Rpc_json.auth_status ~shared ~shareable ~usage)))
   | "auth_respond" ->
-    Or_error.bind (string_param params "id") ~f:(fun id ->
-      Or_error.bind (string_param params "value") ~f:(fun value ->
-        unit_result (Login_manager.respond login ~id value)))
+    Or_error.bind (check_manages_logins client) ~f:(fun () ->
+      Or_error.bind (string_param params "id") ~f:(fun id ->
+        Or_error.bind (string_param params "value") ~f:(fun value ->
+          unit_result (Login_manager.respond login ~id value))))
   | "auth_cancel" ->
-    Login_manager.cancel login;
-    empty
+    Or_error.bind (check_manages_logins client) ~f:(fun () ->
+      Login_manager.cancel login;
+      empty)
   | _ -> Or_error.errorf "unknown method %S" meth
 ;;
 
@@ -6135,6 +6220,7 @@ let handle t client (request : Json.t) : Json.t =
                    ~params))
         with
         | result -> result
+        | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
         | exception exn ->
           Or_error.error_s [%message "internal error" (exn : exn)]
       in

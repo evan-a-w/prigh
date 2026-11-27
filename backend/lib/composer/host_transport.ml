@@ -58,51 +58,52 @@ module Mcp_side = struct
   ;;
 
   let run t ~sw stream =
-    Fiber.fork ~sw (fun () ->
+    Guarded.fork ~sw ~what:"MCP side channel" (fun () ->
       Fiber.first
         (fun () ->
            ignore
              (Promise.await (Host_stream.ended stream) : Host_stream.Ended.t))
         (fun () ->
-           let dispatch ~conn injected line =
-             Fiber.fork ~sw (fun () ->
-               Option.iter
-                 (Injected_tools.handle_line injected line)
-                 ~f:(fun reply ->
-                   ignore
-                     (Host_stream.mcp_write stream ~conn reply
-                      : unit Or_error.t)))
-           in
-           let rec loop () =
-             match Eio.Stream.take t.events with
-             | Open { conn; route } ->
-               Hashtbl.set t.conn_route ~key:conn ~data:route;
-               if not (Hashtbl.mem t.routes route)
-               then Host_stream.mcp_close stream ~conn;
-               loop ()
-             | Closed conn ->
-               Hashtbl.remove t.conn_route conn;
-               loop ()
-             | Line { conn; line } ->
-               (match Hashtbl.find t.conn_route conn with
-                | Some route ->
-                  (match Hashtbl.find t.routes route with
-                   | Some injected -> dispatch ~conn injected line
-                   | None ->
-                     (* Closed or unknown session route: never cross-talk. *)
-                     Host_stream.mcp_close stream ~conn)
-                | None ->
-                  Fiber.fork ~sw (fun () ->
-                    let injected = Promise.await t.tools in
-                    Option.iter
-                      (Injected_tools.handle_line injected line)
-                      ~f:(fun reply ->
-                        ignore
-                          (Host_stream.mcp_write stream ~conn reply
-                           : unit Or_error.t))));
-               loop ()
-           in
-           loop ()))
+           Switch.run (fun mcp_sw ->
+             let dispatch ~conn injected line =
+               Guarded.fork ~sw:mcp_sw ~what:"MCP tool call" (fun () ->
+                 Option.iter
+                   (Injected_tools.handle_line injected line)
+                   ~f:(fun reply ->
+                     ignore
+                       (Host_stream.mcp_write stream ~conn reply
+                        : unit Or_error.t)))
+             in
+             let rec loop () =
+               match Eio.Stream.take t.events with
+               | Open { conn; route } ->
+                 Hashtbl.set t.conn_route ~key:conn ~data:route;
+                 if not (Hashtbl.mem t.routes route)
+                 then Host_stream.mcp_close stream ~conn;
+                 loop ()
+               | Closed conn ->
+                 Hashtbl.remove t.conn_route conn;
+                 loop ()
+               | Line { conn; line } ->
+                 (match Hashtbl.find t.conn_route conn with
+                  | Some route ->
+                    (match Hashtbl.find t.routes route with
+                     | Some injected -> dispatch ~conn injected line
+                     | None ->
+                       (* Closed or unknown session route: never cross-talk. *)
+                       Host_stream.mcp_close stream ~conn)
+                  | None ->
+                    Guarded.fork ~sw:mcp_sw ~what:"MCP tool call" (fun () ->
+                      let injected = Promise.await t.tools in
+                      Option.iter
+                        (Injected_tools.handle_line injected line)
+                        ~f:(fun reply ->
+                          ignore
+                            (Host_stream.mcp_write stream ~conn reply
+                             : unit Or_error.t))));
+                 loop ()
+             in
+             loop ())))
   ;;
 end
 

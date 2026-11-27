@@ -56,15 +56,30 @@ let run
   let process_env =
     if List.is_empty extra_env && List.is_empty unset_env
     then None
-    else
-      Some
-        (Array.append
-           (Array.filter (Core_unix.environment ()) ~f:(fun entry ->
-              let key = String.lsplit2 entry ~on:'=' |> Option.map ~f:fst in
-              not
-                (List.exists unset_env ~f:(fun u ->
-                   Option.equal String.equal key (Some u)))))
-           (Array.of_list (List.map extra_env ~f:(fun (k, v) -> k ^ "=" ^ v))))
+    else (
+      let overridden =
+        String.Set.of_list (unset_env @ List.map extra_env ~f:fst)
+      in
+      let inherited =
+        Array.filter (Core_unix.environment ()) ~f:(fun entry ->
+          match String.lsplit2 entry ~on:'=' with
+          | Some (key, _) -> not (Set.mem overridden key)
+          | None -> true)
+      in
+      let extra =
+        let seen = String.Hash_set.create () in
+        List.rev extra_env
+        |> List.filter ~f:(fun (k, _) ->
+          if Hash_set.mem seen k
+          then false
+          else (
+            Hash_set.add seen k;
+            true))
+        |> List.rev
+        |> List.map ~f:(fun (k, v) -> k ^ "=" ^ v)
+        |> Array.of_list
+      in
+      Some (Array.append inherited extra))
   in
   (* The child leads its own process group so that on cancel or timeout its
      descendants die with it; otherwise they keep the pipes open and draining

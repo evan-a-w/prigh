@@ -111,35 +111,43 @@ let reply_lines = function
   | Error _ -> []
 ;;
 
-let attach t ~cols ~rows ~on_output =
-  let viewer = { Viewer.on_output; receiving = false; detached = false } in
-  t.viewers <- viewer :: t.viewers;
-  let modes = ref "" in
-  let screen = ref [] in
-  let capture flags =
-    sprintf "capture-pane -p -e %s-t %s -S -%d" flags t.name replay_lines
-  in
-  send
-    t
-    [ resize_command ~cols ~rows, ignore_reply
-    ; ( sprintf "display-message -p -t %s '%s'" t.name mode_format
-      , fun reply -> modes := String.concat (reply_lines reply) )
-    ; (capture "", fun reply -> screen := reply_lines reply)
-    ; ( capture "-a -q "
-      , fun reply ->
-          if not viewer.detached
-          then (
-            on_output
-              (replay ~modes:!modes ~screen:!screen ~saved:(reply_lines reply));
-            viewer.receiving <- true) )
-    ];
-  viewer
-;;
-
 let detach t (viewer : Viewer.t) =
   viewer.detached <- true;
   viewer.receiving <- false;
   t.viewers <- List.filter t.viewers ~f:(fun v -> not (phys_equal v viewer))
+;;
+
+let attach t ~cols ~rows ~on_output =
+  let viewer = { Viewer.on_output; receiving = false; detached = false } in
+  t.viewers <- viewer :: t.viewers;
+  let ok = ref false in
+  Exn.protect
+    ~finally:(fun () -> if not !ok then detach t viewer)
+    ~f:(fun () ->
+      let modes = ref "" in
+      let screen = ref [] in
+      let capture flags =
+        sprintf "capture-pane -p -e %s-t %s -S -%d" flags t.name replay_lines
+      in
+      send
+        t
+        [ resize_command ~cols ~rows, ignore_reply
+        ; ( sprintf "display-message -p -t %s '%s'" t.name mode_format
+          , fun reply -> modes := String.concat (reply_lines reply) )
+        ; (capture "", fun reply -> screen := reply_lines reply)
+        ; ( capture "-a -q "
+          , fun reply ->
+              if not viewer.detached
+              then (
+                on_output
+                  (replay
+                     ~modes:!modes
+                     ~screen:!screen
+                     ~saved:(reply_lines reply));
+                viewer.receiving <- true) )
+        ];
+      ok := true;
+      viewer)
 ;;
 
 let finish t =
@@ -217,31 +225,43 @@ let read_loop t stdout =
   close_stdin t
 ;;
 
+let kill_session ~env ~tmux ~socket ~name =
+  Eio.Cancel.protect (fun () ->
+    try
+      ignore
+        (Process.run_collect
+           ~env
+           ~prog:tmux
+           ~args:(tmux_args ~socket [ "kill-session"; "-t"; name ])
+           ()
+         : Process.Output.t)
+    with
+    | _ -> ())
+;;
+
 let create ~env ~sw ~tmux ~socket ~name ~cwd ~cols ~rows ?(command = []) () =
   Or_error.bind
     (start_session ~env ~tmux ~socket ~name ~cwd ~cols ~rows ~command)
     ~f:(fun () ->
       let started, set_started = Promise.create () in
+      let caller_cancelled = ref false in
       (* The terminal's own switch holds the pipes and the client, so they
          are released as soon as it ends. *)
       Fiber.fork ~sw (fun () ->
-        Switch.run
-        @@ fun sw ->
-        let stdin_r, stdin_w = Eio_unix.pipe sw in
-        let stdout_r, stdout_w = Eio_unix.pipe sw in
-        match
-          Eio.Process.spawn
-            ~sw
-            (Eio.Stdenv.process_mgr env)
-            ~stdin:stdin_r
-            ~stdout:stdout_w
-            (tmux :: tmux_args ~socket [ "-C"; "attach-session"; "-t"; name ])
-        with
-        | exception exn ->
-          Promise.resolve
-            set_started
-            (Or_error.errorf "cannot attach to tmux: %s" (Exn.to_string exn))
-        | child ->
+        let cleanup_session () = kill_session ~env ~tmux ~socket ~name in
+        let setup () =
+          Switch.run
+          @@ fun sw ->
+          let stdin_r, stdin_w = Eio_unix.pipe sw in
+          let stdout_r, stdout_w = Eio_unix.pipe sw in
+          let child =
+            Eio.Process.spawn
+              ~sw
+              (Eio.Stdenv.process_mgr env)
+              ~stdin:stdin_r
+              ~stdout:stdout_w
+              (tmux :: tmux_args ~socket [ "-C"; "attach-session"; "-t"; name ])
+          in
           Eio.Flow.close stdin_r;
           Eio.Flow.close stdout_w;
           let exited, set_exited = Promise.create () in
@@ -262,10 +282,36 @@ let create ~env ~sw ~tmux ~socket ~name ~cwd ~cols ~rows ?(command = []) () =
             [ ( sprintf "set-option -t %s destroy-unattached on" name
               , ignore_reply )
             ];
-          Promise.resolve set_started (Ok t);
-          read_loop t stdout_r;
-          ignore (Eio.Process.await child : Eio.Process.exit_status));
-      Promise.await started)
+          if !caller_cancelled
+          then (
+            close_stdin t;
+            cleanup_session ();
+            finish t)
+          else (
+            Promise.resolve set_started (Ok t);
+            read_loop t stdout_r);
+          ignore (Eio.Process.await child : Eio.Process.exit_status)
+        in
+        match setup () with
+        | () -> ()
+        | exception (Eio.Cancel.Cancelled _ as exn) ->
+          if not (Promise.is_resolved started) then cleanup_session ();
+          raise exn
+        | exception exn ->
+          if not (Promise.is_resolved started)
+          then (
+            cleanup_session ();
+            Promise.resolve
+              set_started
+              (Or_error.errorf "cannot attach to tmux: %s" (Exn.to_string exn))));
+      match Promise.await started with
+      | result -> result
+      | exception exn ->
+        caller_cancelled := true;
+        (match Promise.peek started with
+         | Some (Ok t) -> Eio.Cancel.protect (fun () -> kill t)
+         | Some (Error _) | None -> kill_session ~env ~tmux ~socket ~name);
+        raise exn)
 ;;
 
 module For_testing = struct

@@ -27,29 +27,42 @@ module Request = struct
     List.Assoc.find t.headers ~equal:String.Caseless.equal name
   ;;
 
+  let max_header_bytes = 64 * 1024
+
   let parse reader =
     match Eio.Buf_read.line reader with
-    | exception (End_of_file | Eio.Io _) -> None
+    | exception (End_of_file | Eio.Io _) -> `Invalid
+    | exception Eio.Buf_read.Buffer_limit_exceeded -> `Too_large
     | request_line ->
-      (match String.split request_line ~on:' ' with
-       | [ meth; target; _version ] ->
-         let path, query =
-           match String.lsplit2 target ~on:'?' with
-           | Some (path, query) -> path, parse_query query
-           | None -> target, []
-         in
-         let rec headers acc =
-           match Eio.Buf_read.line reader with
-           | exception (End_of_file | Eio.Io _) -> List.rev acc
-           | "" -> List.rev acc
-           | line ->
-             (match String.lsplit2 line ~on:':' with
-              | Some (name, value) ->
-                headers ((String.strip name, String.strip value) :: acc)
-              | None -> headers acc)
-         in
-         Some { meth; target; path; query; headers = headers [] }
-       | _ -> None)
+      if String.length request_line > max_header_bytes
+      then `Too_large
+      else (
+        match String.split request_line ~on:' ' with
+        | [ meth; target; _version ] ->
+          let path, query =
+            match String.lsplit2 target ~on:'?' with
+            | Some (path, query) -> path, parse_query query
+            | None -> target, []
+          in
+          let rec headers acc bytes =
+            match Eio.Buf_read.line reader with
+            | exception (End_of_file | Eio.Io _) -> `Ok (List.rev acc)
+            | exception Eio.Buf_read.Buffer_limit_exceeded -> `Too_large
+            | "" -> `Ok (List.rev acc)
+            | line ->
+              let bytes = bytes + String.length line + 2 in
+              if bytes > max_header_bytes
+              then `Too_large
+              else (
+                match String.lsplit2 line ~on:':' with
+                | Some (name, value) ->
+                  headers ((String.strip name, String.strip value) :: acc) bytes
+                | None -> headers acc bytes)
+          in
+          (match headers [] (String.length request_line + 2) with
+           | `Too_large -> `Too_large
+           | `Ok headers -> `Request { meth; target; path; query; headers })
+        | _ -> `Invalid)
   ;;
 end
 
@@ -129,7 +142,8 @@ let serve_json_lines ~(on_lines : on_lines) ~reader flow =
   on_lines
     ~read_line:(fun () ->
       match Eio.Buf_read.line reader with
-      | exception (End_of_file | Eio.Io _) -> None
+      | exception (End_of_file | Eio.Io _ | Eio.Buf_read.Buffer_limit_exceeded)
+        -> None
       | line -> Some line)
     ~write_line:(fun line -> Eio.Flow.copy_string (line ^ "\n") flow)
 ;;
@@ -140,8 +154,11 @@ let is_json_lines reader =
   match Eio.Buf_read.peek_char reader with
   | Some '{' -> true
   | Some _ | None -> false
-  | exception (End_of_file | Eio.Io _) -> false
+  | exception (End_of_file | Eio.Io _ | Eio.Buf_read.Buffer_limit_exceeded) ->
+    false
 ;;
+
+let header_timeout = 30.
 
 let handle
       ?clock
@@ -159,80 +176,94 @@ let handle
     | Some port ->
       Result.error (Local_site.check ~port ~headers:request.headers)
   in
-  if is_json_lines reader
-  then serve_json_lines ~on_lines ~reader flow
-  else (
-    match Request.parse reader with
-    | None -> ()
-    | Some request when Option.is_some (refused request) ->
-      respond flow (Option.value_exn (refused request))
-    | Some request when Option.is_some (upgrade_handler ~websockets request) ->
-      let on_websocket =
-        Option.value_exn (upgrade_handler ~websockets request)
-      in
-      (match Request.header request "Sec-WebSocket-Key" with
-       | None ->
-         Eio.Flow.copy_string
-           (response
-              ~status:400
-              ~reason:"Bad Request"
-              "missing Sec-WebSocket-Key\n")
-           flow
-       | Some key ->
-         Eio.Flow.copy_string
-           (sprintf
-              "HTTP/1.1 101 Switching Protocols\r\n\
-               Upgrade: websocket\r\n\
-               Connection: Upgrade\r\n\
-               Sec-WebSocket-Accept: %s\r\n\
-               \r\n"
-              (Websocket.accept_key (String.strip key)))
-           flow;
-         let ws = Websocket.create ~reader ~flow () in
-         (match clock with
-          | None -> on_websocket ~query:request.query ws
-          | Some clock ->
-            Fiber.first
-              (fun () -> on_websocket ~query:request.query ws)
-              (fun () ->
-                 Websocket.keepalive
-                   ws
-                   ~clock
-                   ~shutdown:(fun () ->
-                     try Eio.Flow.shutdown flow `All with
-                     | _ -> ())
-                   ()));
-         Websocket.close ws)
-    | Some request when Option.is_some (routes request) ->
-      (Option.value_exn (routes request)) request ~reader (flow :> flow)
-    | Some request when File_http.handles ~path:request.path ->
-      File_http.serve
-        ~meth:request.meth
-        ~path:request.path
-        ~query:request.query
-        ~headers:request.headers
-        ~reader
-        flow
-    | Some request ->
-      (match root with
-       | None ->
-         Eio.Flow.copy_string
-           (response
-              ~status:404
-              ~reason:"Not Found"
-              "no web root configured; only WebSockets are served\n")
-           flow
-       | Some root ->
-         Eio.Flow.copy_string
-           (format_response
-              (Static_site.respond
-                 ~query:request.query
-                 ~root
-                 ~meth:request.meth
-                 ~path:request.path
-                 ~headers:request.headers
-                 ()))
-           flow))
+  let parsed =
+    let read () =
+      if is_json_lines reader then `Json_lines else Request.parse reader
+    in
+    match clock with
+    | None -> Ok (read ())
+    | Some clock ->
+      Eio.Time.with_timeout clock header_timeout (fun () -> Ok (read ()))
+  in
+  match parsed with
+  | Error `Timeout -> ()
+  | Ok `Json_lines -> serve_json_lines ~on_lines ~reader flow
+  | Ok `Invalid -> ()
+  | Ok `Too_large ->
+    Eio.Flow.copy_string
+      (response
+         ~status:431
+         ~reason:"Request Header Fields Too Large"
+         "request headers too large\n")
+      flow
+  | Ok (`Request request) when Option.is_some (refused request) ->
+    respond flow (Option.value_exn (refused request))
+  | Ok (`Request request)
+    when Option.is_some (upgrade_handler ~websockets request) ->
+    let on_websocket = Option.value_exn (upgrade_handler ~websockets request) in
+    (match Request.header request "Sec-WebSocket-Key" with
+     | None ->
+       Eio.Flow.copy_string
+         (response
+            ~status:400
+            ~reason:"Bad Request"
+            "missing Sec-WebSocket-Key\n")
+         flow
+     | Some key ->
+       Eio.Flow.copy_string
+         (sprintf
+            "HTTP/1.1 101 Switching Protocols\r\n\
+             Upgrade: websocket\r\n\
+             Connection: Upgrade\r\n\
+             Sec-WebSocket-Accept: %s\r\n\
+             \r\n"
+            (Websocket.accept_key (String.strip key)))
+         flow;
+       let ws = Websocket.create ~reader ~flow () in
+       (match clock with
+        | None -> on_websocket ~query:request.query ws
+        | Some clock ->
+          Fiber.first
+            (fun () -> on_websocket ~query:request.query ws)
+            (fun () ->
+               Websocket.keepalive
+                 ws
+                 ~clock
+                 ~shutdown:(fun () ->
+                   try Eio.Flow.shutdown flow `All with
+                   | _ -> ())
+                 ()));
+       Websocket.close ws)
+  | Ok (`Request request) when Option.is_some (routes request) ->
+    (Option.value_exn (routes request)) request ~reader (flow :> flow)
+  | Ok (`Request request) when File_http.handles ~path:request.path ->
+    File_http.serve
+      ~meth:request.meth
+      ~path:request.path
+      ~query:request.query
+      ~headers:request.headers
+      ~reader
+      flow
+  | Ok (`Request request) ->
+    (match root with
+     | None ->
+       Eio.Flow.copy_string
+         (response
+            ~status:404
+            ~reason:"Not Found"
+            "no web root configured; only WebSockets are served\n")
+         flow
+     | Some root ->
+       Eio.Flow.copy_string
+         (format_response
+            (Static_site.respond
+               ~query:request.query
+               ~root
+               ~meth:request.meth
+               ~path:request.path
+               ~headers:request.headers
+               ()))
+         flow)
 ;;
 
 (* Replies go out whole at once: with Nagle's algorithm the end of a large
