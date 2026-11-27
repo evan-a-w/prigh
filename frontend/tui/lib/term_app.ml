@@ -15,10 +15,34 @@ module Result_ = struct
     }
 end
 
+let find_on_path name =
+  match Sys.getenv "PATH" with
+  | None -> None
+  | Some path ->
+    List.find_map (String.split path ~on:':') ~f:(fun dir ->
+      let candidate = Filename.concat dir name in
+      let exists =
+        match Sys_unix.file_exists candidate with
+        | `Yes -> true
+        | `No | `Unknown -> false
+      in
+      Option.some_if exists candidate)
+;;
+
+let is_macos () =
+  match Sys_unix.file_exists "/System/Library/CoreServices" with
+  | `Yes -> true
+  | `No | `Unknown -> false
+;;
+
 let open_browser url =
-  don't_wait_for
-    (Process.run ~prog:"xdg-open" ~args:[ url ] ()
-     |> Deferred.map ~f:(fun (_ : string Or_error.t) -> ()))
+  let candidates = if is_macos () then [ "open" ] else [ "xdg-open"; "open" ] in
+  match List.find_map candidates ~f:find_on_path with
+  | None -> ()
+  | Some prog ->
+    don't_wait_for
+      (Process.run ~prog ~args:[ url ] ()
+       |> Deferred.map ~f:(fun (_ : string Or_error.t) -> ()))
 ;;
 
 (* Direct tty access for the sequences Notty does not manage (alt screen,
@@ -29,7 +53,13 @@ let tty_fd () =
 
 let write_tty s = ignore (Core_unix.write_substring (tty_fd ()) ~buf:s : int)
 
+(* Filled in once the app exists so terminal release / focus loss cannot leave
+   bracketed paste stuck in [Collecting]. *)
+let reset_paste = ref (fun () -> ())
+
 let release_terminal () =
+  !reset_paste ();
+  write_tty "\027[?2004l";
   write_tty Term_focus.disable;
   write_tty "\027[?1049l";
   ignore (Core_unix.system "stty sane </dev/tty" : Core_unix.Exit_or_signal.t)
@@ -46,6 +76,7 @@ let reacquire_terminal () =
     (Core_unix.system "stty -icanon -echo -isig -ixon -iexten </dev/tty"
      : Core_unix.Exit_or_signal.t);
   write_tty "\027[?1049h";
+  write_tty "\027[?2004h";
   write_tty Term_focus.enable;
   !repaint ()
 ;;
@@ -119,18 +150,24 @@ let append_history text =
     Out_channel.newline oc)
 ;;
 
-let find_on_path name =
-  match Sys.getenv "PATH" with
-  | None -> None
-  | Some path ->
-    List.find_map (String.split path ~on:':') ~f:(fun dir ->
-      let candidate = Filename.concat dir name in
-      let exists =
-        match Sys_unix.file_exists candidate with
-        | `Yes -> true
-        | `No | `Unknown -> false
-      in
-      Option.some_if exists candidate)
+(* Pause our stdin reader while an external editor owns [/dev/tty] so Async
+   does not steal keystrokes while staying responsive for WS heartbeats. *)
+let pause_input : unit Ivar.t ref = ref (Ivar.create ())
+let resume_input : unit Ivar.t option ref = ref None
+
+let pause_stdin () =
+  let resume = Ivar.create () in
+  resume_input := Some resume;
+  Ivar.fill_if_empty !pause_input ()
+;;
+
+let resume_stdin () =
+  pause_input := Ivar.create ();
+  match !resume_input with
+  | None -> ()
+  | Some resume ->
+    resume_input := None;
+    Ivar.fill_if_empty resume ()
 ;;
 
 let copy_to_clipboard text =
@@ -160,12 +197,19 @@ let edit_externally text =
        | Some v when not (String.is_empty v) -> v
        | _ -> "vi")
   in
-  release_terminal ();
-  let status =
-    Core_unix.system
-      (sprintf "%s %s </dev/tty >/dev/tty 2>&1" editor (Filename.quote tmp))
+  let cmd =
+    sprintf "%s %s </dev/tty >/dev/tty 2>&1" editor (Filename.quote tmp)
   in
-  reacquire_terminal ();
+  pause_stdin ();
+  release_terminal ();
+  let%map.Deferred status =
+    Monitor.protect
+      (fun () -> In_thread.run (fun () -> Core_unix.system cmd))
+      ~finally:(fun () ->
+        reacquire_terminal ();
+        resume_stdin ();
+        Deferred.return ())
+  in
   let contents = In_channel.read_all tmp in
   (try Core_unix.unlink tmp with
    | _ -> ());
@@ -201,7 +245,7 @@ let platform link ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
                  notification))
           ())
   ; suspend = Effect.of_sync_fun suspend ()
-  ; edit_externally = (fun text -> Effect.of_sync_fun edit_externally text)
+  ; edit_externally = (fun text -> Effect.of_deferred_fun edit_externally text)
   ; reconnect =
       (fun ~delay_ms ~session ~as_user ->
         Effect.of_deferred_fun
@@ -268,6 +312,7 @@ let app
          ])
     graph;
   let paste = ref Paste.Idle in
+  reset_paste := (fun () -> paste := Paste.Idle);
   Bonsai.Edge.on_change
     dimensions
     ~equal:Dimensions.equal
@@ -310,12 +355,20 @@ let app
       | Paste `End, Idle -> Effect.Ignore
       | Key_press _, Collecting buf ->
         (match Key_of_event.key event with
+         | Some ({ code = Char ("c" | "C"); ctrl = true; alt = false; _ } as key)
+           ->
+           paste := Idle;
+           inject (Key key)
          | Some { code = Char c; ctrl = false; alt = false; _ } ->
-           Buffer.add_string buf c
-         | Some { code = Enter; _ } -> Buffer.add_char buf '\n'
-         | Some { code = Tab; _ } -> Buffer.add_char buf '\t'
-         | _ -> ());
-        Effect.Ignore
+           Buffer.add_string buf c;
+           Effect.Ignore
+         | Some { code = Enter; _ } ->
+           Buffer.add_char buf '\n';
+           Effect.Ignore
+         | Some { code = Tab; _ } ->
+           Buffer.add_char buf '\t';
+           Effect.Ignore
+         | _ -> Effect.Ignore)
       | Key_press _, Idle ->
         (match Key_of_event.key event with
          | Some key -> inject (Key key)
@@ -425,16 +478,67 @@ let focus_reporting_input ~on_focus =
     in
     at_exit restore;
     let filtered_r, filtered_w = Pipe.create () in
+    let focus_parser = Term_focus.create () in
+    let stdin_fd = Fd.stdin () in
+    let buf = Bytes.create 4096 in
+    let flush_pending () =
+      let pending = Term_focus.flush focus_parser in
+      if not (String.is_empty pending)
+      then Pipe.write_without_pushback_if_open filtered_w pending
+    in
+    let rec read_loop () =
+      match !resume_input with
+      | Some resume ->
+        flush_pending ();
+        let%bind.Deferred () = Ivar.read resume in
+        read_loop ()
+      | None ->
+        let choices =
+          [ Deferred.choice (Ivar.read !pause_input) (fun () -> `Paused)
+          ; Deferred.choice (Fd.ready_to stdin_fd `Read) (fun r -> `Fd r)
+          ]
+          @
+          if Term_focus.has_pending focus_parser
+          then
+            [ Deferred.choice
+                (Clock.after (Time_float.Span.of_ms 25.))
+                (fun () -> `Flush)
+            ]
+          else []
+        in
+        let%bind.Deferred ready = Deferred.choose choices in
+        (match ready with
+         | `Paused -> read_loop ()
+         | `Flush ->
+           flush_pending ();
+           read_loop ()
+         | `Fd (`Bad_fd | `Closed) ->
+           flush_pending ();
+           Deferred.return ()
+         | `Fd `Ready ->
+           if Option.is_some !resume_input
+           then read_loop ()
+           else (
+             match Core_unix.read tty ~buf with
+             | 0 ->
+               flush_pending ();
+               Deferred.return ()
+             | n ->
+               let chunk = Bytes.To_string.sub buf ~pos:0 ~len:n in
+               let input, reports = Term_focus.feed focus_parser chunk in
+               List.iter reports ~f:(fun focused -> !on_focus focused);
+               if not (String.is_empty input)
+               then Pipe.write_without_pushback_if_open filtered_w input;
+               read_loop ()
+             | exception
+                 Core_unix.Unix_error ((EAGAIN | EWOULDBLOCK | EINTR), _, _) ->
+               read_loop ()
+             | exception Core_unix.Unix_error _ ->
+               flush_pending ();
+               Deferred.return ()))
+    in
     don't_wait_for
-      (let%map.Deferred () =
-         Pipe.iter_without_pushback
-           (Reader.pipe (force Reader.stdin))
-           ~f:(fun chunk ->
-             let input, reports = Term_focus.split chunk in
-             List.iter reports ~f:(fun focused -> !on_focus focused);
-             if not (String.is_empty input)
-             then Pipe.write_without_pushback_if_open filtered_w input)
-       in
+      (let%map.Deferred () = read_loop () in
        Pipe.close filtered_w);
     Some (Reader.of_pipe (Info.of_string "prigh-tui input") filtered_r, restore))
 ;;

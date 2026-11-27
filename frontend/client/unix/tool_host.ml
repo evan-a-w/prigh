@@ -64,7 +64,7 @@ let hold t (held : Held.t) =
   | _ -> ()
 ;;
 
-let call t method_ params =
+let rec call t method_ params =
   let held = { Held.method_; params } in
   if not t.online
   then hold t held
@@ -72,12 +72,25 @@ let call t method_ params =
     don't_wait_for
       (match%map Client.call t.client method_ params with
        | Ok _ -> ()
-       | Error _ ->
-         (* Lost with the connection; a result that made it is ignored. *)
-         if not (Client.is_connected t.client)
+       | Error e ->
+         (* Lost with the connection; a result that made it is ignored. On a
+            fast reconnect [Client.is_connected] may already be true again when
+            the old call's error arrives, so also recognise disconnect errors. *)
+         let lost =
+           (not (Client.is_connected t.client))
+           || (not t.online)
+           ||
+           match Error.to_string_hum e with
+           | "backend closed" | "not connected" -> true
+           | _ -> false
+         in
+         if (not t.closing) && lost
          then (
            match method_ with
-           | "tool_exec_result" -> Queue.enqueue t.held held
+           | "tool_exec_result" ->
+             if t.online && Client.is_connected t.client
+             then call t method_ params
+             else Queue.enqueue t.held held
            | _ -> ()))
 ;;
 
