@@ -158,7 +158,7 @@ let add t (item : Item.t) =
 ;;
 
 let notice ?(severity = Severity.Info) t text = add t (Notice (severity, text))
-let clear t = { t with items_rev = [] }
+let clear (_ : t) = empty
 
 let filter t filter =
   if Transcript_filter.is_all filter
@@ -609,6 +609,7 @@ let stream_update t (u : P.Stream_update.t) =
        whole message). *)
     apply_delta t ?partial:u.partial u.delta
   | Some partial, _ -> resync_to t partial ~at
+  | None, Some last when last.stream = u.stream && u.seq <= last.seq -> t
   | None, _ when u.from = 1 ->
     let t =
       match t.at, t.message_start with
@@ -619,7 +620,6 @@ let stream_update t (u : P.Stream_update.t) =
       Some (Option.value t.message_start ~default:(List.length t.items_rev))
     in
     { (apply_delta t u.delta) with at = Some at; resync = false; message_start }
-  | None, Some last when last.stream = u.stream && u.seq <= last.seq -> t
   | None, Some last when last.stream = u.stream && u.from = last.seq + 1 ->
     { (apply_delta t u.delta) with at = Some at }
   | None, (Some _ | None) -> { t with resync = true }

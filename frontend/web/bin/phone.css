@@ -83,12 +83,12 @@
    Whatever opens from a button on a phone comes up from the bottom, full
    width, with a grip and room for the home indicator. */
 
-.app.narrow :is(.chrome-menu, .chip-popover, .context-menu, .account-menu, .filter-menu, .review-popover) {
+.app.narrow :is(.chrome-menu, .chip-popover, .context-menu, .account-menu, .filter-menu, .review-popover, .context-card, .code-menu) {
   position: fixed !important;
   top: auto !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 0 !important;
+  bottom: var(--vvb, 0px) !important;
   width: auto !important;
   max-width: none !important;
   max-height: min(78dvh, calc(var(--vvh, 100dvh) - var(--safe-t) - 24px)) !important;
@@ -114,7 +114,7 @@
 .app.narrow .chip-popover { display: flex; }
 @keyframes sheet-up { from { transform: translateY(24px); } }
 @media (prefers-reduced-motion: reduce) {
-  .app.narrow :is(.chrome-menu, .chip-popover, .context-menu, .account-menu, .filter-menu, .review-popover) { animation: none; }
+  .app.narrow :is(.chrome-menu, .chip-popover, .context-menu, .account-menu, .filter-menu, .review-popover, .context-card, .code-menu) { animation: none; }
 }
 /* What is behind a sheet dims. */
 .app.narrow :is(.chrome-backdrop, .menu-backdrop) { background: var(--scrim); }
@@ -147,7 +147,7 @@
     flex: none;
     height: 64px;
     margin-top: -64px;
-    background: linear-gradient(transparent, var(--card) 75%);
+    background: linear-gradient(transparent, var(--popover) 75%);
     pointer-events: none;
     /* Seen only while the sheet scrolls: a sheet that fits has no timeline. */
     opacity: 0;
@@ -197,6 +197,9 @@
 .app.narrow .toasts { bottom: calc(100% + 8px); }
 /* Over the jump to the bottom, not on it. */
 .app.narrow:has(.jump-to-bottom) .toasts { bottom: calc(100% + 56px); }
+.app.narrow:is(:has(.modal-backdrop), .files-open, .reviewing, .review-open, .terminal-open) .toasts {
+  bottom: calc(max(12px, var(--safe-b)) + var(--vvb, 0px));
+}
 
 /* {1 Dialogs: full-screen pages}
 
@@ -204,7 +207,7 @@
    buttons at the foot over the home indicator. Small confirmations stay a
    sheet from the bottom. */
 
-.app.narrow .modal-backdrop { padding: 0; align-items: flex-end; }
+.app.narrow .modal-backdrop { top: var(--vvt, 0px); bottom: var(--vvb, 0px); padding: 0; align-items: flex-end; }
 .app.narrow .modal {
   width: 100%;
   max-width: none;
@@ -262,6 +265,9 @@
 /* {1 The drawer} */
 
 .app.narrow .sidebar {
+  top: var(--vvt, 0px);
+  bottom: auto;
+  height: var(--vvh, 100dvh);
   width: min(86vw, 340px);
   padding-top: var(--safe-t);
   padding-bottom: var(--safe-b);
@@ -302,8 +308,9 @@
 .app.narrow .chip-popover.model-menu { padding-left: 0 !important; padding-right: 0 !important; overflow: visible; }
 /* One height whatever the provider or engine: the sheet does not jump. */
 .app.narrow .chip-popover.model-menu { height: min(560px, 78dvh, calc(var(--vvh, 100dvh) - var(--safe-t) - 24px)); }
-.app.narrow .model-menu-body { flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+.app.narrow .model-menu-body { flex-direction: column; overflow: hidden; }
 .app.narrow .model-rail {
+  flex: none;
   flex-direction: row;
   width: auto;
   padding: 0 max(8px, var(--safe-l)) 4px;
@@ -315,12 +322,14 @@
 .app.narrow .model-rail-tab { width: var(--tap); height: var(--tap); flex: none; }
 .app.narrow .model-rail-tab.on::before { left: 10px; right: 10px; top: auto; bottom: -4px; width: auto; height: 3px; border-radius: 2px 2px 0 0; }
 .app.narrow .model-rail-rule { width: 0; height: 22px; border-top: 0; border-left: 1px solid var(--border); margin: 0 4px; }
-.app.narrow .model-menu-main { padding: 0 max(4px, var(--safe-l)); }
+.app.narrow .model-menu-main { padding: 0 max(4px, var(--safe-l)); min-height: 0; overflow: hidden; }
 .app.narrow .model-menu-main .popover-search { padding: 4px 8px; }
+.app.narrow .model-menu-main .popover-items { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
 .app.narrow .model-row { min-height: var(--tap); }
 .app.narrow .model-key { display: none; }
 .app.narrow .model-star { width: var(--tap); height: var(--tap); }
 .app.narrow .model-reasoning {
+  flex: none;
   width: auto;
   flex-direction: row;
   flex-wrap: wrap;
@@ -343,12 +352,22 @@
 .app.narrow .reasoning-row.on { border-color: var(--primary); background: var(--sodium-wash); }
 .app.narrow .reasoning-row .reasoning-check { display: none; }
 .app.narrow .reasoning-label { flex: none; }
-.app.narrow .model-menu-foot { padding: 4px max(8px, var(--safe-r)) 0 max(12px, var(--safe-l)); }
+.app.narrow .model-menu-foot { flex: none; padding: 4px max(8px, var(--safe-r)) 0 max(12px, var(--safe-l)); justify-content: flex-end; }
 .app.narrow .model-menu-foot > .menu-keys { display: none; }
-.app.narrow .model-menu-foot { justify-content: flex-end; }
 .app.narrow .model-access-button { min-height: var(--tap); }
 .app.narrow .model-access-item { min-height: var(--tap); }
-.app.narrow .model-access-menu { width: min(300px, calc(100vw - 24px)); }
+.app.narrow .model-access-menu {
+  position: fixed;
+  left: max(12px, var(--safe-l));
+  right: max(12px, var(--safe-r));
+  width: auto;
+  max-width: none;
+  bottom: calc(56px + max(8px, var(--safe-b)) + var(--vvb, 0px));
+  max-height: min(50dvh, calc(var(--vvh, 100dvh) - var(--safe-t) - 80px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: calc(var(--z-menu-surface) + 1);
+}
 /* A tool's line is the toggle for its output: a thumb's height. */
 .app.narrow .tool-head { min-height: var(--tap); }
 /* So is a run's line in quiet. */
@@ -363,6 +382,11 @@
 .app.narrow button.copy { min-height: var(--tap); padding: 0 12px; }
 .app.narrow .modal-back { min-width: 44px; justify-content: center; }
 .app.narrow .account-button { margin-left: 0; min-height: 44px; }
+.app.narrow .jump-to-bottom { width: var(--tap); height: var(--tap); }
+.app.narrow .btw-head .btn.icon { width: var(--tap); height: var(--tap); }
+.app.narrow .worktree { min-height: var(--tap); }
+.app.narrow .pr-toggle { min-height: var(--tap); }
+.app.narrow .pr-checkout .btn.small { min-height: var(--tap); height: auto; }
 
 /* Help: the keys over what they do, not a 1%-wide column broken a letter a line. */
 
@@ -481,6 +505,6 @@
 .app.narrow .mcp-pair-remove { width: var(--tap); }
 .app.narrow .mcp-pair-add { min-height: var(--tap); }
 .app.narrow .mcp-field .text-input:not(textarea) { min-height: var(--tap); }
-.app.narrow .mcp-tools-toggle { min-height: 0; padding: 6px 0; margin: -6px 0; }
+.app.narrow .mcp-tools-toggle { min-height: var(--tap); padding: 6px 0; }
 
 .app.narrow .model-trouble-fix { min-height: 44px; padding: 0 14px; }

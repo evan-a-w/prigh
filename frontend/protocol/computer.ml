@@ -19,7 +19,8 @@ let of_json j =
       Option.value
         (Option.first_some
            (Int.of_string_opt n)
-           (Option.map (Float.of_string_opt n) ~f:Float.iround_nearest_exn))
+           (Option.bind (Float.of_string_opt n) ~f:(fun f ->
+              if Float.is_finite f then Float.iround_nearest f else None)))
         ~default:0
     | _ -> 0
   in

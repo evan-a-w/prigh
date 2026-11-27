@@ -250,7 +250,12 @@ let stream
   in
   let request () =
     let rec attempt ~retry =
-      match idle (fun () -> Http_pool.acquire pool ~env uri) with
+      let acquire () =
+        if retry
+        then Http_pool.acquire pool ~env uri
+        else Http_pool.acquire_fresh pool ~env uri
+      in
+      match idle acquire with
       | exception exn when is_net_error exn ->
         Error (Error.Connection_failed (describe exn))
       | conn ->

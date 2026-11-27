@@ -183,6 +183,7 @@
   app.css
   recursive-sans.woff2
   recursive-mono.woff2
+  inter-sans.woff2
   terminal.js
   xterm.js
   xterm.css

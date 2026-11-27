@@ -3,10 +3,10 @@
    order: the stylesheets loaded later (xterm's, KaTeX's: Page_assets puts
    them in [vendor]), Tailwind's theme, base styles (the components' reset,
    the themes' palettes), the components (prigh-web's page rules first, in
-   [components.page]: style.css to phone.css; then genui.css, diff.css,
-   review.css, forge.css, workspace.css, signin.css), then the utilities,
-   which win over all of them. */
-@layer vendor, theme, base, components, utilities;
+   [components.page]: style.css to temporary.css; then genui.css, diff.css,
+   review.css, forge.css, workspace.css, signin.css), phone.css in [phone],
+   then the utilities, which win over all of them. */
+@layer vendor, theme, base, components, phone, utilities;
 @layer components.page;
 
 @import "tailwindcss/theme.css" layer(theme);

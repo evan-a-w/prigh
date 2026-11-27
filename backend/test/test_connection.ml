@@ -587,7 +587,7 @@ let keepalive_with ~peer =
       (fun () ->
          Websocket.keepalive
            ws
-           ~clock:(Eio.Stdenv.clock t.env)
+           ~clock:(Eio.Stdenv.mono_clock t.env)
            ~shutdown:(fun () ->
              shut := true;
              Eio.Flow.shutdown server_end `All)
@@ -628,6 +628,101 @@ let%expect_test "a WebSocket write stuck on a peer that does not read is ended" 
     |}]
 ;;
 
+let blocking_sink ~on_write =
+  let module S = struct
+    type t = unit -> unit
+
+    let single_write f _ =
+      f ();
+      0
+    ;;
+
+    let copy f ~src:_ = f ()
+  end
+  in
+  Eio.Resource.T (on_write, Eio.Flow.Pi.sink (module S))
+;;
+
+let%expect_test "Websocket.write re-raises Eio.Cancel.Cancelled" =
+  with_sandbox
+  @@ fun _ ->
+  let write_started, resolve_started = Eio.Promise.create () in
+  let flow =
+    blocking_sink ~on_write:(fun () ->
+      Eio.Promise.resolve resolve_started ();
+      Fiber.await_cancel ())
+  in
+  let ws = Websocket.create ~reader:(Eio.Buf_read.of_string "") ~flow () in
+  let saw_cancelled = ref false in
+  Fiber.first
+    (fun () ->
+       try Websocket.send_text ws "hello" with
+       | Eio.Cancel.Cancelled _ as exn ->
+         saw_cancelled := true;
+         raise exn)
+    (fun () -> Eio.Promise.await write_started);
+  printf "cancelled: %b; closed: %b\n" !saw_cancelled (Websocket.is_closed ws);
+  [%expect {| cancelled: true; closed: true |}]
+;;
+
+let%expect_test
+    "keepalive drops a peer within timeout even when a write is blocked"
+  =
+  with_sandbox
+  @@ fun _ ->
+  let clock = Eio_mock.Clock.Mono.make () in
+  let write_started, resolve_started = Eio.Promise.create () in
+  let flow =
+    blocking_sink ~on_write:(fun () ->
+      Eio.Promise.resolve resolve_started ();
+      Fiber.await_cancel ())
+  in
+  let ws = Websocket.create ~reader:(Eio.Buf_read.of_string "") ~flow () in
+  let shut = ref false in
+  let elapsed_ticks = ref 0 in
+  Fiber.first
+    (fun () ->
+       Websocket.keepalive
+         ws
+         ~clock
+         ~shutdown:(fun () -> shut := true)
+         ~interval:15.
+         ~timeout:45.
+         ~write_timeout:300.
+         ())
+    (fun () ->
+       Fiber.both
+         (fun () -> Websocket.send_text ws "stalled")
+         (fun () ->
+            Eio.Promise.await write_started;
+            while not !shut do
+              for _ = 1 to 5 do
+                Eio.Fiber.yield ()
+              done;
+              if Eio_mock.Clock.Mono.try_advance clock then incr elapsed_ticks
+            done;
+            Fiber.await_cancel ()));
+  printf
+    "shut: %b; closed: %b; under_write_timeout: %b\n"
+    !shut
+    (Websocket.is_closed ws)
+    (!elapsed_ticks < 20);
+  [%expect
+    {|
+    +mock time is now 5
+    +mock time is now 10
+    +mock time is now 15
+    +mock time is now 20
+    +mock time is now 25
+    +mock time is now 30
+    +mock time is now 35
+    +mock time is now 40
+    +mock time is now 45
+    +mock time is now 50
+    shut: true; closed: true; under_write_timeout: true
+    |}]
+;;
+
 let%expect_test "an outbox writes in order, and what waits when it finishes" =
   with_sandbox
   @@ fun _ ->
@@ -648,5 +743,44 @@ let%expect_test "an outbox writes in order, and what waits when it finishes" =
     a
     b
     the peer is not reading what is sent to it (4 messages waiting); waiting: 0
+    |}]
+;;
+
+let%expect_test "outbox enforces max_bytes on Rendered_late entries" =
+  with_sandbox
+  @@ fun _ ->
+  let outbox = Outbox.create ~max_lines:10 ~max_bytes:100 () in
+  let late = Outbox.send_late outbox ~bytes:40 (fun () -> "payload") in
+  printf
+    "initial: waiting=%d bytes=%d\n"
+    (Outbox.waiting outbox)
+    (Outbox.bytes outbox);
+  Outbox.resize_late outbox late ~bytes:90;
+  printf
+    "resized: waiting=%d bytes=%d\n"
+    (Outbox.waiting outbox)
+    (Outbox.bytes outbox);
+  Outbox.finish outbox;
+  Outbox.run outbox ~write:ignore;
+  printf
+    "drained: waiting=%d bytes=%d\n"
+    (Outbox.waiting outbox)
+    (Outbox.bytes outbox);
+  let capped = Outbox.create ~max_lines:10 ~max_bytes:100 () in
+  let late2 = Outbox.send_late capped ~bytes:40 (fun () -> "never") in
+  Outbox.resize_late capped late2 ~bytes:101;
+  printf
+    "capped: %s; waiting=%d bytes=%d\n"
+    (Option.value
+       (Eio.Promise.peek (Outbox.failed capped))
+       ~default:"not failed")
+    (Outbox.waiting capped)
+    (Outbox.bytes capped);
+  [%expect
+    {|
+    initial: waiting=1 bytes=40
+    resized: waiting=1 bytes=90
+    drained: waiting=0 bytes=0
+    capped: the peer is not reading what is sent to it (101 bytes waiting); waiting=0 bytes=0
     |}]
 ;;

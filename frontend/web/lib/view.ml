@@ -325,7 +325,10 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
   in
   (* On a phone the file browser and the session card are sheets over the
      page: they have the keyboard while open. *)
-  let sheet = m.narrow && (m.files.open_ || m.session_card.sheet) in
+  let sheet =
+    m.narrow
+    && (m.files.open_ || (m.session_card.sheet && Session_card_view.something m))
+  in
   (* So is the drawer, over the page. *)
   let drawer = Model.drawer m in
   let layered covered = inert_if (covered || sheet || drawer) in
@@ -344,7 +347,12 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
   in
   let chat (m : Model.t) =
     match m.subagent_chat with
-    | Some id -> Subagent_chat_view.view m ~inject id
+    | Some id ->
+      Subagent_chat_view.view
+        ~ui:{ state = m.ui; inject = ui_inject inject; sent = [] }
+        m
+        ~inject
+        id
     | None -> chat m
   in
   Node.div

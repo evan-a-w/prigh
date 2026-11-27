@@ -1689,7 +1689,8 @@ let on_update t params =
            | _ -> false)
        then turn.saw_text <- false;
        opened @ events)
-  | Some "plan" -> on_plan (items "entries" update)
+  | Some "plan" ->
+    if Option.is_some t.turn then on_plan (items "entries" update) else []
   | Some "usage_update" -> on_usage t update
   | Some "notice" ->
     let title = String.strip (Option.value (str "title" update) ~default:"") in
@@ -1788,6 +1789,12 @@ let end_turn t (stop : Adapter_event.Stop.t) =
 let is_autonomous_turn t =
   match t.turn with
   | Some { autonomous = true; _ } -> true
+  | Some _ | None -> false
+;;
+
+let is_cancelled_turn t =
+  match t.turn with
+  | Some { cancelled = true; _ } -> true
   | Some _ | None -> false
 ;;
 

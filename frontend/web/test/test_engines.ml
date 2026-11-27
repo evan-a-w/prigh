@@ -266,6 +266,13 @@ let%expect_test
   H.type_ h "hello";
   H.names h ~selector:".send";
   H.act h Send;
+  let m = H.model h in
+  print_s
+    [%message
+      ""
+        ~draft:(m.draft : string)
+        ~sending:(m.pending.sending : int)
+        ~prompts:(List.length m.pending.prompts : int)];
   toasts h;
   H.click h ~selector:".engine-banner-new";
   [%expect
@@ -273,9 +280,7 @@ let%expect_test
     Codex is not installed on srv: install it there (npm i -g @openai/codex), then retry (New session)
     button "Send" -- This session can't run here: see above
     icon "(no name)"
-    (Rpc (method_ push_pref) (params ((key history) (value hello) (max 500)))
-     (tag Ignore))
-    Scroll_to_bottom
+    ((draft hello) (sending 0) (prompts 0))
     Codex is not installed on srv: install it there (npm i -g @openai/codex), then retry (Dismiss)
     New_session
     (Rpc (method_ new_session) (params ()) (tag Reload_state))
@@ -752,7 +757,8 @@ let%expect_test
     button "Retry" -- /adapters retry
     |}];
   H.click h ~selector:".model-trouble-fix" ~nth:1;
-  [%expect {|
+  [%expect
+    {|
     (Run "/adapters retry")
     (Rpc (method_ retry_models) (params ()) (tag Show_error))
     |}];

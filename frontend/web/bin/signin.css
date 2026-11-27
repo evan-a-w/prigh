@@ -7,9 +7,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   min-height: 100%;
-  padding: 32px 16px;
+  padding: max(24px, var(--safe-t)) max(20px, var(--safe-r)) max(24px, var(--safe-b)) max(20px, var(--safe-l));
   background: var(--background);
   color: var(--foreground);
   overflow-y: auto;
@@ -22,6 +21,7 @@
   flex-direction: column;
   gap: 14px;
   width: min(380px, 100%);
+  margin: auto 0;
   padding: 24px;
   background: var(--card);
   color: var(--card-foreground);
@@ -149,7 +149,7 @@
   .signin { padding: 8px 0; background: transparent; border: 0; box-shadow: none; }
 }
 @media (pointer: coarse) {
-  .signin input { font-size: 16px; height: 44px; }
+  .signin input, .signin details input { font-size: 16px; height: 44px; }
   .signin .btn { min-height: 44px; }
   .signin .saved-forget { width: 44px; height: 44px; }
 }

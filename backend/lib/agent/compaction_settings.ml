@@ -20,11 +20,17 @@ let window_only =
 ;;
 
 let threshold t (model : Model.t) =
-  let window = model.context_window * 4 / 5 in
-  Option.value_map t.max_tokens ~default:window ~f:(Int.min window)
+  if model.context_window > 0
+  then (
+    let window = model.context_window * 4 / 5 in
+    Option.value_map t.max_tokens ~default:window ~f:(Int.min window))
+  else Option.value t.max_tokens ~default:0
 ;;
 
-let should_compact t model ~input_tokens = input_tokens > threshold t model
+let should_compact t model ~input_tokens =
+  let limit = threshold t model in
+  limit > 0 && input_tokens > limit
+;;
 
 let worth_masking_at
       ?(at = 0.625)

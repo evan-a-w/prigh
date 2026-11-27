@@ -500,15 +500,7 @@ let question_dialog ~width ~utc_offset form =
   in
   let pointer row = if Question_form.cursor form = row then "› " else "  " in
   (* Long descriptions and answers wrap, indented under the label. *)
-  let chunks text ~width =
-    let rec go text acc =
-      let head, rest = Text_width.take text ~width:(Int.max 1 width) in
-      if String.is_empty rest
-      then List.rev (head :: acc)
-      else go rest (head :: acc)
-    in
-    go text []
-  in
+  let chunks text ~width = Text_width.chunks text ~width in
   let indent = "      " in
   let choices =
     List.mapi q.choices ~f:(fun i (c : P.Question.Choice.t) ->
@@ -652,13 +644,7 @@ let pr_form_dialog ~width form =
     let room = Int.max 1 (inner - String.length indent) in
     let rows =
       List.concat_map (String.split value ~on:'\n') ~f:(fun line ->
-        let rec go text acc =
-          let head, rest = Text_width.take text ~width:room in
-          if String.is_empty rest
-          then List.rev (head :: acc)
-          else go rest (head :: acc)
-        in
-        go line [])
+        Text_width.chunks line ~width:room)
     in
     let focused = Pr_form.Field.equal focus which in
     let shown, hidden =
@@ -806,15 +792,7 @@ let editor_rows ?(width = 0) (m : App.Model.t) ~marker ~marker_style ~mask
       then String.make (List.length (Text_width.uchars line)) '*'
       else line
     in
-    let chunks =
-      let rec go text acc =
-        let head, rest = Text_width.take text ~width:inner in
-        if String.is_empty rest
-        then List.rev (head :: acc)
-        else go rest (head :: acc)
-      in
-      go line []
-    in
+    let chunks = Text_width.chunks line ~width:inner in
     let first_row = !emitted in
     List.iteri chunks ~f:(fun j chunk ->
       rows := (prefix i j :: Content.Line.of_string chunk) :: !rows;
@@ -1712,7 +1690,9 @@ let sidebar (m : App.Model.t) ~width ~rows : Content.t =
   in
   let room = Int.max 0 (rows - 1) in
   let body =
-    if List.length body <= room
+    if room = 0
+    then []
+    else if List.length body <= room
     then body
     else
       List.take body (room - 1)
@@ -1921,15 +1901,17 @@ let frame (m : App.Model.t) =
         if i = row then pad line ~width:col @ badge else line)
   in
   let main =
-    List.take transcript overlay_top
-    @ List.map overlay_lines ~f:(Content.Line.truncate ~width:area)
+    exactly
+      rows
+      (List.take transcript (Int.max 0 overlay_top)
+       @ List.map overlay_lines ~f:(Content.Line.truncate ~width:area))
   in
   let main =
     if layout.sidebar = 0
     then main
     else
       List.map2_exn
-        (sidebar m ~width:(layout.sidebar - 2) ~rows)
+        (exactly rows (sidebar m ~width:(layout.sidebar - 2) ~rows))
         main
         ~f:(fun side line ->
           pad side ~width:(layout.sidebar - 2)

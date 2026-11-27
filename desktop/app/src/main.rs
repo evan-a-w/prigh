@@ -94,6 +94,13 @@ impl Sidecar {
         windows.entry(label.to_string()).or_default().on_loaded(url, &origins, remote.as_ref(), Instant::now())
     }
 
+    fn download(&self, label: &str, url: &str) {
+        let mut windows = self.windows.lock().unwrap();
+        if let Some(w) = windows.get_mut(label) {
+            w.on_download(url);
+        }
+    }
+
     fn remote(&self) -> Option<Remote> {
         self.remote.lock().unwrap().clone()
     }
@@ -290,10 +297,8 @@ impl BrowserWindow {
         (alive(pid) && self.runs_on_profile(pid)).then_some(pid)
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     fn runs_on_profile(&self, pid: i32) -> bool {
-        // Only Linux says (in /proc) what a process runs: elsewhere a pid
-        // from the lock is not trusted with a signal.
         // The command line can be rewritten (its title) or reordered (a
         // relaunch): files it holds open in the profile say it too.
         std::fs::read(format!("/proc/{pid}/cmdline"))
@@ -304,6 +309,26 @@ impl BrowserWindow {
                     .filter_map(|fd| std::fs::read_link(fd.path()).ok())
                     .any(|target| target.starts_with(&profile))
             })
+    }
+
+    #[cfg(all(unix, not(target_os = "linux")))]
+    fn runs_on_profile(&self, pid: i32) -> bool {
+        let Ok(out) = Command::new("ps")
+            .args(["-ww", "-p", &pid.to_string(), "-o", "command="])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+        else {
+            return false;
+        };
+        if !out.status.success() {
+            return false;
+        }
+        let mut cmdline = out.stdout;
+        while cmdline.last().is_some_and(u8::is_ascii_whitespace) {
+            cmdline.pop();
+        }
+        browser::names_profile(&cmdline, &self.profile.to_string_lossy())
     }
 
     /// Ends the instance `pid` on prigh's profile: SIGTERM, then SIGKILL.
@@ -327,6 +352,7 @@ impl BrowserWindow {
     /// The backend's site, as the sidecar now says to show it (see
     /// [prigh_desktop_core::devtools::Links::set_remote]).
     fn set_remote(&self, remote: Remote, here: bool) {
+        *self.url.lock().unwrap() = Some(browser::with_browser_shell(&remote.url));
         #[cfg(target_os = "linux")]
         if let Some(watcher) = self.devtools.lock().unwrap().clone() {
             watcher.set_remote(remote, here);
@@ -855,7 +881,7 @@ fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
         }
         first
     };
-    if page.remote {
+    let remote_for_page = if page.remote {
         log(format!("showing the backend's prigh-web at {}", redact(url)));
         let remote = Remote {
             url: url.to_string(),
@@ -866,26 +892,35 @@ fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
         if page.here {
             log("signing in to the backend's site in the window");
         }
-        if let Some(b) = sidecar.browser() {
-            b.set_remote(remote, page.here);
-        } else if let Some(w) = app.get_webview_window(WINDOW) {
-            let mut windows = sidecar.windows.lock().unwrap();
-            let window = windows.entry(WINDOW.to_string()).or_default();
-            if page.here {
-                window.sign_in_here();
-            } else if !remote.cookies.is_empty() {
-                set_cookies(&w, &remote);
-                window.cookies_given(&remote.cookies);
+        if sidecar.browser().is_none() {
+            if let Some(w) = app.get_webview_window(WINDOW) {
+                let mut windows = sidecar.windows.lock().unwrap();
+                let window = windows.entry(WINDOW.to_string()).or_default();
+                if page.here {
+                    window.sign_in_here();
+                } else if !remote.cookies.is_empty() {
+                    set_cookies(&w, &remote);
+                    window.cookies_given(&remote.cookies);
+                }
             }
         }
+        Some(remote)
     } else {
         log(format!("prigh desktop is ready at {}", redact(url)));
-    }
+        None
+    };
     if let Some(b) = sidecar.browser() {
-        // Later pages (the backend's site after the connect form) the
-        // page goes to itself.
+        // On the first page, open the browser before updating remote state:
+        // Pipe::watch picks up sidecar.remote() once attached. Later remote
+        // pages update b.url and notify DevTools (the page navigates itself).
         if first {
             b.open(app, sidecar, url);
+            #[cfg(not(target_os = "linux"))]
+            if remote_for_page.as_ref().is_some_and(|r| !r.cookies.is_empty()) {
+                log("no DevTools pipe to give the browser window the sign-in: it signs in to the site itself");
+            }
+        } else if let Some(remote) = remote_for_page {
+            b.set_remote(remote, page.here);
         }
         return;
     }
@@ -896,6 +931,11 @@ fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
     } else {
         parsed
     };
+    let already = w.url().ok().is_some_and(|u| u == target)
+        || sidecar.windows.lock().unwrap().get(WINDOW).is_some_and(|win| win.is_loading(target.as_str()));
+    if already {
+        return;
+    }
     sidecar.windows.lock().unwrap().entry(WINDOW.to_string()).or_default().loading(target.as_str());
     if let Err(e) = w.navigate(target) {
         log(format!("navigating to prigh-web: {e}"));
@@ -928,14 +968,19 @@ fn later_in_window(app: &AppHandle, sidecar: &Arc<Sidecar>, label: &str, url: St
 /// Gives the app's window the backend's site's cookies (from signing in to
 /// its proxy through the default browser).
 fn set_cookies(w: &tauri::WebviewWindow, remote: &Remote) {
-    let Some(domain) = Url::parse(&remote.url).ok().and_then(|u| u.host_str().map(str::to_string)) else { return };
+    let Ok(parsed) = Url::parse(&remote.url) else { return };
+    let Some(domain) = parsed.host_str().map(str::to_string) else { return };
+    let secure = parsed.scheme() == "https";
     for (name, value) in &remote.cookies {
-        let cookie = tauri::webview::Cookie::build((name.clone(), value.clone()))
-            .domain(domain.clone())
+        let mut builder = tauri::webview::Cookie::build((name.clone(), value.clone()))
             .path("/")
-            .secure(remote.url.starts_with("https://"))
-            .http_only(true)
-            .build();
+            .secure(secure)
+            .http_only(true);
+        // RFC 6265bis: __Host- cookies must be host-only (no Domain attribute).
+        if !name.starts_with("__Host-") {
+            builder = builder.domain(domain.clone());
+        }
+        let cookie = builder.build();
         match w.set_cookie(cookie) {
             Ok(()) => log(format!("gave the window the cookie {name} for {domain}")),
             Err(e) => log(format!("could not give the window the cookie {name} for {domain}: {e}")),
@@ -1027,6 +1072,7 @@ fn build_window(
     let (new_app, new_sidecar) = (app.clone(), sidecar.clone());
     let gpu_info = cfg!(target_os = "linux") && env_flag("PRIGH_DESKTOP_GPU_INFO");
     let perm_sidecar = sidecar.clone();
+    let download_sidecar = sidecar.clone();
     let load_sidecar = sidecar;
     let close_on_load = env_flag("PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD");
     // Tests: a script run on each of the sidecar's pages, which closes the
@@ -1107,9 +1153,10 @@ fn build_window(
                 NewWindowResponse::Deny
             }
         })
-        .on_download(|_, event| {
+        .on_download(move |webview, event| {
             match event {
                 DownloadEvent::Requested { url, destination } => {
+                    download_sidecar.download(webview.label(), url.as_str());
                     log(format!("downloading {} to {}", redact(url.as_str()), destination.display()))
                 }
                 DownloadEvent::Finished { url, path, success } => log(format!(

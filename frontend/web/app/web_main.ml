@@ -111,19 +111,19 @@ let reconnect_gate = Reconnect_gate.create ()
 let reconnect client settings ~generation ~session =
   let session = Option.first_some session (url_session ()) in
   match%map.Deferred connect_and_hello client settings ~session with
-  | Error "timed out" ->
-    Client.disconnect client;
-    App.Reply_tag.Reconnect generation, Error "timed out"
-  | Error e -> Reconnect generation, Error e
+  | Error e ->
+    if Reconnect_gate.due reconnect_gate ~generation
+    then Client.disconnect client;
+    App.Reply_tag.Reconnect generation, Error e
   | Ok (reply, None) -> Reconnect generation, Ok reply
   | Ok (reply, Some session) -> Session_gone { generation; session }, Ok reply
 ;;
 
 (* After a suspension or a change of network, a socket can look open but
    carry nothing: one that does not answer is dropped (and so reconnected).
-   One that is slow but alive is not: while something comes in or other
-   answers are still on their way (a large reply on a slow network, a busy
-   backend: ours queues behind them), it gets more time, up to a minute. *)
+   One that is slow but alive is not: while fresh messages keep arriving (or
+   for one grace window when another large reply was already in flight ahead
+   of ours), it gets more time, up to a minute. *)
 let probe client =
   if not (Client.is_connected client)
   then Deferred.unit
@@ -137,7 +137,9 @@ let probe client =
       | `Result _ -> Deferred.unit
       | `Timeout ->
         let now_received = Client.received client in
-        if (now_received > received || others > 0) && waited < 7
+        if
+          waited < 7
+          && (now_received > received || (waited = 0 && others > 0))
         then wait ~waited:(waited + 1) ~received:now_received
         else (
           Client.disconnect client;
@@ -199,24 +201,18 @@ let place_popover () =
         let anchor : Dom_html.element Js.t = Js.Unsafe.coerce anchor in
         let chip = anchor##getBoundingClientRect in
         let box =
-          match
-            Js.Opt.to_option
-              (Js.Unsafe.meth_call
-                 anchor
-                 "closest"
-                 [| Js.Unsafe.inject (Js.string "[data-popover-box]") |]
-               : Dom_html.element Js.t Js.opt)
-          with
+          match Browser.closest anchor "[data-popover-box]" with
           | Some box -> box##getBoundingClientRect
           | None -> chip
         in
         let margin = 8. in
         let above = Js.to_float chip##.top -. margin in
-        let below =
-          Float.of_int Dom_html.window##.innerHeight
-          -. Js.to_float chip##.bottom
-          -. margin
+        let viewport_height =
+          Option.value
+            (Browser.visual_height ())
+            ~default:(Float.of_int Dom_html.window##.innerHeight)
         in
+        let below = viewport_height -. Js.to_float chip##.bottom -. margin in
         let wanted = Float.of_int el##.scrollHeight in
         let down = Float.(above < wanted && below > above) in
         let set name value =
@@ -248,7 +244,9 @@ let place_popover () =
           let over = Js.to_float menu##.right -. right in
           if Float.(over > 0.)
           then (
-            let room = Js.to_float menu##.left -. Js.to_float box##.left in
+            let room =
+              Float.max 0. (Js.to_float menu##.left -. Js.to_float box##.left)
+            in
             set "--popover-shift" (-.Float.min over room)));
         (* The current choice in the middle of a long list. *)
         Js.Opt.iter
@@ -965,10 +963,29 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
   if (not (String.equal k.key "Tab")) || k.alt || k.ctrl || k.meta
   then false
   else (
+    let is_visible_focusable (el : Dom_html.element Js.t) =
+      let inert =
+        Js.Opt.test
+          (Js.Unsafe.meth_call
+             el
+             "closest"
+             [| Js.Unsafe.inject (Js.string "[inert]") |])
+      in
+      if inert
+      then false
+      else (
+        let style = Dom_html.window##getComputedStyle el in
+        let hidden =
+          String.equal (Js.to_string style##.display) "none"
+          || String.equal (Js.to_string style##.visibility) "hidden"
+        in
+        (not hidden) && (Js.Unsafe.coerce el)##getClientRects##.length > 0)
+    in
     match
-      List.last
-        (Dom.list_of_nodeList
-           (Dom_html.document##querySelectorAll (Js.string ".modal")))
+      Dom.list_of_nodeList
+        (Dom_html.document##querySelectorAll (Js.string ".modal"))
+      |> List.filter ~f:is_visible_focusable
+      |> List.last
     with
     | None -> false
     | Some modal ->
@@ -980,6 +997,8 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
                  textarea:not(:disabled), select:not(:disabled), a[href], \
                  summary, [tabindex]:not([tabindex='-1']), .modal-body"))
         |> List.filter ~f:(fun (el : Dom_html.element Js.t) ->
+          is_visible_focusable el
+          &&
           if Js.to_bool (el##.classList##contains (Js.string "modal-body"))
           then el##.scrollHeight > el##.clientHeight
           else true)
@@ -1007,16 +1026,31 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
         in
         let stop = stops.(target) in
         (* WebKit does not focus a scroller without a tabindex. *)
-        if not (Js.to_bool (stop##hasAttribute (Js.string "tabindex")))
+        if
+          Js.to_bool (stop##.classList##contains (Js.string "modal-body"))
+          && not (Js.to_bool (stop##hasAttribute (Js.string "tabindex")))
         then stop##setAttribute (Js.string "tabindex") (Js.string "-1");
         stop##focus;
         true))
 ;;
 
-(* A phone: a narrow window, or a phone on its side (short, and touched). *)
+let input_focused () =
+  Js.Opt.case
+    Dom_html.document##.activeElement
+    (fun () -> false)
+    (fun el ->
+       let tag = String.lowercase (Js.to_string el##.tagName) in
+       String.equal tag "input"
+       || String.equal tag "textarea"
+       || Js.to_bool (Js.Unsafe.get el (Js.string "isContentEditable")))
+;;
+
+(* A phone: a narrow window, or a phone on its side (short, and touched),
+   unless a wide screen merely shrank under an on-screen keyboard. *)
 let narrow () =
   Dom_html.window##.innerWidth < 760
   || (Dom_html.window##.innerHeight < 500
+      && (not (input_focused ()))
       && Js.to_bool
            (Dom_html.window##matchMedia (Js.string "(pointer: coarse)"))##.matches)
 ;;
@@ -1024,15 +1058,24 @@ let narrow () =
 (* The app is as tall as what the user sees: the on-screen keyboard shrinks
    the visual viewport, and the composer stays over it (phone.css). *)
 let set_visual_height () =
-  Option.iter (Browser.visual_height ()) ~f:(fun h ->
-    ignore
-      (Js.Unsafe.meth_call
-         (Js.Unsafe.get Dom_html.document##.documentElement (Js.string "style"))
-         "setProperty"
-         [| Js.Unsafe.inject (Js.string "--vvh")
-          ; Js.Unsafe.inject (Js.string (sprintf "%.0fpx" h))
-         |]
-       : unit))
+  Option.iter (Browser.visual_viewport ()) ~f:(fun (h, top) ->
+    let style =
+      Js.Unsafe.get Dom_html.document##.documentElement (Js.string "style")
+    in
+    let set name value =
+      ignore
+        (Js.Unsafe.meth_call
+           style
+           "setProperty"
+           [| Js.Unsafe.inject (Js.string name)
+            ; Js.Unsafe.inject (Js.string (sprintf "%.0fpx" value))
+           |]
+         : unit)
+    in
+    let inner = Float.of_int Dom_html.window##.innerHeight in
+    set "--vvh" h;
+    set "--vvt" top;
+    set "--vvb" (Float.max 0. (inner -. (h +. top))))
 ;;
 
 let install_listeners ~schedule ~current =
@@ -1152,14 +1195,11 @@ let install_listeners ~schedule ~current =
   (* A context menu's item: its copy, in the click (see [Gesture_copy]). *)
   listen Dom_html.Event.click (fun ev ->
     Js.Opt.iter ev##.target (fun target ->
-      Js.Opt.iter
-        (Js.Unsafe.meth_call
+      Option.iter
+        (Browser.closest
            target
-           "closest"
-           [| Js.Unsafe.inject
-                (Js.string ".context-menu [data-item]:not([aria-disabled])")
-           |])
-        (fun (item : Dom_html.element Js.t) ->
+           ".context-menu:not(.field-menu) [data-item]:not([aria-disabled])")
+        ~f:(fun item ->
           Js.Opt.iter
             (item##getAttribute (Js.string "data-item"))
             (fun id ->
@@ -1167,9 +1207,11 @@ let install_listeners ~schedule ~current =
                 (snd
                    (App.update !current (Picker_choose (Js.to_string id)))))));
     Js._true);
+  (* Click-swallowing capture listeners first, before chat/link/paging clicks. *)
+  Gesture_listeners.install ~schedule;
+  Menu_listeners.install ();
   Chat_listeners.install ~schedule;
   Session_link_listeners.install ~schedule;
-  Gesture_listeners.install ~schedule;
   Annotate_widget.install ~schedule;
   Downsize.install ~schedule;
   Viewer_widget.install ~schedule;
@@ -1187,7 +1229,6 @@ let install_listeners ~schedule ~current =
   Agents_listeners.install ~schedule;
   Jump_listeners.install ();
   Selection_listeners.install ~schedule;
-  Menu_listeners.install ();
   Field_menu_listeners.install ~schedule;
   Review_margin.install ();
   (* The chat follows new output unless the user has scrolled up. The page
@@ -1313,13 +1354,34 @@ let install_listeners ~schedule ~current =
        |> Option.map ~f:(fun t -> Js.to_float t##.clientY);
     Js._true);
   List.iter [ Dom_html.Event.touchend; Dom_html.Event.touchcancel ] ~f:(fun event ->
-    listen event (fun (ev : Dom_html.touchEvent Js.t) ->
+    listen ~capture:true event (fun (ev : Dom_html.touchEvent Js.t) ->
       touching := ev##.touches##.length > 0;
+      if not !touching then touch_y := None;
       Js._true));
+  ignore
+    (Dom_html.addEventListener
+       Dom_html.window
+       Dom_html.Event.blur
+       (Dom.handler (fun _ ->
+          touching := false;
+          touch_y := None;
+          Js._true))
+       Js._false
+     : Dom_html.event_listener_id);
+  listen (Dom_html.Event.make "visibilitychange") (fun _ ->
+    if Js.to_bool (Js.Unsafe.get Dom_html.document "hidden")
+    then (
+      touching := false;
+      touch_y := None);
+    Js._true);
   listen Dom_html.Event.touchmove (fun (ev : Dom_html.touchEvent Js.t) ->
     (match !touch_y, Js.Optdef.to_option (ev##.touches##item 0) with
-     | Some y0, Some t when in_chat ev && Float.(Js.to_float t##.clientY > y0 +. 4.)
-       -> turned_up ()
+     | Some y0, Some t when in_chat ev ->
+       let y = Js.to_float t##.clientY in
+       if Float.(y > y0 +. 4.)
+       then turned_up ()
+       else if Float.(y < y0)
+       then touch_y := Some y
      | _ -> ());
     Js._true);
   (* Scroll events do not bubble: only capturing sees the chat's. Scrolling
@@ -1336,19 +1398,57 @@ let install_listeners ~schedule ~current =
        in
        if at_end el
        then (
-         turn_up := None;
-         set_following true)
+         if Option.is_none !turn_up then set_following true)
        else if not ours
        then (
          turn_up := None;
          set_following false)
      | _ -> ());
     Js._true);
+  let touches_chat
+        (chat : Dom_html.element Js.t)
+        (records : MutationObserver.mutationRecord Js.t Js.js_array Js.t)
+    =
+    let contains (node : Dom.node Js.t) =
+      Js.to_bool ((Js.Unsafe.coerce chat)##contains node : bool Js.t)
+    in
+    let rec check i =
+      if i >= records##.length
+      then false
+      else
+        Js.Optdef.case
+          (Js.array_get records i)
+          (fun () -> check (i + 1))
+          (fun (record : MutationObserver.mutationRecord Js.t) ->
+             if contains record##.target
+             then true
+             else (
+               let added = record##.addedNodes in
+               let rec check_added j =
+                 if j >= added##.length
+                 then false
+                 else
+                   Js.Opt.case
+                     (added##item j)
+                     (fun () -> check_added (j + 1))
+                     (fun node ->
+                        phys_equal node (chat :> Dom.node Js.t)
+                        || contains node
+                        || Js.to_bool
+                             ((Js.Unsafe.coerce node)##contains chat : bool Js.t)
+                        || check_added (j + 1))
+               in
+               check_added 0 || check (i + 1)))
+    in
+    check 0
+  in
   let observer =
     new%js MutationObserver.mutationObserver
       (Js.wrap_callback (fun records _ ->
          if !following && not (Terminal_widget.only_inside records)
-         then Option.iter (chat_element ()) ~f:follow_to_end))
+         then
+           Option.iter (chat_element ()) ~f:(fun chat ->
+             if touches_chat chat records then follow_to_end chat)))
   in
   let options = MutationObserver.empty_mutation_observer_init () in
   options##.childList := true;
@@ -1516,7 +1616,7 @@ let time_zone () =
 let run_app (settings : Settings.t) =
   let client =
     Client.create ~connect:(fun () ->
-      Ws_transport.connect ~url:settings.backend)
+      Ws_transport.connect ~timeout:connect_timeout ~url:settings.backend ())
   in
   (* A page that was in a session before (reloaded, or brought back by the
      browser) on a network that is down starts offline and reconnects. *)
@@ -1530,10 +1630,10 @@ let run_app (settings : Settings.t) =
        match%map.Deferred
          connect_and_hello client settings ~session:settings.session
        with
-       | Error "timed out" ->
+       | Error _ as e ->
          Client.disconnect client;
-         Error "timed out"
-       | result -> result
+         e
+       | Ok _ as ok -> ok
      with
      | Error error when refused error || not (known ()) ->
        let%map.Deferred () = Client.close client in
@@ -1624,6 +1724,18 @@ let run_app (settings : Settings.t) =
        in
        on_window "online" (App.Action.Network true);
        on_window "offline" (App.Action.Network false);
+       (* iOS Safari restores pages from bfcache with [pageshow.persisted]
+          without firing [visibilitychange] or [online]. *)
+       ignore
+         (Dom_html.addEventListener
+            Dom_html.window
+            (Dom_html.Event.make "pageshow")
+            (Dom.handler (fun ev ->
+               if Js.to_bool (Js.Unsafe.get ev (Js.string "persisted"))
+               then schedule (App.Action.Page_hidden false);
+               Js._true))
+            Js._false
+          : Dom_html.event_listener_id);
        (* The offset changes with daylight saving time. *)
        let tick () =
          schedule (App.Action.Tick (Time_ns.now ()));

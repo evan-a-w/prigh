@@ -281,13 +281,13 @@
       const last = state.doc.lineAt(r.empty ? r.to : Math.max(r.from, r.to - 1)).number;
       return [first, last, state.sliceDoc(r.from, r.to)];
     };
-    const extensions = [
+    const makeExtensions = (lang) => [
       lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(),
       drawSelection(), history(), bracketMatching(), indentOnInput(),
       highlightSelectionMatches(), indentUnit.of("  "),
       EditorState.tabSize.of(2),
       EditorView.lineWrapping, hanging, hunksField, marksField, marksGutter,
-      syntaxHighlighting(style), language.of([]),
+      syntaxHighlighting(style), language.of((languages[lang] || (() => []))()),
       // Mod-l and Mod-i are the page's: ask in the chat, ask here.
       keymap.of([...defaultKeymap.filter((b) => b.key !== "Mod-l" && b.key !== "Mod-i"),
                  ...historyKeymap, ...searchKeymap,
@@ -306,7 +306,7 @@
     ];
     const view = new EditorView({
       parent: host,
-      state: EditorState.create({ doc: "", extensions }),
+      state: EditorState.create({ doc: "", extensions: makeExtensions(null) }),
     });
     const onHunk = (i, what) => o.onHunk(i, what);
     const askState = {
@@ -322,11 +322,17 @@
     let swipe = null;
     host.addEventListener("pointerdown", (ev) => {
       if (ev.pointerType !== "touch" || !ev.isPrimary) return;
-      if (ev.target.closest && ev.target.closest(".cm-ask, .cm-agent-change, .cm-panels")) return;
-      swipe = { x: ev.clientX, y: ev.clientY, t: ev.timeStamp, dx: 0, sideways: false };
+      if (!view.state.selection.main.empty) return;
+      if (document.querySelectorAll(".code-tab").length === 1) return;
+      const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target?.parentElement;
+      if (target && target.closest(".cm-ask, .cm-agent-change, .cm-panels")) return;
+      swipe = {
+        pointerId: ev.pointerId, x: ev.clientX, y: ev.clientY,
+        t: ev.timeStamp, dx: 0, sideways: false,
+      };
     }, { passive: true });
     host.addEventListener("pointermove", (ev) => {
-      if (!swipe || ev.pointerType !== "touch") return;
+      if (!swipe || ev.pointerType !== "touch" || ev.pointerId !== swipe.pointerId) return;
       const dx = ev.clientX - swipe.x, dy = ev.clientY - swipe.y;
       if (!swipe.sideways && Math.abs(dx) > 16 && Math.abs(dx) > 2 * Math.abs(dy))
         swipe.sideways = true;
@@ -339,6 +345,7 @@
     }, { passive: true });
     const endSwipe = (ev) => {
       if (!swipe) return;
+      if (ev.type !== "blur" && ev.pointerId !== swipe.pointerId) return;
       const s = swipe;
       swipe = null;
       view.dom.style.transform = "";
@@ -347,11 +354,12 @@
           && ev.timeStamp - s.t < 800 && view.state.selection.main.empty)
         o.onSwipe(s.dx < 0 ? 1 : -1);
     };
-    host.addEventListener("pointerup", endSwipe, { passive: true });
-    host.addEventListener("pointercancel", endSwipe, { passive: true });
+    window.addEventListener("pointerup", endSwipe, { passive: true });
+    window.addEventListener("pointercancel", endSwipe, { passive: true });
+    window.addEventListener("blur", endSwipe);
     let lastTop = 0;
     view.scrollDOM.addEventListener("scroll", () => {
-      const top = view.scrollDOM.scrollTop;
+      const top = Math.max(0, view.scrollDOM.scrollTop);
       if (Math.abs(top - lastTop) < 24) return;
       o.onScroll(top > lastTop && top > 40 ? "down" : "up");
       lastTop = top;
@@ -378,9 +386,13 @@
       // A new file: its own undo history and the top of it in view.
       load(text, lang) {
         flush();
-        view.setState(EditorState.create({ doc: "", extensions }));
-        this.setDoc(text, lang);
+        quiet = true;
+        view.setState(EditorState.create({ doc: text, extensions: makeExtensions(lang) }));
+        quiet = false;
+        const [first, last, sel] = selection(view.state);
+        o.onSelect(first, last, sel);
         view.scrollDOM.scrollTop = 0;
+        lastTop = 0;
       },
       // The agent's changes on show, those kept, and the ask box.
       setChange(hunks, kept, ask) {
@@ -420,8 +432,12 @@
       },
       focus: () => view.focus(),
       dispose: () => {
+        if (pending) { cancelAnimationFrame(pending); pending = 0; }
         document.removeEventListener("keydown", before, true);
         document.removeEventListener("pointerdown", before, true);
+        window.removeEventListener("pointerup", endSwipe);
+        window.removeEventListener("pointercancel", endSwipe);
+        window.removeEventListener("blur", endSwipe);
         view.destroy();
       },
     };

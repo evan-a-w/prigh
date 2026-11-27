@@ -2730,3 +2730,159 @@ let%expect_test "hello reply: the engines a backend deploys" =
      (Error "field \"engines\": expected array, got \"harness\""))
     |}]
 ;;
+
+let%expect_test "config to_json encodes worktrees_dir = None as null" =
+  let json = Config.to_json { Config.default with worktrees_dir = None } in
+  print_s [%sexp (Jsonaf.member "worktrees_dir" json : Jsonaf.t option)];
+  let roundtrip = Or_error.ok_exn (Config.of_json json) in
+  print_s [%sexp (roundtrip.worktrees_dir : string option)];
+  [%expect
+    {|
+    (Null)
+    ()
+    |}]
+;;
+
+let%expect_test
+    "session_summary Change.insert sorts None updated_at to the bottom"
+  =
+  let make id updated_at : Session_summary.t =
+    { id
+    ; path = "/tmp/" ^ id ^ ".jsonl"
+    ; name = None
+    ; description = None
+    ; cwd = "/work"
+    ; created_at = "2026-01-01T00:00:00Z"
+    ; updated_at
+    ; first_prompt = None
+    ; message_count = 0
+    ; parent = None
+    ; live = false
+    ; running = false
+    ; background = 0
+    ; clients = 0
+    ; waiting = 0
+    ; failed = false
+    ; archived = false
+    ; pinned = None
+    ; bytes = 0
+    ; host = None
+    ; repo = None
+    ; worktrees = []
+    ; home = None
+    }
+  in
+  let sessions =
+    Session_summary.Change.apply
+      { changed =
+          [ make "none1" None
+          ; make "mid" (Some "2026-02-01T00:00:00Z")
+          ; make "newest" (Some "2026-03-01T00:00:00Z")
+          ; make "none2" None
+          ; make "oldest" (Some "2026-01-01T00:00:00Z")
+          ]
+      ; removed = []
+      }
+      []
+  in
+  print_s
+    [%sexp
+      (List.map sessions ~f:(fun (s : Session_summary.t) -> s.id, s.updated_at)
+       : (string * string option) list)];
+  [%expect
+    {|
+    ((newest (2026-03-01T00:00:00Z))
+     (mid    (2026-02-01T00:00:00Z))
+     (oldest (2026-01-01T00:00:00Z))
+     (none1 ())
+     (none2 ()))
+    |}]
+;;
+
+let%expect_test
+    "stream_update apply guards stale/reordered updates and orphan \
+     tool_call_delta"
+  =
+  let msg content : Message.Assistant.t =
+    { content
+    ; stop_reason = End_turn
+    ; usage = Usage.zero
+    ; model = "m"
+    ; at = None
+    }
+  in
+  let at = Some { Stream_update.Position.stream = 2; seq = 5 } in
+  let show u =
+    print_s
+      [%sexp
+        (Stream_update.apply u ~at (msg [ Text "hi" ])
+         : Stream_update.Applied.t)]
+  in
+  (* Stale stream (stream < at.stream) with from = 1 must not reset message. *)
+  show
+    { stream = 1
+    ; from = 1
+    ; seq = 1
+    ; block = 0
+    ; delta = Text_delta "old"
+    ; partial = None
+    };
+  (* Stale stream with partial must be ignored. *)
+  show
+    { stream = 1
+    ; from = 1
+    ; seq = 1
+    ; block = 0
+    ; delta = Text_delta "old"
+    ; partial = Some (msg [ Text "old" ])
+    };
+  (* Already-applied seq with partial must be ignored. *)
+  show
+    { stream = 2
+    ; from = 1
+    ; seq = 5
+    ; block = 0
+    ; delta = Text_delta "dup"
+    ; partial = Some (msg [ Text "dup" ])
+    };
+  (* Orphaned Tool_call_delta when block is not a Tool_call signals Gap. *)
+  show
+    { stream = 2
+    ; from = 6
+    ; seq = 6
+    ; block = 1
+    ; delta = Tool_call_delta { index = 0; arguments = "{}" }
+    ; partial = None
+    };
+  (* Legacy partial without stream/seq (0/0) still updates. *)
+  print_s
+    [%sexp
+      (Stream_update.apply
+         { stream = 0
+         ; from = 0
+         ; seq = 0
+         ; block = -1
+         ; delta = Text_delta "x"
+         ; partial = Some (msg [ Text "x" ])
+         }
+         ~at:(Some { stream = 0; seq = 0 })
+         (msg [])
+       : Stream_update.Applied.t)];
+  [%expect
+    {|
+    Unchanged
+    Unchanged
+    Unchanged
+    Gap
+    (Updated
+      ((stream 0)
+       (seq    0))
+      ((content ((Text x)))
+       (stop_reason End_turn)
+       (usage (
+         (input      0)
+         (output     0)
+         (cache_read 0)))
+       (model m)))
+    |}]
+;;

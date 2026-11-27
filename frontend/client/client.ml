@@ -63,19 +63,23 @@ let attach t (transport : Transport.t) =
   t.detached <- detached;
   don't_wait_for
     (let%bind () =
-       Pipe.iter_without_pushback transport.lines ~f:(handle_line t)
+       Pipe.iter_without_pushback transport.lines ~f:(fun line ->
+         if Ivar.is_empty detached then handle_line t line)
      in
-     (* A newer transport may already be in place after a reconnect. *)
-     (match t.transport with
-      | Some current when phys_equal current transport -> t.transport <- None
-      | _ -> ());
-     fail_pending t "backend closed";
-     push t Closed;
-     Ivar.fill_if_empty detached ();
+     (* Skip if [disconnect] or [close] already detached this transport, so a
+        newer transport attached in the meantime is untouched. *)
+     if Ivar.is_empty detached
+     then (
+       (match t.transport with
+        | Some current when phys_equal current transport -> t.transport <- None
+        | _ -> ());
+       fail_pending t "backend closed";
+       push t Closed;
+       Ivar.fill_if_empty detached ());
      return ());
   don't_wait_for
     (Pipe.iter_without_pushback transport.stderr_lines ~f:(fun line ->
-       push t (Stderr line)))
+       if Ivar.is_empty detached then push t (Stderr line)))
 ;;
 
 let connect t =
@@ -126,20 +130,37 @@ let call t method_ params =
     t.next_id <- id + 1;
     let ivar = Ivar.create () in
     Hashtbl.set t.pending ~key:id ~data:ivar;
-    transport.send_line (Request.to_line { id; method_; params });
-    Ivar.read ivar
+    (match
+       Or_error.try_with_join (fun () ->
+         transport.send_line (Request.to_line { id; method_; params }))
+     with
+     | Ok () -> Ivar.read ivar
+     | Error _ as err ->
+       Hashtbl.remove t.pending id;
+       Deferred.return err)
 ;;
 
 let is_connected t = Option.is_some t.transport
 let received t = t.received
 let waiting t = Hashtbl.length t.pending
 
-let disconnect t =
+let abandon_connecting t =
   if Option.is_some t.connecting
   then (
     t.connecting <- None;
-    t.attempts <- t.attempts + 1);
-  Option.iter t.transport ~f:(fun transport -> transport.close ())
+    t.attempts <- t.attempts + 1)
+;;
+
+let disconnect t =
+  abandon_connecting t;
+  match t.transport with
+  | None -> ()
+  | Some transport ->
+    t.transport <- None;
+    fail_pending t "backend closed";
+    push t Closed;
+    Ivar.fill_if_empty t.detached ();
+    transport.close ()
 ;;
 
 let disconnected t =
@@ -151,10 +172,14 @@ let disconnected t =
 let incoming t = t.incoming_r
 
 let close t =
+  abandon_connecting t;
   Pipe.close t.incoming_w;
   match t.transport with
   | None -> return ()
   | Some transport ->
+    t.transport <- None;
+    fail_pending t "backend closed";
+    Ivar.fill_if_empty t.detached ();
     transport.close ();
     transport.closed
 ;;

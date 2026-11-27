@@ -1787,7 +1787,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   toasts h;
   [%expect
     {|
-    (Cache_prefs (((key history) (value (("/setusr alice" /setusr))))))
+    (Cache_prefs (((key history) (value (("/setusr alice"))))))
     (Rpc (method_ set_user) (params ((user alice))) (tag User_switched))
     (Expire_toast (id 1) (after_ms 2500))
     (Focus editor)
@@ -1805,7 +1805,6 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
          web.files-preview-width web.terminal-height web.review-chat-width
          web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
-    Acting as bob
     Back to alice
     |}];
   run h "/setusr";

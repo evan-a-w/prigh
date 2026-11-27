@@ -29,7 +29,7 @@ module Read = struct
 
   let int j k =
     Option.bind (num j k) ~f:(fun f ->
-      Option.some_if (Float.is_finite f) (Float.iround_nearest_exn f))
+      if Float.is_finite f then Float.iround_nearest f else None)
   ;;
 
   let bool j k =
@@ -1046,9 +1046,21 @@ let first_line s =
   | [] -> ""
 ;;
 
+let utf8_prefix s max_bytes =
+  let n = String.length s in
+  if n <= max_bytes
+  then s
+  else (
+    let i = ref max_bytes in
+    while !i > 0 && Char.to_int s.[!i] land 0xc0 = 0x80 do
+      decr i
+    done;
+    String.prefix s !i)
+;;
+
 let shorten s =
   let s = first_line s in
-  if String.length s <= 60 then s else String.prefix s 59 ^ "…"
+  if String.length s <= 60 then s else utf8_prefix s 59 ^ "…"
 ;;
 
 let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")

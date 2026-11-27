@@ -344,6 +344,8 @@ let usage_status response : Subscription_usage.Status.t =
   | _ -> Api_key
 ;;
 
+let json_float x = `Number (sprintf "%.17g" x)
+
 (* A [rate_limit_event]'s window ([utilization] 0 to 1) replaces the one
    of the same name. *)
 let note_limit t info =
@@ -353,17 +355,11 @@ let note_limit t info =
       `Object
         [ ( kind
           , `Object
-              (( "utilization"
-               , `Number
-                   (Float.to_string_hum ~strip_zero:true (utilization *. 100.))
-               )
+              (("utilization", json_float (utilization *. 100.))
                :: Option.value_map
                     (num info "resetsAt")
                     ~default:[]
-                    ~f:(fun at ->
-                      [ ( "resets_at"
-                        , `Number (Float.to_string_hum ~strip_zero:true at) )
-                      ])) )
+                    ~f:(fun at -> [ "resets_at", json_float at ])) )
         ]
     in
     (match Subscription_usage.parse_anthropic (Json.to_string window) with
@@ -1076,6 +1072,20 @@ let deny t ~request_id ~message ~stop =
     (`Object
         ([ "behavior", `String "deny"; "message", `String message ]
          @ if stop then [ "interrupt", `True ] else []))
+;;
+
+let cancel_pending t =
+  let pending = t.permissions in
+  t.permissions <- [];
+  List.concat_map pending ~f:(fun (p : Permission.t) ->
+    [ Output.Send
+        (deny
+           t
+           ~request_id:p.request_id
+           ~message:"The user stopped the turn."
+           ~stop:true)
+    ; Output.Event (Request_withdrawn { request_id = p.request_id })
+    ])
 ;;
 
 (* Claude Code's suggestions, kept to this session. *)

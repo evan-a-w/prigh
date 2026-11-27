@@ -46,7 +46,7 @@ self.addEventListener("activate", event => {
 
 // The page's Reload in its "new version" notice.
 self.addEventListener("message", event => {
-  if (event.data === "skip-waiting") self.skipWaiting();
+  if (event.data === "skip-waiting") event.waitUntil(self.skipWaiting());
 });
 
 // The page: this build's at once, without waiting for the network (a phone

@@ -32,8 +32,10 @@ let capabilities_of
 type t =
   { codec : Codec.t
   ; driver : Codec.Response.t Adapter.Driver.t
+  ; sw : Switch.t
   ; mutable lines : int (* lines read, to tell a quiet replay *)
   ; mutable last_line : Time_float.t
+  ; mutable last_turn_activity : Time_float.t
   ; mutable before_plan : string option (* the mode plan mode replaced *)
   ; mutable model : string option (* the model last set *)
   ; mutable agent_default : string option (* its model before we set one *)
@@ -84,6 +86,32 @@ let dispatch t (output : Codec.Output.t) =
     if not (String.is_empty title)
     then Adapter.Driver.push t.driver (Session_title title)
   | Title None | Config_changed _ -> ()
+;;
+
+let is_turn_activity : Codec.Output.t -> bool = function
+  | Event
+      ( Turn_started _
+      | Text_delta _
+      | Text_done _
+      | Thinking_delta _
+      | Thinking_done _
+      | Tool_start _
+      | Tool_update _
+      | Tool_end _
+      | Approval_request _
+      | User_question _
+      | Plan _
+      | Turn_diff _ ) -> true
+  | Event
+      ( Thread_started _
+      | Usage _
+      | Notice _
+      | Compacted _
+      | Retrying _
+      | Request_withdrawn _
+      | Session_title _
+      | Turn_end _ )
+  | Send _ | Response _ | Commands _ | Title _ | Config_changed _ -> false
 ;;
 
 (* The agent's own command for compacting its context, when it has one
@@ -397,6 +425,72 @@ let create
       | _ -> Ok ()
     ;;
 
+    let watch_autonomous t =
+      if not t.watching_autonomous
+      then (
+        t.watching_autonomous <- true;
+        let text_quiet = Time_float.Span.to_sec autonomous_quiet in
+        let wait_quiet = Float.min 60. (text_quiet *. 12.) in
+        let cancel_quiet = Float.min 0.25 text_quiet in
+        let max_autonomous = Float.min 600. (text_quiet *. 120.) in
+        let started_at = Time_float.now () in
+        Fiber.fork_daemon ~sw:t.sw (fun () ->
+          Guarded.run
+            ~what:(sprintf "%s autonomous watcher" agent.display_name)
+            (fun () ->
+               Exn.protect
+                 ~finally:(fun () -> t.watching_autonomous <- false)
+                 ~f:(fun () ->
+                   let poll =
+                     Float.min 0.2 (Float.max 0.01 (text_quiet /. 2.))
+                   in
+                   let rec loop () =
+                     Eio_unix.sleep poll;
+                     if
+                       (not (Adapter.Driver.alive t.driver))
+                       || not (Codec.is_autonomous_turn t.codec)
+                     then ()
+                     else (
+                       let now = Time_float.now () in
+                       let idle =
+                         Time_float.Span.to_sec
+                           (Time_float.diff now t.last_turn_activity)
+                       in
+                       let elapsed =
+                         Time_float.Span.to_sec (Time_float.diff now started_at)
+                       in
+                       if Codec.is_cancelled_turn t.codec
+                       then
+                         if Float.(idle >= cancel_quiet)
+                         then
+                           List.iter
+                             (Codec.finish_autonomous t.codec)
+                             ~f:(dispatch t)
+                         else loop ()
+                       else if Float.(elapsed >= max_autonomous)
+                       then
+                         List.iter
+                           (Codec.finish_autonomous t.codec)
+                           ~f:(dispatch t)
+                       else if Codec.has_open_work t.codec
+                       then loop ()
+                       else (
+                         let limit =
+                           if Codec.autonomous_has_text t.codec
+                           then text_quiet
+                           else wait_quiet
+                         in
+                         if Float.(idle >= limit)
+                         then
+                           List.iter
+                             (Codec.finish_autonomous t.codec)
+                             ~f:(dispatch t)
+                         else loop ()))
+                   in
+                   loop ()));
+          `Stop_daemon))
+    ;;
+
     let open_session
           ~sw
           ?interrupt_grace
@@ -415,11 +509,14 @@ let create
           ?request_timeout
           transport
       in
+      let now = Time_float.now () in
       let t =
         { codec
         ; driver
+        ; sw
         ; lines = 0
-        ; last_line = Time_float.now ()
+        ; last_line = now
+        ; last_turn_activity = now
         ; before_plan = None
         ; model = None
         ; agent_default = None
@@ -445,50 +542,17 @@ let create
         | _ -> ()
       in
       Adapter.Driver.on_orphan_request driver refuse_orphan;
-      let watch_autonomous () =
-        if not t.watching_autonomous
-        then (
-          t.watching_autonomous <- true;
-          let text_quiet = Time_float.Span.to_sec autonomous_quiet in
-          let wait_quiet = Float.min 60. (text_quiet *. 12.) in
-          Fiber.fork_daemon ~sw (fun () ->
-            let poll = Float.min 0.5 (Float.max 0.01 (text_quiet /. 2.)) in
-            let rec loop () =
-              Eio_unix.sleep poll;
-              if
-                (not (Adapter.Driver.alive t.driver))
-                || not (Codec.is_autonomous_turn t.codec)
-              then (
-                t.watching_autonomous <- false;
-                `Stop_daemon)
-              else if Codec.has_open_work t.codec
-              then loop ()
-              else (
-                let idle =
-                  Time_float.Span.to_sec
-                    (Time_float.diff (Time_float.now ()) t.last_line)
-                in
-                let limit =
-                  if Codec.autonomous_has_text t.codec
-                  then text_quiet
-                  else wait_quiet
-                in
-                if Float.(idle >= limit)
-                then (
-                  t.watching_autonomous <- false;
-                  List.iter (Codec.finish_autonomous t.codec) ~f:(dispatch t);
-                  `Stop_daemon)
-                else loop ())
-            in
-            loop ()))
-      in
       Adapter.Driver.run
         driver
         ~handle_line:(fun line ->
           t.lines <- t.lines + 1;
-          t.last_line <- Time_float.now ();
-          List.iter (Codec.handle_line codec line) ~f:(dispatch t);
-          if Codec.is_autonomous_turn codec then watch_autonomous ())
+          let now = Time_float.now () in
+          t.last_line <- now;
+          let outputs = Codec.handle_line codec line in
+          if List.exists outputs ~f:is_turn_activity
+          then t.last_turn_activity <- now;
+          List.iter outputs ~f:(dispatch t);
+          if Codec.is_autonomous_turn codec then watch_autonomous t)
         ~on_exit:(fun exit ->
           List.iter
             (Codec.process_exited
@@ -686,9 +750,14 @@ let create
       else
         let open Or_error.Let_syntax in
         let%bind () = apply t settings in
-        let%map outputs = Codec.prompt t.codec (inputs_of input) in
-        Adapter.Driver.begin_turn t.driver;
-        List.iter outputs ~f:(dispatch t)
+        if not (Adapter.Driver.alive t.driver)
+        then Or_error.errorf "%s is not running" agent.display_name
+        else if Adapter.Driver.in_turn t.driver
+        then Or_error.errorf "a %s turn is already running" agent.display_name
+        else (
+          let%map outputs = Codec.prompt t.codec (inputs_of input) in
+          Adapter.Driver.begin_turn t.driver;
+          List.iter outputs ~f:(dispatch t))
     ;;
 
     let limits _ = None
@@ -934,8 +1003,10 @@ let create
         let autonomous = Codec.is_autonomous_turn t.codec in
         List.iter (Codec.cancel t.codec) ~f:(dispatch t);
         if autonomous
-        then List.iter (Codec.finish_autonomous t.codec) ~f:(dispatch t)
-        else Adapter.Driver.watch_interrupt t.driver)
+        then (
+          t.last_turn_activity <- Time_float.now ();
+          watch_autonomous t);
+        Adapter.Driver.watch_interrupt t.driver)
     ;;
 
     let reply_approval t ~request_id reply =

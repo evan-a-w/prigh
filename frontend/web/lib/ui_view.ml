@@ -128,7 +128,14 @@ let stat ~label ~value ~unit ~delta ~trend ~good ~caption ~spark:values =
 ;;
 
 let progress ~label ~value ~max ~tone ~caption =
-  let pct = Float.clamp_exn (value /. max) ~min:0. ~max:1. in
+  let ratio =
+    if Float.( <= ) max 0. || not (Float.is_finite value && Float.is_finite max)
+    then 0.
+    else value /. max
+  in
+  let pct =
+    if Float.is_finite ratio then Float.clamp_exn ratio ~min:0. ~max:1. else 0.
+  in
   div
     ("ui-progress " ^ tone_cls tone)
     [ div

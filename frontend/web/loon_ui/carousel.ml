@@ -127,7 +127,6 @@ type dom =
   ; mutable hovered : bool
   ; mutable stopped : bool
   ; mutable timer_for : int option
-  ; mutable observed : bool
   }
 
 let doms : dom String.Table.t = String.Table.create ()
@@ -143,7 +142,6 @@ let dom t =
     ; hovered = false
     ; stopped = false
     ; timer_for = None
-    ; observed = false
     })
 ;;
 
@@ -300,22 +298,6 @@ and update t (viewport : Dom_html.element Js.t) =
     st.applied <- Some selected;
     st.translate <- -.snaps.(selected);
     set_transform t viewport ~translate:st.translate ~animate);
-  if not st.observed
-  then (
-    st.observed <- true;
-    let observer = Js.Unsafe.global##.ResizeObserver in
-    if Js.Optdef.test observer
-    then (
-      let callback =
-        Js.wrap_callback (fun _ _ ->
-          match st.latest with
-          | Some t ->
-            st.applied <- None;
-            update t viewport
-          | None -> ())
-      in
-      let o = new%js observer callback in
-      o##observe viewport));
   schedule_autoplay t
 ;;
 
@@ -460,17 +442,106 @@ let on_pointerup t (ev : Dom_html.pointerEvent Js.t) =
           else nearest
         in
         let n = Array.length st.snaps in
-        let target =
-          if t.loop then target % n else Int.clamp_exn target ~min:0 ~max:(n - 1)
-        in
-        match st.latest with
-        | Some t when target <> t.state.selected -> fire (scroll_to t target)
-        | _ ->
-          (* Back to the slide it was on. *)
-          st.translate <- -.st.snaps.(current);
-          set_transform t viewport ~translate:st.translate ~animate:true)
+        if n > 0
+        then (
+          let target =
+            if t.loop then target % n else Int.clamp_exn target ~min:0 ~max:(n - 1)
+          in
+          match st.latest with
+          | Some t when target <> t.state.selected -> fire (scroll_to t target)
+          | _ ->
+            (* Back to the slide it was on. *)
+            let current = Int.clamp_exn current ~min:0 ~max:(n - 1) in
+            st.translate <- -.st.snaps.(current);
+            set_transform t viewport ~translate:st.translate ~animate:true))
     | _ -> ())
 ;;
+
+let on_pointercancel t (ev : Dom_html.pointerEvent Js.t) =
+  Effect.of_thunk (fun () ->
+    let st = dom t in
+    match st.drag, current_target ev with
+    | Some drag, Some viewport when drag.pointer_id = ev##.pointerId ->
+      st.drag <- None;
+      if drag.dragging
+      then (
+        let n = Array.length st.snaps in
+        if n > 0
+        then (
+          let current =
+            Int.clamp_exn (Option.value st.applied ~default:0) ~min:0 ~max:(n - 1)
+          in
+          st.translate <- -.st.snaps.(current);
+          set_transform t viewport ~translate:st.translate ~animate:true))
+    | _ -> ())
+;;
+
+type carousel = t
+
+module Viewport_hook = Vdom.Attr.Hooks.Make (struct
+    module Input = struct
+      type t = carousel
+
+      let sexp_of_t _ = Sexp.Atom "<carousel>"
+      let combine _ second = second
+    end
+
+    module State = struct
+      type t =
+        { mutable latest : carousel
+        ; mutable observer : Js.Unsafe.any option
+        ; mutable cancel_listener : Dom.event_listener_id option
+        }
+    end
+
+    let init latest _ = { State.latest; observer = None; cancel_listener = None }
+
+    let on_mount =
+      `Schedule_immediately_after_this_dom_patch_completes
+        (fun t (state : State.t) (viewport : Dom_html.element Js.t) ->
+          state.latest <- t;
+          update t viewport;
+          let observer = Js.Unsafe.global##.ResizeObserver in
+          if Js.Optdef.test observer
+          then (
+            let callback =
+              Js.wrap_callback (fun _ _ ->
+                let st = dom state.latest in
+                st.applied <- None;
+                update state.latest viewport)
+            in
+            let o = new%js observer callback in
+            ignore (Js.Unsafe.meth_call o "observe" [| Js.Unsafe.inject viewport |] : Js.Unsafe.any);
+            state.observer <- Some (Js.Unsafe.inject o));
+          state.cancel_listener
+          <- Some
+               (Dom_html.addEventListener
+                  viewport
+                  (Dom_html.Event.make "pointercancel")
+                  (Dom_html.handler (fun ev ->
+                     fire (on_pointercancel state.latest ev);
+                     Js._true))
+                  Js._false))
+    ;;
+
+    let update ~old_input:_ ~new_input (state : State.t) viewport =
+      state.latest <- new_input;
+      ignore
+        (Dom_html.window##requestAnimationFrame
+           (Js.wrap_callback (fun (_ : Js.number_t) -> update new_input viewport))
+         : Dom_html.animation_frame_request_id)
+    ;;
+
+    let destroy _ (state : State.t) _ =
+      Option.iter state.observer ~f:(fun o ->
+        ignore ((Js.Unsafe.coerce o)##disconnect : unit));
+      state.observer <- None;
+      Option.iter state.cancel_listener ~f:Dom_html.removeEventListener;
+      state.cancel_listener <- None;
+      fire (After_render.cancel (state.latest.id ^ "-autoplay"));
+      Hashtbl.remove doms state.latest.id
+    ;;
+  end)
 
 let content ?(attrs = []) ?class_ t children =
   let st_click =
@@ -491,7 +562,7 @@ let content ?(attrs = []) ?class_ t children =
              ~field:"touch-action"
              ~value:
                (if horizontal t then "pan-y pinch-zoom" else "pan-x pinch-zoom"))
-      ; After_render.attr ~name:"carousel" (update t)
+      ; Vdom.Attr.create_hook "loon-carousel-viewport" (Viewport_hook.create t)
       ; Attr.on_pointerdown (on_pointerdown t)
       ; Attr.on_pointermove (on_pointermove t)
       ; Attr.on_pointerup (on_pointerup t)

@@ -126,7 +126,12 @@ let alloc_wire_id t =
 ;;
 
 let write_physical t line =
-  if t.alive then Line_transport.write_line t.transport line
+  if t.alive
+  then (
+    try Line_transport.write_line t.transport line with
+    | Eio.Cancel.Cancelled _ as exn -> raise exn
+    | exn ->
+      eprintf "prigh: harness mux write failed: %s\n%!" (Exn.to_string exn))
 ;;
 
 let push_session (session : Session.t) line =
@@ -236,8 +241,16 @@ let is_auth_error t err =
 
 let unregister_if_owned t ~key (session : Session.t) =
   match Hashtbl.find t.by_route_id key with
-  | Some owner when owner.id = session.id -> Hashtbl.remove t.by_route_id key
-  | Some _ | None -> ()
+  | Some owner when owner.id = session.id ->
+    Hashtbl.remove t.by_route_id key;
+    true
+  | Some _ | None -> false
+;;
+
+let owned_by_other t ~key (session : Session.t) =
+  match Hashtbl.find t.by_route_id key with
+  | Some owner -> owner.id <> session.id
+  | None -> false
 ;;
 
 let adopt_codex_subagents t (session : Session.t) params =
@@ -283,7 +296,7 @@ let handle_server_line t line =
                 | Some err ->
                   if is_auth_error t err then t.on_drain t;
                   Option.iter pre_registered ~f:(fun key ->
-                    unregister_if_owned t ~key session);
+                    ignore (unregister_if_owned t ~key session : bool));
                   push_session session (Json.to_string (with_id json orig_id))
                 | None ->
                   let sid =
@@ -294,14 +307,15 @@ let handle_server_line t line =
                   if session.stopped
                   then (
                     Option.iter pre_registered ~f:(fun key ->
-                      unregister_if_owned t ~key session);
+                      ignore (unregister_if_owned t ~key session : bool));
                     Option.iter sid ~f:(fun session_id ->
                       if
-                        not
-                          (Option.equal
-                             String.equal
-                             session.acp_session_id
-                             (Some session_id))
+                        (not
+                           (Option.equal
+                              String.equal
+                              session.acp_session_id
+                              (Some session_id)))
+                        && not (owned_by_other t ~key:session_id session)
                       then send_acp_close t ~session_id))
                   else (
                     Option.iter sid ~f:(fun sid ->
@@ -313,7 +327,7 @@ let handle_server_line t line =
                 | Some err ->
                   if is_auth_error t err then t.on_drain t;
                   Option.iter pre_registered ~f:(fun key ->
-                    unregister_if_owned t ~key session);
+                    ignore (unregister_if_owned t ~key session : bool));
                   push_session session (Json.to_string (with_id json orig_id))
                 | None ->
                   let tid =
@@ -323,9 +337,10 @@ let handle_server_line t line =
                   if session.stopped
                   then (
                     Option.iter pre_registered ~f:(fun key ->
-                      unregister_if_owned t ~key session);
+                      ignore (unregister_if_owned t ~key session : bool));
                     Option.iter tid ~f:(fun thread_id ->
-                      send_codex_unsubscribe t ~thread_id))
+                      if not (owned_by_other t ~key:thread_id session)
+                      then send_codex_unsubscribe t ~thread_id))
                   else (
                     Option.iter tid ~f:(fun tid ->
                       Hash_set.add session.codex_threads tid;
@@ -439,13 +454,14 @@ let stop_session t (session : Session.t) =
     (match t.protocol with
      | Acp ->
        Option.iter session.acp_session_id ~f:(fun sid ->
-         unregister_if_owned t ~key:sid session;
-         send_acp_close t ~session_id:sid)
+         if unregister_if_owned t ~key:sid session
+         then send_acp_close t ~session_id:sid)
      | Codex ->
-       Hash_set.iter session.codex_threads ~f:(fun tid ->
-         unregister_if_owned t ~key:tid session);
        List.iter session.codex_main_threads ~f:(fun thread_id ->
-         send_codex_unsubscribe t ~thread_id));
+         if unregister_if_owned t ~key:thread_id session
+         then send_codex_unsubscribe t ~thread_id);
+       Hash_set.iter session.codex_threads ~f:(fun tid ->
+         ignore (unregister_if_owned t ~key:tid session : bool)));
     let dangling =
       Hashtbl.fold t.server_reqs ~init:[] ~f:(fun ~key ~data:sr acc ->
         if sr.session.id = session.id then (key, sr) :: acc else acc)
@@ -555,16 +571,35 @@ let handle_client_line t (session : Session.t) line =
            (Json.to_string (with_id json (`Number (Int.to_string wire_id))))
        | Some "session/close", Some orig_id when Protocol.equal t.protocol Acp
          ->
-         (match str "sessionId" params, session.acp_session_id with
+         let sid = str "sessionId" params in
+         let stolen =
+           Option.value_map sid ~default:false ~f:(fun sid ->
+             owned_by_other t ~key:sid session)
+         in
+         (match sid, session.acp_session_id with
           | Some sid, Some cur when String.equal sid cur ->
             session.acp_session_id <- None;
-            unregister_if_owned t ~key:sid session
+            ignore (unregister_if_owned t ~key:sid session : bool)
           | _ -> ());
-         let wire_id = alloc_wire_id t in
-         Hashtbl.set t.pending ~key:wire_id ~data:(Forward { session; orig_id });
-         write_physical
-           t
-           (Json.to_string (with_id json (`Number (Int.to_string wire_id))))
+         if stolen
+         then
+           push_session
+             session
+             (Json.to_string
+                (`Object
+                    [ "jsonrpc", `String "2.0"
+                    ; "id", orig_id
+                    ; "result", `Object []
+                    ]))
+         else (
+           let wire_id = alloc_wire_id t in
+           Hashtbl.set
+             t.pending
+             ~key:wire_id
+             ~data:(Forward { session; orig_id });
+           write_physical
+             t
+             (Json.to_string (with_id json (`Number (Int.to_string wire_id)))))
        | Some _, Some orig_id ->
          let wire_id = alloc_wire_id t in
          Hashtbl.set t.pending ~key:wire_id ~data:(Forward { session; orig_id });
@@ -718,32 +753,56 @@ let create
     }
   in
   Fiber.fork ~sw (fun () ->
-    let rec loop () =
-      match Line_transport.read_line transport with
-      | Some line ->
-        handle_server_line t line;
-        loop ()
-      | None -> ()
+    let cleanup exit =
+      let was_alive = t.alive in
+      t.alive <- false;
+      t.exit <- Some exit;
+      Hashtbl.iter t.pending ~f:(function
+        | Initialize resolve ->
+          Promise.resolve
+            resolve
+            (Or_error.error_string
+               (Adapter.Driver.exit_message ~display_name:"the process" exit))
+        | _ -> ());
+      Hashtbl.clear t.pending;
+      let sessions = Hashtbl.data t.sessions in
+      Hashtbl.clear t.sessions;
+      Hashtbl.clear t.by_route_id;
+      Hashtbl.clear t.server_reqs;
+      List.iter sessions ~f:(fun s -> finish_session s exit);
+      if was_alive then t.on_exit t
     in
-    loop ();
-    let exit = Line_transport.ended transport in
-    let was_alive = t.alive in
-    t.alive <- false;
-    t.exit <- Some exit;
-    Hashtbl.iter t.pending ~f:(function
-      | Initialize resolve ->
-        Promise.resolve
-          resolve
-          (Or_error.error_string
-             (Adapter.Driver.exit_message ~display_name:"the process" exit))
-      | _ -> ());
-    Hashtbl.clear t.pending;
-    let sessions = Hashtbl.data t.sessions in
-    Hashtbl.clear t.sessions;
-    Hashtbl.clear t.by_route_id;
-    Hashtbl.clear t.server_reqs;
-    List.iter sessions ~f:(fun s -> finish_session s exit);
-    if was_alive then t.on_exit t);
+    let failed = ref None in
+    (try
+       let rec loop () =
+         match Line_transport.read_line transport with
+         | Some line ->
+           handle_server_line t line;
+           loop ()
+         | None -> ()
+       in
+       loop ()
+     with
+     | Eio.Cancel.Cancelled _ as exn ->
+       cleanup { Line_transport.Exit.code = None; stderr_tail = "" };
+       raise exn
+     | exn ->
+       eprintf "prigh: harness mux reader failed: %s\n%!" (Exn.to_string exn);
+       failed := Some exn;
+       Line_transport.stop transport);
+    let exit =
+      match !failed with
+      | Some exn ->
+        { Line_transport.Exit.code = None; stderr_tail = Exn.to_string exn }
+      | None ->
+        (try Line_transport.ended transport with
+         | Eio.Cancel.Cancelled _ as exn ->
+           cleanup { Line_transport.Exit.code = None; stderr_tail = "" };
+           raise exn
+         | exn ->
+           { Line_transport.Exit.code = None; stderr_tail = Exn.to_string exn })
+    in
+    cleanup exit);
   let init_promise, init_resolve = Promise.create () in
   Hashtbl.set t.pending ~key:0 ~data:(Initialize init_resolve);
   let init_line =

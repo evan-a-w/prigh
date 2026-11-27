@@ -503,8 +503,9 @@ let%expect_test "a turn that raises stops its process: the next starts another" 
   Agent.wait_idle agent;
   [%expect
     {|
+    prigh: Codex write failed: (Failure "the line could not be sent")
     spawn #1
-    notice: run failed: (Failure "the line could not be sent")
+    assistant: (Error"Codex was stopped before its turn ended") ""
     spawn #2
     assistant: End_turn "hello"
     |}]

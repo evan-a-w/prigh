@@ -2,20 +2,25 @@ open! Core
 open Js_of_ocaml
 
 let chat () = Dom_html.getElementById_opt "chat"
+let closest = Browser.closest
 
-let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
+(* The element, height, scroll position, and fallback timer before older
+   messages were added. *)
+let pending
+  : (Dom_html.element Js.t * int * float * Dom_html.timeout_id_safe) option ref
   =
-  Js.Opt.to_option
-    (Js.Unsafe.meth_call
-       el
-       "closest"
-       [| Js.Unsafe.inject (Js.string selector) |])
+  ref None
 ;;
 
-(* The height and scroll position before older messages were added. *)
-let pending = ref None
+let clear_pending () =
+  Option.iter !pending ~f:(fun (el, _, _, timer) ->
+    Dom_html.clearTimeout timer;
+    el##.style##removeProperty (Js.string "overflow-anchor") |> ignore);
+  pending := None
+;;
 
 let keep_position () =
+  clear_pending ();
   Option.iter (chat ()) ~f:(fun el ->
     (* The browser's own scroll anchoring would move it as well. *)
     el##.style##setProperty
@@ -23,16 +28,24 @@ let keep_position () =
       (Js.string "none")
       Js.undefined
     |> ignore;
-    pending := Some (el##.scrollHeight, Js.to_float el##.scrollTop))
+    let timer = Dom_html.setTimeout clear_pending 1500. in
+    pending := Some (el, el##.scrollHeight, Js.to_float el##.scrollTop, timer))
 ;;
 
 let restore () =
   match !pending, chat () with
-  | Some (height, top), Some el when el##.scrollHeight <> height ->
-    pending := None;
-    el##.scrollTop := Js.float (top +. Float.of_int (el##.scrollHeight - height));
-    el##.style##removeProperty (Js.string "overflow-anchor") |> ignore
-  | _ -> ()
+  | Some (saved_el, height, top, _), Some el ->
+    if not (phys_equal saved_el el)
+    then clear_pending ()
+    else if el##.scrollHeight > height
+    then (
+      clear_pending ();
+      el##.scrollTop
+      := Js.float (top +. Float.of_int (el##.scrollHeight - height)))
+    else if el##.scrollHeight < height
+    then clear_pending ()
+  | Some _, None -> clear_pending ()
+  | None, _ -> ()
 ;;
 
 let near_top (el : Dom_html.element Js.t) =
@@ -55,14 +68,18 @@ let load_older () = !scheduler Prigh_web.App.Action.Load_older
 
 let install ~schedule =
   scheduler := schedule;
-  let maybe_load (ev : #Dom_html.event Js.t) =
+  let maybe_load ~exact (ev : #Dom_html.event Js.t) =
     match chat () with
     | Some el
       when Js.Opt.case
              ev##.target
              (fun () -> false)
              (fun target ->
-                Js.to_bool ((Js.Unsafe.coerce el)##contains target : bool Js.t))
+                if exact
+                then phys_equal (target :> Dom.node Js.t) (el :> Dom.node Js.t)
+                else
+                  Js.to_bool
+                    ((Js.Unsafe.coerce el)##contains target : bool Js.t))
            && near_top el
            && more () -> schedule Prigh_web.App.Action.Load_older
     | _ -> ()
@@ -78,14 +95,15 @@ let install ~schedule =
          Js._true
        : Dom_html.event_listener_id)
   in
-  (* Scroll events do not bubble: capturing sees the chat's. A wheel turned
-     up at the very top scrolls nothing. *)
-  listen (Dom_html.Event.make "scroll") maybe_load;
+  (* Scroll events do not bubble: capturing sees the chat's (and nested
+     scrollers, which [exact] ignores). A wheel turned up at the very top
+     scrolls nothing. *)
+  listen (Dom_html.Event.make "scroll") (maybe_load ~exact:true);
   listen
     (Dom_html.Event.make "wheel")
     (fun (ev : Dom_html.mouseScrollEvent Js.t) ->
        if Float.(Js.to_float (Js.Unsafe.coerce ev)##.deltaY < 0.)
-       then maybe_load ev);
+       then maybe_load ~exact:false ev);
   listen Dom_html.Event.click (fun (ev : Dom_html.mouseEvent Js.t) ->
     Js.Opt.iter ev##.target (fun target ->
       Option.iter

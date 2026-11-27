@@ -60,6 +60,23 @@ let%expect_test "the threshold: 80% of the window, or the cap if lower" =
     |}]
 ;;
 
+let%expect_test "an unknown context window still honours an explicit cap" =
+  let unknown = { flash with context_window = 0 } in
+  List.iter [ None; Some 300_000 ] ~f:(fun max_tokens ->
+    let s = capped max_tokens in
+    printf
+      "cap %s: threshold=%d should(100)=%b should(300001)=%b\n"
+      (Option.value_map max_tokens ~default:"none" ~f:Int.to_string)
+      (Compaction_settings.threshold s unknown)
+      (Compaction_settings.should_compact s unknown ~input_tokens:100)
+      (Compaction_settings.should_compact s unknown ~input_tokens:300_001));
+  [%expect
+    {|
+    cap none: threshold=0 should(100)=false should(300001)=false
+    cap 300000: threshold=300000 should(100)=false should(300001)=true
+    |}]
+;;
+
 let%expect_test "the summariser: the compaction model when it holds the context"
   =
   let show settings session =

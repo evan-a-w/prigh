@@ -71,7 +71,7 @@ let apply_block t (event : Assistant_event.t) =
     Buffer.add_string b s;
     push t (Thinking { text = b; signature = None });
     last + 1
-  | Thinking_signature s, Thinking b :: _ ->
+  | Thinking_signature s, Thinking ({ signature = None; _ } as b) :: _ ->
     b.signature <- Some s;
     last
   | Thinking_signature s, _ ->

@@ -597,7 +597,10 @@ let confirm_key (m : App.Model.t) (c : Prigh_protocol.Pending.Confirm.t) t
 ;;
 
 (* A character, not a named key like [ArrowUp]. *)
-let typed key = String.length key = 1 || Char.to_int key.[0] >= 0x80
+let typed key =
+  String.length key = 1
+  || ((not (String.is_empty key)) && Char.to_int key.[0] >= 0x80)
+;;
 
 (* ↑↓ rows, ←→ questions, Space picks, typing goes to the own answer (its
    field, once focused, types itself), Enter accepts, Esc declines. *)
@@ -676,10 +679,26 @@ let code_key (m : App.Model.t) t : App.Action.t option =
   | "Escape" when m.code.menu -> code Toggle_menu
   | "Escape" when Option.is_some m.code.goto -> code Goto_cancel
   | "Escape" when m.narrow && m.code.drawer -> code Toggle_drawer
-  | "Escape" when m.narrow && m.code.sheet -> code Toggle_sheet
+  | "Escape"
+    when m.narrow
+         && m.code.sheet
+         && Option.is_none (App.Model.popup m)
+         && (not m.context_card)
+         && Option.is_none m.btw
+         && (not m.status_tray)
+         && (not m.files.open_)
+         && (not m.session_card.sheet)
+         && not (App.Model.drawer m) -> code Toggle_sheet
   | ("f" | "F") when command t && Poly.equal t.target Page ->
     code (Command Find)
-  | "Escape" when Poly.equal t.target Page -> code Leave
+  | "Escape"
+    when Poly.equal t.target Page
+         && (not (App.Model.drawer m))
+         && (not (m.narrow && m.status_tray))
+         && (not m.context_card)
+         && (not m.marks.selecting)
+         && (not (m.narrow && m.files.open_))
+         && not (m.narrow && m.session_card.sheet) -> code Leave
   | _ -> None
 ;;
 
@@ -751,20 +770,20 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | "ArrowUp" when alt_only t -> Some Dequeue
      | "ArrowUp" when ctrl_only t -> Some (Jump_to_user_message (-1))
      | "ArrowDown" when ctrl_only t -> Some (Jump_to_user_message 1)
-     | "Escape" when App.Model.drawer m -> Some Toggle_sidebar
      | "Escape" when m.narrow && m.status_tray && Option.is_none m.dialog ->
        Some Toggle_status_tray
      | "Escape" when m.context_card && Option.is_none m.dialog ->
        Some Toggle_context_card
-     (* Sessions selected (a Ctrl or Shift click leaves the focus where it
-        was): Esc ends it from anywhere. *)
-     | "Escape" when m.marks.selecting && Option.is_none m.dialog ->
-       Some (Select_sessions false)
      (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
      | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
        Some (Files Close)
      | "Escape" when m.narrow && m.session_card.sheet ->
        Some (Session_card (Sheet false))
+     (* Sessions selected (a Ctrl or Shift click leaves the focus where it
+        was): Esc ends it from anywhere, before closing the drawer. *)
+     | "Escape" when m.marks.selecting && Option.is_none m.dialog ->
+       Some (Select_sessions false)
+     | "Escape" when App.Model.drawer m -> Some Toggle_sidebar
      (* A subagent's chat: back to its parent's. *)
      | "Escape"
        when Option.is_some m.subagent_chat

@@ -835,10 +835,24 @@ let rec update t (action : Action.t) =
       }
     in
     update (scoped t) (Open None)
-  | Close -> { t with open_ = false; selection = None }, [ Out.Focus "editor" ]
+  | Close ->
+    ( { t with
+        open_ = false
+      ; selection = None
+      ; files_open = false
+      ; display_open = false
+      }
+    , [ Out.Focus "editor" ] )
   | Toggle ->
     if t.open_
-    then { t with open_ = false; selection = None }, []
+    then
+      ( { t with
+          open_ = false
+        ; selection = None
+        ; files_open = false
+        ; display_open = false
+        }
+      , [] )
     else (
       let t = { t with open_ = true } in
       let t, diff = get_diff t in

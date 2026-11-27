@@ -719,6 +719,7 @@ button.tool-head > .chev {
   transition: transform 0.15s, opacity 0.15s;
 }
 button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-head > .chev { opacity: 1; }
+@media (hover: none) { button.tool-head > .chev { opacity: 0.7; } }
 .tool.open > button.tool-head > .chev { transform: rotate(90deg); }
 .tool-body > .details { font: 11.5px var(--mono); color: var(--faint); }
 
@@ -1131,6 +1132,8 @@ button.image:focus-visible { outline: 2px solid var(--primary); outline-offset: 
 .attach-chip.failed .attach-chip-detail { color: var(--destructive); overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
 .attach-chip-remove { width: 20px; height: 20px; flex-shrink: 0; }
 .attach-chip-remove .icon { width: 11px; height: 11px; }
+.app.narrow .attach-chip { overflow: visible; min-height: 40px; }
+.app.narrow .attach-chip-remove { width: 40px; height: 40px; }
 .composer-buttons .attach .icon { width: 17px; height: 17px; }
 
 /* A long paste: its chip opens it (read, insert as text, remove). */

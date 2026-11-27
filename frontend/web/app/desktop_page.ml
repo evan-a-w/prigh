@@ -10,13 +10,16 @@ let storage () =
 
 let stored_at name =
   Option.bind (storage ()) ~f:(fun storage ->
-    Js.Opt.to_option (storage##getItem (Js.string name))
-    |> Option.map ~f:Js.to_string)
+    Option.try_with (fun () ->
+      Js.Opt.to_option (storage##getItem (Js.string name))
+      |> Option.map ~f:Js.to_string)
+    |> Option.join)
 ;;
 
 let store name value =
   Option.iter (storage ()) ~f:(fun storage ->
-    storage##setItem (Js.string name) (Js.string value))
+    try storage##setItem (Js.string name) (Js.string value) with
+    | _ -> ())
 ;;
 
 let stored () = stored_at Desktop_link.storage_key

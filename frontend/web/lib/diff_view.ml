@@ -159,6 +159,7 @@ let number_cell (kind : [ `Same | `Added | `Removed ]) ~old_line ~new_line =
 ;;
 
 let tab_width = 8
+let max_hang = 12
 
 let hang text =
   let rec indent i col ~tabs =
@@ -171,9 +172,12 @@ let hang text =
         indent (i + 1) ((col / tab_width * tab_width) + tab_width) ~tabs:true
       | _ -> col, tabs)
   in
-  match indent 0 0 ~tabs:false with
-  | col, false -> col + 2
-  | col, true -> col / tab_width * tab_width
+  let n =
+    match indent 0 0 ~tabs:false with
+    | col, false -> col + 2
+    | col, true -> col / tab_width * tab_width
+  in
+  Int.min n max_hang
 ;;
 
 let default_hang = 2

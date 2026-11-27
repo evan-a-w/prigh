@@ -166,36 +166,37 @@ let serve_terminal t (entry : Entry.t) ~cols ~rows channel =
     Terminal.attach terminal ~cols ~rows ~on_output:(fun data ->
       push (Outgoing.Data data))
   in
-  Fiber.fork_daemon ~sw (fun () ->
-    Promise.await (Terminal.exited terminal);
-    push Outgoing.Exited;
-    `Stop_daemon);
-  let rec write () =
-    match (Eio.Stream.take outgoing : Outgoing.t) with
-    | Data data ->
-      Terminal_channel.send channel (`Binary data);
-      if not (Terminal_channel.is_closed channel) then write ()
-    | Overflow -> ()
-    | Exited -> Terminal_channel.send_text channel {|{"type":"exit"}|}
-  in
-  let rec read () =
-    match
-      Eio.Time.with_timeout (clock t) t.heartbeat_timeout (fun () ->
-        Ok (Terminal_channel.read channel))
-    with
-    | Error `Timeout | Ok None -> ()
-    | Ok (Some (`Binary data)) ->
-      Terminal.input terminal data;
-      read ()
-    | Ok (Some (`Text text)) ->
-      control_message terminal channel text;
-      read ()
-  in
   Exn.protect
-    ~f:(fun () -> Fiber.first write read)
     ~finally:(fun () ->
       Terminal.detach terminal viewer;
       start_idle_timer t entry)
+    ~f:(fun () ->
+      Fiber.fork_daemon ~sw (fun () ->
+        Promise.await (Terminal.exited terminal);
+        push Outgoing.Exited;
+        `Stop_daemon);
+      let rec write () =
+        match (Eio.Stream.take outgoing : Outgoing.t) with
+        | Data data ->
+          Terminal_channel.send channel (`Binary data);
+          if not (Terminal_channel.is_closed channel) then write ()
+        | Overflow -> ()
+        | Exited -> Terminal_channel.send_text channel {|{"type":"exit"}|}
+      in
+      let rec read () =
+        match
+          Eio.Time.with_timeout (clock t) t.heartbeat_timeout (fun () ->
+            Ok (Terminal_channel.read channel))
+        with
+        | Error `Timeout | Ok None -> ()
+        | Ok (Some (`Binary data)) ->
+          Terminal.input terminal data;
+          read ()
+        | Ok (Some (`Text text)) ->
+          control_message terminal channel text;
+          read ()
+      in
+      Fiber.first write read)
 ;;
 
 let serve t ~key ~cwd ~cols ~rows channel =

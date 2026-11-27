@@ -132,7 +132,8 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
               [ button
                   ~cls:
                     "small picker-trim shrink-0 self-center \
-                     in-[.picker-item:not(.selected):not(:hover)]:invisible"
+                     in-[.picker-item:not(.selected):not(:hover)]:invisible \
+                     [@media(hover:none)]:visible narrow:visible"
                   ~title:"Trim everything before this (Delete)"
                   ~label:("Trim the context before " ^ item.label)
                   ~on_click:
@@ -390,9 +391,10 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
         ~attrs:
           [ Attr.class_ "delete-list mt-2.5 flex list-none flex-col gap-0.5 p-0"
           ]
-        (List.map (List.take sessions shown) ~f:row
+        (let total = List.length sessions in
+         List.map (List.take sessions shown) ~f:row
          @
-         if count > shown
+         if total > shown
          then
            [ Node.li
                ~attrs:
@@ -400,7 +402,7 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
                      "delete-more px-2 py-0.5 text-xs text-muted-foreground \
                       tabular-nums"
                  ]
-               [ Node.textf "and %d more" (count - shown) ]
+               [ Node.textf "and %d more" (total - shown) ]
            ]
          else [])
     ; (match warnings with
@@ -892,10 +894,13 @@ let confirm (m : App.Model.t) ~inject =
       body
 ;;
 
-let view m ~inject =
+let view (m : App.Model.t) ~inject =
+  let has_confirm = not (List.is_empty m.confirms) in
+  let has_question = (not has_confirm) && not (List.is_empty m.questions) in
+  let covered = has_confirm || has_question in
   Node.fragment
-    [ dialog m ~inject
-    ; (if List.is_empty m.confirms
+    [ (if covered then inert (dialog m ~inject) else dialog m ~inject)
+    ; (if has_question
        then
          Question_view.view
            m.questions

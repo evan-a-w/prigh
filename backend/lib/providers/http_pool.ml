@@ -119,17 +119,7 @@ module Socket = struct
     Eio.Resource.T (t, handler)
   ;;
 
-  let connect ~(env : Env.t) ~host ~port =
-    let addr =
-      match
-        Eio.Net.getaddrinfo_stream
-          ~service:(Int.to_string port)
-          (Eio.Stdenv.net env)
-          host
-      with
-      | addr :: _ -> addr
-      | [] -> failwithf "could not resolve %s" host ()
-    in
+  let connect_addr ~(env : Env.t) addr =
     Switch.run
     @@ fun sw ->
     let eio = Eio.Net.connect ~sw (Eio.Stdenv.net env) addr in
@@ -142,6 +132,25 @@ module Socket = struct
     in
     Core_unix.set_nonblock fd;
     { fd; closed = false }
+  ;;
+
+  let connect ~(env : Env.t) ~host ~port =
+    let addrs =
+      Eio.Net.getaddrinfo_stream
+        ~service:(Int.to_string port)
+        (Eio.Stdenv.net env)
+        host
+    in
+    let rec try_addrs = function
+      | [] -> failwithf "could not resolve %s" host ()
+      | [ addr ] -> connect_addr ~env addr
+      | addr :: rest ->
+        (match connect_addr ~env addr with
+         | socket -> socket
+         | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+         | exception _ -> try_addrs rest)
+    in
+    try_addrs addrs
   ;;
 end
 
@@ -229,6 +238,38 @@ let tls_host host =
   Result.ok (Result.bind (Domain_name.of_string host) ~f:Domain_name.host)
 ;;
 
+let connect_new t ~env ~scheme ~host ~port ~key =
+  let flow_of socket =
+    match scheme with
+    | "http" -> Socket.flow socket
+    | "https" ->
+      (Tls_eio.client_of_flow
+         (force t.tls)
+         ?host:(tls_host host)
+         (Socket.flow socket)
+        :> [ Eio.Flow.two_way_ty | Eio.Resource.close_ty ] Eio.Resource.t)
+    | other -> failwithf "unsupported URL scheme %S" other ()
+  in
+  let socket = Socket.connect ~env ~host ~port in
+  match flow_of socket with
+  | flow ->
+    { Connection.key
+    ; socket
+    ; flow
+    ; reused = false
+    ; idle_since = Time_ns.now ()
+    }
+  | exception exn ->
+    Socket.close socket;
+    raise exn
+;;
+
+let acquire_fresh t ~env uri =
+  expire t;
+  let scheme, host, port, key = key uri in
+  connect_new t ~env ~scheme ~host ~port ~key
+;;
+
 let acquire t ~env uri =
   expire t;
   let scheme, host, port, key = key uri in
@@ -236,30 +277,7 @@ let acquire t ~env uri =
   | Some c ->
     c.reused <- true;
     c
-  | None ->
-    let flow_of socket =
-      match scheme with
-      | "http" -> Socket.flow socket
-      | "https" ->
-        (Tls_eio.client_of_flow
-           (force t.tls)
-           ?host:(tls_host host)
-           (Socket.flow socket)
-          :> [ Eio.Flow.two_way_ty | Eio.Resource.close_ty ] Eio.Resource.t)
-      | other -> failwithf "unsupported URL scheme %S" other ()
-    in
-    let socket = Socket.connect ~env ~host ~port in
-    (match flow_of socket with
-     | flow ->
-       { Connection.key
-       ; socket
-       ; flow
-       ; reused = false
-       ; idle_since = Time_ns.now ()
-       }
-     | exception exn ->
-       Socket.close socket;
-       raise exn)
+  | None -> connect_new t ~env ~scheme ~host ~port ~key
 ;;
 
 let oldest t =

@@ -179,7 +179,7 @@ let%expect_test "a subagent finishes: how long ago, then failed" =
   H.texts h ~selector:".session-card-agent" |> List.iter ~f:print_endline;
   [%expect
     {|
-    (Subagents 2)
+    (Subagents)
     (1 finished · 1 failed)
     (Session_card (Fold Ended))
     Fix the touch targets now
@@ -341,16 +341,16 @@ let%expect_test
   print_s [%sexp ((H.model h).session_card : Prigh_web.Session_card.t)];
   [%expect
     {|
-    (Subagents 2)
+    (Subagents 1)
     (Review the phone layout thinking…) (1 finished)
     button "1 finished"
-    (Subagents 2)
+    (Subagents)
     (1 finished · 1 failed)
     (Session_card (Fold Ended))
-    (Subagents 2)
+    (Subagents)
     (1 finished · 1 failed) (Fix the touch targets now) (Review the phone layout failed now)
     (Session_card (Fold Ended))
-    (Subagents 2)
+    (Subagents)
     (1 finished · 1 failed)
     (Session_card (Fold Ended))
     ((subagents_open true) (ended_open false) (jobs_open true)
@@ -380,7 +380,7 @@ let%expect_test
     {|
     (Subagents 2)
     (Fix the touch targets working…) (Review the phone layout thinking…)
-    (Jobs 4)
+    (Jobs 1)
     npm run dev j1 ready on :3000 running 1m 15s
     (Kill j1 (/jobs kill j1))
     (1 finished · 1 killed · 1 failed)
@@ -424,7 +424,7 @@ let%expect_test
     (Session_card (Fold Jobs))
     (Subagents 2)
     (Fix the touch targets working…) (Review the phone layout thinking…)
-    (Jobs 4)
+    (Jobs 1)
     (Worktrees 2)
     |}]
 ;;
@@ -451,7 +451,7 @@ let%expect_test "a running job's button kills it: acknowledged at once" =
     button "Kill j1" -- Killing j1…
     <button class="[&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-destructive in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center narrow:size-11 outline-none rounded-[min(var(--radius-md),10px)] rounded-lg select-none session-card-kill shrink-0 size-6 text-muted-foreground text-sm transition-all whitespace-nowrap">
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Jobs 1)
+    (Jobs)
     (1 killed)
     |}]
 ;;
@@ -506,7 +506,7 @@ let%expect_test "only jobs: the card shows, and on a phone its sheet lists them"
     Toggle_status_tray
     Toggle_session_card
     This session
-    (Jobs 4)
+    (Jobs 1)
     npm run dev j1 ready on :3000 running 1m 15s
     (Kill j1 (/jobs kill j1))
     (1 finished · 1 killed · 1 failed)

@@ -481,25 +481,39 @@ module Lines = struct
   ;;
 
   let add t data =
-    let lines = ref [] in
-    let start = ref 0 in
-    String.iteri data ~f:(fun i c ->
-      if Char.equal c '\n'
-      then (
-        Buffer.add_substring t.partial data ~pos:!start ~len:(i - !start);
-        lines := Buffer.contents t.partial :: !lines;
-        Buffer.clear t.partial;
-        start := i + 1));
-    Buffer.add_substring
-      t.partial
-      data
-      ~pos:!start
-      ~len:(String.length data - !start);
-    if Buffer.length t.partial > t.max_line
+    if not t.too_long
     then (
-      t.too_long <- true;
-      Cancellation.cancel t.stopped)
-    else emit t (List.rev !lines)
+      let lines = ref [] in
+      let start = ref 0 in
+      let len = String.length data in
+      let rec scan i =
+        if i = len
+        then (
+          let tail_len = len - !start in
+          if Buffer.length t.partial + tail_len > t.max_line
+          then (
+            Buffer.clear t.partial;
+            t.too_long <- true;
+            Cancellation.cancel t.stopped)
+          else Buffer.add_substring t.partial data ~pos:!start ~len:tail_len)
+        else if Char.equal data.[i] '\n'
+        then (
+          let piece_len = i - !start in
+          if Buffer.length t.partial + piece_len > t.max_line
+          then (
+            Buffer.clear t.partial;
+            t.too_long <- true;
+            Cancellation.cancel t.stopped)
+          else (
+            Buffer.add_substring t.partial data ~pos:!start ~len:piece_len;
+            lines := Buffer.contents t.partial :: !lines;
+            Buffer.clear t.partial;
+            start := i + 1;
+            scan (i + 1)))
+        else scan (i + 1)
+      in
+      scan 0;
+      if not t.too_long then emit t (List.rev !lines))
   ;;
 
   (* A last line without its [\n]. *)

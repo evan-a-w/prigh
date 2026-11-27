@@ -115,13 +115,14 @@ val is_closed : t -> bool
     read or a write stuck on it ends) and returns. Pings the peer every
     [interval] seconds while nothing is being written (browsers answer pings
     by themselves, also from a suspended page); the peer is gone when
-    nothing came from it for [timeout] seconds since the last write ended,
-    or when one write has been stuck for [write_timeout] seconds (it is not
-    reading). Defaults: 15, 45, 300. Once the connection is closed
-    otherwise, waits to be cancelled. *)
+    nothing came from it for [timeout] seconds (even while a write is
+    blocked), or when one write has been stuck for [write_timeout] seconds
+    (it is not reading). Measured on the monotonic [clock]. Defaults: 15,
+    45, 300. Once the connection is closed otherwise, waits to be
+    cancelled. *)
 val keepalive
   :  t
-  -> clock:_ Eio.Time.clock
+  -> clock:_ Eio.Time.Mono.t
   -> shutdown:(unit -> unit)
   -> ?interval:float
   -> ?timeout:float

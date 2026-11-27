@@ -124,7 +124,11 @@ let ask t ~(asker : Party.t) ~(target : Party.t) ~question =
     | Error _ as error ->
       close t question;
       unpost t ~session:target.id mail;
-      error)
+      error
+    | exception exn ->
+      close t question;
+      unpost t ~session:target.id mail;
+      raise exn)
 ;;
 
 let reply t (question : Question.t) ~answered text =
@@ -147,6 +151,9 @@ let reply t (question : Question.t) ~answered text =
       question.id
       session
       (Error.to_string_hum error)
+  | exception exn ->
+    unpost t ~session mail;
+    raise exn
 ;;
 
 let answer t ~session ~id text =

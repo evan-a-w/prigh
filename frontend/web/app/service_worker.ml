@@ -8,12 +8,20 @@ let glue : Js.Unsafe.any Lazy.t =
        {|(function () {
   const sw = window.isSecureContext && navigator.serviceWorker;
   let registration = null;
+  let hadController = !!(sw && sw.controller);
   let updating = false;
+  let reloading = false;
   let onUpdateReady = null;
-  let told = false;
+  let toldWorker = null;
+  const reloadOnce = () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  };
   const tell = () => {
-    if (onUpdateReady && !told && registration.waiting && sw.controller) {
-      told = true;
+    const waiting = registration && registration.waiting;
+    if (onUpdateReady && waiting && waiting !== toldWorker && sw && sw.controller) {
+      toldWorker = waiting;
       onUpdateReady();
     }
   };
@@ -21,12 +29,17 @@ let glue : Js.Unsafe.any Lazy.t =
     register: function () {
       if (!sw) return;
       sw.addEventListener("controllerchange", () => {
-        if (updating) window.location.reload();
+        toldWorker = null;
+        if (updating || hadController) {
+          reloadOnce();
+        } else {
+          hadController = true;
+        }
       });
       // The worker showed the page it keeps, and a proxy in front now wants
       // its sign-in (sw.template.js): the next load goes to the network.
       sw.addEventListener("message", event => {
-        if (event.data === "prigh-sw: reload") window.location.reload();
+        if (event.data === "prigh-sw: reload") reloadOnce();
       });
       sw.register("sw.js").then(r => {
         if (!r) return;
@@ -51,10 +64,22 @@ let glue : Js.Unsafe.any Lazy.t =
       if (registration) tell();
     },
     applyUpdate: function () {
+      toldWorker = null;
       const waiting = registration && registration.waiting;
-      if (!waiting) { window.location.reload(); return; }
+      if (!waiting || waiting.state === "redundant" || waiting.state === "activated") {
+        reloadOnce();
+        return;
+      }
       updating = true;
-      waiting.postMessage("skip-waiting");
+      waiting.addEventListener("statechange", () => {
+        if (waiting.state === "redundant") reloadOnce();
+      });
+      setTimeout(reloadOnce, 3000);
+      try {
+        waiting.postMessage("skip-waiting");
+      } catch (e) {
+        reloadOnce();
+      }
     },
     showNotification: function (title, options) {
       if (!(sw && sw.controller && registration)) return false;

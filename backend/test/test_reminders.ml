@@ -297,6 +297,7 @@ let%expect_test "not after an error, an abort, in plan mode or past the budget" 
     request: 1 messages
       user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant: expensive
+    notice: the session's budget of $0.50 is spent ($0.60 so far): /budget 2 raises it, /budget off removes it
     |}]
 ;;
 

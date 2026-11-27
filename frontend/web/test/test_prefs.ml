@@ -292,7 +292,7 @@ let%expect_test
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
-    (Cache_prefs (((key history) (value (("/accent green" "/accent teal"))))))
+    (Cache_prefs (((key history) (value (("/accent green"))))))
     (Cache_prefs
      (((key web.theme) (value (original))) ((key web.accent) (value (green)))
       ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
@@ -330,7 +330,7 @@ let%expect_test
          web.files-preview-width web.terminal-height web.review-chat-width
          web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
-    ("Accent: green" "Back to alice")
+    ("Back to alice")
     |}];
   (* An older backend refuses get_prefs: the browser keeps them. *)
   let h = H.connecting () in

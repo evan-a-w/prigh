@@ -217,15 +217,21 @@ module Scroll_buttons = Vdom.Attr.Hooks.Make (struct
           | Some vp ->
             let up = query content "[data-slot=select-scroll-up-button]" in
             let down = query content "[data-slot=select-scroll-down-button]" in
+            let dir = ref 0. in
+            let stop () =
+              Option.iter state.timer ~f:(fun t -> Dom_html.window##clearInterval t);
+              state.timer <- None;
+              dir := 0.
+            in
             let update () =
               let top = Js.to_float vp##.scrollTop in
               let max_top = Float.of_int (vp##.scrollHeight - vp##.clientHeight) in
-              set_hidden up Float.(top <= 0.);
-              set_hidden down Float.(round_up top >= max_top)
-            in
-            let stop () =
-              Option.iter state.timer ~f:(fun t -> Dom_html.window##clearInterval t);
-              state.timer <- None
+              let hide_up = Float.(top <= 0.) in
+              let hide_down = Float.(round_up top >= max_top) in
+              set_hidden up hide_up;
+              set_hidden down hide_down;
+              if (hide_up && Float.(!dir < 0.)) || (hide_down && Float.(!dir > 0.))
+              then stop ()
             in
             let listen target event f =
               Dom_html.addEventListener
@@ -242,16 +248,19 @@ module Scroll_buttons = Vdom.Attr.Hooks.Make (struct
               | Some b ->
                 let start () =
                   if Option.is_none state.timer
-                  then
+                  then (
+                    dir := dy;
                     state.timer
                     <- Some
                          (Dom_html.window##setInterval
                             (Js.wrap_callback (fun () ->
                                vp##.scrollTop := Js.float (Js.to_float vp##.scrollTop +. dy)))
-                            (Js.float 50.))
+                            (Js.float 50.)))
                 in
                 [ listen b Dom_html.Event.pointerdown start
                 ; listen b Dom_html.Event.pointermove start
+                ; listen b Dom_html.Event.pointerup stop
+                ; listen b (Dom_html.Event.make "pointercancel") stop
                 ; listen b Dom_html.Event.pointerleave stop
                 ]
             in
@@ -273,7 +282,9 @@ module Scroll_buttons = Vdom.Attr.Hooks.Make (struct
 
     let destroy _ (state : State.t) _ =
       Option.iter state.timer ~f:(fun t -> Dom_html.window##clearInterval t);
-      List.iter state.listeners ~f:Dom_html.removeEventListener
+      state.timer <- None;
+      List.iter state.listeners ~f:Dom_html.removeEventListener;
+      state.listeners <- []
     ;;
   end)
 

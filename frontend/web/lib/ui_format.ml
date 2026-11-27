@@ -105,25 +105,42 @@ let nice_step raw =
 ;;
 
 let ticks ?(count = 5) lo hi =
-  let lo, hi = Float.min lo hi, Float.max lo hi in
-  let lo, hi =
-    if Float.(hi -. lo < 1e-12)
-    then if Float.(lo = 0.) then 0., 1. else Float.min lo 0., Float.max hi 0.
-    else lo, hi
-  in
-  let lo, hi =
-    if Float.(hi -. lo < 1e-12) then lo -. 1., hi +. 1. else lo, hi
-  in
-  let step = nice_step ((hi -. lo) /. Float.of_int (Int.max 1 (count - 1))) in
-  (* Within a tick of zero: from zero. *)
-  let lo = if Float.(lo > 0. && lo <= step) then 0. else lo in
-  let hi = if Float.(hi < 0. && hi >= -.step) then 0. else hi in
-  let first = Float.round_down (lo /. step) *. step in
-  let last = Float.round_up (hi /. step) *. step in
-  let n = Float.iround_nearest_exn ((last -. first) /. step) in
-  List.init (n + 1) ~f:(fun i ->
-    let v = first +. (Float.of_int i *. step) in
-    (* No [-0.] or [0.30000000000000004]. *)
-    let v = Float.round_decimal v ~decimal_digits:10 in
-    if Float.(v = 0.) then 0. else v)
+  if not (Float.is_finite lo && Float.is_finite hi)
+  then [ 0.; 1. ]
+  else (
+    let lo, hi = Float.min lo hi, Float.max lo hi in
+    let lo, hi =
+      if Float.(hi -. lo < 1e-12)
+      then if Float.(lo = 0.) then 0., 1. else Float.min lo 0., Float.max hi 0.
+      else lo, hi
+    in
+    let lo, hi =
+      if Float.(hi -. lo < 1e-12) then lo -. 1., hi +. 1. else lo, hi
+    in
+    let step = nice_step ((hi -. lo) /. Float.of_int (Int.max 1 (count - 1))) in
+    if not (Float.is_finite step && Float.(step > 0.))
+    then [ lo; hi ]
+    else (
+      (* Within a tick of zero: from zero. *)
+      let lo = if Float.(lo > 0. && lo <= step) then 0. else lo in
+      let hi = if Float.(hi < 0. && hi >= -.step) then 0. else hi in
+      let first = Float.round_down (lo /. step) *. step in
+      let last = Float.round_up (hi /. step) *. step in
+      let ratio = (last -. first) /. step in
+      if
+        not
+          (Float.is_finite first
+           && Float.is_finite last
+           && Float.is_finite ratio)
+      then [ lo; hi ]
+      else (
+        let n =
+          Option.value (Float.iround_nearest ratio) ~default:1
+          |> Int.clamp_exn ~min:0 ~max:100
+        in
+        List.init (n + 1) ~f:(fun i ->
+          let v = first +. (Float.of_int i *. step) in
+          (* No [-0.] or [0.30000000000000004]. *)
+          let v = Float.round_decimal v ~decimal_digits:10 in
+          if Float.(v = 0.) then 0. else v))))
 ;;

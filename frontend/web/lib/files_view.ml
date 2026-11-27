@@ -158,27 +158,49 @@ let crumbs_bar items extra =
 let path_bar (t : Files.t) ~inject =
   match t.editing_path, t.listing with
   | Some text, _ ->
-    Node.input
-      ~attrs:
-        [ Attr.id "files-path"
-        ; Attr.class_ "files-path-input"
-        ; Attr.value text
-        ; Attr.placeholder "A path: /abs, ~/in/home or relative, Enter to go"
-        ; Attr.create "autocomplete" "off"
-        ; Attr.create "spellcheck" "false"
-        ; Attr.create "aria-label" "Go to path"
-        ; Attr.on_input (fun _ text -> inject (files (Edit_path (Some text))))
-        ; Attr.on_keydown (fun ev ->
-            match Js_of_ocaml.Js.Optdef.to_option ev##.key with
-            | Some key when String.equal (Js_of_ocaml.Js.to_string key) "Enter"
-              -> inject (files Submit_path)
-            | Some key when String.equal (Js_of_ocaml.Js.to_string key) "Escape"
-              ->
-              Effect.Many
-                [ Effect.Stop_propagation; inject (files (Edit_path None)) ]
-            | _ -> Effect.Ignore)
-        ]
-      ()
+    div
+      ~cls:"files-path-edit flex min-w-0 flex-1 items-center gap-1"
+      [ Node.input
+          ~attrs:
+            [ Attr.id "files-path"
+            ; Attr.class_ "files-path-input min-w-0 flex-1"
+            ; Attr.value text
+            ; Attr.placeholder
+                "A path: /abs, ~/in/home or relative, Enter to go"
+            ; Attr.create "autocomplete" "off"
+            ; Attr.create "spellcheck" "false"
+            ; Attr.create "enterkeyhint" "go"
+            ; Attr.create "aria-label" "Go to path"
+            ; Attr.on_input (fun _ text ->
+                inject (files (Edit_path (Some text))))
+            ; Attr.on_keydown (fun ev ->
+                match Js_of_ocaml.Js.Optdef.to_option ev##.key with
+                | Some key
+                  when String.equal (Js_of_ocaml.Js.to_string key) "Enter" ->
+                  inject (files Submit_path)
+                | Some key
+                  when String.equal (Js_of_ocaml.Js.to_string key) "Escape" ->
+                  Effect.Many
+                    [ Effect.Stop_propagation; inject (files (Edit_path None)) ]
+                | _ -> Effect.Ignore)
+            ]
+          ()
+      ; button
+          ~cls:"files-path-go shrink-0 narrow:h-11 narrow:px-3"
+          ~variant:Outline
+          ~size:Xs
+          ~title:"Go to this path (Enter)"
+          ~on_click:(inject (files Submit_path))
+          [ Node.text "Go" ]
+      ; button
+          ~cls:"files-path-cancel shrink-0 narrow:size-11"
+          ~variant:Ghost
+          ~size:Icon_xs
+          ~title:"Cancel (Esc)"
+          ~label:"Cancel"
+          ~on_click:(inject (files (Edit_path None)))
+          [ icon Close ]
+      ]
   | None, Some listing ->
     crumbs_bar
       (crumbs t listing ~inject)

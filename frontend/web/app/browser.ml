@@ -1,20 +1,29 @@
 open! Core
 open Js_of_ocaml
 
-let storage () = Js.Optdef.to_option Dom_html.window##.localStorage
+let storage () =
+  Option.try_with (fun () -> Js.Optdef.to_option Dom_html.window##.localStorage)
+  |> Option.join
+;;
 
 let get_item key =
   Option.bind (storage ()) ~f:(fun s ->
-    Js.Opt.to_option (s##getItem (Js.string key)) |> Option.map ~f:Js.to_string)
+    Option.try_with (fun () ->
+      Js.Opt.to_option (s##getItem (Js.string key))
+      |> Option.map ~f:Js.to_string)
+    |> Option.join)
 ;;
 
 let set_item key value =
   Option.iter (storage ()) ~f:(fun s ->
-    s##setItem (Js.string key) (Js.string value))
+    try s##setItem (Js.string key) (Js.string value) with
+    | _ -> ())
 ;;
 
 let remove_item key =
-  Option.iter (storage ()) ~f:(fun s -> s##removeItem (Js.string key))
+  Option.iter (storage ()) ~f:(fun s ->
+    try s##removeItem (Js.string key) with
+    | _ -> ())
 ;;
 
 let query_param name =
@@ -25,7 +34,9 @@ let query_param name =
   List.find_map (String.split search ~on:'&') ~f:(fun pair ->
     match String.lsplit2 pair ~on:'=' with
     | Some (k, v) when String.equal k name ->
-      Some (Js.to_string (Js.decodeURIComponent (Js.string v)))
+      Some
+        (try Js.to_string (Js.decodeURIComponent (Js.string v)) with
+         | _ -> v)
     | _ -> None)
 ;;
 
@@ -135,11 +146,23 @@ module Viewport = struct
   ;;
 
   let on_change f =
-    listen Dom_html.window "resize" f;
+    let pending = ref false in
+    let schedule () =
+      if not !pending
+      then (
+        pending := true;
+        ignore
+          (Dom_html.window##requestAnimationFrame
+             (Js.wrap_callback (fun (_ : Js.number_t) ->
+                pending := false;
+                f ()))
+           : Dom_html.animation_frame_request_id))
+    in
+    listen Dom_html.window "resize" schedule;
     Option.iter (visual ()) ~f:(fun vv ->
       let vv : Dom_html.eventTarget Js.t = Js.Unsafe.coerce vv in
-      listen vv "resize" f;
-      listen vv "scroll" f)
+      listen vv "resize" schedule;
+      listen vv "scroll" schedule)
   ;;
 end
 
@@ -278,6 +301,33 @@ let input_value id =
 let visual_height () =
   Option.map (Viewport.visual ()) ~f:(fun vv ->
     Js.float_of_number (Js.Unsafe.get vv (Js.string "height")))
+;;
+
+let visual_viewport () =
+  Option.map (Viewport.visual ()) ~f:(fun vv ->
+    ( Js.float_of_number (Js.Unsafe.get vv (Js.string "height"))
+    , Js.float_of_number (Js.Unsafe.get vv (Js.string "offsetTop")) ))
+;;
+
+let element_of (el : Dom_html.element Js.t) : Dom_html.element Js.t option =
+  let node_type = Js.Unsafe.get el (Js.string "nodeType") in
+  if Js.Optdef.test node_type && Int.equal (Obj.magic node_type : int) 1
+  then Some el
+  else (
+    let parent = Js.Unsafe.get el (Js.string "parentElement") in
+    if Js.Optdef.test parent && Js.Opt.test parent
+    then Some (Js.Unsafe.coerce parent)
+    else None)
+;;
+
+let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
+  =
+  Option.bind (element_of el) ~f:(fun el ->
+    Js.Opt.to_option
+      (Js.Unsafe.meth_call
+         el
+         "closest"
+         [| Js.Unsafe.inject (Js.string selector) |]))
 ;;
 
 let post_status ~content_type ~url ~body ~f =

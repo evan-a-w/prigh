@@ -69,7 +69,6 @@ module Driver = struct
 
   let alive t = t.alive && not t.stopping
   let await_exit t = Promise.await t.exited
-  let write t line = if alive t then Line_transport.write_line t.transport line
   let on_orphan_request t f = t.on_orphan_request <- f
   let on_autonomous t f = t.on_autonomous <- Some f
   let on_title t f = t.on_title <- Some f
@@ -150,6 +149,38 @@ module Driver = struct
             -> orphan.text <- Some text
           | Approval_request _ | User_question _ -> t.on_orphan_request event
           | _ -> ()))
+  ;;
+
+  let stop t =
+    if not t.stopping
+    then (
+      t.stopping <- true;
+      (* Its turn ends now: the process may take long to go (a host away
+         answers nothing). *)
+      if t.in_turn
+      then
+        push
+          t
+          (Turn_end
+             { turn_id = None
+             ; stop =
+                 Failed
+                   { kind = Crashed { stderr_tail = "" }
+                   ; message =
+                       sprintf "%s was stopped before its turn ended" t.name
+                   }
+             });
+      Line_transport.stop t.transport)
+  ;;
+
+  let write t line =
+    if alive t
+    then (
+      try Line_transport.write_line t.transport line with
+      | Eio.Cancel.Cancelled _ as exn -> raise exn
+      | exn ->
+        eprintf "prigh: %s write failed: %s\n%!" t.name (Exn.to_string exn);
+        stop t)
   ;;
 
   let next_event t = Eio.Stream.take t.events
@@ -259,75 +290,86 @@ module Driver = struct
 
   let in_turn t = t.in_turn
 
-  let stop t =
-    if not t.stopping
-    then (
-      t.stopping <- true;
-      (* Its turn ends now: the process may take long to go (a host away
-         answers nothing). *)
-      if t.in_turn
-      then
-        push
-          t
-          (Turn_end
-             { turn_id = None
-             ; stop =
-                 Failed
-                   { kind = Crashed { stderr_tail = "" }
-                   ; message =
-                       sprintf "%s was stopped before its turn ended" t.name
-                   }
-             });
-      Line_transport.stop t.transport)
-  ;;
-
   let run t ~handle_line ~on_exit =
     Fiber.fork ~sw:t.sw (fun () ->
-      let rec loop () =
-        match Line_transport.read_line t.transport with
-        | Some line ->
-          handle_line line;
-          loop ()
-        | None -> ()
+      let finish exit =
+        t.exit <- Some exit;
+        t.alive <- false;
+        t.orphan <- None;
+        Eio.Condition.broadcast t.idle;
+        ignore (Promise.try_resolve t.resolve_exit () : bool);
+        let waiters = t.waiters in
+        t.waiters <- [];
+        List.iter waiters ~f:(fun w ->
+          Promise.resolve
+            w.resolve
+            (Or_error.error_string
+               (exit_message ~display_name:"the process" exit)));
+        (try on_exit exit with
+         | Eio.Cancel.Cancelled _ as exn -> raise exn
+         | exn ->
+           eprintf "prigh: %s on_exit failed: %s\n%!" t.name (Exn.to_string exn));
+        if t.in_turn
+        then
+          push
+            t
+            (Turn_end
+               { turn_id = None
+               ; stop =
+                   Failed
+                     { kind = Crashed { stderr_tail = exit.stderr_tail }
+                     ; message =
+                         exit_message
+                           ~tail:false
+                           ~display_name:"the harness"
+                           exit
+                     }
+               })
       in
-      loop ();
-      let exit = Line_transport.ended t.transport in
-      t.exit <- Some exit;
-      t.alive <- false;
-      t.orphan <- None;
-      Eio.Condition.broadcast t.idle;
-      ignore (Promise.try_resolve t.resolve_exit () : bool);
-      let waiters = t.waiters in
-      t.waiters <- [];
-      List.iter waiters ~f:(fun w ->
-        Promise.resolve
-          w.resolve
-          (Or_error.error_string
-             (exit_message ~display_name:"the process" exit)));
-      on_exit exit;
-      if t.in_turn
-      then
-        push
-          t
-          (Turn_end
-             { turn_id = None
-             ; stop =
-                 Failed
-                   { kind = Crashed { stderr_tail = exit.stderr_tail }
-                   ; message =
-                       exit_message ~tail:false ~display_name:"the harness" exit
-                   }
-             }))
+      let failed = ref None in
+      (try
+         let rec loop () =
+           match Line_transport.read_line t.transport with
+           | Some line ->
+             handle_line line;
+             loop ()
+           | None -> ()
+         in
+         loop ()
+       with
+       | Eio.Cancel.Cancelled _ as exn ->
+         finish { Line_transport.Exit.code = None; stderr_tail = "" };
+         raise exn
+       | exn ->
+         eprintf "prigh: %s reader failed: %s\n%!" t.name (Exn.to_string exn);
+         failed := Some exn;
+         Line_transport.stop t.transport);
+      let exit =
+        match !failed with
+        | Some exn ->
+          { Line_transport.Exit.code = None; stderr_tail = Exn.to_string exn }
+        | None ->
+          (try Line_transport.ended t.transport with
+           | Eio.Cancel.Cancelled _ as exn ->
+             finish { Line_transport.Exit.code = None; stderr_tail = "" };
+             raise exn
+           | exn ->
+             { Line_transport.Exit.code = None
+             ; stderr_tail = Exn.to_string exn
+             })
+      in
+      finish exit)
   ;;
 
   let watch_interrupt t =
     let turn = t.turns in
     Fiber.fork_daemon ~sw:t.sw (fun () ->
-      Eio_unix.sleep (Time_float.Span.to_sec t.interrupt_grace);
-      if t.in_turn && t.turns = turn
-      then (
-        push t (Turn_end { turn_id = None; stop = Interrupted });
-        stop t);
+      Guarded.run ~what:(sprintf "%s interrupt watcher" t.name) (fun () ->
+        Eio_unix.sleep (Time_float.Span.to_sec t.interrupt_grace);
+        if t.in_turn && t.turns = turn
+        then (
+          push t (Turn_end { turn_id = None; stop = Interrupted });
+          stop t));
       `Stop_daemon)
   ;;
 end

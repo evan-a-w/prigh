@@ -604,7 +604,8 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
           Option.to_list (web_search_use item) @ [ web_search_result item ]
         | Some "reasoning", Some item ->
           (match Json.member "encrypted_content" item with
-           | Some (`String _) -> [ Thinking_signature (Json.to_string item) ]
+           | Some (`String s) when not (String.is_empty s) ->
+             [ Thinking_signature (Json.to_string item) ]
            | _ -> [])
         | Some "function_call", Some item ->
           (match

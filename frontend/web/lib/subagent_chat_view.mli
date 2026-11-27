@@ -6,7 +6,8 @@ open! Import
     bar's breadcrumb says whose it is and leads back; the composer writes to
     it. *)
 val view
-  :  App.Model.t
+  :  ?ui:Ui_context.Page.t
+  -> App.Model.t
   -> inject:(App.Action.t -> unit Effect.t)
   -> string
   -> Node.t

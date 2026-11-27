@@ -460,10 +460,10 @@ let run
   let turns = ref 0 in
   let continue_ = ref true in
   while !continue_ do
-    if !turns > 0 then compact_if_large ();
     match halt () with
     | Some _ -> continue_ := false
     | None ->
+      if !turns > 0 then compact_if_large ();
       incr turns;
       emit Turn_start;
       let turn_span = Trace.start "turn" ~attrs:[ "turn", Int !turns ] in
@@ -735,7 +735,10 @@ let run
         | Some n -> !turns >= n
         | None -> false
       in
-      if over_limit || Cancellation.is_cancelled cancel
+      if
+        over_limit
+        || Cancellation.is_cancelled cancel
+        || Option.is_some (halt ())
       then continue_ := false
       else (
         match assistant.stop_reason, calls with

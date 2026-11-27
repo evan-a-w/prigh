@@ -83,7 +83,8 @@ let popup (m : App.Model.t) ~inject =
                        (Bool.to_string (i = Completion.selected c))
                    ; Attr.on_mousedown (fun ev ->
                        Js_of_ocaml.Dom.preventDefault ev;
-                       inject (Action.Complete_choose i))
+                       Effect.Ignore)
+                   ; Attr.on_click (fun _ -> inject (Action.Complete_choose i))
                    ]
                  [ span ~cls:"popup-label" item.label
                  ; (if item.marked
@@ -638,13 +639,20 @@ let view (m : App.Model.t) ~inject =
                               ~label:"Stop"
                               ~on_click:(inject stop)
                               [ icon Stop ]
-                          else
+                          else (
+                            let slash_command =
+                              String.is_prefix
+                                (String.strip m.draft)
+                                ~prefix:"/"
+                            in
                             button
                               ~cls:"primary round send"
                               ~title:
-                                (if Option.is_some (Engine_banner.reason m)
+                                (if
+                                   (not slash_command)
+                                   && Option.is_some (Engine_banner.reason m)
                                  then "This session can't run here: see above"
-                                 else if not connected
+                                 else if (not slash_command) && not connected
                                  then "Not connected to the backend"
                                  else if running
                                  then "Steer (Enter)"
@@ -652,10 +660,12 @@ let view (m : App.Model.t) ~inject =
                               ~label:(if running then "Steer" else "Send")
                               ~disabled:
                                 ((not has_input)
-                                 || (not connected)
-                                 || Option.is_some (Engine_banner.reason m))
+                                 || ((not slash_command)
+                                     && ((not connected)
+                                         || Option.is_some
+                                              (Engine_banner.reason m))))
                               ~on_click:(inject Action.Send)
-                              [ icon Send ])
+                              [ icon Send ]))
                        ]
                 ]
             ]

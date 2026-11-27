@@ -15,28 +15,25 @@ type t =
   ; mutable event : string option
   ; mutable data : string list
   ; mutable id : string option
-  ; mutable has_fields : bool
   }
 
 let create () =
-  { pending = Buffer.create 1024
-  ; event = None
-  ; data = []
-  ; id = None
-  ; has_fields = false
-  }
+  { pending = Buffer.create 1024; event = None; data = []; id = None }
 ;;
 
 let reset t =
   t.event <- None;
   t.data <- [];
-  t.id <- None;
-  t.has_fields <- false
+  t.id <- None
 ;;
 
+(* WHATWG §9.2.6: a block with no [data:] lines is ignored (keepalive frames
+   such as [event: ping\n\n] must not be dispatched as empty events). *)
 let take_event t =
-  if not t.has_fields
-  then None
+  if List.is_empty t.data
+  then (
+    reset t;
+    None)
   else (
     let event =
       { Event.event = t.event
@@ -50,15 +47,9 @@ let take_event t =
 
 let handle_field t ~name ~value =
   match name with
-  | "data" ->
-    t.has_fields <- true;
-    t.data <- value :: t.data
-  | "event" ->
-    t.has_fields <- true;
-    t.event <- Some value
-  | "id" ->
-    t.has_fields <- true;
-    t.id <- Some value
+  | "data" -> t.data <- value :: t.data
+  | "event" -> t.event <- Some value
+  | "id" -> t.id <- Some value
   | _ -> ()
 ;;
 

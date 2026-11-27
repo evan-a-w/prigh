@@ -145,7 +145,10 @@
    other sheets. */
 .app.narrow .terminal-panel {
   position: fixed;
-  inset: 0 0 auto;
+  top: var(--vvt, 0px);
+  right: 0;
+  bottom: auto;
+  left: 0;
   height: var(--vvh, 100dvh);
   max-height: none;
   z-index: calc(var(--z-sheet) - 5);
@@ -662,6 +665,7 @@ body.dropping-files .files-panel::after {
     max-width: 86vw;
     box-shadow: var(--float-shadow);
   }
+  .app:not(.narrow) .files-panel:has(.review-popover) { z-index: var(--z-menu-anchor); }
 }
 
 /* Phones: a full-screen sheet under the safe area; the preview takes it
@@ -669,13 +673,18 @@ body.dropping-files .files-panel::after {
    tools a row of their own under the host's name and the close. */
 .app.narrow .files-panel {
   position: fixed;
-  inset: 0;
+  top: var(--vvt, 0px);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: var(--vvh, 100dvh);
   width: auto;
   z-index: var(--z-sheet);
   border-left: 0;
   padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
   animation: files-up 0.2s ease-out;
 }
+.app.narrow .files-panel:has(.review-popover) { z-index: var(--z-menu-anchor); }
 .app.narrow :is(.files-side, .files-preview) { width: auto; flex: 1 1 auto; border-left: 0; }
 .app.narrow :is(.files-head, .files-preview-head) { min-height: 50px; }
 .app.narrow .files-head { padding: 2px 8px 2px 12px; flex-wrap: wrap; gap: 0 4px; }
@@ -687,6 +696,7 @@ body.dropping-files .files-panel::after {
 .app.narrow .files-head .review-open { order: 1; min-height: var(--tap); }
 .app.narrow .files-crumbs { padding-top: 0; padding-bottom: 0; }
 .app.narrow .files-crumb { display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+.app.narrow .files-path-input { font-size: 16px; min-height: var(--tap); }
 .app.narrow .files-sort { min-height: var(--tap); }
 .app.narrow .files-columns, .app.narrow .files-row { grid-template-columns: 18px minmax(0, 1fr) auto 64px; }
 .app.narrow .files-columns { grid-template-columns: minmax(0, 1fr) 64px; }
@@ -802,7 +812,7 @@ body.dropping-files .files-panel::after {
   .code-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--input); }
   .code-dot.on { background: var(--foreground); }
   .code-menu-anchor { position: relative; }
-  .code-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-menu-surface); }
+  .code-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-menu); }
   .app.narrow .code-menu-backdrop { background: var(--scrim); }
   /* Its look is the shared menu's (Menu_view: loon's DropdownMenu); here
      only where it hangs, and its items as buttons. */
@@ -991,7 +1001,10 @@ body.dropping-files .files-panel::after {
     left: 0;
     right: 0;
     top: auto;
-    bottom: 0;
+    bottom: var(--vvb, 0px);
+    max-height: min(78dvh, calc(var(--vvh, 100dvh) - var(--safe-t) - 24px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     min-width: 0;
     padding: 8px 8px max(8px, var(--safe-b));
     border-radius: 16px 16px 0 0;
@@ -1051,6 +1064,7 @@ body.dropping-files .files-panel::after {
     background: var(--card);
   }
   .app.narrow .code-page:has(.cm-focused) .code-keys { display: flex; }
+  .app.narrow .code-keys { height: auto; min-height: 48px; padding-bottom: max(4px, var(--safe-b)); }
   .app.narrow.editing:has(.code-page .cm-focused) .main { display: none; }
   .app.narrow .code-page:has(.cm-focused) .code-peek { display: none; }
   .code-keys-scroll {
@@ -1217,10 +1231,12 @@ body.dropping-files .files-panel::after {
     .viewer-sizes, .viewer-caption .viewer-name { display: none; }
     .viewer-draw span { display: none; }
     .viewer-tools { gap: 4px; margin-left: auto; }
-    .viewer-btn { min-width: 36px; height: 36px; padding: 0 6px; }
+    .viewer-btn { min-width: 44px; height: 44px; padding: 0 6px; }
     .viewer-pct { min-width: 48px; }
-    .viewer-nav { width: 38px; height: 38px; top: auto; bottom: max(14px, env(safe-area-inset-bottom)); translate: none; }
+    .viewer-nav { width: 44px; height: 44px; top: auto; bottom: max(14px, env(safe-area-inset-bottom)); translate: none; }
   }
+  .app.narrow .viewer-btn { min-width: var(--tap); height: var(--tap); }
+  .app.narrow .viewer-nav { width: var(--tap); height: var(--tap); }
   @media (prefers-reduced-motion: reduce) {
     dialog.viewer { animation: none; }
     .viewer.animate .viewer-img { transition: none; }

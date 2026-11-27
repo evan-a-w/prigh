@@ -62,6 +62,11 @@ table.diff td.text {
   background-position: calc(var(--hang) - 1ch) 1lh;
   background-size: 1px calc(100% - 1lh);
 }
+.app.narrow table.diff td.text {
+  padding-left: min(var(--hang, 2ch), 12ch);
+  text-indent: calc(-1 * min(var(--hang, 2ch), 12ch));
+  background-position: calc(min(var(--hang, 2ch), 12ch) - 1ch) 1lh;
+}
 table.diff tr.del .wd { background: color-mix(in srgb, var(--del-fg) 26%, transparent); border-radius: 2px; }
 table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transparent); border-radius: 2px; }
 

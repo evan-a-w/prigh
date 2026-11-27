@@ -90,7 +90,7 @@ let dispatch t (output : Codex_codec.Output.t) =
   | Response r -> Adapter.Driver.answer t.driver r
   | Token_refresh { request_id; previous_account_id = _ } ->
     (* Fetching may refresh over the network: not on the reader's fiber. *)
-    Fiber.fork ~sw:t.sw (fun () ->
+    Guarded.fork ~sw:t.sw ~what:"Codex token refresh" (fun () ->
       let tokens =
         match t.login with
         | Some login -> Codex_login.tokens login ~refused:true
@@ -453,6 +453,7 @@ let complete
               ~cancel
               ~next_event:(fun () -> Adapter.Driver.next_event t.driver)
               ~interrupt:(fun () ->
+                List.iter (Codex_codec.cancel_pending t.codec) ~f:(dispatch t);
                 match Codex_codec.interrupt t.codec with
                 | `Send line -> Adapter.Driver.write t.driver line
                 | `Deferred | `Idle -> ())
@@ -524,8 +525,9 @@ let start
   let%map () = failed thread ~what:"the thread" in
   (* Not waited for: a turn need not wait for the list. *)
   Fiber.fork_daemon ~sw (fun () ->
-    t.models <- list_models driver codec;
-    t.on_change ();
+    Guarded.run ~what:"Codex model list" (fun () ->
+      t.models <- list_models driver codec;
+      t.on_change ());
     `Stop_daemon);
   t
 ;;
@@ -537,13 +539,20 @@ let send t settings input =
   Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Codex is not running"
+  else if Adapter.Driver.in_turn t.driver
+  then Or_error.error_string "a Codex turn is already running"
   else (
     renew_login t;
-    let%map.Or_error line =
-      Codex_codec.start_turn t.codec (settings_of t settings) (inputs input)
-    in
-    Adapter.Driver.begin_turn t.driver;
-    Adapter.Driver.write t.driver line)
+    if not (Adapter.Driver.alive t.driver)
+    then Or_error.error_string "Codex is not running"
+    else if Adapter.Driver.in_turn t.driver
+    then Or_error.error_string "a Codex turn is already running"
+    else (
+      let%map.Or_error line =
+        Codex_codec.start_turn t.codec (settings_of t settings) (inputs input)
+      in
+      Adapter.Driver.begin_turn t.driver;
+      Adapter.Driver.write t.driver line))
 ;;
 
 (* Waits for Codex's answer: a refused steer (the turn ended meanwhile,
@@ -562,6 +571,7 @@ let steer t input =
 ;;
 
 let interrupt t =
+  List.iter (Codex_codec.cancel_pending t.codec) ~f:(dispatch t);
   (match Codex_codec.interrupt t.codec with
    | `Send line -> Adapter.Driver.write t.driver line
    | `Deferred | `Idle -> ());
@@ -615,10 +625,17 @@ let compact t settings ~instructions:_ =
   Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Codex is not running"
+  else if Adapter.Driver.in_turn t.driver
+  then Or_error.error_string "a Codex turn is already running"
   else (
     renew_login t;
-    ignore (settings : Adapter.Settings.t);
-    let%map.Or_error line = Codex_codec.compact t.codec in
-    Adapter.Driver.begin_turn t.driver;
-    Adapter.Driver.write t.driver line)
+    if not (Adapter.Driver.alive t.driver)
+    then Or_error.error_string "Codex is not running"
+    else if Adapter.Driver.in_turn t.driver
+    then Or_error.error_string "a Codex turn is already running"
+    else (
+      ignore (settings : Adapter.Settings.t);
+      let%map.Or_error line = Codex_codec.compact t.codec in
+      Adapter.Driver.begin_turn t.driver;
+      Adapter.Driver.write t.driver line))
 ;;

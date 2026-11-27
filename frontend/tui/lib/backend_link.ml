@@ -410,6 +410,7 @@ let rec connect_pending t =
   | None, _ -> return result
   | Some _, Error _ -> connect_pending t
   | Some _, Ok () ->
+    if Client.is_connected t.client then t.dropped <- t.dropped + 1;
     Client.disconnect t.client;
     let%bind () = Client.disconnected t.client in
     connect_pending t
@@ -430,9 +431,7 @@ let reconnect t ~delay_ms ~session ~as_user =
      | Error e ->
        (* A switch abandons the attempt under way. *)
        return
-         (Option.value
-            (superseded ())
-            ~default:(Error (Error.to_string_hum e)))
+         (Option.value (superseded ()) ~default:(Error (Error.to_string_hum e)))
      | Ok () ->
        (match superseded () with
         | Some error -> return error

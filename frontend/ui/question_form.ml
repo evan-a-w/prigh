@@ -85,7 +85,9 @@ let next t =
 
 let insert t text =
   let t = { t with cursor = rows t - 1 } in
-  update_answer t ~f:(fun a -> { a with own = a.own ^ text })
+  update_answer t ~f:(fun a ->
+    let picked = if (question t).multiple then a.picked else Int.Set.empty in
+    { picked; own = a.own ^ text })
 ;;
 
 let toggle t =
@@ -101,7 +103,8 @@ let toggle t =
            else Set.add a.picked t.cursor)
       })
   else
-    update_answer t ~f:(fun a -> { a with picked = Int.Set.singleton t.cursor })
+    update_answer t ~f:(fun _ ->
+      { Answer.picked = Int.Set.singleton t.cursor; own = "" })
 ;;
 
 (* By character: UTF-8 continuation bytes go with their lead byte. *)
@@ -119,15 +122,33 @@ let backspace t =
 ;;
 
 let set_own t own =
-  update_answer { t with cursor = rows t - 1 } ~f:(fun a -> { a with own })
+  update_answer
+    { t with cursor = rows t - 1 }
+    ~f:(fun a ->
+      let picked =
+        if (question t).multiple || String.is_empty (String.strip own)
+        then a.picked
+        else Int.Set.empty
+      in
+      { picked; own })
 ;;
 
 let answers t =
   List.map2_exn t.questions t.answers ~f:(fun q a ->
-    List.filter_mapi q.choices ~f:(fun i c ->
-      if Set.mem a.picked i then Some c.label else None)
-    @
-    if String.is_empty (String.strip a.own) then [] else [ String.strip a.own ])
+    let picked =
+      List.filter_mapi q.choices ~f:(fun i c ->
+        if Set.mem a.picked i then Some c.label else None)
+    in
+    let own =
+      if String.is_empty (String.strip a.own)
+      then []
+      else [ String.strip a.own ]
+    in
+    if q.multiple
+    then picked @ own
+    else if not (List.is_empty own)
+    then own
+    else List.take picked 1)
 ;;
 
 let answered t ~question =

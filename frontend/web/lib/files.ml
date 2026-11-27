@@ -716,6 +716,10 @@ let check_name name =
 let ask_accept t =
   match t.ask with
   | None -> t, []
+  | Some
+      ( New_folder { busy = true; _ }
+      | Rename { busy = true; _ }
+      | Delete { busy = true; _ } ) -> t, []
   | Some (New_folder ({ dir; input; _ } as a)) ->
     let name = String.strip input in
     (match check_name name with
@@ -1070,6 +1074,12 @@ let set_where t where =
           match a.file, a.status with
           | Some file, Uploading _ -> Some (Out.Page (Abort_upload file))
           | _ -> None)
+        @ List.map t.uploads ~f:(fun u -> Out.Page (Abort_upload u.local.file))
+        @ List.map t.conflicts ~f:(fun u -> Out.Page (Forget u.local.file))
+        @
+        match t.ask with
+        | Some (Overwrite u) -> [ Out.Page (Forget u.local.file) ]
+        | Some (New_folder _ | Rename _ | Delete _) | None -> []
       else []
     in
     let t =
@@ -1082,8 +1092,10 @@ let set_where t where =
       ; preview = None
       ; editing_path = None
       ; ask = None
+      ; uploads = (if moved_away then [] else t.uploads)
       ; conflicts = []
       ; attachments = (if moved_away then [] else t.attachments)
+      ; busy = None
       }
     in
     if t.open_ && Option.is_some where

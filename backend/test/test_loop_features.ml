@@ -535,6 +535,7 @@ let%expect_test "a failed run, an abort or the budget stop a goal" =
     {|
     request: 1 messages, last user "[prigh goal] Work on this goal until it is fully achieved:" (+goal_complete)
     assistant: expensive
+    notice: the session's budget of $0.50 is spent ($0.60 so far): /budget 2 raises it, /budget off removes it
     notice: goal stopped: the session's budget is spent; /goal resume continues it
     ((running false) (cost_usd 0.6) (budget_usd (0.5))
      (goal

@@ -386,7 +386,9 @@ let footer ~names times (message : Message.Assistant.t) =
       [ Option.value (Map.find names message.model) ~default:message.model
       ; tokens input ^ " in"
       ]
-      @ (if Float.(cache_read > 0.) then [ tokens cache_read ^ " cached" ] else [])
+      @ (if Float.(cache_read > 0.)
+         then [ tokens cache_read ^ " cached" ]
+         else [])
       @ [ tokens output ^ " out" ]
     | _ -> []
   in
@@ -924,6 +926,14 @@ and entry
       Some (More.Open menu.highlighted)
     | more, _ -> more
   in
+  let server_ids =
+    match entry with
+    | Assistant { message; _ } ->
+      List.filter_map message.content ~f:(function
+        | Server_tool s -> Some s.id
+        | Tool_call _ | Text _ | Thinking _ -> None)
+    | Shell _ | User _ | Compaction _ -> []
+  in
   let ids =
     match entry with
     | Assistant { message; _ } ->
@@ -992,14 +1002,25 @@ and entry
       ; times
       ; names
       ; expanded =
-          List.concat_map ids ~f:(fun id ->
+          List.concat_map (ids @ server_ids) ~f:(fun id ->
             [ Fold.expanded fold id
             ; Fold.expanded fold (Tool_view.open_key id)
             ])
           @ List.concat_map boxes ~f:(fun box ->
             Fold.expanded fold (Activity_runs.Box.key box)
-            :: List.map (Activity_runs.Box.steps box) ~f:(fun step ->
-              Fold.expanded fold (Activity_runs.Step.key step)))
+            :: List.concat_map (Activity_runs.Box.steps box) ~f:(fun step ->
+              Fold.expanded fold (Activity_runs.Step.key step)
+              ::
+              (match step with
+               | Server { tool; _ } -> [ Fold.expanded fold tool.id ]
+               | Report { user; _ } when String.is_prefix user.text ~prefix:"["
+                 ->
+                 (match Prigh_ui.Delivery.parse user.text with
+                  | Some sections ->
+                    List.map sections ~f:(fun s ->
+                      Fold.expanded fold (Delivery_view.job_key s))
+                  | None -> [])
+               | Thinking _ | Call _ | Report _ -> [])))
           @ List.map box_calls ~f:(Fold.expanded fold)
       ; quiet = quiet_deps
       ; nested =
