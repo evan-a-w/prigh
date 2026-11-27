@@ -298,3 +298,64 @@ let%expect_test
     (((Failed "it crashed") 0))
     |}]
 ;;
+
+let%expect_test "external harness turns skip blocking mcp_refresh" =
+  with_fake []
+  @@ fun t fake ~settings:_ ->
+  let agent = fake.agent in
+  (* Never answer $mcp_servers: a harness turn would block here, while an
+     external harness skips mcp_refresh entirely. *)
+  fake.auto <- None;
+  Eio.Switch.run
+  @@ fun sw ->
+  let opencode = Option.value_exn (Acp_agent.find_known "opencode") in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.05) opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             let read () =
+               Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+                 Json.parse l |> Or_error.ok_exn)
+             in
+             let reply j result =
+               Line_transport.Peer.write_line
+                 p
+                 (Json.to_string
+                    (`Object
+                        [ "jsonrpc", `String "2.0"
+                        ; "id", Option.value_exn (Json.member "id" j)
+                        ; "result", Json.parse result |> Or_error.ok_exn
+                        ]))
+             in
+             let init = Option.value_exn (read ()) in
+             reply init {|{"protocolVersion":1,"agentCapabilities":{}}|};
+             let ns = Option.value_exn (read ()) in
+             reply ns {|{"sessionId":"s1"}|};
+             let req = Option.value_exn (read ()) in
+             Line_transport.Peer.write_line
+               p
+               {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Fast reply."}}}}|};
+             reply req {|{"stopReason":"end_turn"}|};
+             ignore (read () : Json.t option))))
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.set_runner agent (Some (Composer_runner.runner composer));
+  ignore t;
+  Or_error.ok_exn (Agent.prompt agent "hi");
+  Agent.wait_idle agent;
+  Composer_runner.close composer;
+  printf
+    "held_mcp_requests=%d last=%S\n"
+    (Queue.length fake.held)
+    (match List.last (Agent.messages agent) with
+     | Some (Assistant a) -> Message.Assistant.text a
+     | _ -> "");
+  [%expect {| held_mcp_requests=0 last="Fast reply." |}]
+;;

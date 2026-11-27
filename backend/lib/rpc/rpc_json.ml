@@ -638,7 +638,8 @@ let entry (e : Session.Entry.t) =
         ]
     | Masked { through } -> [ "kind", str "masked"; "through", str through ]
     | Name { name } -> [ "kind", str "name"; "name", str name ]
-    | Description { text } -> [ "kind", str "description"; "text", str text ]
+    | Description { text; native = _ } ->
+      [ "kind", str "description"; "text", str text ]
     | Cwd { cwd; host = _ } -> [ "kind", str "cwd"; "cwd", str cwd ]
     | System_prompt _ -> [ "kind", str "system_prompt" ]
     | Goal _ -> [ "kind", str "goal" ]

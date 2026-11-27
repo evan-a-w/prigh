@@ -159,6 +159,7 @@ module External = struct
         -> context:Tool.Context.t
         -> emit:(Agent_event.t -> unit)
         -> steer:(unit -> Message.t list)
+        -> await_steer:(unit -> unit)
         -> wake:(unit -> Message.t list)
         -> cancel:Cancellation.t
         -> prompts:Message.t list
@@ -668,10 +669,15 @@ let feeds ~(context : Tool.Context.t) ~jobs inbox =
   steer, wake
 ;;
 
-(* [steer] and [wake] for an external harness subagent (no prigh shell jobs). *)
+(* [steer], [await_steer] and [wake] for an external harness subagent (no prigh shell jobs). *)
 let ext_feeds ~(context : Tool.Context.t) inbox =
   let steer () =
     Option.value_map inbox ~default:[] ~f:Subagent_inbox.take_steers
+  in
+  let await_steer () =
+    match inbox with
+    | Some inbox -> Subagent_inbox.await_steer inbox
+    | None -> Fiber.await_cancel ()
   in
   let rec wake () =
     match Option.value_map inbox ~default:[] ~f:Subagent_inbox.take_all with
@@ -683,7 +689,7 @@ let ext_feeds ~(context : Tool.Context.t) inbox =
               && not (Subagent_inbox.close_if_empty inbox) -> wake ()
        | Some _ | None -> [])
   in
-  steer, wake
+  steer, await_steer, wake
 ;;
 
 module Ext_state = struct
@@ -895,7 +901,7 @@ let run_once
       in
       added, left, 0.
     | External { adapter; model; host_id; host_name; _ }, _, Some ext_state ->
-      let steer, wake = ext_feeds ~context inbox in
+      let steer, await_steer, wake = ext_feeds ~context inbox in
       let { External.messages; cost_usd } =
         match
           ext_state.external_.run
@@ -921,6 +927,7 @@ let run_once
             ~context
             ~emit
             ~steer
+            ~await_steer
             ~wake
             ~cancel:context.cancel
             ~prompts

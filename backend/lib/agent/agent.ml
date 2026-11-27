@@ -221,6 +221,7 @@ type t =
     (** the session's engine when it is not the harness on [provider] *)
   ; mutable unavailable : string option
   ; accounts : Provider_id.t -> Login_choice.t list
+  ; provider_configured : Provider_id.t -> bool
   ; mutable login : Account_ref.t option
     (** the account of [model]'s provider to use ([None]: its default) *)
   ; tools : Tool.t list
@@ -246,6 +247,9 @@ type t =
   ; mutable describing : unit Promise.t option
   ; auto_describe : bool
   ; queue : Queued.t Steer_queue.t
+  ; steer_signal : Eio.Condition.t
+    (** broadcast whenever steering messages, deliveries, mail, reminders or
+        mode notes become available during a run *)
   ; mutable subscribers : (Event.t -> unit) list
   ; mutable config : Config.t
   ; pending_confirms : Waiting_confirm.t String.Table.t
@@ -383,11 +387,34 @@ let settle_thinking model thinking =
 ;;
 
 let is_external (m : Model.t) = External_model.is_external (Model.key m)
+let direct_providers = [ Provider_id.Anthropic; Openai_codex; Openai; Deepseek ]
+
+(* An authenticated direct model prigh can call itself, checked live
+   (including shared accounts and logins added after session start). *)
+let live_direct_model t =
+  match
+    List.find_map direct_providers ~f:(fun provider ->
+      if t.provider_configured provider
+      then Model.default_for provider
+      else None)
+  with
+  | Some _ as m -> m
+  | None ->
+    List.find (Model_registry.models t.models) ~f:(fun m ->
+      Provider_id.is_custom m.provider && t.provider_configured m.provider)
+;;
 
 (* The model of requests prigh makes itself (approval verdicts, names,
-   descriptions): the session's, or prigh's own while an external harness
-   runs the session. *)
-let aux_model t = if is_external t.model then t.harness_model else t.model
+   descriptions): the session's, or while an external harness runs the
+   session, prigh's own model if its provider is configured, else any live
+   authenticated direct model, else [t.harness_model]. *)
+let aux_model t =
+  if not (is_external t.model)
+  then t.model
+  else if t.provider_configured t.harness_model.provider
+  then t.harness_model
+  else Option.value (live_direct_model t) ~default:t.harness_model
+;;
 
 let restore_settings t =
   t.goal <- Session.goal t.session;
@@ -817,6 +844,8 @@ let queue_update t =
   broadcast t (Queue_update { steer; follow_up })
 ;;
 
+let signal_steer t = Eio.Condition.broadcast t.steer_signal
+
 (* ---- approvals, plan mode and questions --------------------------------- *)
 
 let record_approval t =
@@ -913,6 +942,7 @@ let switch_mode ?approval ?plan ?chat t =
     environment_changed t;
     record_approval t;
     recheck_confirms t;
+    signal_steer t;
     state_changed t)
 ;;
 
@@ -1143,7 +1173,16 @@ let cancel_resume_timer t =
 ;;
 
 let adopt_config t (config : Config.t) =
+  let naming_changed =
+    not
+      (Option.equal String.equal config.naming_model t.config.naming_model
+       && Option.equal
+            String.equal
+            config.generate_model
+            t.config.generate_model)
+  in
   t.config <- config;
+  if naming_changed then t.aux_noted <- false;
   Trace.set_level t.tracer (Trace.Level.effective ~configured:config.trace);
   broadcast t (Config_changed config);
   if (not config.resume_on_limit_reset) && Option.is_some t.resume
@@ -1539,8 +1578,10 @@ let set_host_cwd t (host : Host.t) ~cwd =
 ;;
 
 let activate_host t (host : Host.t) ~cwd ~pinned =
-  if not (String.equal t.active_host host.id)
+  let host_changed = not (String.equal t.active_host host.id) in
+  if host_changed
   then (
+    if not (is_running t) then Option.iter t.runner ~f:Runner.close;
     environment_changed t;
     hosts_changed t;
     ignore (Computer_consent.revoke t.computer_consent : bool));
@@ -2517,33 +2558,6 @@ let moving_home t ~worktree ~to_ ~move =
     | Clear -> ignore (Session.set_home t.session None : Session.Entry.t))
 ;;
 
-(* The session cwd is a property of the host, so switching hosts means
-   choosing a directory there; without [cwd] the host's own is used. *)
-let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
-  match find_host t id with
-  | None when String.equal id Host.backend_id && not t.backend_host_enabled ->
-    Or_error.error_string "the backend tool host is disabled"
-  | None when String.equal id t.active_host ->
-    Or_error.error_string (host_unavailable_message t)
-  | None -> Or_error.errorf "unknown tool host %S" id
-  | Some host ->
-    let outcome =
-      match cwd with
-      | None ->
-        Ok (Dir_change.Outcome.Changed { cwd = host.cwd; created = false })
-      | Some path -> change_dir_on t host path ~if_missing
-    in
-    Or_error.map
-      outcome
-      ~f:
-        (apply_dir_change ~f:(fun cwd ->
-           moving_home
-             t
-             ~worktree:false
-             ~to_:(fun () -> place_on t host ~pinned:true ~cwd)
-             ~move:(fun () -> activate_host t host ~cwd ~pinned:true)))
-;;
-
 (* [render_ui]'s images are read where [fs_preview] reads them: on the
    active tool host, in the session cwd; like it, without waiting for a host
    that is away. *)
@@ -3275,6 +3289,7 @@ let settle_runner_model t =
 let set_runner t runner =
   Option.iter t.runner ~f:Runner.close;
   t.runner <- runner;
+  t.aux_noted <- false;
   settle_runner_model t;
   state_changed t
 ;;
@@ -3531,6 +3546,7 @@ let deliveries t =
 let set_model ?account t model =
   t.model <- model;
   if not (is_external model) then t.harness_model <- model;
+  t.aux_noted <- false;
   t.login <- (if is_external model then None else account);
   let thinking = settle_thinking model t.thinking in
   if not (Thinking.equal thinking t.thinking)
@@ -3891,6 +3907,30 @@ let turn_input t ~context ~prompts ~kind : Engine_intf.Turn.Input.t =
   }
 ;;
 
+let auth_changed t = t.aux_noted <- false
+
+let has_manual_name session =
+  match Session.name session with
+  | Some name -> not (String.is_empty (String.strip name))
+  | None -> false
+;;
+
+let set_external_title t title =
+  let title = String.strip title in
+  if (not (String.is_empty title)) && not (has_manual_name t.session)
+  then (
+    let same =
+      Option.equal String.equal (Session.description t.session) (Some title)
+      && Session_description.has_native t.session
+    in
+    if not same
+    then (
+      ignore
+        (Session.set_description ~native:true t.session ~text:title
+         : Session.Entry.t);
+      state_changed t))
+;;
+
 (* An external harness's process, started when the session is opened so
    that its first message does not wait for it: what it needs of a run's
    services is where it works and the tools it is offered. *)
@@ -3913,8 +3953,10 @@ let prewarm t =
       ; execute = executor t
       ; background = t.background
       ; steer = (fun () -> [])
+      ; await_steer = (fun () -> Fiber.await_cancel ())
       ; halt = (fun () -> None)
       ; add_spend = (fun ~usage:_ ~cost_usd:_ -> ())
+      ; set_title = set_external_title t
       }
       (turn_input t ~context:[] ~prompts:[] ~kind:Prompt)
   | _ -> ()
@@ -3985,7 +4027,7 @@ and run_now ~kind ~tried ~then_ t prompts =
          | Autonomous -> true
          | Prompt | Compact _ -> false
        in
-       if (not t.chat_mode) && not is_autonomous
+       if (not t.chat_mode) && (not is_autonomous) && own_loop t
        then
          Turn_timings.phase "mcp_refresh" (fun () ->
            refresh_mcp_for_run t ~cancel);
@@ -4033,6 +4075,7 @@ and run_now ~kind ~tried ~then_ t prompts =
                  else []
                in
                deliveries t @ mail t @ note @ queued @ due_reminders t)
+         ; await_steer = (fun () -> Eio.Condition.await_no_mutex t.steer_signal)
          ; halt =
              (fun () ->
                let reason =
@@ -4046,6 +4089,7 @@ and run_now ~kind ~tried ~then_ t prompts =
              (fun ~usage ~cost_usd ->
                ignore
                  (Session.add_spend session ~usage ~cost_usd : Session.Entry.t))
+         ; set_title = set_external_title t
          ; emit =
              (fun event ->
                account t event;
@@ -4055,7 +4099,9 @@ and run_now ~kind ~tried ~then_ t prompts =
                | (Message_start m | Message_end m) when recorded m -> ()
                | Turn_end _ ->
                  if phys_equal session t.session
-                 then Reminder.Tracker.turn_ended t.reminder_tracker;
+                 then (
+                   Reminder.Tracker.turn_ended t.reminder_tracker;
+                   signal_steer t);
                  broadcast t (Loop event)
                | Compacted { summary; _ } ->
                  if phys_equal session t.session
@@ -4431,6 +4477,7 @@ and auto_describe t =
   if
     t.auto_describe
     && (not (Session.temporary session))
+    && (not (is_external t.model && t.aux_noted))
     && Option.is_none t.describing
     && Session_description.wanted session
   then (
@@ -4539,8 +4586,8 @@ let subagent_queue_changed t =
    turn to receive it; a running one picks it up at its next turn boundary. *)
 let background_changed t =
   sweep_orphans t ~main_running:(is_running t);
-  if (not (is_running t)) && Background_tasks.has_undelivered t.background
-  then start_run t [];
+  if Background_tasks.has_undelivered t.background
+  then if is_running t then signal_steer t else start_run t [];
   state_changed t
 ;;
 
@@ -4629,6 +4676,7 @@ let create
       ~sw
       ~provider
       ?(accounts = fun (_ : Provider_id.t) -> [])
+      ?provider_configured
       ~tools
       ~sessions_dir
       ~home
@@ -4696,6 +4744,14 @@ let create
   let cwd = Session.cwd session in
   let pinned = ref (fun () -> None) in
   let provider = with_pinned provider ~pinned:(fun () -> !pinned ()) in
+  let provider_configured =
+    match provider_configured with
+    | Some f -> f
+    | None ->
+      fun provider ->
+        (not (List.is_empty (accounts provider)))
+        || Provider_id.is_custom provider
+  in
   let t =
     { env
     ; sw
@@ -4703,6 +4759,7 @@ let create
     ; runner
     ; unavailable = None
     ; accounts
+    ; provider_configured
     ; login = None
     ; tools
     ; offered
@@ -4727,6 +4784,7 @@ let create
     ; describing = None
     ; auto_describe
     ; queue = Steer_queue.create ()
+    ; steer_signal = Eio.Condition.create ()
     ; subscribers = []
     ; config
     ; pending_confirms = String.Table.create ()
@@ -4925,6 +4983,7 @@ let enqueue_queued t kind queued =
   if is_running t
   then (
     Steer_queue.push t.queue kind queued;
+    if Steer_queue.Kind.equal kind Steer then signal_steer t;
     queue_update t)
   else start_run t [] ~then_:(fun ~cancel -> [ user_message ~cancel t queued ])
 ;;
@@ -4990,7 +5049,9 @@ let rec wait_idle t =
     else Mcp_refresh.wait t.mcp_refresh
 ;;
 
-let check_mail t = if (not (is_running t)) && has_mail t then start_run t []
+let check_mail t =
+  if has_mail t then if is_running t then signal_steer t else start_run t []
+;;
 
 let has_running_subagents t =
   Background_tasks.has_running ~kind:Subagent t.background
@@ -5006,7 +5067,12 @@ let has_managed_subagent t ~agent_id =
 
 let set_subagent_engines t engines = t.subagent_engines <- engines
 let subagent_engines t = t.subagent_engines
-let harness_model t = t.harness_model
+
+let harness_model t =
+  if t.provider_configured t.harness_model.provider
+  then t.harness_model
+  else Option.value (live_direct_model t) ~default:t.harness_model
+;;
 
 let add_spend t ~usage ~cost_usd =
   ignore (Session.add_spend t.session ~usage ~cost_usd : Session.Entry.t)
@@ -5791,6 +5857,7 @@ let replace_session t session ~keep_host =
   Option.iter t.runner ~f:Runner.close;
   t.runner <- None;
   t.unavailable <- None;
+  t.aux_noted <- false;
   t.session <- session;
   Hashtbl.clear t.judgements;
   t.tracer <- tracer_for ~clock:t.trace_clock ~config:t.config session;
@@ -5894,6 +5961,34 @@ let set_transcript_filter t filter =
     state_changed t)
 ;;
 
+(* The session cwd is a property of the host, so switching hosts means
+   choosing a directory there; without [cwd] the host's own is used. *)
+let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
+  match find_host t id with
+  | None when String.equal id Host.backend_id && not t.backend_host_enabled ->
+    Or_error.error_string "the backend tool host is disabled"
+  | None when String.equal id t.active_host ->
+    Or_error.error_string (host_unavailable_message t)
+  | None -> Or_error.errorf "unknown tool host %S" id
+  | Some host ->
+    let outcome =
+      match cwd with
+      | None ->
+        Ok (Dir_change.Outcome.Changed { cwd = host.cwd; created = false })
+      | Some path -> change_dir_on t host path ~if_missing
+    in
+    Or_error.map
+      outcome
+      ~f:
+        (apply_dir_change ~f:(fun cwd ->
+           moving_home
+             t
+             ~worktree:false
+             ~to_:(fun () -> place_on t host ~pinned:true ~cwd)
+             ~move:(fun () -> activate_host t host ~cwd ~pinned:true);
+           prewarm t))
+;;
+
 let set_cwd
       ?(if_missing = Dir_change.If_missing.Fail)
       ?(worktree = false)
@@ -5911,12 +6006,14 @@ let set_cwd
         (change_dir_on t host (host_relative t path) ~if_missing)
         ~f:
           (apply_dir_change ~f:(fun cwd ->
+             let changed = not (String.equal t.cwd cwd) in
              moving_home
                t
                ~worktree
                ~to_:(fun () -> place_on t host ~pinned:t.host_pinned ~cwd)
                ~move:(fun () -> set_host_cwd t host ~cwd);
-             state_changed t)))
+             state_changed t;
+             if changed then prewarm t)))
 ;;
 
 let no_home_message =
@@ -5973,6 +6070,7 @@ let switch_back ?(main = false) t =
           else activate_host t host ~cwd ~pinned;
           ignore (Session.set_home t.session None : Session.Entry.t);
           state_changed t;
+          prewarm t;
           Ok (Dir_change.Outcome.Changed { cwd; created = false })))
 ;;
 

@@ -1736,3 +1736,294 @@ let%expect_test
     after grace elapsed: live=false stopped=true
     |}]
 ;;
+
+let%expect_test "ACP skips git checkpoints when rollback is Unsupported" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let checkpoint_calls = ref 0 in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.05) opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~checkpoint:(fun _ ->
+        incr checkpoint_calls;
+        Tool.Result.ok "{}")
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             P.new_session p "ses_1";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_1" "No checkpoint needed.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             ignore (P.read p : Json.t option))))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.subscribe agent ~f:print_event;
+  prompt agent "hi";
+  Composer_runner.close composer;
+  printf "checkpoint_calls=%d\n" !checkpoint_calls;
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "hi"
+    assistant (acp:opencode/default, End_turn): "No checkpoint needed."
+    checkpoint_calls=0
+    |}]
+;;
+
+let%expect_test
+    "ACP prewarm applies initial mode, model and thinking before first prompt"
+  =
+  let prewarmed, mark_prewarmed = Eio.Promise.create () in
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.05) opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~on_prewarm:(fun _ _ ->
+        ignore (Eio.Promise.try_resolve mark_prewarmed () : bool))
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             let ns = P.expect p "session/new" in
+             P.result
+               p
+               ns
+               (sprintf
+                  {|{"sessionId":"ses_1",%s,
+                     "models":{"currentModelId":"gemini-flash","availableModels":[
+                       {"modelId":"gemini-flash","name":"Gemini Flash"},
+                       {"modelId":"sonnet","name":"Sonnet"}]},
+                     "configOptions":[{"id":"effort","name":"Effort","category":"thought_level",
+                       "type":"select","currentValue":"medium","options":[
+                         {"value":"low","name":"Low"},{"value":"medium","name":"Medium"},
+                         {"value":"high","name":"High"}]}]}|}
+                  P.modes);
+             let m = P.expect p "session/set_mode" in
+             P.result p m "{}";
+             let md = P.expect p "session/set_model" in
+             P.result p md "{}";
+             let th = P.expect p "session/set_config_option" in
+             P.result p th "{}";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_1" "Zero extra roundtrips.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             ignore (P.read p : Json.t option))))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.set_mode agent ~plan:true;
+  Agent.set_model
+    agent
+    (External_model.model
+       ~adapter:"acp:opencode"
+       ~name:"Sonnet"
+       ~thinking_levels:[ Low; Medium; High ]
+       ~can_disable_thinking:false
+       "sonnet");
+  Or_error.ok_exn (Agent.set_thinking agent (On (Some High)));
+  Agent.subscribe agent ~f:print_event;
+  print_endline "--- prewarm ---";
+  Agent.prewarm agent;
+  Eio.Promise.await prewarmed;
+  print_endline "--- first prompt ---";
+  prompt agent "go";
+  Composer_runner.close composer;
+  [%expect
+    {|
+    --- prewarm ---
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/set_mode plan
+    agent got session/set_model sonnet
+    agent got session/set_config_option effort=high
+    --- first prompt ---
+    agent got session/prompt "go"
+    assistant (acp:opencode/sonnet, End_turn): "Zero extra roundtrips."
+    |}]
+;;
+
+let%expect_test
+    "ACP session/load quiet-wait finishes promptly without overshoot"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let quiet = 0.06 in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec quiet) opencode
+  in
+  let load_started = ref None in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~start:(fun ~cwd ->
+        { (Adapter.Start.default ~cwd) with resume = Some "ses_prev" })
+      ~spawn:(fun _ ->
+        Ok
+          (Line_transport.Peer.spawn ~sw (fun p ->
+             P.initialize p;
+             ignore (P.expect p "session/load" : Json.t);
+             load_started := Some (Time_float.now ());
+             (* Replay a chunk 20ms in, then go quiet and never answer session/load. *)
+             Eio_unix.sleep 0.02;
+             P.text p "ses_prev" "old replay";
+             let req = P.expect p "session/prompt" in
+             P.text p "ses_prev" "Resumed.";
+             P.result p req {|{"stopReason":"end_turn"}|};
+             ignore (P.read p : Json.t option))))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.subscribe agent ~f:print_event;
+  prompt agent "continue";
+  let elapsed_ms =
+    Time_float.Span.to_ms
+      (Time_float.diff (Time_float.now ()) (Option.value_exn !load_started))
+  in
+  Composer_runner.close composer;
+  (* With 20ms replay + 60ms quiet, ~80ms total (well under 140ms, vs >120ms+
+     full-quiet overshoot on the old loop). *)
+  printf "no_overshoot=%b\n" Float.(elapsed_ms < 150.);
+  [%expect
+    {|
+    agent got initialize
+    agent got session/load session=ses_prev mcp=[]
+    agent got session/prompt "continue"
+    assistant (acp:opencode/default, End_turn): "Resumed."
+    no_overshoot=true
+    |}]
+;;
+
+let%expect_test
+    "ACP session_info_update sets native title in-turn and between turns"
+  =
+  let send_between, trigger_between = Eio.Promise.create () in
+  let between_sent, mark_between_sent = Eio.Promise.create () in
+  let send_after_manual, trigger_after_manual = Eio.Promise.create () in
+  let after_manual_sent, mark_after_manual_sent = Eio.Promise.create () in
+  with_acp ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let req = P.expect p "session/prompt" in
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"session_info_update","title":"ACP in-turn title"}|};
+    P.text p "ses_1" "Hello.";
+    P.result p req {|{"stopReason":"end_turn"}|};
+    Eio.Promise.await send_between;
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"session_info_update","title":"ACP refined title"}|};
+    Eio.Promise.resolve mark_between_sent ();
+    Eio.Promise.await send_after_manual;
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"session_info_update","title":"Ignored after manual"}|};
+    Eio.Promise.resolve mark_after_manual_sent ();
+    ignore (P.read p : Json.t option))
+  @@ fun agent _ ->
+  let state_cond = Eio.Condition.create () in
+  Agent.subscribe agent ~f:(function
+    | State_changed _ -> Eio.Condition.broadcast state_cond
+    | _ -> ());
+  let show label =
+    let s = Agent.session agent in
+    printf
+      "%s: name=%s desc=%s native=%b wanted=%b\n"
+      label
+      (Option.value (Session.name s) ~default:"-")
+      (Option.value (Session.description s) ~default:"-")
+      (Session_description.has_native s)
+      (Session_description.wanted s)
+  in
+  prompt agent "hi";
+  show "in-turn";
+  Eio.Promise.resolve trigger_between ();
+  Eio.Promise.await between_sent;
+  while
+    not
+      (Option.equal
+         String.equal
+         (Session.description (Agent.session agent))
+         (Some "ACP refined title"))
+  do
+    Eio.Condition.await_no_mutex state_cond
+  done;
+  show "between-turns";
+  ignore
+    (Session.set_name (Agent.session agent) ~name:"Manual title"
+     : Session.Entry.t);
+  Eio.Promise.resolve trigger_after_manual ();
+  Eio.Promise.await after_manual_sent;
+  Eio.Fiber.yield ();
+  Eio.Fiber.yield ();
+  show "after-manual";
+  [%expect
+    {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "hi"
+    assistant (acp:opencode/default, End_turn): "Hello."
+    in-turn: name=- desc=ACP in-turn title native=true wanted=false
+    between-turns: name=- desc=ACP refined title native=true wanted=false
+    after-manual: name=Manual title desc=ACP refined title native=true wanted=false
+    |}]
+;;

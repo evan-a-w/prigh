@@ -142,6 +142,7 @@ type t =
       ; message : string
       }
   | Notice of string
+  | Session_title of string
   | Turn_end of
       { turn_id : string option
       ; stop : Stop.t

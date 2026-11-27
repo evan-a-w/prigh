@@ -40,6 +40,16 @@ val refresh
   -> on_done:(unit -> unit)
   -> unit
 
+(** Records a catalog result obtained outside {!refresh} (such as an early
+    prewarm of a session's harness) under [(host, login, adapter)]. *)
+val record
+  :  t
+  -> host:string
+  -> login:string option
+  -> string
+  -> Adapter.Catalog.t Or_error.t
+  -> unit
+
 (** Why asking [adapter]'s catalog on [host] failed last, if it did. *)
 val failure
   :  t

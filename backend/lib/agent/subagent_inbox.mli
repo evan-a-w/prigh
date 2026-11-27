@@ -62,6 +62,9 @@ val take_all : t -> Message.t list
 (** Blocks until a message is queued. *)
 val await : t -> unit
 
+(** Blocks until a steer message is queued. *)
+val await_steer : t -> unit
+
 (** Closes the inbox when nothing is queued; whether it did. *)
 val close_if_empty : t -> bool
 

@@ -79,7 +79,11 @@ let dispatch t (output : Codec.Output.t) =
   | Send line -> Adapter.Driver.write t.driver line
   | Response r -> Adapter.Driver.answer t.driver r
   | Commands commands -> t.commands <- commands
-  | Config_changed _ | Title _ -> ()
+  | Title (Some title) ->
+    let title = String.strip title in
+    if not (String.is_empty title)
+    then Adapter.Driver.push t.driver (Session_title title)
+  | Title None | Config_changed _ -> ()
 ;;
 
 (* The agent's own command for compacting its context, when it has one
@@ -249,12 +253,14 @@ let create
       in
       let quiet () =
         let quiet = Time_float.Span.to_sec load_quiet in
-        let rec wait () =
-          Eio_unix.sleep quiet;
-          let idle = Time_float.diff (Time_float.now ()) t.last_line in
-          if
-            t.lines > lines_before
-            && Float.(Time_float.Span.to_sec idle >= quiet)
+        let min_step = Float.min 0.05 (quiet *. 0.1) in
+        let rec wait delay =
+          Eio_unix.sleep delay;
+          let idle =
+            Time_float.Span.to_sec
+              (Time_float.diff (Time_float.now ()) t.last_line)
+          in
+          if t.lines > lines_before && Float.(idle >= quiet)
           then (
             Codec.assume_loaded t.codec ~session_id;
             Ok
@@ -263,9 +269,15 @@ let create
                  ; session_id
                  ; config = Codec.session_config t.codec
                  }))
-          else wait ()
+          else (
+            let next =
+              if t.lines > lines_before
+              then Float.max min_step (quiet -. idle)
+              else quiet
+            in
+            wait next)
         in
-        wait ()
+        wait quiet
       in
       let timeout () =
         Eio_unix.sleep (Time_float.Span.to_sec load_timeout);
@@ -277,11 +289,96 @@ let create
       Fiber.any [ answered; quiet; timeout ]
     ;;
 
-    let start
+    let set_mode t mode_id =
+      match Codec.set_mode t.codec ~mode_id with
+      | Error _ as e -> e
+      | Ok line ->
+        let%bind.Or_error r =
+          Turn_timings.phase "session/set_mode" (fun () ->
+            Adapter.Driver.request t.driver line ~matches:(function
+              | Mode_set _ | Failed { kind = Set_mode; _ } -> true
+              | _ -> false))
+        in
+        refused "the mode" r
+    ;;
+
+    (* Plan mode is the agent's [plan] mode; the model, its [model] option
+       when it offers it. What it does not offer is left as it is. *)
+    let apply t (s : Adapter.Settings.t) =
+      let open Or_error.Let_syntax in
+      let config = Codec.session_config t.codec in
+      let plan_id =
+        List.find_map config.modes ~f:(fun (m : Codec.Mode.t) ->
+          Option.some_if (String.Caseless.equal m.id "plan") m.id)
+      in
+      let in_plan =
+        match config.current_mode, plan_id with
+        | Some current, Some plan -> String.equal current plan
+        | _ -> false
+      in
+      let plan_changed = not (Option.equal Bool.equal t.plan (Some s.plan)) in
+      let%bind () =
+        match plan_id with
+        | _ when not plan_changed -> Ok ()
+        | Some plan when s.plan && not in_plan ->
+          t.before_plan <- config.current_mode;
+          set_mode t plan
+        | Some _ when (not s.plan) && in_plan ->
+          let back =
+            Option.first_some
+              t.before_plan
+              (List.find_map config.modes ~f:(fun (m : Codec.Mode.t) ->
+                 Option.some_if (not (String.Caseless.equal m.id "plan")) m.id))
+          in
+          t.before_plan <- None;
+          (match back with
+           | Some mode -> set_mode t mode
+           | None -> Ok ())
+        | _ -> Ok ()
+      in
+      t.plan <- Some s.plan;
+      let set_option ~what (option : Codec.Config_option.t) value =
+        match
+          Codec.set_config_option t.codec ~config_id:option.id (`Id value)
+        with
+        | Error _ as e -> e
+        | Ok line ->
+          let%bind r =
+            Turn_timings.phase "session/set_config_option" (fun () ->
+              Adapter.Driver.request t.driver line ~matches:(function
+                | Config_set _ | Failed { kind = Set_config_option; _ } -> true
+                | _ -> false))
+          in
+          refused what r
+      in
+      (* Its default (no model chosen) is the model it started with. *)
+      let%bind () =
+        match
+          ( Option.first_some s.model t.agent_default
+          , Codec.Session_config.option config ~category:"model" )
+        with
+        | ( Some model
+          , Some ({ value = Select { current; choices }; _ } as option) )
+          when (not (String.equal current model))
+               && (not (Option.equal String.equal t.model (Some model)))
+               && List.exists
+                    choices
+                    ~f:(fun (c : Codec.Config_option.Choice.t) ->
+                      String.equal c.value model) ->
+          let%map () = set_option ~what:"the model" option model in
+          t.model <- Some model
+        | _ -> Ok ()
+      in
+      match Thought.choice (Codec.session_config t.codec) s.thinking with
+      | Some (option, value) ->
+        set_option ~what:"the thinking level" option value
+      | _ -> Ok ()
+    ;;
+
+    let open_session
           ~sw
           ?interrupt_grace
           ?request_timeout
-          ?injected:_
           transport
           (start : Adapter.Start.t)
       =
@@ -494,6 +591,26 @@ let create
       t
     ;;
 
+    let start
+          ~sw
+          ?interrupt_grace
+          ?request_timeout
+          ?injected:_
+          transport
+          (start : Adapter.Start.t)
+      =
+      let%bind.Or_error t =
+        open_session ~sw ?interrupt_grace ?request_timeout transport start
+      in
+      (* Apply initial mode/model/thinking during startup/prewarm so the first
+         [session/prompt] does not pay serial config roundtrips. *)
+      match apply t (Adapter.Settings.of_start start) with
+      | Ok () -> Ok t
+      | Error _ as e ->
+        Adapter.Driver.stop t.driver;
+        e
+    ;;
+
     let next_event' t : Adapter_event.t =
       match Adapter.Driver.next_event t.driver, t.login with
       | ( Turn_end { turn_id; stop = Failed { kind = Auth_required _; message } }
@@ -531,92 +648,6 @@ let create
          | event -> event)
     ;;
 
-    let set_mode t mode_id =
-      match Codec.set_mode t.codec ~mode_id with
-      | Error _ as e -> e
-      | Ok line ->
-        let%bind.Or_error r =
-          Turn_timings.phase "session/set_mode" (fun () ->
-            Adapter.Driver.request t.driver line ~matches:(function
-              | Mode_set _ | Failed { kind = Set_mode; _ } -> true
-              | _ -> false))
-        in
-        refused "the mode" r
-    ;;
-
-    (* Plan mode is the agent's [plan] mode; the model, its [model] option
-       when it offers it. What it does not offer is left as it is. *)
-    let apply t (s : Adapter.Settings.t) =
-      let open Or_error.Let_syntax in
-      let config = Codec.session_config t.codec in
-      let plan_id =
-        List.find_map config.modes ~f:(fun (m : Codec.Mode.t) ->
-          Option.some_if (String.Caseless.equal m.id "plan") m.id)
-      in
-      let in_plan =
-        match config.current_mode, plan_id with
-        | Some current, Some plan -> String.equal current plan
-        | _ -> false
-      in
-      let plan_changed = not (Option.equal Bool.equal t.plan (Some s.plan)) in
-      let%bind () =
-        match plan_id with
-        | _ when not plan_changed -> Ok ()
-        | Some plan when s.plan && not in_plan ->
-          t.before_plan <- config.current_mode;
-          set_mode t plan
-        | Some _ when (not s.plan) && in_plan ->
-          let back =
-            Option.first_some
-              t.before_plan
-              (List.find_map config.modes ~f:(fun (m : Codec.Mode.t) ->
-                 Option.some_if (not (String.Caseless.equal m.id "plan")) m.id))
-          in
-          t.before_plan <- None;
-          (match back with
-           | Some mode -> set_mode t mode
-           | None -> Ok ())
-        | _ -> Ok ()
-      in
-      t.plan <- Some s.plan;
-      let set_option ~what (option : Codec.Config_option.t) value =
-        match
-          Codec.set_config_option t.codec ~config_id:option.id (`Id value)
-        with
-        | Error _ as e -> e
-        | Ok line ->
-          let%bind r =
-            Turn_timings.phase "session/set_config_option" (fun () ->
-              Adapter.Driver.request t.driver line ~matches:(function
-                | Config_set _ | Failed { kind = Set_config_option; _ } -> true
-                | _ -> false))
-          in
-          refused what r
-      in
-      (* Its default (no model chosen) is the model it started with. *)
-      let%bind () =
-        match
-          ( Option.first_some s.model t.agent_default
-          , Codec.Session_config.option config ~category:"model" )
-        with
-        | ( Some model
-          , Some ({ value = Select { current; choices }; _ } as option) )
-          when (not (String.equal current model))
-               && (not (Option.equal String.equal t.model (Some model)))
-               && List.exists
-                    choices
-                    ~f:(fun (c : Codec.Config_option.Choice.t) ->
-                      String.equal c.value model) ->
-          let%map () = set_option ~what:"the model" option model in
-          t.model <- Some model
-        | _ -> Ok ()
-      in
-      match Thought.choice (Codec.session_config t.codec) s.thinking with
-      | Some (option, value) ->
-        set_option ~what:"the thinking level" option value
-      | _ -> Ok ()
-    ;;
-
     let inputs_of (input : Adapter.Input.t) =
       (if String.is_empty input.text
        then []
@@ -643,6 +674,7 @@ let create
     (* Its models come with a session. *)
     let on_change _ _ = ()
     let on_autonomous t f = Adapter.Driver.on_autonomous t.driver f
+    let on_title t f = Adapter.Driver.on_title t.driver f
 
     (* The choices of its [model] option, in its order, the one it started
        with first. *)
@@ -676,7 +708,7 @@ let create
     (* A session opened only to read its models. *)
     let catalog ~sw ?request_timeout transport (s : Adapter.Start.t) =
       let%map.Or_error t =
-        start
+        open_session
           ~sw
           ?request_timeout
           transport

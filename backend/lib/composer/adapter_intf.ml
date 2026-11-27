@@ -214,6 +214,9 @@ module type S = sig
       and record it as a run. *)
   val on_autonomous : t -> (unit -> unit) -> unit
 
+  (** [f] is called when the harness reports a session title between turns. *)
+  val on_title : t -> (string -> unit) -> unit
+
   (** Runs the process [transport] runs only to ask its {!Catalog}: the
       handshake, its models and its login's limits, opening no thread
       (nothing is recorded with the harness); the caller stops the

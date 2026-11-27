@@ -1458,6 +1458,17 @@ let notification t method_ params =
     (match owner t params with
      | `Main -> token_usage t params
      | `Subagent _ | `Unknown -> [])
+  | "thread/name/updated" ->
+    (match owner t params with
+     | `Main ->
+       (match
+          Option.first_some (str "threadName" params) (str "name" params)
+          |> Option.map ~f:String.strip
+        with
+        | Some title when not (String.is_empty title) ->
+          [ event (Session_title title) ]
+        | _ -> [])
+     | `Subagent _ | `Unknown -> [])
   | "error" ->
     (match owner t params with
      | `Main ->

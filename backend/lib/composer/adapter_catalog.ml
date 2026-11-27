@@ -88,6 +88,20 @@ let refresh ?(force = false) t ~sw ~host ~login adapter ~max_age ~fetch ~on_done
         on_done ()))
 ;;
 
+let record t ~host ~login adapter result =
+  let key = { Key.host; login; adapter } in
+  match result with
+  | Ok (catalog : Adapter.Catalog.t) ->
+    Hashtbl.remove t.failed key;
+    let catalog =
+      match catalog.models, find t ~host ~login adapter with
+      | [], Some old -> { catalog with models = old.models }
+      | _ -> catalog
+    in
+    Hashtbl.set t.entries ~key ~data:{ catalog; at = t.now () }
+  | Error e -> Hashtbl.set t.failed ~key ~data:(t.now (), e)
+;;
+
 let failure t ~host ~login adapter =
   Option.map (Hashtbl.find t.failed { Key.host; login; adapter }) ~f:snd
 ;;

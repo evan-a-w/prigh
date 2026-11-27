@@ -246,6 +246,12 @@ val create
            a usage limit carries on with the next one that allows
            fallback before handing over to [fallback_models] (default:
            none) *)
+  -> ?provider_configured:(Provider_id.t -> bool)
+       (** whether a direct provider currently has usable credentials
+           (stored login, shared account, env var, or custom provider):
+           consulted dynamically when resolving an auxiliary model for an
+           external harness session (default: non-empty [accounts] or a
+           custom provider) *)
   -> tools:Tool.t list
   -> sessions_dir:string
   -> home:string
@@ -343,6 +349,15 @@ val prewarm : t -> unit
 (** Stops the external harness's process, if one runs: a later run starts
     it again. *)
 val stop_engine : t -> unit
+
+(** Called when the user's available provider logins or shared accounts
+    changed, so auxiliary requests (such as auto-description on an external
+    session) can retry against live auth. *)
+val auth_changed : t -> unit
+
+(** Records a native session title reported by an external harness, unless
+    the user has manually named the session. *)
+val set_external_title : t -> string -> unit
 
 (** Called when the session's live external harness begins a turn of its own
     between prompts (e.g. woken by a background task): drives and records

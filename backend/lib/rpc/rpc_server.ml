@@ -1529,7 +1529,7 @@ let fetch_catalog
   =
   let login = force login in
   let start = { (Adapter.Start.default ~cwd) with login } in
-  let launch = A.launch start in
+  let launch = { (A.launch start) with mcp = false } in
   let result =
     let%bind.Or_error transport =
       match t.spawn_external with
@@ -1807,6 +1807,20 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
              Option.is_none start.login
              && note_seen t ~host:(Agent.active_host agent) adapter_id result
            then adapters_changed t ~hosts:(hosts t))
+         ~on_prewarm:(fun (start : Adapter.Start.t) result ->
+           let host = Agent.active_host agent in
+           let login = catalog_login t ~adapter:adapter_name in
+           let result =
+             match start.login with
+             | None -> result
+             | Some credential ->
+               Result.map_error
+                 result
+                 ~f:(catalog_login_error adapter_id credential)
+           in
+           Adapter_catalog.record t.catalogs ~host ~login adapter_name result;
+           if Result.is_error result
+           then catalog_changed t ~host ~login adapter_name)
          ~checkpoint:(fun args ->
            Agent.host_call agent ~name:Checkpoint.op args)
          ~host:(fun () -> Agent.active_host agent)
@@ -2009,6 +2023,7 @@ let send_accounts_changed t =
    pinned to one no longer shared go back to the default login. *)
 let shares_changed t =
   send_accounts_changed t;
+  Hashtbl.iter t.agents ~f:Agent.auth_changed;
   Option.iter t.member ~f:(fun { shares; user } ->
     Hashtbl.iter t.agents ~f:(fun agent ->
       let state = Agent.state agent in
@@ -2196,6 +2211,7 @@ let create
   (* Recipients see a login's new label, or that it is gone. *)
   Login_manager.subscribe login ~f:(function
     | Done _ | Logged_out _ | Accounts_changed ->
+      Hashtbl.iter t.agents ~f:Agent.auth_changed;
       Option.iter t.member ~f:(fun { shares; user } ->
         Account_shares.changed shares ~owner:user)
     | _ -> ());
@@ -3229,6 +3245,7 @@ let new_session
   Agent.set_engine agent engine;
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
+  Agent.prewarm agent;
   match attached_state t client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])
@@ -4252,6 +4269,7 @@ let set_adapter_login t params =
     match Agent.engine_choice agent with
     | { engine = Composer; adapter = Some a }
       when String.equal (Adapter_id.to_string a) adapter ->
+      if not (Agent.is_running agent) then Agent.stop_engine agent;
       route t agent (State_changed (Agent.state agent))
     | _ -> ());
   `Object [ "adapter_logins", adapter_logins_json t ]
