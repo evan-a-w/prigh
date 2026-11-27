@@ -68,6 +68,7 @@ let settings ~cwd ~sandbox ~models (s : Adapter.Settings.t)
   ; plan = s.plan
   ; efforts = efforts models s
   ; sandbox
+  ; writable_roots = s.extra_dirs
   }
 ;;
 

@@ -22,6 +22,7 @@ type t =
   ; effort : string option
   ; setting_sources : string list
   ; strict_mcp_config : bool
+  ; add_dirs : string list
   }
 [@@deriving sexp_of]
 
@@ -35,6 +36,7 @@ let default =
   ; effort = None
   ; setting_sources = [ "user" ]
   ; strict_mcp_config = true
+  ; add_dirs = []
   }
 ;;
 
@@ -80,6 +82,7 @@ let argv t =
         "--max-thinking-tokens"
         (Option.map t.max_thinking_tokens ~f:Int.to_string)
     ; eq "--effort" t.effort
+    ; List.concat_map t.add_dirs ~f:(fun dir -> opt "--add-dir" (Some dir))
     ; [ "--input-format"; "stream-json" ]
     ]
 ;;
