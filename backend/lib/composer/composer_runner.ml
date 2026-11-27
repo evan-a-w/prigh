@@ -1369,7 +1369,16 @@ and run_turn'
    let old_window = snd t.context in
    let tokens =
      match input.kind with
-     | Compact _ -> tokens
+     | Compact _ ->
+       (match tokens with
+        | Some _ -> tokens
+        | None ->
+          (* If compaction failed or was aborted without reporting a new
+             context size, keep the previous one so auto-compaction retries
+             on the next turn instead of forgetting it is over threshold. *)
+          (match Composer_recorder.stop recorder with
+           | Some (Failed _ | Interrupted) | None -> fst t.context
+           | Some Done -> None))
      | Prompt | Autonomous ->
        Option.first_some
          tokens

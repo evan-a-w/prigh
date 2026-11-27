@@ -183,7 +183,11 @@ let handle
     match clock with
     | None -> Ok (read ())
     | Some clock ->
-      Eio.Time.with_timeout clock header_timeout (fun () -> Ok (read ()))
+      Fiber.first
+        (fun () -> Ok (read ()))
+        (fun () ->
+           Eio.Time.Mono.sleep clock header_timeout;
+           Error `Timeout)
   in
   match parsed with
   | Error `Timeout -> ()
