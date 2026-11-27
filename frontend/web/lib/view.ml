@@ -347,7 +347,12 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
   in
   let chat (m : Model.t) =
     match m.subagent_chat with
-    | Some id -> Subagent_chat_view.view m ~inject id
+    | Some id ->
+      Subagent_chat_view.view
+        ~ui:{ state = m.ui; inject = ui_inject inject; sent = [] }
+        m
+        ~inject
+        id
     | None -> chat m
   in
   Node.div

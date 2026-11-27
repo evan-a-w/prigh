@@ -89,6 +89,7 @@ let content
            ; Attr.on_keydown (fun ev ->
                Option.value (Dismiss.escape_keydown ~on_escape:close ev) ~default:Effect.Ignore)
            ; Dismiss.attr
+               ~pointer_outside:dismissible
                ~modal:true
                ~on_dismiss:(fun (reason : Dismiss.Reason.t) ->
                  match reason with

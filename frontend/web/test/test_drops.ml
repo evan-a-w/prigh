@@ -157,3 +157,34 @@ let%expect_test "failing to connect keeps trying" =
     ((connection (Reconnecting (attempt 21) (generation 1))) (lost 0))
     |}]
 ;;
+
+let%expect_test "reconnecting to a gone session clears pending.messages" =
+  let h = Harness.connecting () in
+  (* Receive state (starting [get_messages_page] so [pending.messages = true])
+     and a live message before the page arrives, then drop to a gone session. *)
+  Harness.quiet h (fun () ->
+    Harness.act h Start;
+    Harness.reply h "get_state" (Harness.state_json ());
+    Harness.event
+      h
+      {|{"type":"event","event":"message_end","message":{"role":"user","text":"hi"}}|});
+  print_s [%sexp ((Harness.model h).pending.messages : bool)];
+  Harness.quiet h (fun () ->
+    Harness.act h Backend_closed;
+    Harness.act
+      h
+      (Reply
+         ( Session_gone { generation = 1; session = "s1" }
+         , Ok (Jsonaf.of_string {|{"client_id":"c2"}|}) )));
+  let m = Harness.model h in
+  print_s
+    [%message
+      ""
+        ~messages:(m.pending.messages : bool)
+        ~session_gone:(m.session_gone : string option)];
+  [%expect
+    {|
+    true
+    ((messages false) (session_gone ()))
+    |}]
+;;

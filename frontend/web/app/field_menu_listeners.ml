@@ -36,6 +36,20 @@ let find (el : Dom_html.element Js.t) : Target.t option =
   | None -> Option.some_if (text_field el) (Target.Field el)
 ;;
 
+let has_selection_range el =
+  Js.Opt.test (Js.Unsafe.get el (Js.string "selectionStart") : int Js.opt)
+;;
+
+let window_selection () =
+  match
+    Js.Opt.to_option
+      (Js.Unsafe.meth_call Dom_html.window "getSelection" [||]
+       : Js.Unsafe.any Js.opt)
+  with
+  | None -> ""
+  | Some sel -> Js.to_string (Js.Unsafe.meth_call sel "toString" [||])
+;;
+
 let int_field el name =
   Js.Opt.case
     (Js.Unsafe.get el (Js.string name) : int Js.opt)
@@ -48,7 +62,10 @@ let bool_field el name = Js.to_bool (Js.Unsafe.get el (Js.string name))
 let describe : Target.t -> Field_menu.Field.t = function
   | Field el ->
     { kind = Text_field
-    ; selection = int_field el "selectionStart" < int_field el "selectionEnd"
+    ; selection =
+        (if has_selection_range el
+         then int_field el "selectionStart" < int_field el "selectionEnd"
+         else not (String.is_empty (window_selection ())))
     ; editable = not (bool_field el "readOnly" || bool_field el "disabled")
     ; secret =
         String.equal
@@ -112,12 +129,15 @@ let install ~schedule =
 ;;
 
 let selected_text el =
-  let value = Js.to_string (Js.Unsafe.get el (Js.string "value")) in
-  let units = Js.string value in
-  Js.to_string
-    (units##substring
-       (int_field el "selectionStart")
-       (int_field el "selectionEnd"))
+  if has_selection_range el
+  then (
+    let value = Js.to_string (Js.Unsafe.get el (Js.string "value")) in
+    let units = Js.string value in
+    Js.to_string
+      (units##substring
+         (int_field el "selectionStart")
+         (int_field el "selectionEnd")))
+  else window_selection ()
 ;;
 
 (* [text] in place of the selection, as typing it would: the field's undo
@@ -139,16 +159,22 @@ let replace (el : Dom_html.element Js.t) text =
   in
   if not done_
   then (
-    ignore
-      (Js.Unsafe.meth_call
-         el
-         "setRangeText"
-         [| Js.Unsafe.inject (Js.string text)
-          ; Js.Unsafe.inject (int_field el "selectionStart")
-          ; Js.Unsafe.inject (int_field el "selectionEnd")
-          ; Js.Unsafe.inject (Js.string "end")
-         |]
-       : Js.Unsafe.any);
+    (try
+       if has_selection_range el
+       then
+         ignore
+           (Js.Unsafe.meth_call
+              el
+              "setRangeText"
+              [| Js.Unsafe.inject (Js.string text)
+               ; Js.Unsafe.inject (int_field el "selectionStart")
+               ; Js.Unsafe.inject (int_field el "selectionEnd")
+               ; Js.Unsafe.inject (Js.string "end")
+              |]
+            : Js.Unsafe.any)
+       else Js.Unsafe.set el (Js.string "value") (Js.string text)
+     with
+     | _ -> Js.Unsafe.set el (Js.string "value") (Js.string text));
     let event =
       Js.Unsafe.new_obj
         Js.Unsafe.global##._Event

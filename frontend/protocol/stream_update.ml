@@ -82,14 +82,10 @@ let apply_delta (content : Content.t list) ~block (delta : Delta.t) =
   | Tool_call_start { index = _; id; name } ->
     add (Tool_call { id; name; arguments = "" })
   | Tool_call_delta { index = _; arguments } ->
-    (* For a call that never started the backend changed nothing. *)
-    Some
-      (Option.value
-         (change (function
-            | Tool_call c ->
-              Some (Tool_call { c with arguments = c.arguments ^ arguments })
-            | Text _ | Thinking _ | Server_tool _ -> None))
-         ~default:content)
+    change (function
+      | Tool_call c ->
+        Some (Tool_call { c with arguments = c.arguments ^ arguments })
+      | Text _ | Thinking _ | Server_tool _ -> None)
   | Server_tool_use { id; name; input } ->
     add_or_change
       (Server_tool { id; name; input; output = None; is_error = false })
@@ -111,20 +107,26 @@ let apply t ~(at : Position.t option) (message : Message.Assistant.t)
   : Applied.t
   =
   let position = { Position.stream = t.stream; seq = t.seq } in
-  match t.partial with
-  | Some partial -> Updated (position, partial)
-  | None ->
-    let base =
-      match at with
-      | _ when t.from = 1 -> Some { message with content = [] }
-      | Some at when at.stream = t.stream && t.from = at.seq + 1 -> Some message
-      | Some _ | None -> None
-    in
-    (match at, base with
-     | Some at, _ when at.stream = t.stream && t.seq <= at.seq -> Unchanged
-     | _, None -> Gap
-     | _, Some base ->
-       (match apply_delta base.content ~block:t.block t.delta with
-        | Some content -> Updated (position, { base with content })
-        | None -> Gap))
+  match at with
+  | Some at when t.stream < at.stream -> Unchanged
+  | Some at when at.stream = t.stream && t.seq > 0 && t.seq <= at.seq ->
+    Unchanged
+  | _ ->
+    (match t.partial with
+     | Some partial -> Updated (position, partial)
+     | None ->
+       let base =
+         match at with
+         | _ when t.from = 1 -> Some { message with content = [] }
+         | Some at when at.stream = t.stream && t.from = at.seq + 1 ->
+           Some message
+         | Some _ | None -> None
+       in
+       (match at, base with
+        | Some at, _ when at.stream = t.stream && t.seq <= at.seq -> Unchanged
+        | _, None -> Gap
+        | _, Some base ->
+          (match apply_delta base.content ~block:t.block t.delta with
+           | Some content -> Updated (position, { base with content })
+           | None -> Gap)))
 ;;

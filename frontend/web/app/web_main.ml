@@ -963,10 +963,29 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
   if (not (String.equal k.key "Tab")) || k.alt || k.ctrl || k.meta
   then false
   else (
+    let is_visible_focusable (el : Dom_html.element Js.t) =
+      let inert =
+        Js.Opt.test
+          (Js.Unsafe.meth_call
+             el
+             "closest"
+             [| Js.Unsafe.inject (Js.string "[inert]") |])
+      in
+      if inert
+      then false
+      else (
+        let style = Dom_html.window##getComputedStyle el in
+        let hidden =
+          String.equal (Js.to_string style##.display) "none"
+          || String.equal (Js.to_string style##.visibility) "hidden"
+        in
+        (not hidden) && (Js.Unsafe.coerce el)##getClientRects##.length > 0)
+    in
     match
-      List.last
-        (Dom.list_of_nodeList
-           (Dom_html.document##querySelectorAll (Js.string ".modal")))
+      Dom.list_of_nodeList
+        (Dom_html.document##querySelectorAll (Js.string ".modal"))
+      |> List.filter ~f:is_visible_focusable
+      |> List.last
     with
     | None -> false
     | Some modal ->
@@ -978,6 +997,8 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
                  textarea:not(:disabled), select:not(:disabled), a[href], \
                  summary, [tabindex]:not([tabindex='-1']), .modal-body"))
         |> List.filter ~f:(fun (el : Dom_html.element Js.t) ->
+          is_visible_focusable el
+          &&
           if Js.to_bool (el##.classList##contains (Js.string "modal-body"))
           then el##.scrollHeight > el##.clientHeight
           else true)
@@ -1005,7 +1026,9 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
         in
         let stop = stops.(target) in
         (* WebKit does not focus a scroller without a tabindex. *)
-        if not (Js.to_bool (stop##hasAttribute (Js.string "tabindex")))
+        if
+          Js.to_bool (stop##.classList##contains (Js.string "modal-body"))
+          && not (Js.to_bool (stop##hasAttribute (Js.string "tabindex")))
         then stop##setAttribute (Js.string "tabindex") (Js.string "-1");
         stop##focus;
         true))

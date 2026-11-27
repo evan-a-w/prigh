@@ -679,3 +679,26 @@ let%expect_test "phone: strip_hidden, drawer and menu clear on navigation" =
     after menu command: menu=false
     |}]
 ;;
+
+let%expect_test "desktop sidebar drawer opens in the code editor" =
+  let h = entered () in
+  let show () =
+    let m = H.model h in
+    print_s
+      [%message
+        ""
+          ~focused:(Prigh_web.App.Model.focused m : bool)
+          ~drawer:(Prigh_web.App.Model.drawer m : bool)]
+  in
+  show ();
+  H.act h Toggle_sidebar;
+  show ();
+  H.act h (Code Leave);
+  show ();
+  [%expect
+    {|
+    ((focused true) (drawer false))
+    ((focused true) (drawer true))
+    ((focused false) (drawer false))
+    |}]
+;;

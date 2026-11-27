@@ -16,10 +16,11 @@ let note ?(failed = false) children =
     children
 ;;
 
-let transcript (m : Model.t) ~inject (a : Agents.Agent.t) =
+let transcript ?ui (m : Model.t) ~inject (a : Agents.Agent.t) =
   match Chat.find_subagent m.chat a.id with
   | Some s when not (List.is_empty (Chat.entries s.chat)) ->
     Chat_view.view
+      ?ui
       ~fold:(Fold.scoped (Model.fold m) s.agent_id)
       ~names:(Model.model_names m)
       (Model.message_time m)
@@ -67,7 +68,7 @@ let ending (m : Model.t) (a : Agents.Agent.t) =
       ]
 ;;
 
-let view (m : Model.t) ~inject id =
+let view ?ui (m : Model.t) ~inject id =
   match Agents.find_agent m.agents id with
   | None ->
     note
@@ -80,5 +81,5 @@ let view (m : Model.t) ~inject id =
   | Some a ->
     Node.div
       ~attrs:[ Attr.class_ "subagent-chat"; Attr.create "data-subagent" a.id ]
-      [ transcript m ~inject a; ending m a ]
+      [ transcript ?ui m ~inject a; ending m a ]
 ;;

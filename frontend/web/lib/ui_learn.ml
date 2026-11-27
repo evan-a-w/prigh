@@ -273,7 +273,11 @@ let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list)
              ])
         [ Node.span
             ~attrs:[ Attr.class_ "ui-option-key" ]
-            [ Node.text (String.of_char (Char.of_int_exn (65 + j))) ]
+            [ Node.text
+                (if j >= 0 && j < 26
+                 then String.of_char (Char.of_int_exn (65 + j))
+                 else Int.to_string (j + 1))
+            ]
         ; Node.span ~attrs:[ Attr.class_ "ui-option-text" ] [ Node.text text ]
         ; (match state with
            | [ "correct" ] ->

@@ -3453,7 +3453,9 @@ let render_radial_bar (ctx : render_ctx) : rendered =
   let ascale : Chart_scale.Linear.t = { domain = 0., data_max; range = start_angle, end_angle } in
   let ang v =
     let a = Chart_scale.Linear.apply ascale v in
-    if Float.(end_angle >= start_angle)
+    if not (Float.is_finite a && Float.is_finite start_angle && Float.is_finite end_angle)
+    then start_angle
+    else if Float.(end_angle >= start_angle)
     then Float.clamp_exn a ~min:start_angle ~max:end_angle
     else Float.clamp_exn a ~min:end_angle ~max:start_angle
   in

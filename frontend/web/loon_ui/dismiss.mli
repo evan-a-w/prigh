@@ -19,6 +19,7 @@ end
 val attr
   :  ?inside:string list
   -> ?focus_outside:bool
+  -> ?pointer_outside:bool
   -> ?modal:bool
   -> on_dismiss:(Reason.t -> unit Effect.t)
   -> unit

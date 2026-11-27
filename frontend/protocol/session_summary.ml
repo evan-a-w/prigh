@@ -133,8 +133,9 @@ module Change = struct
     let newer (o : summary) =
       match o.updated_at, s.updated_at with
       | Some o, Some s -> String.( >= ) o s
-      | None, Some _ -> true
-      | _, None -> false
+      | Some _, None -> true
+      | None, Some _ -> false
+      | None, None -> true
     in
     let before, after = List.split_while sessions ~f:newer in
     before @ (s :: after)

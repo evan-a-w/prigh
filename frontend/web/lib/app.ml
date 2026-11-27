@@ -2084,7 +2084,14 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; session_gone = None
       ; want_temporary = None
       ; leaving = None
+      ; leave_ok = false
       ; landing = false
+      ; field_menu = None
+      ; context_card = false
+      ; status_tray = false
+      ; review_drawer = false
+      ; downsizing = []
+      ; model_menu = Model_menu.init
       }
     , cancel_btw m
       @ cancel_generate m
@@ -5687,6 +5694,9 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     { m with
       hello = Some hello
     ; login_users = String.Map.empty
+    ; models = []
+    ; auth = []
+    ; share_targets = []
     ; state = None
     ; chat = Chat.empty
     ; paging = Paging.all
@@ -5696,21 +5706,43 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; sessions = []
     ; marks = Session_marks.empty
     ; session_hits = None
+    ; archived_open = false
     ; confirms = []
     ; confirm_reason = None
     ; questions = []
     ; queue = Queued.empty
     ; agent_queues = []
     ; dialog = None
+    ; return_to_settings = false
+    ; theme_preview = None
+    ; cancelled_login = None
+    ; toasts = []
+    ; field_menu = None
+    ; draft = ""
+    ; cursor = 0
+    ; history = History.empty
     ; completion = None
     ; btw = None
     ; generate = Generate.empty
     ; downsizing = []
     ; git_bar = Git_bar.empty
+    ; session_card = Session_card.default
     ; subagent_chat = None
     ; images = []
     ; pasted = []
     ; paste_undo = None
+    ; review_drawer = false
+    ; status_tray = false
+    ; context_card = false
+    ; scrolled_up = false
+    ; transcript_filter = Transcript_filter.all
+    ; terminal = Terminal.closed
+    ; files = Files.closed
+    ; code = Code_editor.empty
+    ; review = Code_review.empty
+    ; review_memory = Review_memory.empty
+    ; model_menu = Model_menu.init
+    ; favourite_models = []
     ; skills = Skills.empty
     ; worktrees = Worktrees.reset m.worktrees
     ; repo_worktrees = Repo_listings.empty
@@ -5718,6 +5750,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; session_gone = None
     ; want_temporary = None
     ; leaving = None
+    ; leave_ok = false
     ; landing = false
     ; outputs_loading = String.Set.empty
     ; folds = String.Set.empty
@@ -8866,6 +8899,7 @@ module Rejoin = struct
     let m =
       { m with
         drops = Drops.rejoined m.drops ~resyncing:(Option.is_some m.state)
+      ; forges = { m.forges with signing_out = String.Set.empty }
       }
     in
     match m.state with
@@ -8891,11 +8925,14 @@ module Rejoin = struct
       { m with
         drops =
           { (Drops.rejoined m.drops ~resyncing:false) with rejoined = false }
+      ; forges = { m.forges with signing_out = String.Set.empty }
       }
     in
     let m, restored = restore_unsure m ~delivered:(fun _ -> false) in
     if List.is_empty (Chat.entries m.chat)
-    then { m with state = None }, restored @ start_commands m
+    then
+      ( { m with state = None; pending = In_flight.none }
+      , restored @ start_commands m )
     else
       (* Nothing of it is live any more: what it waited for, queued, ran. *)
       ( { m with
@@ -8913,7 +8950,8 @@ module Rejoin = struct
         ; btw = None
         ; agents = Agents.empty
         ; subagent_chat = None
-        ; pending = { m.pending with prompts = []; sending = 0 }
+        ; outputs_loading = String.Set.empty
+        ; pending = In_flight.none
         }
       , restored
         @ [ rpc "list_models" [] ~tag:Models
@@ -8972,7 +9010,10 @@ let forge_reply (m : Model.t) (tag : Forge_reply.t) result =
         | Loaded _ -> f
         | Loading | Failed _ -> { f with accounts = Failed e })
     , [] )
-  | Logout _, Ok _, _ -> m, []
+  | Logout host, Ok _, _ ->
+    ( with_forges m ~f:(fun f ->
+        { f with signing_out = Set.remove f.signing_out host })
+    , [] )
   | Logout host, Error e, _ ->
     error
       (with_forges
@@ -9012,20 +9053,35 @@ let forge_reply (m : Model.t) (tag : Forge_reply.t) result =
     in
     { m with dialog = Some (Pr_create f) }, focus
   | Created, Ok json, dialog ->
-    decode m json Pr_detail.of_json ~f:(fun d ->
-      let m, cmds =
-        match dialog with
-        | Some (Pr_create { busy = true; back = Some l; _ }) ->
-          list_prs
-            m
-            (Pull_requests.create ~query:(Picker.query l.picker) l.filter)
-        | Some (Pr_create { busy = true; back = None; _ }) -> close_dialog m
-        | _ -> m, []
-      in
-      let m, toast_cmds =
-        toast m (sprintf "#%d created: %s" d.pr.number d.pr.url)
-      in
-      m, cmds @ toast_cmds)
+    (match Pr_detail.of_json json with
+     | Ok d ->
+       let m, cmds =
+         match dialog with
+         | Some (Pr_create { busy = true; back = Some l; _ }) ->
+           list_prs
+             m
+             (Pull_requests.create ~query:(Picker.query l.picker) l.filter)
+         | Some (Pr_create { busy = true; back = None; _ }) -> close_dialog m
+         | _ -> m, []
+       in
+       let m, toast_cmds =
+         toast m (sprintf "#%d created: %s" d.pr.number d.pr.url)
+       in
+       m, cmds @ toast_cmds
+     | Error e ->
+       (match dialog with
+        | Some (Pr_create ({ busy = true; _ } as f)) ->
+          ( { m with
+              dialog =
+                Some
+                  (Pr_create
+                     { f with
+                       busy = false
+                     ; error = Some (Error.to_string_hum e)
+                     })
+            }
+          , [] )
+        | _ -> error m (Error.to_string_hum e)))
   | Created, Error e, Some (Pr_create ({ busy = true; _ } as f)) ->
     ( { m with
         dialog = Some (Pr_create { f with busy = false; error = Some (said e) })
@@ -10747,7 +10803,7 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
     in
     let m =
       match dialog with
-      | Some (Login _) -> { m with dialog = None }
+      | Some (Login _) -> { m with dialog = None; return_to_settings = false }
       | _ -> m
     in
     let m, cmds =
@@ -10769,7 +10825,8 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
   | Logged_out { provider; account = _ }, dialog ->
     let m =
       match dialog with
-      | Some (Login { purpose = Logout; _ }) -> { m with dialog = None }
+      | Some (Login { purpose = Logout; _ }) ->
+        { m with dialog = None; return_to_settings = false }
       | _ -> m
     in
     let m, cmds = toast m (sprintf "Logged out of %s" provider) in
@@ -12189,6 +12246,11 @@ let respond_login (m : Model.t) (flow : Login_flow.t) =
        m, cmds @ [ respond ])
 ;;
 
+let settings_showing (m : Model.t) section =
+  (not (m.narrow && m.settings_home))
+  && Settings_section.equal m.settings_section section
+;;
+
 let dialog_accept (m : Model.t) =
   match m.dialog with
   | None -> m, []
@@ -12248,31 +12310,37 @@ let dialog_accept (m : Model.t) =
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
-  | Some Settings when Option.is_some m.memory.draft -> save_memory m
-  | Some Settings when Option.is_some m.instructions.draft -> save_instruction m
   | Some Settings
-    when Settings_section.equal m.settings_section Mcp
-         && Option.is_some m.mcp.removing -> mcp_remove m
+    when settings_showing m Memory && Option.is_some m.memory.draft ->
+    save_memory m
   | Some Settings
-    when Settings_section.equal m.settings_section Mcp
-         && Option.is_some m.mcp.paste -> mcp_paste_save m
+    when settings_showing m Custom_instructions
+         && Option.is_some m.instructions.draft -> save_instruction m
+  | Some Settings when settings_showing m Mcp && Option.is_some m.mcp.removing
+    -> mcp_remove m
+  | Some Settings when settings_showing m Mcp && Option.is_some m.mcp.paste ->
+    mcp_paste_save m
+  | Some Settings when settings_showing m Mcp && Option.is_some m.mcp.draft ->
+    mcp_save m
   | Some Settings
-    when Settings_section.equal m.settings_section Mcp
-         && Option.is_some m.mcp.draft -> mcp_save m
+    when settings_showing m About_you && About_you.dirty m.about_you ->
+    save_about_you m
   | Some Settings
-    when Settings_section.equal m.settings_section About_you
-         && About_you.dirty m.about_you -> save_about_you m
-  | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
+    when settings_showing m Models
+         && Option.is_some (Compact_at.draft m.compact_at) ->
     commit_compact_at m
   | Some Settings
-    when not (List.is_empty (Default_fields.drafted m.default_fields)) ->
+    when settings_showing m New_sessions
+         && not (List.is_empty (Default_fields.drafted m.default_fields)) ->
     List.fold
       (Default_fields.drafted m.default_fields)
       ~init:(m, [])
       ~f:(fun (m, cmds) which ->
         let m, more = commit_default_field m which in
         m, cmds @ more)
-  | Some Settings when Option.is_some (Archive_after.draft m.archive_after) ->
+  | Some Settings
+    when settings_showing m Sessions
+         && Option.is_some (Archive_after.draft m.archive_after) ->
     commit_archive_after m
   | Some
       ( Help
@@ -12935,16 +13003,23 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Rename _), Some { target = Session_title; _ } -> stop_generate m
      (* Esc leaves the note being written, or the deletion asked about,
         before the page. *)
-     | Some Settings, _ when Option.is_some m.memory.draft ->
+     | Some Settings, _
+       when settings_showing m Memory && Option.is_some m.memory.draft ->
        { m with memory = Memory_notes.cancel m.memory }, []
-     | Some Settings, _ when Option.is_some m.memory.forgetting ->
+     | Some Settings, _
+       when settings_showing m Memory && Option.is_some m.memory.forgetting ->
        { m with memory = Memory_notes.cancel_forget m.memory }, []
-     | Some Settings, _ when Option.is_some m.instructions.draft ->
+     | Some Settings, _
+       when settings_showing m Custom_instructions
+            && Option.is_some m.instructions.draft ->
        { m with instructions = Instruction_notes.cancel m.instructions }, []
-     | Some Settings, _ when Option.is_some m.instructions.removing ->
+     | Some Settings, _
+       when settings_showing m Custom_instructions
+            && Option.is_some m.instructions.removing ->
        ( { m with instructions = Instruction_notes.cancel_remove m.instructions }
        , [] )
-     | Some Settings, _ when Option.is_some (Mcp_page.escape m.mcp) ->
+     | Some Settings, _
+       when settings_showing m Mcp && Option.is_some (Mcp_page.escape m.mcp) ->
        { m with mcp = Option.value_exn (Mcp_page.escape m.mcp) }, []
      | Some (Popover { chip = Model; _ }), _ when m.model_menu.access_open ->
        { m with model_menu = { m.model_menu with access_open = false } }, []
@@ -13270,17 +13345,45 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Code action ->
     let code, outs = Code_editor.update m.code action in
     let m, cmds = with_code m (code, outs) in
-    (* The ask box's prompt goes as the composer's would, with its lines
-       as the chip; what the composer held stays there. *)
+    (* The ask box's prompt goes as a plain prompt with its lines as the chip,
+       without taking the composer's draft, attachments or slash parsing. *)
     List.fold outs ~init:(m, cmds) ~f:(fun (m, cmds) -> function
       | Send { chip; text } ->
-        let draft = m.draft in
-        let m, more =
-          send
-            { (set_draft m text) with code = { m.code with chip = Some chip } }
-            ~follow_up:false
-        in
-        set_draft m draft, cmds @ more
+        let text = String.strip text in
+        if String.is_empty text
+        then m, cmds
+        else (
+          let draft = m.draft in
+          let cursor = m.cursor in
+          let completion = m.completion in
+          let images = m.images in
+          let pasted = m.pasted in
+          let paste_undo = m.paste_undo in
+          let attachments = m.files.attachments in
+          let old_chip = m.code.chip in
+          let prompt_text, chip_pasted = Code_editor.Chip.prompt chip text in
+          let m', more =
+            send_draft
+              { (set_draft m prompt_text) with
+                images = []
+              ; pasted = chip_pasted
+              ; paste_undo = None
+              ; files = { m.files with attachments = [] }
+              }
+              ~follow_up:false
+          in
+          let m' =
+            { (set_draft m' draft) with
+              cursor
+            ; completion
+            ; images
+            ; pasted
+            ; paste_undo
+            ; files = { m'.files with attachments }
+            ; code = { m'.code with chip = old_chip }
+            }
+          in
+          m', cmds @ more)
       | _ -> m, cmds)
   | Review action -> review_update m action
   | Review_pick which -> open_review_pick m which
@@ -13348,23 +13451,28 @@ let settle (m : Model.t) cmds =
 ;;
 
 (* What the session's engine cannot do is refused here, in the backend's
-   words, rather than sent. *)
-let block_engine_refused (m : Model.t) cmds =
+   words, rather than sent; any optimistic state the action set for the
+   refused call is rolled back so drafts and busy spinners are not lost or
+   stuck. *)
+let block_engine_refused ~before (m : Model.t) cmds =
   match m.state with
   | None -> m, cmds
   | Some (s : State.t) ->
-    let m, kept =
-      List.fold cmds ~init:(m, []) ~f:(fun (m, kept) cmd ->
-        match cmd with
+    let reasons =
+      List.filter_map cmds ~f:(function
         | Command.Rpc { method_; params; _ } ->
-          (match Session_engine.refuse s.engine ~method_ ~params with
-           | Some why ->
-             let m, toast = error m why in
-             m, List.rev_append toast kept
-           | None -> m, cmd :: kept)
-        | _ -> m, cmd :: kept)
+          Session_engine.refuse s.engine ~method_ ~params
+        | _ -> None)
     in
-    m, List.rev kept
+    (match reasons with
+     | [] -> m, cmds
+     | _ ->
+       let m, toasts =
+         List.fold reasons ~init:(before, []) ~f:(fun (m, acc) why ->
+           let m, toast = error m why in
+           m, List.rev_append toast acc)
+       in
+       m, List.rev toasts)
 ;;
 
 (* What leaves the session (for another, or another user). *)
@@ -13414,10 +13522,10 @@ let rec update (m : Model.t) (action : Action.t) =
 
 and update_unguarded (m : Model.t) (action : Action.t) =
   let m', cmds = update_connected m action in
-  let m', cmds = block_engine_refused m' cmds in
-  (* The drawer over the review goes with it. *)
+  let m', cmds = block_engine_refused ~before:m m' cmds in
+  (* The drawer over the review or code editor goes with it. *)
   let m' =
-    if m'.review_drawer && not m'.review.open_
+    if m'.review_drawer && not (Model.focused m')
     then { m' with review_drawer = false }
     else m'
   in
