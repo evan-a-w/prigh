@@ -1542,6 +1542,30 @@ let pool_cwd t ~host ~fallback =
     | None -> fallback)
 ;;
 
+let pool_protocol_of
+      t
+      ~(adapter_id : Adapter_id.t)
+      ~(start : Adapter.Start.t)
+      ~(launch : Adapter.Launch.t)
+  =
+  match adapter_id with
+  | Acp name ->
+    let xai =
+      Option.value_map
+        (Engines.acp_agent t.engines name)
+        ~default:false
+        ~f:(fun (a : Acp_agent.t) -> a.quirks.xai_extensions)
+    in
+    let login_fallback =
+      String.equal name "antigravity"
+      && Option.is_some start.login
+      && Option.is_none launch.secret
+    in
+    if xai || login_fallback then None else Some Harness_mux.Protocol.Acp
+  | Codex -> Some Harness_mux.Protocol.Codex
+  | Claude | Prigh -> None
+;;
+
 let acquire_external
       t
       agent
@@ -1557,25 +1581,7 @@ let acquire_external
     | Some spawn -> spawn agent ~host launch
     | None -> host_spawn_on agent ~sw ~host ~host_name launch
   in
-  let pool_protocol =
-    match adapter_id with
-    | Acp name ->
-      let xai =
-        Option.value_map
-          (Engines.acp_agent t.engines name)
-          ~default:false
-          ~f:(fun (a : Acp_agent.t) -> a.quirks.xai_extensions)
-      in
-      let login_fallback =
-        String.equal name "antigravity"
-        && Option.is_some start.login
-        && Option.is_none launch.secret
-      in
-      if xai || login_fallback then None else Some Harness_mux.Protocol.Acp
-    | Codex -> Some Harness_mux.Protocol.Codex
-    | Claude | Prigh -> None
-  in
-  match pool_protocol with
+  match pool_protocol_of t ~adapter_id ~start ~launch with
   | None -> spawn_direct ()
   | Some protocol ->
     let member =
@@ -2220,12 +2226,25 @@ let external_complete
     in
     let login = cli_credential t agent ~adapter:adapter_name in
     let no_sandbox = no_sandbox t agent ~host ~host_name ~cwd adapter_id in
+    let (module A : Adapter.S) = adapter in
     Switch.run (fun sw ->
       let spawn launch =
+        let start = { (Adapter.Start.default ~cwd) with login; no_sandbox } in
+        let launch =
+          match pool_protocol_of t ~adapter_id ~start ~launch with
+          | Some _ -> A.launch start
+          | None -> launch
+        in
         let spawned =
-          match t.spawn_external with
-          | Some spawn -> spawn agent ~host launch
-          | None -> host_spawn_on agent ~sw ~host ~host_name launch
+          acquire_external
+            t
+            agent
+            ~sw
+            ~host
+            ~host_name
+            ~adapter_id
+            ~start
+            ~launch
         in
         if Result.is_error spawned
         then

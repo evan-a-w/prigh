@@ -1056,6 +1056,8 @@ let%expect_test
     Faux_provider.create [ Reply.error "not logged in to DeepSeek" ]
   in
   let spawn_count = ref 0 in
+  let session_seq = ref 0 in
+  let close_count = ref 0 in
   let fake_acp (p : Line_transport.Peer.t) =
     let rec loop () =
       match read_json p with
@@ -1074,13 +1076,17 @@ let%expect_test
              ];
            loop ()
          | Some "session/new" ->
+           incr session_seq;
+           let sid = sprintf "ses_rpc_%d" !session_seq in
            write_json
              p
              [ "jsonrpc", `String "2.0"
              ; "id", id_of j
              ; ( "result"
                , Json.parse
-                   {|{"sessionId":"ses_rpc","configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"gemini-3-pro","options":[{"value":"gemini-3-pro","name":"Gemini 3 Pro"},{"value":"gemini-3-flash","name":"Gemini 3 Flash"}]}]}|}
+                   (sprintf
+                      {|{"sessionId":%S,"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"gemini-3-pro","options":[{"value":"gemini-3-pro","name":"Gemini 3 Pro"},{"value":"gemini-3-flash","name":"Gemini 3 Flash"}]}]}|}
+                      sid)
                  |> Or_error.ok_exn )
              ];
            loop ()
@@ -1093,13 +1099,20 @@ let%expect_test
              ];
            loop ()
          | Some "session/prompt" ->
+           let sid =
+             Option.value
+               (Option.bind (Json.member "params" j) ~f:(str "sessionId"))
+               ~default:"ses_rpc_1"
+           in
            write_json
              p
              [ "jsonrpc", `String "2.0"
              ; "method", `String "session/update"
              ; ( "params"
                , Json.parse
-                   {|{"sessionId":"ses_rpc","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"feat/rpc-external-draft"}}}|}
+                   (sprintf
+                      {|{"sessionId":%S,"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"feat/rpc-external-draft"}}}|}
+                      sid)
                  |> Or_error.ok_exn )
              ];
            write_json
@@ -1111,6 +1124,7 @@ let%expect_test
              ];
            loop ()
          | Some "session/close" ->
+           incr close_count;
            write_json
              p
              [ "jsonrpc", `String "2.0"; "id", id_of j; "result", `Object [] ];
@@ -1174,12 +1188,17 @@ let%expect_test
       "set_config"
   in
   print_endline (Json.to_string cfg_ok);
+  printf
+    "spawns=%d sessions=%d closes_before_shutdown=%d\n"
+    !spawn_count
+    !session_seq
+    !close_count;
   Rpc_server.shutdown server;
   [%expect
     {|
     rpc spawn #1 mcp=true
-    rpc spawn #2 mcp=false
     {"type":"response","id":"r","ok":true,"result":{"gen_id":"gen-1","kind":"branch_name","text":"feat/rpc-external-draft","model":"acp:antigravity/gemini-3-flash","cost_usd":0}}
     {"type":"response","id":"r","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","default_chat_mode":false,"permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"default_host":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":"acp:antigravity/gemini-3-flash","approval_model":null,"trace":"default"}}
+    spawns=1 sessions=2 closes_before_shutdown=1
     |}]
 ;;

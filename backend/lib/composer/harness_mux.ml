@@ -553,6 +553,18 @@ let handle_client_line t (session : Session.t) line =
          write_physical
            t
            (Json.to_string (with_id json (`Number (Int.to_string wire_id))))
+       | Some "session/close", Some orig_id when Protocol.equal t.protocol Acp
+         ->
+         (match str "sessionId" params, session.acp_session_id with
+          | Some sid, Some cur when String.equal sid cur ->
+            session.acp_session_id <- None;
+            unregister_if_owned t ~key:sid session
+          | _ -> ());
+         let wire_id = alloc_wire_id t in
+         Hashtbl.set t.pending ~key:wire_id ~data:(Forward { session; orig_id });
+         write_physical
+           t
+           (Json.to_string (with_id json (`Number (Int.to_string wire_id))))
        | Some _, Some orig_id ->
          let wire_id = alloc_wire_id t in
          Hashtbl.set t.pending ~key:wire_id ~data:(Forward { session; orig_id });
