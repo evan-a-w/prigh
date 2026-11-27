@@ -32,3 +32,17 @@ val ask
   -> siblings:string list
   -> unit
   -> string Or_error.t
+
+(** Like {!ask}, delegating the underlying completion to [complete]. *)
+val ask_with
+  :  complete:
+       (system:string
+        -> user:string
+        -> max_tokens:int
+        -> cancel:Cancellation.t
+        -> (string, [ `Aborted | `Error of string ]) Result.t)
+  -> ?cancel:Cancellation.t
+  -> task:string
+  -> siblings:string list
+  -> unit
+  -> string Or_error.t

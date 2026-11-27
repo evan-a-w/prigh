@@ -22,6 +22,9 @@ type t =
   ; effort : string option
   ; setting_sources : string list
   ; strict_mcp_config : bool
+  ; no_session_persistence : bool
+  ; tools : string option
+  ; max_turns : int option
   }
 [@@deriving sexp_of]
 
@@ -35,6 +38,9 @@ let default =
   ; effort = None
   ; setting_sources = [ "user" ]
   ; strict_mcp_config = true
+  ; no_session_persistence = false
+  ; tools = None
+  ; max_turns = None
   }
 ;;
 
@@ -74,6 +80,9 @@ let argv t =
     ; resume
     ; opt "--mcp-config" (Option.map t.mcp_config ~f:Json.to_string)
     ; (if t.strict_mcp_config then [ "--strict-mcp-config" ] else [])
+    ; (if t.no_session_persistence then [ "--no-session-persistence" ] else [])
+    ; opt "--tools" t.tools
+    ; opt "--max-turns" (Option.map t.max_turns ~f:Int.to_string)
     ; [ "--setting-sources=" ^ String.concat ~sep:"," t.setting_sources ]
     ; [ "--include-partial-messages" ]
     ; opt

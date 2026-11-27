@@ -21,3 +21,18 @@ val ask
   -> system:string
   -> string
   -> string Or_error.t
+
+(** Like {!ask}, delegating the underlying completion to [complete] (so
+    callers can route through direct providers or external harnesses). *)
+val ask_with
+  :  complete:
+       (system:string
+        -> user:string
+        -> max_tokens:int
+        -> cancel:Cancellation.t
+        -> (string, [ `Aborted | `Error of string ]) Result.t)
+  -> ?cancel:Cancellation.t
+  -> what:string
+  -> system:string
+  -> string
+  -> string Or_error.t

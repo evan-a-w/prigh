@@ -122,6 +122,31 @@ module Catalog = struct
   [@@deriving sexp_of]
 end
 
+(** Input to a one-shot tool-less text completion ({!S.complete}). *)
+module Complete_input = struct
+  type t =
+    { system : string
+    ; prompt : string
+    ; model : string option
+      (** Adapter-native model id; [None] prefers a fast/cheap model from the
+          adapter's catalog when available, else its default. *)
+    ; catalog_models : Model.t list
+      (** Previously known models for this adapter, if any. *)
+    }
+  [@@deriving sexp_of]
+end
+
+(** Result of a one-shot tool-less text completion ({!S.complete}). *)
+module Completion = struct
+  type t =
+    { text : string
+    ; usage : Usage.t
+    ; cost_usd : float
+    ; model : string option (** External model key that answered, if known. *)
+    }
+  [@@deriving sexp_of]
+end
+
 (** Why a harness on one of prigh's logins wants its process replaced
     before the next turn, its thread continued ({!S.renewal}): for a harness
     that takes the login only when it starts (Claude Code). *)
@@ -176,6 +201,11 @@ module type S = sig
 
   val launch : Start.t -> Launch.t
 
+  (** How to launch a lightweight process for a one-shot text completion
+      ({!complete}): no MCP side channel, no tools or session persistence
+      where the harness supports turning them off. *)
+  val launch_complete : Start.t -> Launch.t
+
   (** Talks to the process [transport] runs: the handshake, then the thread
       (new, resumed or forked). Fails, saying why, when the process does not
       answer as expected, in time ([request_timeout] for each request, 60s),
@@ -224,6 +254,21 @@ module type S = sig
     -> Line_transport.t
     -> Start.t
     -> Catalog.t Or_error.t
+
+  (** Runs one tool-less text completion over [transport] in an ephemeral
+      session/thread, auto-denying any unexpected approval or question request,
+      streaming text deltas to [on_delta], and stopping cleanly on [cancel],
+      [timeout] or turn end. *)
+  val complete
+    :  sw:Switch.t
+    -> ?timeout:Time_float.Span.t
+    -> ?request_timeout:Time_float.Span.t
+    -> ?on_delta:(string -> unit)
+    -> cancel:Cancellation.t
+    -> Line_transport.t
+    -> Start.t
+    -> Complete_input.t
+    -> Completion.t Or_error.t
 
   (** Compacts the thread's context ([/compact]): runs as a turn, ending
       with [Turn_end]. *)

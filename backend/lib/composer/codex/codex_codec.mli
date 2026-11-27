@@ -54,6 +54,9 @@ module Thread_options : sig
         http_headers}] *)
     ; dynamic_tools : Dynamic_tool.t list
     ; config : (string * Json.t) list (** more dotted config overrides *)
+    ; ephemeral : bool
+      (** [true] for one-shot completions: passes [ephemeral: true] on
+          [thread/start] and omits [tools.update_plan.enabled] *)
     }
 
   val empty : t

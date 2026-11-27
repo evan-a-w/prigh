@@ -157,6 +157,7 @@ module Request_kind : sig
     | New_session
     | Load_session
     | Resume_session
+    | Close_session
     | Prompt
     | Set_mode
     | Set_config_option
@@ -176,6 +177,7 @@ module Response : sig
         ; session_id : string
         ; config : Session_config.t
         }
+    | Session_closed
     | Mode_set of string
     | Config_set of Config_option.t list
     | Failed of
@@ -229,6 +231,10 @@ val resume_session
   -> cwd:string
   -> mcp_servers:Mcp_server.t list
   -> string
+
+(** [session/close] when the agent advertised [sessionCapabilities.close] and a
+    session is open; [None] otherwise. *)
+val close_session : t -> string option
 
 (** Starts a turn: the request's line, then [Turn_started]. Errors without a
     session, while a turn runs, or with images the agent does not take. *)

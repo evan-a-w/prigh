@@ -28,6 +28,7 @@ module Thread_options = struct
     ; mcp_servers : (string * Json.t) list
     ; dynamic_tools : Dynamic_tool.t list
     ; config : (string * Json.t) list
+    ; ephemeral : bool
     }
 
   let empty =
@@ -35,6 +36,7 @@ module Thread_options = struct
     ; mcp_servers = []
     ; dynamic_tools = []
     ; config = []
+    ; ephemeral = false
     }
   ;;
 end
@@ -365,10 +367,10 @@ let thread_params
       (o : Thread_options.t)
   =
   let config =
-    ("tools.update_plan.enabled", `True)
-    :: (List.map o.mcp_servers ~f:(fun (name, server) ->
-          "mcp_servers." ^ name, server)
-        @ o.config)
+    (if o.ephemeral then [] else [ "tools.update_plan.enabled", `True ])
+    @ List.map o.mcp_servers ~f:(fun (name, server) ->
+      "mcp_servers." ^ name, server)
+    @ o.config
   in
   let dynamic_tools =
     match o.dynamic_tools with
@@ -390,6 +392,9 @@ let thread_params
     [ opt "threadId" (fun id -> `String id) thread_id
     ; opt "lastTurnId" (fun id -> `String id) last_turn_id
     ; Option.map thread_id ~f:(fun _ -> "excludeTurns", `True)
+    ; Option.some_if
+        (o.ephemeral && Option.is_none thread_id)
+        ("ephemeral", `True)
     ; Some ("cwd", `String s.cwd)
     ; opt "model" (fun m -> `String m) s.model
     ; Some ("approvalPolicy", approval_policy)

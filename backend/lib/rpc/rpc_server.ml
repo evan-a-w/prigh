@@ -1870,12 +1870,104 @@ let subagent_engines t agent =
     ()
 ;;
 
+let direct_available t (model : Model.t) =
+  match model.provider with
+  | Google_antigravity -> false
+  | Custom name ->
+    (not (External_model.is_adapter name))
+    && Option.is_some
+         (Model_registry.find_provider (Login_manager.models t.login) name)
+  | (Anthropic | Openai | Openai_codex | Deepseek) as provider ->
+    let store = Login_manager.store t.login in
+    let getenv = Login_manager.getenv t.login in
+    let has_own =
+      match Provider_auth.status ~getenv store with
+      | Error _ -> false
+      | Ok statuses ->
+        List.exists statuses ~f:(fun (s : Provider_auth.Status.t) ->
+          Provider_id.equal s.provider provider && Option.is_some s.configured)
+    in
+    has_own
+    || Option.value_map t.member ~default:false ~f:(fun member ->
+      match Login_choice.list ~member store provider with
+      | Ok (_ :: _) -> true
+      | Ok [] | Error _ -> false)
+;;
+
+let external_complete
+      t
+      agent
+      ~adapter:adapter_id
+      ~model
+      ~system
+      ~prompt
+      ~cwd
+      ~cancel
+      ~on_delta
+  =
+  match Composer_adapters.find t.engines adapter_id with
+  | Error _ as e -> e
+  | Ok adapter ->
+    let host = Agent.active_host agent in
+    let host_name = active_host_label agent in
+    let adapter_name = Adapter_id.to_string adapter_id in
+    let catalog_models =
+      match Agent.engine_choice agent with
+      | { engine = Composer; adapter = Some a }
+        when Adapter_id.equal a adapter_id ->
+        (match Agent.external_models agent with
+         | Some (_ :: _ as models) -> models
+         | Some [] | None ->
+           Option.value_map
+             (find_catalog t agent adapter_id)
+             ~default:[]
+             ~f:(fun c -> c.models))
+      | _ ->
+        Option.value_map
+          (find_catalog t agent adapter_id)
+          ~default:[]
+          ~f:(fun c -> c.models)
+    in
+    let login = cli_credential t agent ~adapter:adapter_name in
+    let no_sandbox = no_sandbox t agent ~host ~host_name ~cwd adapter_id in
+    Switch.run (fun sw ->
+      let spawn launch =
+        let spawned =
+          match t.spawn_external with
+          | Some spawn -> spawn agent ~host launch
+          | None -> host_spawn_on agent ~sw ~host ~host_name launch
+        in
+        if Result.is_error spawned
+        then
+          recheck_adapter_on t agent ~host ~host_name ~cwd:launch.cwd adapter_id;
+        spawned
+      in
+      External_complete.run
+        ~adapter
+        ~spawn
+        ?login
+        ?no_sandbox
+        ~catalog_models
+        ~on_delta
+        ~cancel
+        ~cwd
+        ~model
+        ~system
+        ~prompt
+        ())
+;;
+
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
 let register t agent =
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
   Agent.set_subagent_engines agent (Some (subagent_engines t agent));
+  Agent.set_external_complete agent (Some (external_complete t agent));
+  Agent.set_direct_available agent (direct_available t);
+  Agent.set_known_adapter agent (function
+    | Prigh -> false
+    | a -> Engines.drivable t.engines a);
   Agent.set_hosts agent (hosts t) ~returning:(returning t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);

@@ -25,6 +25,18 @@ val describe
   -> Session.t
   -> string Or_error.t
 
+(** Like {!describe}, delegating the underlying completion to [complete]. *)
+val describe_with
+  :  complete:
+       (system:string
+        -> user:string
+        -> max_tokens:int
+        -> cancel:Cancellation.t
+        -> (string, [ `Aborted | `Error of string ]) Result.t)
+  -> ?cancel:Cancellation.t
+  -> Session.t
+  -> string Or_error.t
+
 (** What the model is asked to write. *)
 val instructions : string
 

@@ -13,8 +13,18 @@ open! Import
 (** [ADAPTER/MODEL]. *)
 val name : adapter:string -> string option -> string
 
+(** Whether [adapter] is an external harness adapter name ([codex], [claude],
+    or [acp:<name>]). *)
+val is_adapter : string -> bool
+
 (** Whether a recorded model name is an external harness's. *)
 val is_external : string -> bool
+
+(** Parses an external model spec ([codex/<id>], [claude/<id>],
+    [acp:<name>/<id>], or bare [acp:<name>] as [default]). Returns [None] for
+    non-external names (direct HTTP models), [Some (Error _)] for malformed
+    external specs (empty model id or malformed [acp:] prefix). *)
+val parse_spec : string -> (Adapter_id.t * string) Or_error.t option
 
 (** The placeholder's id: the harness picks. *)
 val default_id : string

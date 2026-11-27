@@ -20,6 +20,28 @@ let is_external name =
   | None -> false
 ;;
 
+let parse_spec s =
+  let s = String.strip s in
+  match String.lsplit2 s ~on:'/' with
+  | Some (adapter, id) when is_adapter adapter ->
+    let id = String.strip id in
+    if String.is_empty id
+    then Some (Or_error.errorf "empty model name for %s" adapter)
+    else (
+      match Adapter_id.of_string adapter with
+      | Ok ((Codex | Claude | Acp _) as adapter_id) ->
+        Some (Ok (adapter_id, id))
+      | Ok Prigh -> None
+      | Error _ as e -> Some e)
+  | Some _ -> None
+  | None when String.is_prefix s ~prefix:"acp:" ->
+    (match Adapter_id.of_string s with
+     | Ok (Acp _ as adapter_id) -> Some (Ok (adapter_id, default_id))
+     | Ok (Codex | Claude | Prigh) -> None
+     | Error _ as e -> Some e)
+  | None -> None
+;;
+
 (* The windows of the model families harnesses run, by a word of their id
    or name (the first that matches): Gemini 3.x has 1M tokens, Claude 4.x 200k, GPT-OSS 128k. *)
 let known_windows =

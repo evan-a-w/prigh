@@ -74,6 +74,17 @@ let prompt ~task ~siblings =
        ^ String.concat ~sep:"\n" (List.map names ~f:(fun n -> "- " ^ n)))
 ;;
 
+let ask_with ~complete ?cancel ~task ~siblings () =
+  Or_error.map
+    (Naming.ask_with
+       ~complete
+       ?cancel
+       ~what:"naming the subagent"
+       ~system:instructions
+       (prompt ~task ~siblings))
+    ~f:(Naming.clean ~max_length)
+;;
+
 let ask ~provider ~model ?cancel ~task ~siblings () =
   Or_error.map
     (Naming.ask
