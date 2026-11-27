@@ -20,11 +20,19 @@ val create : ?max_lines:int -> ?max_bytes:int -> unit -> t
     finished. *)
 val send : t -> string -> unit
 
+module Late : sig
+  type t
+end
+
 (** Queues a line made by [render] when its turn to be written comes, so
     that what it says can still change while it waits (see
-    {!Update_coalescer}). It counts as a line, but not towards
-    [max_bytes]. *)
-val send_late : t -> (unit -> string) -> unit
+    {!Update_coalescer}). [bytes] is its initial size towards [max_bytes];
+    call {!resize_late} as its size changes while waiting. *)
+val send_late : t -> bytes:int -> (unit -> string) -> Late.t
+
+(** Updates the byte size of a still-waiting {!send_late} entry. Fails the
+    outbox if growth pushes total waiting bytes past [max_bytes]. *)
+val resize_late : t -> Late.t -> bytes:int -> unit
 
 (** Writes the lines in order as they come, until [finish] (and the lines
     sent before it are written) or a failure. A [write] that raises fails
@@ -43,3 +51,6 @@ val failed : t -> string Promise.t
 
 (** Lines waiting to be written. *)
 val waiting : t -> int
+
+(** Bytes waiting to be written. *)
+val bytes : t -> int

@@ -199,7 +199,10 @@ module Fake_worker = struct
     let stderr_lines, stderr = Pipe.create () in
     let exit = Ivar.create () in
     { transport =
-        { send_line = Pipe.write_without_pushback_if_open sent_w
+        { send_line =
+            (fun line ->
+              Pipe.write_without_pushback_if_open sent_w line;
+              Ok ())
         ; lines
         ; stderr_lines
         ; close = (fun () -> Ivar.fill_if_empty exit ())

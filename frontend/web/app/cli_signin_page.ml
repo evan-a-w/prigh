@@ -10,19 +10,24 @@ let storage () =
 
 let pending () =
   Option.bind (storage ()) ~f:(fun storage ->
-    Js.Opt.to_option (storage##getItem (Js.string Cli_signin.pending_key))
-    |> Option.map ~f:Js.to_string)
+    Option.try_with (fun () ->
+      Js.Opt.to_option (storage##getItem (Js.string Cli_signin.pending_key))
+      |> Option.map ~f:Js.to_string)
+    |> Option.join)
   |> Option.bind ~f:Cli_signin.Request.of_string
 ;;
 
 let set_pending request =
   Option.iter (storage ()) ~f:(fun storage ->
-    match request with
-    | Some request ->
-      storage##setItem
-        (Js.string Cli_signin.pending_key)
-        (Js.string (Cli_signin.Request.to_string request))
-    | None -> storage##removeItem (Js.string Cli_signin.pending_key))
+    try
+      match request with
+      | Some request ->
+        storage##setItem
+          (Js.string Cli_signin.pending_key)
+          (Js.string (Cli_signin.Request.to_string request))
+      | None -> storage##removeItem (Js.string Cli_signin.pending_key)
+    with
+    | _ -> ())
 ;;
 
 let take () =

@@ -40,7 +40,8 @@ let%expect_test "call/response correlation, events, errors, close" =
   Transport.In_memory.Backend.send
     backend
     {|{"type":"response","id":99,"ok":true,"result":null}|};
-  let%bind a and b in
+  let%bind a
+  and b in
   print_s
     [%message
       (a : Prigh_protocol.Json.t Or_error.t)
@@ -83,8 +84,9 @@ let%expect_test "call/response correlation, events, errors, close" =
   return ()
 ;;
 
-let%expect_test "reconnect: a fresh transport per attempt, shared attempts, \
-                 failures reported"
+let%expect_test
+    "reconnect: a fresh transport per attempt, shared attempts, failures \
+     reported"
   =
   let backends = Queue.create () in
   let attempts = ref 0 in
@@ -118,7 +120,8 @@ let%expect_test "reconnect: a fresh transport per attempt, shared attempts, \
   (* Two concurrent attempts share one connection. *)
   let a = Client.connect client in
   let b = Client.connect client in
-  let%bind a and b in
+  let%bind a
+  and b in
   printf
     "attempts=%d a=%s b=%s connected=%b\n"
     !attempts
@@ -137,7 +140,8 @@ let%expect_test "reconnect: a fresh transport per attempt, shared attempts, \
     {|{"type":"response","id":1,"ok":true,"result":"pong"}|};
   let%bind reply in
   print_s [%sexp (reply : Prigh_protocol.Json.t Or_error.t)];
-  [%expect {|
+  [%expect
+    {|
     {"id":1,"method":"ping","params":{}}
     (Ok pong)
     |}];
@@ -209,6 +213,132 @@ let%expect_test
     {|
     {"id":1,"method":"ping","params":{}}
     (Ok pong)
+    |}];
+  let%bind () = Client.close client in
+  return ()
+;;
+
+let%expect_test
+    "disconnect detaches synchronously so an immediate reconnect opens a fresh \
+     transport"
+  =
+  let backends = Queue.create () in
+  let attempts = ref 0 in
+  let connect () =
+    incr attempts;
+    let transport, backend = Transport.In_memory.create () in
+    Queue.enqueue backends backend;
+    Deferred.Or_error.return transport
+  in
+  let client = Client.create ~connect in
+  let incoming = Client.incoming client in
+  let%bind () = Deferred.Or_error.ok_exn (Client.connect client) in
+  let in_flight = Client.call client "ping" [] in
+  Client.disconnect client;
+  printf
+    "after disconnect: connected=%b waiting=%d\n"
+    (Client.is_connected client)
+    (Client.waiting client);
+  (* An immediate reconnect must open a new transport rather than reusing the
+     closing one. *)
+  let%bind reconnected = Client.connect client in
+  let%bind in_flight in
+  let%bind closed = Pipe.read_exn incoming in
+  printf
+    "attempts=%d reconnected=%s in_flight=%s closed=%s\n"
+    !attempts
+    (Sexp.to_string [%sexp (reconnected : unit Or_error.t)])
+    (Sexp.to_string [%sexp (in_flight : Prigh_protocol.Json.t Or_error.t)])
+    (Sexp.to_string [%sexp (closed : Client.Incoming.t)]);
+  (* A call on the new transport must not be failed or followed by a stale
+     Closed once the old transport's reader finishes. *)
+  let _first = Queue.dequeue_exn backends in
+  let second = Queue.dequeue_exn backends in
+  let reply = Client.call client "ping" [] in
+  let%bind () = Scheduler.yield_until_no_jobs_remain () in
+  printf
+    "after yield: connected=%b waiting=%d incoming_empty=%b\n"
+    (Client.is_connected client)
+    (Client.waiting client)
+    (Pipe.is_empty incoming);
+  let%bind request =
+    Pipe.read_exn (Transport.In_memory.Backend.requests second)
+  in
+  print_endline request;
+  Transport.In_memory.Backend.send
+    second
+    {|{"type":"response","id":2,"ok":true,"result":"pong"}|};
+  let%bind reply in
+  print_s [%sexp (reply : Prigh_protocol.Json.t Or_error.t)];
+  [%expect
+    {|
+    after disconnect: connected=false waiting=0
+    attempts=2 reconnected=(Ok()) in_flight=(Error"backend closed") closed=Closed
+    after yield: connected=true waiting=1 incoming_empty=true
+    {"id":2,"method":"ping","params":{}}
+    (Ok pong)
+    |}];
+  let%bind () = Client.close client in
+  return ()
+;;
+
+let%expect_test "close abandons an in-flight connect attempt" =
+  let hung = Ivar.create () in
+  let client = Client.create ~connect:(fun () -> Ivar.read hung) in
+  let first = Client.connect client in
+  let%bind () = Client.close client in
+  let late, _late_backend = Transport.In_memory.create () in
+  Ivar.fill_exn hung (Ok late);
+  let%bind first
+  and () = late.closed in
+  printf
+    "first=%s connected=%b\n"
+    (Sexp.to_string [%sexp (first : unit Or_error.t)])
+    (Client.is_connected client);
+  [%expect {| first=(Error abandoned) connected=false |}];
+  return ()
+;;
+
+let%expect_test "send_line failure fails the call and does not leak pending" =
+  let lines_r, lines_w = Pipe.create () in
+  let stderr_r, stderr_w = Pipe.create () in
+  let closed = Ivar.create () in
+  let calls = ref 0 in
+  let transport : Transport.t =
+    { send_line =
+        (fun _ ->
+          incr calls;
+          if !calls = 1
+          then Or_error.error_string "websocket not open"
+          else failwith "send threw")
+    ; lines = lines_r
+    ; stderr_lines = stderr_r
+    ; close =
+        (fun () ->
+          Pipe.close lines_w;
+          Pipe.close stderr_w;
+          Ivar.fill_if_empty closed ())
+    ; closed = Ivar.read closed
+    }
+  in
+  let client =
+    Client.create ~connect:(fun () -> Deferred.Or_error.return transport)
+  in
+  let%bind () = Deferred.Or_error.ok_exn (Client.connect client) in
+  let%bind r1 = Client.call client "ping" [] in
+  printf
+    "r1=%s waiting=%d\n"
+    (Sexp.to_string [%sexp (r1 : Prigh_protocol.Json.t Or_error.t)])
+    (Client.waiting client);
+  let%bind r2 = Client.call client "ping" [] in
+  printf
+    "r2_is_error=%b waiting=%d\n"
+    (Or_error.is_error r2)
+    (Client.waiting client);
+  [%expect
+    {|
+    r1=(Error"websocket not open") waiting=0
+    r2_is_error=true waiting=0
     |}];
   let%bind () = Client.close client in
   return ()

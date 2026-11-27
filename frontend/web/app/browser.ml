@@ -1,20 +1,29 @@
 open! Core
 open Js_of_ocaml
 
-let storage () = Js.Optdef.to_option Dom_html.window##.localStorage
+let storage () =
+  Option.try_with (fun () -> Js.Optdef.to_option Dom_html.window##.localStorage)
+  |> Option.join
+;;
 
 let get_item key =
   Option.bind (storage ()) ~f:(fun s ->
-    Js.Opt.to_option (s##getItem (Js.string key)) |> Option.map ~f:Js.to_string)
+    Option.try_with (fun () ->
+      Js.Opt.to_option (s##getItem (Js.string key))
+      |> Option.map ~f:Js.to_string)
+    |> Option.join)
 ;;
 
 let set_item key value =
   Option.iter (storage ()) ~f:(fun s ->
-    s##setItem (Js.string key) (Js.string value))
+    try s##setItem (Js.string key) (Js.string value) with
+    | _ -> ())
 ;;
 
 let remove_item key =
-  Option.iter (storage ()) ~f:(fun s -> s##removeItem (Js.string key))
+  Option.iter (storage ()) ~f:(fun s ->
+    try s##removeItem (Js.string key) with
+    | _ -> ())
 ;;
 
 let query_param name =
@@ -25,7 +34,9 @@ let query_param name =
   List.find_map (String.split search ~on:'&') ~f:(fun pair ->
     match String.lsplit2 pair ~on:'=' with
     | Some (k, v) when String.equal k name ->
-      Some (Js.to_string (Js.decodeURIComponent (Js.string v)))
+      Some
+        (try Js.to_string (Js.decodeURIComponent (Js.string v)) with
+         | _ -> v)
     | _ -> None)
 ;;
 

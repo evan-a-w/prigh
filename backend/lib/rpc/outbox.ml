@@ -8,10 +8,18 @@ module State = struct
     | Failed
 end
 
+module Late = struct
+  type t =
+    { render : unit -> string
+    ; mutable bytes : int
+    ; mutable dequeued : bool
+    }
+end
+
 module Entry = struct
   type t =
     | Line of string
-    | Rendered_late of (unit -> string)
+    | Rendered_late of Late.t
 end
 
 type t =
@@ -43,6 +51,9 @@ let fail t reason =
   | Failed -> ()
   | Open | Finishing ->
     t.state <- Failed;
+    Queue.iter t.queue ~f:(function
+      | Entry.Line _ -> ()
+      | Rendered_late late -> late.dequeued <- true);
     Queue.clear t.queue;
     t.bytes <- 0;
     Promise.resolve t.resolve_failed reason;
@@ -56,7 +67,7 @@ let enqueue t (entry : Entry.t) =
     Queue.enqueue t.queue entry;
     (match entry with
      | Line line -> t.bytes <- t.bytes + String.length line
-     | Rendered_late _ -> ());
+     | Rendered_late late -> t.bytes <- t.bytes + late.bytes);
     let lines = Queue.length t.queue in
     if lines > t.max_lines
     then
@@ -76,7 +87,35 @@ let enqueue t (entry : Entry.t) =
 ;;
 
 let send t line = enqueue t (Line line)
-let send_late t render = enqueue t (Rendered_late render)
+
+let send_late t ~bytes render =
+  let bytes = Int.max 0 bytes in
+  match t.state with
+  | Failed | Finishing -> { Late.render; bytes = 0; dequeued = true }
+  | Open ->
+    let late = { Late.render; bytes; dequeued = false } in
+    enqueue t (Rendered_late late);
+    late
+;;
+
+let resize_late t (late : Late.t) ~bytes =
+  match t.state with
+  | Failed | Finishing -> ()
+  | Open ->
+    if not late.dequeued
+    then (
+      let new_bytes = Int.max 0 bytes in
+      let delta = new_bytes - late.bytes in
+      late.bytes <- new_bytes;
+      t.bytes <- t.bytes + delta;
+      if delta > 0 && t.bytes > t.max_bytes
+      then
+        fail
+          t
+          (sprintf
+             "the peer is not reading what is sent to it (%d bytes waiting)"
+             t.bytes))
+;;
 
 let finish t =
   match t.state with
@@ -95,7 +134,10 @@ let rec run t ~write =
       | Line line ->
         t.bytes <- t.bytes - String.length line;
         line
-      | Rendered_late render -> render ()
+      | Rendered_late late ->
+        late.dequeued <- true;
+        t.bytes <- t.bytes - late.bytes;
+        late.render ()
     in
     (match write line with
      | () -> run t ~write
@@ -109,3 +151,4 @@ let rec run t ~write =
 
 let failed t = t.failed
 let waiting t = Queue.length t.queue
+let bytes t = t.bytes

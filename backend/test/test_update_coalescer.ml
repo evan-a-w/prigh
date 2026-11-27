@@ -135,3 +135,58 @@ let%expect_test "waiting deltas merge into one covering their pieces" =
     {"type":"event","event":"message_update","stream":3,"seq":1,"delta":{"type":"text_delta","text":"new","block":0}}
     |}]
 ;;
+
+let%expect_test "coalesced deltas enforce the outbox byte cap" =
+  with_sandbox
+  @@ fun _ ->
+  let outbox = Outbox.create ~max_lines:100 ~max_bytes:300 () in
+  let coalescer = Update_coalescer.create outbox in
+  let chunk = String.make 50 'a' in
+  for seq = 1 to 10 do
+    Update_coalescer.send
+      coalescer
+      (Json.of_string (numbered ~stream:1 ~seq ~block:0 (text chunk)))
+  done;
+  printf
+    "failed: %b; waiting: %d; bytes: %d\n"
+    (Option.is_some (Eio.Promise.peek (Outbox.failed outbox)))
+    (Outbox.waiting outbox)
+    (Outbox.bytes outbox);
+  [%expect {| failed: true; waiting: 0; bytes: 0 |}]
+;;
+
+let%expect_test
+    "many coalesced deltas concatenate in linear time and track bytes"
+  =
+  with_sandbox
+  @@ fun _ ->
+  let outbox = Outbox.create () in
+  let coalescer = Update_coalescer.create outbox in
+  let n = 2_000 in
+  for seq = 1 to n do
+    Update_coalescer.send
+      coalescer
+      (Json.of_string (numbered ~stream:1 ~seq ~block:0 (text "0123456789")))
+  done;
+  let waiting_before = Outbox.waiting outbox in
+  let bytes_before = Outbox.bytes outbox in
+  let flushed = ref [] in
+  Outbox.finish outbox;
+  Outbox.run outbox ~write:(fun line -> flushed := line :: !flushed);
+  let line = List.hd_exn !flushed in
+  let json = Json.of_string line in
+  let delta_text =
+    match Json.member "delta" json |> Option.bind ~f:(Json.member "text") with
+    | Some (`String s) -> s
+    | _ -> ""
+  in
+  printf
+    "waiting=%d bytes_tracked=%b flushed=%d text_len=%d drained_bytes=%d\n"
+    waiting_before
+    (bytes_before >= n * 10)
+    (List.length !flushed)
+    (String.length delta_text)
+    (Outbox.bytes outbox);
+  [%expect
+    {| waiting=1 bytes_tracked=true flushed=1 text_len=20000 drained_bytes=0 |}]
+;;

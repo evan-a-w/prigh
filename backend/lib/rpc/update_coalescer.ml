@@ -1,10 +1,32 @@
 open! Core
 open! Import
 
+module Delta_acc = struct
+  type t =
+    { key : string
+    ; mutable rev_chunks : string list
+    ; mutable text_bytes : int
+    }
+
+  let create ~key initial =
+    { key; rev_chunks = [ initial ]; text_bytes = String.length initial }
+  ;;
+
+  let add t chunk =
+    t.rev_chunks <- chunk :: t.rev_chunks;
+    t.text_bytes <- t.text_bytes + String.length chunk
+  ;;
+
+  let contents t = String.concat (List.rev t.rev_chunks)
+end
+
 module Waiting = struct
   type t =
     { mutable event : Json.t
     ; mutable line : string Lazy.t option (** until merged *)
+    ; delta_acc : Delta_acc.t option
+    ; mutable base_bytes : int
+    ; mutable late : Outbox.Late.t option
     }
 end
 
@@ -37,6 +59,18 @@ let replace json name value =
   | other -> other
 ;;
 
+let rec json_bytes = function
+  | `Null -> 4
+  | `True -> 4
+  | `False -> 5
+  | `String s -> String.length s + 2
+  | `Number s -> String.length s
+  | `Array xs -> List.fold xs ~init:2 ~f:(fun acc x -> acc + json_bytes x + 1)
+  | `Object fields ->
+    List.fold fields ~init:2 ~f:(fun acc (k, v) ->
+      acc + String.length k + 4 + json_bytes v)
+;;
+
 (* The stream a [message_update] belongs to: the main agent's or a
    (nested) subagent's. *)
 let rec stream json =
@@ -56,10 +90,31 @@ let same_number a b key =
   | _ -> false
 ;;
 
+let delta_text_key delta =
+  match string_field delta "type" with
+  | Some ("text_delta" | "thinking_delta") -> Some "text"
+  | Some "tool_call_delta" -> Some "arguments"
+  | _ -> None
+;;
+
+let rec innermost_delta json =
+  match string_field json "event" with
+  | Some "subagent" -> Option.bind (field json "inner") ~f:innermost_delta
+  | Some "message_update" -> field json "delta"
+  | _ -> None
+;;
+
+let initial_delta_acc json =
+  Option.bind (innermost_delta json) ~f:(fun delta ->
+    Option.bind (delta_text_key delta) ~f:(fun key ->
+      Option.map (string_field delta key) ~f:(fun text ->
+        Delta_acc.create ~key text)))
+;;
+
 let join_deltas earlier later =
-  let concat key =
+  let check key =
     match string_field earlier key, string_field later key with
-    | Some a, Some b -> Some (replace later key (`String (a ^ b)))
+    | Some _, Some b -> Some (replace later key (`String ""), b)
     | _ -> None
   in
   if not (same_number earlier later "block")
@@ -67,14 +122,15 @@ let join_deltas earlier later =
   else (
     match string_field earlier "type", string_field later "type" with
     | Some "text_delta", Some "text_delta"
-    | Some "thinking_delta", Some "thinking_delta" -> concat "text"
+    | Some "thinking_delta", Some "thinking_delta" -> check "text"
     | Some "tool_call_delta", Some "tool_call_delta"
-      when same_number earlier later "index" -> concat "arguments"
+      when same_number earlier later "index" -> check "arguments"
     | _ -> None)
 ;;
 
-(* [later]'s delta joined to [earlier]'s, covering both: [from] is the
-   earlier's first. *)
+(* [later]'s envelope joined to [earlier]'s, covering both: [from] is the
+   earlier's first. The accumulated delta text lives in [Delta_acc] instead
+   of being re-concatenated on every update. *)
 let join_updates earlier later =
   if
     (not (same_number earlier later "stream"))
@@ -86,17 +142,20 @@ let join_updates earlier later =
   else
     Option.both (field earlier "delta") (field later "delta")
     |> Option.bind ~f:(fun (a, b) -> join_deltas a b)
-    |> Option.map ~f:(fun delta ->
+    |> Option.map ~f:(fun (delta, chunk) ->
       let later = replace later "delta" delta in
-      match field earlier "from", field earlier "seq", later with
-      | Some from, _, `Object fields | None, Some from, `Object fields ->
-        `Object
-          (List.concat_map fields ~f:(fun (k, v) ->
-             match k with
-             | "from" -> []
-             | "seq" -> [ "from", from; k, v ]
-             | _ -> [ k, v ]))
-      | _ -> later)
+      let event =
+        match field earlier "from", field earlier "seq", later with
+        | Some from, _, `Object fields | None, Some from, `Object fields ->
+          `Object
+            (List.concat_map fields ~f:(fun (k, v) ->
+               match k with
+               | "from" -> []
+               | "seq" -> [ "from", from; k, v ]
+               | _ -> [ k, v ]))
+        | _ -> later
+      in
+      event, chunk)
 ;;
 
 (* Both are updates of one stream. *)
@@ -105,8 +164,21 @@ let rec join earlier later =
   | Some "subagent" ->
     Option.both (field earlier "inner") (field later "inner")
     |> Option.bind ~f:(fun (a, b) ->
-      Option.map (join a b) ~f:(replace later "inner"))
+      Option.map (join a b) ~f:(fun (inner, chunk) ->
+        replace later "inner" inner, chunk))
   | _ -> join_updates earlier later
+;;
+
+let rec set_delta_field json ~key ~value =
+  match string_field json "event" with
+  | Some "subagent" ->
+    (match field json "inner" with
+     | Some inner -> replace json "inner" (set_delta_field inner ~key ~value)
+     | None -> json)
+  | _ ->
+    (match field json "delta" with
+     | Some delta -> replace json "delta" (replace delta key value)
+     | None -> json)
 ;;
 
 let render ?line json =
@@ -115,25 +187,68 @@ let render ?line json =
   | None -> Json.to_string json
 ;;
 
-let send t ?line json =
-  match stream json with
+let render_waiting (w : Waiting.t) =
+  match w.line with
+  | Some line -> force line
   | None ->
-    Hashtbl.clear t.waiting;
-    Outbox.send t.outbox (render ?line json)
-  | Some key ->
-    let joined =
-      Option.bind (Hashtbl.find t.waiting key) ~f:(fun (w : Waiting.t) ->
-        Option.map (join w.event json) ~f:(fun event ->
-          w.event <- event;
-          w.line <- None))
+    let json =
+      match w.delta_acc with
+      | Some acc ->
+        set_delta_field
+          w.event
+          ~key:acc.key
+          ~value:(`String (Delta_acc.contents acc))
+      | None -> w.event
     in
-    if Option.is_none joined
-    then (
-      let w = { Waiting.event = json; line } in
-      Hashtbl.set t.waiting ~key ~data:w;
-      Outbox.send_late t.outbox (fun () ->
-        (match Hashtbl.find t.waiting key with
-         | Some w' when phys_equal w w' -> Hashtbl.remove t.waiting key
-         | Some _ | None -> ());
-        render ?line:w.line w.event))
+    Json.to_string json
+;;
+
+let send t ?line json =
+  if Option.is_some (Promise.peek (Outbox.failed t.outbox))
+  then Hashtbl.clear t.waiting
+  else (
+    match stream json with
+    | None ->
+      Hashtbl.clear t.waiting;
+      Outbox.send t.outbox (render ?line json)
+    | Some key ->
+      let joined =
+        Option.bind (Hashtbl.find t.waiting key) ~f:(fun (w : Waiting.t) ->
+          Option.bind w.delta_acc ~f:(fun acc ->
+            Option.map (join w.event json) ~f:(fun (event, chunk) ->
+              Delta_acc.add acc chunk;
+              w.event <- event;
+              w.line <- None;
+              w.base_bytes <- Int.max 0 (json_bytes event);
+              Option.iter w.late ~f:(fun late ->
+                Outbox.resize_late
+                  t.outbox
+                  late
+                  ~bytes:(w.base_bytes + acc.text_bytes)))))
+      in
+      if Option.is_none joined
+      then (
+        let delta_acc = initial_delta_acc json in
+        let initial_bytes =
+          match line with
+          | Some l when Lazy.is_val l -> String.length (force l)
+          | _ -> json_bytes json
+        in
+        let base_bytes =
+          match delta_acc with
+          | Some acc -> Int.max 0 (initial_bytes - acc.text_bytes)
+          | None -> initial_bytes
+        in
+        let w =
+          { Waiting.event = json; line; delta_acc; base_bytes; late = None }
+        in
+        Hashtbl.set t.waiting ~key ~data:w;
+        let late =
+          Outbox.send_late t.outbox ~bytes:initial_bytes (fun () ->
+            (match Hashtbl.find t.waiting key with
+             | Some w' when phys_equal w w' -> Hashtbl.remove t.waiting key
+             | Some _ | None -> ());
+            render_waiting w)
+        in
+        w.late <- Some late))
 ;;

@@ -11,7 +11,11 @@ let spawn ?env ~prog ~args () =
     Ok
       { Transport.send_line =
           (fun line ->
-            if not (Writer.is_closed stdin) then Writer.write_line stdin line)
+            if Writer.is_closed stdin
+            then Or_error.error_string "transport closed"
+            else (
+              Writer.write_line stdin line;
+              Ok ()))
       ; lines = Reader.lines (Process.stdout process)
       ; stderr_lines = Reader.lines (Process.stderr process)
       ; close =
@@ -20,8 +24,9 @@ let spawn ?env ~prog ~args () =
             upon
               (Clock.after (Time_float.Span.of_sec 2.))
               (fun () ->
-                if not (Deferred.is_determined closed)
-                then Signal_unix.send_i Signal.kill (`Pid (Process.pid process))))
+                 if not (Deferred.is_determined closed)
+                 then
+                   Signal_unix.send_i Signal.kill (`Pid (Process.pid process))))
       ; closed
       }
 ;;

@@ -366,7 +366,7 @@ let listen
          no_delay flow;
          keepalive flow;
          handle
-           ~clock:(Eio.Stdenv.clock env)
+           ~clock:(Eio.Stdenv.mono_clock env)
            ?local_port:(Option.some_if local port)
            ?routes
            ~root
