@@ -152,6 +152,7 @@ module Request_kind = struct
     | New_session
     | Load_session
     | Resume_session
+    | Close_session
     | Prompt
     | Set_mode
     | Set_config_option
@@ -230,6 +231,7 @@ module Pending = struct
     | New_session
     | Load_session of string
     | Resume_session of string
+    | Close_session
     | Prompt
     | Steer (* a message for the running turn *)
     | Set_mode of string
@@ -243,6 +245,7 @@ module Pending = struct
     | New_session -> New_session
     | Load_session _ -> Load_session
     | Resume_session _ -> Resume_session
+    | Close_session -> Close_session
     | Prompt | Steer -> Prompt
     | Set_mode _ -> Set_mode
     | Set_config_option _ | Set_model _ -> Set_config_option
@@ -438,6 +441,14 @@ let resume_session t ~session_id ~cwd ~mcp_servers =
     ~session_id
     ~cwd
     ~mcp_servers
+;;
+
+let close_session t ~session_id =
+  request
+    t
+    Close_session
+    "session/close"
+    (`Object [ "sessionId", `String session_id ])
 ;;
 
 let content_block : Input.t -> Json.t = function
@@ -1784,6 +1795,7 @@ let on_response t ~id ~result ~error =
              let config = parse_session_config t result in
              t.config <- config;
              [ Output.Response (Session_opened { kind; session_id; config }) ])
+        | Close_session -> []
         | Steer -> []
         | Prompt when steered t ->
           note_usage t result;

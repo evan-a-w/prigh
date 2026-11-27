@@ -6,7 +6,7 @@ type live = Live : (module Adapter.S with type t = 'a) * 'a -> live
 type t =
   { sw : Switch.t
   ; adapter : Adapter.t
-  ; spawn : Adapter.Launch.t -> Line_transport.t Or_error.t
+  ; spawn : Adapter.Start.t -> Adapter.Launch.t -> Line_transport.t Or_error.t
   ; start : cwd:string -> Adapter.Start.t
   ; interrupt_grace : Time_float.Span.t option
   ; request_timeout : Time_float.Span.t option
@@ -60,6 +60,7 @@ let create
       ~sw
       ~adapter
       ~spawn
+      ?spawn_start
       ?(start = fun ~cwd -> Adapter.Start.default ~cwd)
       ?interrupt_grace
       ?request_timeout
@@ -81,7 +82,10 @@ let create
   =
   { sw
   ; adapter
-  ; spawn
+  ; spawn =
+      (match spawn_start with
+       | Some f -> f
+       | None -> fun _start launch -> spawn launch)
   ; start
   ; interrupt_grace
   ; request_timeout
@@ -246,7 +250,7 @@ let note_thread
 let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
   let (module A) = t.adapter in
   let launch = Turn_timings.phase "launch" (fun () -> A.launch start) in
-  match Turn_timings.phase "spawn" (fun () -> t.spawn launch) with
+  match Turn_timings.phase "spawn" (fun () -> t.spawn start launch) with
   | Error e -> Error (`Spawn e)
   | Ok transport ->
     Option.iter (Line_transport.notice transport) ~f:(fun notice ->

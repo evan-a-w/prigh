@@ -157,6 +157,7 @@ module Request_kind : sig
     | New_session
     | Load_session
     | Resume_session
+    | Close_session
     | Prompt
     | Set_mode
     | Set_config_option
@@ -229,6 +230,10 @@ val resume_session
   -> cwd:string
   -> mcp_servers:Mcp_server.t list
   -> string
+
+(** [session/close] (when {!Agent_capabilities.t.close_session}): closes a
+    session without stopping the agent process. *)
+val close_session : t -> session_id:string -> string
 
 (** Starts a turn: the request's line, then [Turn_started]. Errors without a
     session, while a turn runs, or with images the agent does not take. *)

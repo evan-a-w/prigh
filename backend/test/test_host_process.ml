@@ -517,6 +517,7 @@ let%expect_test "stream: lost lines, old hosts and hosts that went away" =
           ; prigh = "/bin/prigh"
           ; mcp_socket = None
           ; mcp_token = None
+          ; mcp_routes = false
           ; secret = false
           }
       ; Out { seq = 1; line = "one" }
@@ -641,7 +642,7 @@ let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
     | Line { conn; line = _ }, Some s ->
       Host_stream.mcp_write s ~conn {|{"pong":1}|} |> ok_exn;
       Host_stream.mcp_close s ~conn
-    | (Line _ | Closed _), _ -> ()
+    | (Open _ | Line _ | Closed _), _ -> ()
   in
   let s =
     Host_stream.start

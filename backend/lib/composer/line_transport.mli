@@ -40,6 +40,13 @@ module Mcp : sig
   type t =
     { bridge : Injected_tools.Bridge.t
     ; serve : Injected_tools.t -> unit
+    ; route :
+        (string -> Injected_tools.t -> Injected_tools.Bridge.t * (unit -> unit))
+          option
+      (** When [Some], the host supports per-session routed MCP:
+          [route id tools] registers [tools] under route [id], returning the
+          bridge config carrying that route and a release callback that
+          unregisters [id] and closes its connections. *)
     }
 end
 

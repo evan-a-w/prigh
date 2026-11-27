@@ -52,6 +52,8 @@ module Started : sig
     ; mcp_socket : string option (** with [mcp]: the side channel's socket *)
     ; mcp_token : string option
       (** with [mcp]: what the bridge presents first ({!Mcp_bridge}) *)
+    ; mcp_routes : bool
+      (** whether the host's MCP listener supports [token:route] routing *)
     ; secret : bool
       (** it got [secret] on its descriptor ({!Host_process.Up.Started}) *)
     }
@@ -60,6 +62,10 @@ end
 
 module Mcp_event : sig
   type t =
+    | Open of
+        { conn : int
+        ; route : string
+        }
     | Line of
         { conn : int
         ; line : string
