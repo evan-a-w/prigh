@@ -730,3 +730,374 @@ let%expect_test
     rpc engine=<omitted>
     |}]
 ;;
+
+let%expect_test
+    "subagent_continue resumes a finished external subagent's thread"
+  =
+  let reply_n = ref 0 in
+  with_harness_and_engines
+    ~peer:(fun ~host:_ ~adapter:_ _ p ->
+      incr reply_n;
+      fake_codex_peer
+        ~log_prompt:true
+        ~reply_text:(sprintf "codex report #%d" !reply_n)
+        p)
+    ~main:
+      [ call "subagent" {|{"task":"audit parser","engine":"codex"}|}
+      ; Reply.text "started"
+      ; call
+          "subagent_continue"
+          {|{"id":"a1","message":"also check error paths"}|}
+      ; Reply.text "continued"
+      ; Reply.text "all done"
+      ]
+    []
+  @@ fun _t agent ->
+  run agent ~prompt:"please run a codex subagent";
+  [%expect
+    {|
+    subagent a1 starts engine=codex host=<same> model=codex/gpt-5.4
+    spawn codex on <host> (backend) in $DIR
+    subagent -> started agent a1 on Codex (audit parser); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+      [codex] thread/start thread=thr-codex-1
+      [codex] turn/start model=<default> effort=<default> has_handoff=false
+    subagent a1 ends: codex report #1
+    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+    subagent a1 continues engine=codex host=<same> model=codex/gpt-5.4
+    spawn codex on <host> (backend) in $DIR
+    subagent_continue -> continuing a1; its report will be delivered to you when it finishes: keep working or end your turn meanwhile
+      [codex] thread/resume thread=thr-codex-1
+      [codex] turn/start model=<default> effort=<default> has_handoff=false
+    subagent a1 ends: codex report #2
+    [subagent: 2 turns, 0 in / 0 out tokens, $0.0000]
+    |}]
+;;
+
+(* Helper to run a harness main agent that spawns ACP (antigravity) subagents
+   with fast autonomous_quiet / open_work_timeout for testing. *)
+let with_acp_subagents
+      ?(open_work_timeout = Time_float.Span.of_sec 5.)
+      ?(autonomous_quiet = Time_float.Span.of_sec 0.02)
+      ?(steer_poll = Time_float.Span.of_sec 0.01)
+      ~peer
+      ~main
+      f
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let agent_ref = ref None in
+  let provider = Routed_provider.create ~main [] in
+  let acp_engines =
+    Or_error.ok_exn
+      (Engines.create
+         ~engines:[ Harness; Composer ]
+         ~adapters:[ Acp "antigravity" ]
+         ())
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider
+      ~tools:
+        (Tools.all
+         @ (Tool_subagent.create
+              ~engines:(fun () ->
+                Option.bind !agent_ref ~f:Agent.subagent_engines)
+              ~provider
+              ~current_model:(fun () -> Model.default)
+              ~current_thinking:(fun () -> Off)
+              ~home:t.dir
+              ()
+            :: Tool_subagent.control_tools))
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~cwd:t.dir
+      ()
+  in
+  agent_ref := Some agent;
+  let ext =
+    Composer_subagent.create
+      ~engines:acp_engines
+      ~current:(fun () -> Agent.engine_choice agent)
+      ~harness_model:(fun () -> Agent.harness_model agent)
+      ~external_models:(fun ~host:_ _ -> None)
+      ~parent_messages:(fun () -> Agent.messages agent)
+      ~approval_mode:(fun () -> (Agent.state agent).approval_mode)
+      ~plan_mode:(fun () -> (Agent.state agent).plan_mode)
+      ~add_spend:(Agent.add_spend agent)
+      ~notice:(Agent.notice agent)
+      ~autonomous_quiet
+      ~open_work_timeout
+      ~steer_poll
+      ~spawn:(fun ~sw ~host:_ ~host_name:_ ~adapter:_ _launch ->
+        Ok (Line_transport.Peer.spawn ~sw peer))
+      ()
+  in
+  Agent.set_subagent_engines agent (Some ext);
+  Agent.set_mode agent ~approval:Auto;
+  f t agent
+;;
+
+let acp_handshake (p : Line_transport.Peer.t) ~session_id =
+  let module P = Test_acp_adapter.P in
+  let rec read_method () =
+    match P.read p with
+    | None -> failwith "unexpected EOF during handshake"
+    | Some j ->
+      (match P.str "method" j with
+       | Some m -> m, j
+       | None -> read_method ())
+  in
+  let m1, j1 = read_method () in
+  assert (String.equal m1 "initialize");
+  P.result
+    p
+    j1
+    {|{"protocolVersion":1,"agentCapabilities":{"loadSession":true}}|};
+  let m2, j2 = read_method () in
+  assert (String.equal m2 "session/new");
+  P.result p j2 (sprintf {|{"sessionId":%S}|} session_id)
+;;
+
+let acp_read_prompt (p : Line_transport.Peer.t) =
+  let module P = Test_acp_adapter.P in
+  let rec loop () =
+    match P.read p with
+    | None -> None
+    | Some j ->
+      (match P.str "method" j with
+       | Some "session/prompt" -> Some j
+       | _ -> loop ())
+  in
+  loop ()
+;;
+
+let%expect_test
+    "ACP subagent stays alive for open background tool call and drives \
+     autonomous wakeup"
+  =
+  let module P = Test_acp_adapter.P in
+  let bg_settled, mark_bg_settled = Eio.Promise.create () in
+  let finish_build, trigger_finish_build = Eio.Promise.create () in
+  let peer_closed = ref false in
+  with_acp_subagents
+    ~peer:(fun p ->
+      acp_handshake p ~session_id:"ses_bg";
+      let req = Option.value_exn (acp_read_prompt p) in
+      P.update
+        p
+        "ses_bg"
+        {|{"sessionUpdate":"tool_call","toolCallId":"tc1","title":"dune build","kind":"execute","status":"in_progress","rawInput":{"command":"dune build"}}|};
+      P.text p "ses_bg" "Build started in background.";
+      P.result p req {|{"stopReason":"end_turn"}|};
+      (* Wait until the test verifies the subagent is still alive, then finish
+         the background command and emit the final report autonomously. *)
+      Eio.Promise.await finish_build;
+      P.update
+        p
+        "ses_bg"
+        {|{"sessionUpdate":"tool_call_update","toolCallId":"tc1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"Build OK"}}]}|};
+      P.text p "ses_bg" "Build succeeded, all checks green!";
+      ignore (P.read p : Json.t option);
+      peer_closed := true)
+    ~main:
+      [ call "subagent" {|{"task":"run build","engine":"antigravity"}|}
+      ; Reply.text "started"
+      ; Reply.text "great"
+      ]
+  @@ fun _t agent ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Subagent { agent_id; event = Tool_end { call; result }; _ }) ->
+      printf
+        "subagent %s tool_end %s: %s%S\n"
+        agent_id
+        call.name
+        (if result.is_error then "ERROR " else "")
+        result.text;
+      if String.equal result.text "[running in background]"
+      then ignore (Eio.Promise.try_resolve mark_bg_settled () : bool)
+    | Loop (Subagent_end { agent_id; result; _ }) ->
+      printf "subagent %s ends: %s\n" agent_id result.text
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "use antigravity to run build");
+  Eio.Promise.await bg_settled;
+  Eio.Fiber.yield ();
+  printf
+    "while background cmd runs: running=%b peer_closed=%b\n"
+    (Agent.has_running_subagents agent)
+    !peer_closed;
+  Eio.Promise.resolve trigger_finish_build ();
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    subagent a1 tool_end bash: "[running in background]"
+    while background cmd runs: running=true peer_closed=false
+    subagent a1 tool_end bash: "Build OK"
+    subagent a1 ends: Build succeeded, all checks green!
+    [subagent: 4 turns, 0 in / 0 out tokens, $0.0000]
+    |}]
+;;
+
+let%expect_test
+    "ACP subagent: normal completion exits at once; steer, cancel, exit, and \
+     timeout during open work"
+  =
+  let module P = Test_acp_adapter.P in
+  (* 1. Normal completion: tool completes before end_turn, exits immediately. *)
+  with_acp_subagents
+    ~open_work_timeout:(Time_float.Span.of_sec 30.)
+    ~peer:(fun p ->
+      acp_handshake p ~session_id:"s1";
+      let req = Option.value_exn (acp_read_prompt p) in
+      P.update
+        p
+        "s1"
+        {|{"sessionUpdate":"tool_call","toolCallId":"t1","title":"echo hi","kind":"execute","status":"completed","content":[{"type":"content","content":{"type":"text","text":"hi"}}]}|};
+      P.text p "s1" "normal done";
+      P.result p req {|{"stopReason":"end_turn"}|};
+      ignore (P.read p : Json.t option))
+    ~main:
+      [ call "subagent" {|{"task":"normal","engine":"antigravity"}|}
+      ; Reply.text "started"
+      ; Reply.text "ok"
+      ]
+  @@ fun _t agent ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Subagent_end { agent_id; result; _ }) ->
+      printf "normal %s: %s\n" agent_id result.text
+    | _ -> ());
+  run agent ~prompt:"use antigravity normal";
+  (* 2. Steer during open-work wait sends a follow-up Prompt turn. *)
+  let waiting_steer, mark_waiting_steer = Eio.Promise.create () in
+  with_acp_subagents
+    ~peer:(fun p ->
+      acp_handshake p ~session_id:"s2";
+      let req1 = Option.value_exn (acp_read_prompt p) in
+      P.update
+        p
+        "s2"
+        {|{"sessionUpdate":"tool_call","toolCallId":"t2","title":"long cmd","kind":"execute","status":"in_progress"}|};
+      P.text p "s2" "started long cmd";
+      P.result p req1 {|{"stopReason":"end_turn"}|};
+      Eio.Promise.resolve mark_waiting_steer ();
+      let req2 = Option.value_exn (acp_read_prompt p) in
+      P.update
+        p
+        "s2"
+        {|{"sessionUpdate":"tool_call_update","toolCallId":"t2","status":"completed","content":[{"type":"content","content":{"type":"text","text":"done"}}]}|};
+      P.text p "s2" "steered and done";
+      P.result p req2 {|{"stopReason":"end_turn"}|};
+      ignore (P.read p : Json.t option))
+    ~main:
+      [ call "subagent" {|{"task":"steerable","engine":"antigravity"}|}
+      ; Reply.text "started"
+      ; Reply.text "ok"
+      ]
+  @@ fun _t agent ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Subagent_end { agent_id; result; _ }) ->
+      printf "steer %s: %s\n" agent_id result.text
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "use antigravity steerable");
+  Eio.Promise.await waiting_steer;
+  Or_error.ok_exn
+    (Agent.steer_subagent agent ~agent_id:"a1" ~kind:Steer "wrap up now");
+  Agent.wait_idle agent;
+  (* 3. Cancel during open-work wait stops immediately and reports cancelled. *)
+  let waiting_cancel, mark_waiting_cancel = Eio.Promise.create () in
+  with_acp_subagents
+    ~open_work_timeout:(Time_float.Span.of_sec 30.)
+    ~peer:(fun p ->
+      acp_handshake p ~session_id:"s3";
+      let req = Option.value_exn (acp_read_prompt p) in
+      P.update
+        p
+        "s3"
+        {|{"sessionUpdate":"tool_call","toolCallId":"t3","title":"slow","kind":"execute","status":"in_progress"}|};
+      P.text p "s3" "waiting";
+      P.result p req {|{"stopReason":"end_turn"}|};
+      Eio.Promise.resolve mark_waiting_cancel ();
+      ignore (P.read p : Json.t option))
+    ~main:
+      [ call "subagent" {|{"task":"cancellable","engine":"antigravity"}|}
+      ; Reply.text "started"
+      ; Reply.text "ok"
+      ]
+  @@ fun _t agent ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Subagent_end { agent_id; result; _ }) ->
+      printf
+        "cancel %s (error=%b): %s\n"
+        agent_id
+        result.is_error
+        (String.split_lines result.text |> List.hd_exn)
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "use antigravity cancellable");
+  Eio.Promise.await waiting_cancel;
+  Or_error.ok_exn (Agent.cancel_subagent agent ~agent_id:"a1");
+  Agent.wait_idle agent;
+  (* 4. Process exit during open-work wait stops immediately. *)
+  with_acp_subagents
+    ~open_work_timeout:(Time_float.Span.of_sec 30.)
+    ~peer:(fun p ->
+      acp_handshake p ~session_id:"s4";
+      let req = Option.value_exn (acp_read_prompt p) in
+      P.update
+        p
+        "s4"
+        {|{"sessionUpdate":"tool_call","toolCallId":"t4","title":"slow","kind":"execute","status":"in_progress"}|};
+      P.text p "s4" "partial before exit";
+      P.result p req {|{"stopReason":"end_turn"}|})
+    ~main:
+      [ call "subagent" {|{"task":"exiting","engine":"antigravity"}|}
+      ; Reply.text "started"
+      ; Reply.text "ok"
+      ]
+  @@ fun _t agent ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Subagent_end { agent_id; result; _ }) ->
+      printf "exit %s: %s\n" agent_id result.text
+    | _ -> ());
+  run agent ~prompt:"use antigravity exiting";
+  (* 5. Safety timeout on leaked open tool call stops wait with a notice. *)
+  with_acp_subagents
+    ~open_work_timeout:(Time_float.Span.of_sec 0.03)
+    ~peer:(fun p ->
+      acp_handshake p ~session_id:"s5";
+      let req = Option.value_exn (acp_read_prompt p) in
+      P.update
+        p
+        "s5"
+        {|{"sessionUpdate":"tool_call","toolCallId":"t5","title":"leaked","kind":"execute","status":"in_progress"}|};
+      P.text p "s5" "leaked tool";
+      P.result p req {|{"stopReason":"end_turn"}|};
+      ignore (P.read p : Json.t option))
+    ~main:
+      [ call "subagent" {|{"task":"leaked","engine":"antigravity"}|}
+      ; Reply.text "started"
+      ; Reply.text "ok"
+      ]
+  @@ fun _t agent ->
+  Agent.subscribe agent ~f:(function
+    | Notice n -> printf "timeout notice: %s\n" n
+    | Loop (Subagent_end { agent_id; result; _ }) ->
+      printf "timeout %s: %s\n" agent_id result.text
+    | _ -> ());
+  run agent ~prompt:"use antigravity leaked";
+  [%expect
+    {|
+    normal a1: normal done
+    [subagent: 2 turns, 0 in / 0 out tokens, $0.0000]
+    steer a1: steered and done
+    [subagent: 3 turns, 0 in / 0 out tokens, $0.0000]
+    cancel a1 (error=true): [cancelled]
+    exit a1: partial before exit
+    [subagent: 2 turns, 0 in / 0 out tokens, $0.0000]
+    timeout notice: acp:antigravity subagent timed out waiting for background work to finish
+    timeout a1: leaked tool
+    [subagent: 2 turns, 0 in / 0 out tokens, $0.0000]
+    |}]
+;;

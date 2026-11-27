@@ -747,7 +747,9 @@ let create
     let thread_id t = Codec.session_id t.codec
     let cost_total t = Codec.cost_total t.codec
     let in_turn t = Adapter.Driver.in_turn t.driver
+    let has_open_work t = Codec.has_open_work t.codec
     let alive t = Adapter.Driver.alive t.driver
+    let await_exit t = Adapter.Driver.await_exit t.driver
     let login t = Option.map t.login ~f:Antigravity_login.credential
 
     let renewal t : Adapter.Login_renewal.t option =

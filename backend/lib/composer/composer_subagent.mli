@@ -41,5 +41,9 @@ val create
   -> ?steer_poll:Time_float.Span.t
   -> ?request_timeout:Time_float.Span.t
   -> ?interrupt_grace:Time_float.Span.t
+  -> ?autonomous_quiet:Time_float.Span.t
+  -> ?open_work_timeout:Time_float.Span.t
+       (** safety timeout when waiting for an external harness's in-flight
+           background work after [end_turn] (default 30 min) *)
   -> unit
   -> Tool_subagent.External.t

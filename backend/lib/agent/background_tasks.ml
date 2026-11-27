@@ -646,19 +646,10 @@ let park t id ~out_of_turns resume =
 ;;
 
 let unpark t id = Option.is_some (Hashtbl.find_and_remove t.parked id)
-
-let is_parked t id =
-  match Hashtbl.find t.parked id with
-  | Some { out_of_turns; _ } -> out_of_turns
-  | None -> false
-;;
+let is_parked t id = Hashtbl.mem t.parked id
 
 let parked_text t =
-  match
-    Hashtbl.filter t.parked ~f:(fun (p : Parked.t) -> p.out_of_turns)
-    |> Hashtbl.keys
-    |> List.sort ~compare:String.compare
-  with
+  match Hashtbl.keys t.parked |> List.sort ~compare:String.compare with
   | [] -> "none"
   | ids -> String.concat ~sep:", " ids
 ;;
@@ -668,8 +659,8 @@ let not_parked t id ~(task : Task.t option) =
   match task with
   | None ->
     Or_error.errorf
-      "unknown subagent %S: only a subagent of yours that ran out of turns can \
-       be continued %s"
+      "unknown subagent %S: only a finished, failed, or out-of-turns subagent \
+       of yours can be continued %s"
       id
       can
   | Some task ->
@@ -686,8 +677,7 @@ let not_parked t id ~(task : Task.t option) =
          can
      | Some outcome ->
        Or_error.errorf
-         "%s %s and cannot be continued: only a subagent that ran out of turns \
-          can %s; start a new subagent for more work"
+         "%s %s and cannot be continued %s; start a new subagent for more work"
          id
          (if String.equal outcome.status "finished"
           then "finished"
@@ -714,10 +704,10 @@ let continue_ t id ~max_turns ~message =
   let parked =
     match task, Hashtbl.find t.parked id with
     | Some task, _ when Task.running task -> None
-    | _, Some { out_of_turns = true; resume } ->
+    | _, Some { resume; _ } ->
       Hashtbl.remove t.parked id;
       Some resume
-    | _, (Some { out_of_turns = false; _ } | None) -> None
+    | _, None -> None
   in
   let message =
     Option.map message ~f:(fun m -> Subagent_inbox.From.Caller, m)
@@ -767,9 +757,11 @@ let cancel t ~kind id =
     then (
       Cancellation.cancel task.cancel;
       Ok ())
-    else if is_parked t id
-    then Ok (ignore (unpark t id : bool))
-    else Or_error.errorf "%s %s already finished" (Kind.word kind) id)
+    else (
+      match Hashtbl.find t.parked id with
+      | Some { out_of_turns = true; _ } -> Ok (ignore (unpark t id : bool))
+      | Some { out_of_turns = false; _ } | None ->
+        Or_error.errorf "%s %s already finished" (Kind.word kind) id))
 ;;
 
 let cancel_and_wait t ~kind id ~cancel =
@@ -782,6 +774,7 @@ let cancel_and_wait t ~kind id ~cancel =
     | None ->
       Or_error.errorf "interrupted while cancelling %s %s" (Kind.word kind) id
     | Some () ->
+      ignore (unpark t id : bool);
       mark_delivered t [ task ];
       Ok task)
 ;;

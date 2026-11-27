@@ -11,6 +11,16 @@ let error_assistant ~adapter ~model message =
     }
 ;;
 
+let aborted_assistant ~adapter ~model =
+  Message.Assistant
+    { content = []
+    ; model = External_model.name ~adapter:(Adapter_id.to_string adapter) model
+    ; usage = Usage.zero
+    ; stop_reason = Aborted
+    ; account = None
+    }
+;;
+
 let create
       ~engines
       ~current
@@ -29,9 +39,16 @@ let create
       ?steer_poll
       ?request_timeout
       ?interrupt_grace
+      ?autonomous_quiet
+      ?(open_work_timeout = Time_float.Span.of_sec 1800.)
       ()
   : Tool_subagent.External.t
   =
+  let steer_poll_sec =
+    Time_float.Span.to_sec
+      (Option.value steer_poll ~default:(Time_float.Span.of_sec 0.2))
+  in
+  let open_work_timeout_sec = Time_float.Span.to_sec open_work_timeout in
   let run
         ~adapter:adapter_id
         ~host_id
@@ -58,7 +75,7 @@ let create
         ~prompts
     : Tool_subagent.External.run_result
     =
-    match Composer_adapters.find engines adapter_id with
+    match Composer_adapters.find ?autonomous_quiet engines adapter_id with
     | Error e ->
       { Tool_subagent.External.messages =
           [ error_assistant ~adapter:adapter_id ~model (Error.to_string_hum e) ]
@@ -67,9 +84,14 @@ let create
     | Ok adapter ->
       let adapter_name = Adapter_id.to_string adapter_id in
       let run_cost = ref 0. in
-      List.iter prompts ~f:(fun m ->
-        ignore (Session.append_message session m : Session.Entry.t));
-      let recorded m = List.mem prompts m ~equal:phys_equal in
+      let recorded_prompts = ref [] in
+      let record_prompts msgs =
+        List.iter msgs ~f:(fun m ->
+          recorded_prompts := m :: !recorded_prompts;
+          ignore (Session.append_message session m : Session.Entry.t))
+      in
+      let recorded m = List.mem !recorded_prompts m ~equal:phys_equal in
+      record_prompts prompts;
       Switch.run
       @@ fun sw ->
       let background =
@@ -81,6 +103,8 @@ let create
           ()
       in
       Background_tasks.connect background ~emit ~on_change:ignore;
+      let autonomous_pending = ref false in
+      let wake_cond = Eio.Condition.create () in
       let start ~cwd =
         { (Adapter.Start.default ~cwd) with
           resume
@@ -118,9 +142,11 @@ let create
           ~home
           ~depth
           ~agent_id
-          ~wake
           ?handoff_from
           ~catalog:(fun () -> catalog ~host:host_id adapter_id)
+          ~on_autonomous:(fun () ->
+            autonomous_pending := true;
+            Eio.Condition.broadcast wake_cond)
           ()
       in
       let services : Engine_intf.Services.t =
@@ -153,16 +179,60 @@ let create
               add_spend ~usage ~cost_usd)
         }
       in
-      let input : Engine_intf.Turn.Input.t =
-        { context = Session.messages session
-        ; prompts
-        ; chat = context.chat
-        ; thinking
-        ; approval
-        ; plan
-        ; model
-        ; kind = Prompt
-        }
+      let run_one ~kind prompts =
+        let input : Engine_intf.Turn.Input.t =
+          { context = Session.messages session
+          ; prompts
+          ; chat = context.chat
+          ; thinking
+          ; approval
+          ; plan
+          ; model
+          ; kind
+          }
+        in
+        Runner.run_turn (Composer_runner.runner runner) services ~cancel input
+      in
+      let await_open_work () =
+        let await_autonomous () =
+          let rec loop () =
+            if !autonomous_pending
+            then `Autonomous
+            else (
+              Eio.Condition.await_no_mutex wake_cond;
+              loop ())
+          in
+          loop ()
+        in
+        let await_steer () =
+          let rec loop () =
+            match steer () with
+            | _ :: _ as msgs -> `Steer msgs
+            | [] ->
+              Eio_unix.sleep steer_poll_sec;
+              loop ()
+          in
+          loop ()
+        in
+        let await_exit () =
+          Composer_runner.await_exit runner;
+          `Exited
+        in
+        let await_cancel () =
+          Cancellation.await cancel;
+          `Cancelled
+        in
+        let await_timeout () =
+          Eio_unix.sleep open_work_timeout_sec;
+          `Timeout
+        in
+        Fiber.any
+          [ await_autonomous
+          ; await_steer
+          ; await_exit
+          ; await_cancel
+          ; await_timeout
+          ]
       in
       let messages =
         Exn.protect
@@ -171,11 +241,48 @@ let create
             Background_tasks.cancel_all ~discard:true background;
             Background_tasks.wait_all background)
           ~f:(fun () ->
-            Runner.run_turn
-              (Composer_runner.runner runner)
-              services
-              ~cancel
-              input)
+            let initial = run_one ~kind:Prompt prompts in
+            let rec continue_loop acc =
+              if Cancellation.is_cancelled cancel
+              then
+                if Composer_runner.has_open_work runner || !autonomous_pending
+                then acc @ [ aborted_assistant ~adapter:adapter_id ~model ]
+                else acc
+              else if Option.is_some (context.halt ())
+              then acc
+              else if !autonomous_pending
+              then (
+                autonomous_pending := false;
+                let more = run_one ~kind:Autonomous [] in
+                continue_loop (acc @ more))
+              else if Composer_runner.has_open_work runner
+              then (
+                match await_open_work () with
+                | `Autonomous -> continue_loop acc
+                | `Steer msgs ->
+                  record_prompts msgs;
+                  let more = run_one ~kind:Prompt msgs in
+                  continue_loop (acc @ more)
+                | `Exited ->
+                  if !autonomous_pending then continue_loop acc else acc
+                | `Cancelled ->
+                  acc @ [ aborted_assistant ~adapter:adapter_id ~model ]
+                | `Timeout ->
+                  notice
+                    (sprintf
+                       "%s subagent timed out waiting for background work to \
+                        finish"
+                       adapter_name);
+                  acc)
+              else (
+                match wake () with
+                | [] -> acc
+                | msgs ->
+                  record_prompts msgs;
+                  let more = run_one ~kind:Prompt msgs in
+                  continue_loop (acc @ more))
+            in
+            continue_loop initial)
       in
       { Tool_subagent.External.messages; cost_usd = !run_cost }
   in

@@ -224,21 +224,20 @@ val send
 (** The subagents with queued messages, oldest first. *)
 val queues : t -> Subagent_inbox.Listing.t list
 
-(** {2 Subagents out of turns}
+(** {2 Continuable subagents}
 
-    A subagent that stopped at its turn limit is parked with what it needs
-    to carry on: [subagent_continue] runs it again. A background one keeps
-    its task (and id), which runs again and reports again; a synchronous
-    one (a subagent's own, parked in its caller's tasks) is run by its
-    caller. Cancelling it, {!cancel_all} and {!forget_finished} free it.
-
-    A background subagent that finished is parked too ([out_of_turns]
-    false), for the user to carry on with ({!send}); [subagent_continue]
-    takes only those out of turns. *)
+    A subagent that finished, failed, or stopped at its turn limit is parked
+    with what it needs to carry on: [subagent_continue] runs it again (with
+    a follow-up message and/or more turns). A background one keeps its task
+    (and id), which runs again and reports again; a synchronous one (a
+    subagent's own, parked in its caller's tasks) is run by its caller.
+    Cancelling it, {!cancel_all} and {!forget_finished} free it. A
+    background subagent that finished can also be chatted with by the user
+    ({!send}). *)
 
 val park : t -> string -> out_of_turns:bool -> Resume.t -> unit
 
-(** Parked out of turns: [subagent_continue] can continue it. *)
+(** Parked and continuable by [subagent_continue]. *)
 val is_parked : t -> string -> bool
 
 (** Unparks [id]: a background subagent's task runs it again ([`Restarted]:
