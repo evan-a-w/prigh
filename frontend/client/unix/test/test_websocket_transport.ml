@@ -107,7 +107,7 @@ let session ?tls ?authenticator ?headers ?host () =
     Server.close server
   | Ok t ->
     let%bind () = read_lines t 4 in
-    t.send_line {|{"method":"ping"}|};
+    Or_error.ok_exn (t.send_line {|{"method":"ping"}|});
     t.close ();
     let%bind () = finished in
     let%bind () = t.closed in

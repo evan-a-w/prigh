@@ -111,19 +111,19 @@ let reconnect_gate = Reconnect_gate.create ()
 let reconnect client settings ~generation ~session =
   let session = Option.first_some session (url_session ()) in
   match%map.Deferred connect_and_hello client settings ~session with
-  | Error "timed out" ->
-    Client.disconnect client;
-    App.Reply_tag.Reconnect generation, Error "timed out"
-  | Error e -> Reconnect generation, Error e
+  | Error e ->
+    if Reconnect_gate.due reconnect_gate ~generation
+    then Client.disconnect client;
+    App.Reply_tag.Reconnect generation, Error e
   | Ok (reply, None) -> Reconnect generation, Ok reply
   | Ok (reply, Some session) -> Session_gone { generation; session }, Ok reply
 ;;
 
 (* After a suspension or a change of network, a socket can look open but
    carry nothing: one that does not answer is dropped (and so reconnected).
-   One that is slow but alive is not: while something comes in or other
-   answers are still on their way (a large reply on a slow network, a busy
-   backend: ours queues behind them), it gets more time, up to a minute. *)
+   One that is slow but alive is not: while fresh messages keep arriving (or
+   for one grace window when another large reply was already in flight ahead
+   of ours), it gets more time, up to a minute. *)
 let probe client =
   if not (Client.is_connected client)
   then Deferred.unit
@@ -137,7 +137,9 @@ let probe client =
       | `Result _ -> Deferred.unit
       | `Timeout ->
         let now_received = Client.received client in
-        if (now_received > received || others > 0) && waited < 7
+        if
+          waited < 7
+          && (now_received > received || (waited = 0 && others > 0))
         then wait ~waited:(waited + 1) ~received:now_received
         else (
           Client.disconnect client;
@@ -1516,7 +1518,7 @@ let time_zone () =
 let run_app (settings : Settings.t) =
   let client =
     Client.create ~connect:(fun () ->
-      Ws_transport.connect ~url:settings.backend)
+      Ws_transport.connect ~timeout:connect_timeout ~url:settings.backend ())
   in
   (* A page that was in a session before (reloaded, or brought back by the
      browser) on a network that is down starts offline and reconnects. *)
@@ -1530,10 +1532,10 @@ let run_app (settings : Settings.t) =
        match%map.Deferred
          connect_and_hello client settings ~session:settings.session
        with
-       | Error "timed out" ->
+       | Error _ as e ->
          Client.disconnect client;
-         Error "timed out"
-       | result -> result
+         e
+       | Ok _ as ok -> ok
      with
      | Error error when refused error || not (known ()) ->
        let%map.Deferred () = Client.close client in
@@ -1624,6 +1626,18 @@ let run_app (settings : Settings.t) =
        in
        on_window "online" (App.Action.Network true);
        on_window "offline" (App.Action.Network false);
+       (* iOS Safari restores pages from bfcache with [pageshow.persisted]
+          without firing [visibilitychange] or [online]. *)
+       ignore
+         (Dom_html.addEventListener
+            Dom_html.window
+            (Dom_html.Event.make "pageshow")
+            (Dom.handler (fun ev ->
+               if Js.to_bool (Js.Unsafe.get ev (Js.string "persisted"))
+               then schedule (App.Action.Page_hidden false);
+               Js._true))
+            Js._false
+          : Dom_html.event_listener_id);
        (* The offset changes with daylight saving time. *)
        let tick () =
          schedule (App.Action.Tick (Time_ns.now ()));

@@ -4,7 +4,7 @@ open! Async_kernel
 (** A bidirectional line channel to the backend: stdio to a spawned
     process, TCP, or a WebSocket's text messages. *)
 type t =
-  { send_line : string -> unit
+  { send_line : string -> unit Or_error.t
   ; lines : string Pipe.Reader.t
   ; stderr_lines : string Pipe.Reader.t
   ; close : unit -> unit

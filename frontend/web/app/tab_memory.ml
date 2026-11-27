@@ -14,10 +14,13 @@ let session () = Browser.query_param "session"
 
 let save_for ~session key fields =
   Option.iter (storage ()) ~f:(fun storage ->
-    storage##setItem
-      (Js.string key)
-      (Js.string
-         (Jsonaf.to_string (`Object (("session", `String session) :: fields)))))
+    try
+      storage##setItem
+        (Js.string key)
+        (Js.string
+           (Jsonaf.to_string (`Object (("session", `String session) :: fields))))
+    with
+    | _ -> ())
 ;;
 
 let save key fields =
@@ -29,7 +32,11 @@ let save key fields =
 let load key ~f =
   let open Option.Let_syntax in
   let%bind storage = storage () in
-  let%bind text = Js.Opt.to_option (storage##getItem (Js.string key)) in
+  let%bind text =
+    Option.try_with (fun () ->
+      Js.Opt.to_option (storage##getItem (Js.string key)))
+    |> Option.join
+  in
   let%bind json = Jsonaf.parse (Js.to_string text) |> Result.ok in
   match Jsonaf.member "session" json with
   | Some (`String session) ->
@@ -106,21 +113,27 @@ let temporary_key = "prigh-web.temporary"
 let remember_temporary = function
   | Some (session, key) ->
     Option.iter (storage ()) ~f:(fun storage ->
-      storage##setItem
-        (Js.string temporary_key)
-        (Js.string
-           (Jsonaf.to_string
-              (`Object [ "session", `String session; "key", `String key ]))))
+      try
+        storage##setItem
+          (Js.string temporary_key)
+          (Js.string
+             (Jsonaf.to_string
+                (`Object [ "session", `String session; "key", `String key ])))
+      with
+      | _ -> ())
   | None ->
     Option.iter (storage ()) ~f:(fun storage ->
-      storage##removeItem (Js.string temporary_key))
+      try storage##removeItem (Js.string temporary_key) with
+      | _ -> ())
 ;;
 
 let temporary_key_of session =
   let open Option.Let_syntax in
   let%bind storage = storage () in
   let%bind text =
-    Js.Opt.to_option (storage##getItem (Js.string temporary_key))
+    Option.try_with (fun () ->
+      Js.Opt.to_option (storage##getItem (Js.string temporary_key)))
+    |> Option.join
   in
   let%bind json = Jsonaf.parse (Js.to_string text) |> Result.ok in
   match Jsonaf.member "session" json, Jsonaf.member "key" json with

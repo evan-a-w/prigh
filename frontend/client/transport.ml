@@ -2,7 +2,7 @@ open! Core
 open! Async_kernel
 
 type t =
-  { send_line : string -> unit
+  { send_line : string -> unit Or_error.t
   ; lines : string Pipe.Reader.t
   ; stderr_lines : string Pipe.Reader.t
   ; close : unit -> unit
@@ -27,7 +27,12 @@ module In_memory = struct
     let stderr_r, _stderr_w = Pipe.create () in
     let t =
       { send_line =
-          (fun line -> Pipe.write_without_pushback_if_open requests_w line)
+          (fun line ->
+            if Pipe.is_closed requests_w
+            then Or_error.error_string "transport closed"
+            else (
+              Pipe.write_without_pushback requests_w line;
+              Ok ()))
       ; lines = lines_r
       ; stderr_lines = stderr_r
       ; close =

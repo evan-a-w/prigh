@@ -43,7 +43,7 @@ val respond : flow -> Static_site.Response.t -> unit
     site. With [local_port], every HTTP request (WebSocket upgrades too)
     first passes {!Local_site.check}. *)
 val handle
-  :  ?clock:_ Eio.Time.clock
+  :  ?clock:_ Eio.Time.Mono.t
   -> ?local_port:int
   -> ?routes:(Request.t -> on_http option)
   -> root:string option

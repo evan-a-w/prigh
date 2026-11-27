@@ -225,7 +225,8 @@ let send t json =
   don't_wait_for
   @@ Throttle.enqueue t.sends (fun () ->
     match%map worker t with
-    | Ok transport -> transport.send_line (Jsonaf.to_string json)
+    | Ok transport ->
+      ignore (transport.send_line (Jsonaf.to_string json) : unit Or_error.t)
     | Error e ->
       (match Jsonaf.member "exec_id" json, Jsonaf.member "type" json with
        | Some (`String exec_id), _ ->

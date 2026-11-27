@@ -16,7 +16,9 @@ let supported () =
 
 let permission () =
   if supported ()
-  then Js.to_string (Js.Unsafe.get (notification_class ()) "permission")
+  then (
+    try Js.to_string (Js.Unsafe.get (notification_class ()) "permission") with
+    | _ -> "unsupported")
   else "unsupported"
 ;;
 
@@ -28,15 +30,21 @@ let request_permission () =
     let answer value =
       Ivar.fill_if_empty result (Js.to_string (Js.Unsafe.coerce value))
     in
-    let promise =
-      Js.Unsafe.meth_call (notification_class ()) "requestPermission" [||]
-    in
-    ignore
-      (Js.Unsafe.meth_call
-         promise
-         "then"
-         [| Js.Unsafe.inject (Js.wrap_callback answer) |]
-       : Js.Unsafe.any);
+    (try
+       let promise =
+         Js.Unsafe.meth_call (notification_class ()) "requestPermission" [||]
+       in
+       ignore
+         (Js.Unsafe.meth_call
+            promise
+            "then"
+            [| Js.Unsafe.inject (Js.wrap_callback answer)
+             ; Js.Unsafe.inject
+                 (Js.wrap_callback (fun _ -> Ivar.fill_if_empty result "denied"))
+            |]
+          : Js.Unsafe.any)
+     with
+     | _ -> Ivar.fill_if_empty result "unsupported");
     Ivar.read result)
 ;;
 
@@ -57,20 +65,26 @@ let show (n : Prigh_ui.Notify.t) =
     in
     if not (Service_worker.show_notification ~title:n.title options)
     then (
-      let notification =
-        Js.Unsafe.new_obj
-          (notification_class ())
-          [| Js.Unsafe.inject (Js.string n.title); Js.Unsafe.inject options |]
-      in
-      (* Clicking it brings the tab back. *)
-      Js.Unsafe.set
-        notification
-        "onclick"
-        (Js.wrap_callback (fun () ->
-           ignore
-             (Js.Unsafe.meth_call Dom_html.window "focus" [||] : Js.Unsafe.any);
-           ignore
-             (Js.Unsafe.meth_call notification "close" [||] : Js.Unsafe.any)))))
+      (* Android Chrome throws TypeError on [new Notification(...)], requiring
+         ServiceWorkerRegistration.showNotification instead. *)
+      try
+        let notification =
+          Js.Unsafe.new_obj
+            (notification_class ())
+            [| Js.Unsafe.inject (Js.string n.title); Js.Unsafe.inject options |]
+        in
+        (* Clicking it brings the tab back. *)
+        Js.Unsafe.set
+          notification
+          "onclick"
+          (Js.wrap_callback (fun () ->
+             ignore
+               (Js.Unsafe.meth_call Dom_html.window "focus" [||]
+                : Js.Unsafe.any);
+             ignore
+               (Js.Unsafe.meth_call notification "close" [||] : Js.Unsafe.any)))
+      with
+      | _ -> ()))
 ;;
 
 let hidden () = Js.to_bool (Js.Unsafe.get Dom_html.document "hidden")

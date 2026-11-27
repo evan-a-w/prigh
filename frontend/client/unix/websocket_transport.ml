@@ -432,7 +432,10 @@ let transport
          pinged := true)
        else pinged := false;
        return ());
-  { Transport.send_line = (fun line -> send ~opcode:Opcode.text line)
+  { Transport.send_line =
+      (fun line ->
+        send ~opcode:Opcode.text line;
+        Ok ())
   ; lines = lines_r
   ; stderr_lines = stderr_r
   ; close
