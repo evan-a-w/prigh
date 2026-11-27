@@ -67,7 +67,7 @@ let content_class =
      data-[vaul-drawer-direction=bottom]:inset-x-0 \
      data-[vaul-drawer-direction=bottom]:bottom-0 \
      data-[vaul-drawer-direction=bottom]:mt-24 \
-     data-[vaul-drawer-direction=bottom]:max-h-[80vh] \
+     data-[vaul-drawer-direction=bottom]:max-h-[min(80dvh,calc(var(--vvh,100dvh)-var(--safe-t)-24px))] \
      data-[vaul-drawer-direction=left]:inset-y-0 \
      data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 \
      data-[vaul-drawer-direction=right]:inset-y-0 \
@@ -75,14 +75,14 @@ let content_class =
      data-[vaul-drawer-direction=right]:w-3/4 \
      data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 \
      data-[vaul-drawer-direction=top]:mb-24 \
-     data-[vaul-drawer-direction=top]:max-h-[80vh] \
+     data-[vaul-drawer-direction=top]:max-h-[min(80dvh,calc(var(--vvh,100dvh)-var(--safe-t)-24px))] \
      data-[vaul-drawer-direction=left]:sm:max-w-sm \
      data-[vaul-drawer-direction=right]:sm:max-w-sm"
   ]
 ;;
 
 let handle_class =
-  "bg-muted mt-4 h-1 w-[100px] rounded-full mx-auto hidden shrink-0 \
+  "bg-muted mt-4 h-1 w-[100px] rounded-full mx-auto hidden shrink-0 touch-none \
    group-data-[vaul-drawer-direction=bottom]/drawer-content:block"
 ;;
 
@@ -156,37 +156,51 @@ module Drag = Vdom.Attr.Hooks.Make (struct
       | _ -> ""
     ;;
 
+    let on_handle_or_header (target : Dom_html.element Js.t) =
+      Js.Opt.test
+        ((Js.Unsafe.coerce target)##closest
+           (Js.string "[data-slot=drawer-handle], [data-slot=drawer-header]")
+         : Dom_html.element Js.t Js.opt)
+    ;;
+
+    let at_scroll_top (target : Dom_html.element Js.t) (root : Dom_html.element Js.t) =
+      let rec climb (el : Dom_html.element Js.t) =
+        if el##.scrollHeight > el##.clientHeight && Float.(Js.to_float el##.scrollTop > 0.)
+        then false
+        else if phys_equal el root
+        then true
+        else if
+          Js.Opt.case
+            (el##getAttribute (Js.string "role"))
+            (fun () -> false)
+            (fun r -> String.equal (Js.to_string r) "dialog")
+        then true
+        else (
+          match Js.Opt.to_option (Js.Opt.bind el##.parentNode Dom_html.CoerceTo.element) with
+          | Some parent -> climb parent
+          | None -> true)
+      in
+      climb target
+    ;;
+
+    let drag_slop = 6.
+
     (* vaul's [shouldDrag], for a bottom drawer not yet moved. *)
-    let should_drag (target : Dom_html.element Js.t) ~opened ~dragged_up =
+    let should_drag (target : Dom_html.element Js.t) (root : Dom_html.element Js.t) ~opened ~dragged_up =
       if Float.(now () -. opened < 500.)
       then false
       else if not (String.is_empty (selection ()))
       then false
       else if Float.(dragged_up > 0.)
       then false
-      else (
-        let rec climb (el : Dom_html.element Js.t) =
-          if el##.scrollHeight > el##.clientHeight && Float.(Js.to_float el##.scrollTop <> 0.)
-          then false
-          else if
-            Js.Opt.case
-              (el##getAttribute (Js.string "role"))
-              (fun () -> false)
-              (fun r -> String.equal (Js.to_string r) "dialog")
-          then true
-          else (
-            match Js.Opt.to_option (Js.Opt.bind el##.parentNode Dom_html.CoerceTo.element) with
-            | Some parent -> climb parent
-            | None -> true)
-        in
-        climb target)
+      else at_scroll_top target root
     ;;
 
     let on_mount =
       `Schedule_immediately_after_this_dom_patch_completes
         (fun _ (state : State.t) (el : Dom_html.element Js.t) ->
           let opened = now () in
-          (* The press: its y, time and target; whether it drags yet. *)
+          (* The press: pointer id, y, time, target and whether it started on the handle/header. *)
           let press = ref None in
           let allowed = ref false in
           let swipe = ref 0. in
@@ -208,6 +222,14 @@ module Drag = Vdom.Attr.Hooks.Make (struct
               := Js.string (if animate then "opacity " ^ transition else "none");
               ov##.style##.opacity := Js.string (sprintf "%g" o))
           in
+          let clear_styles () =
+            swipe := 0.;
+            el##.style##.transition := Js.string "";
+            el##.style##.transform := Js.string "";
+            Option.iter (overlay ()) ~f:(fun (ov : Dom_html.element Js.t) ->
+              ov##.style##.transition := Js.string "";
+              ov##.style##.opacity := Js.string "")
+          in
           let reset () =
             set_y ~animate:true 0.;
             set_opacity ~animate:true 1.
@@ -220,10 +242,11 @@ module Drag = Vdom.Attr.Hooks.Make (struct
                  Js.Opt.iter ev##.target (fun target ->
                    if ev##.button = 0 && not (no_drag target)
                    then (
-                     press := Some (Js.to_float ev##.clientY, now (), target);
-                     allowed := false;
-                     try (Js.Unsafe.coerce target)##setPointerCapture ev##.pointerId with
-                     | _ -> ()));
+                     let on_handle = on_handle_or_header target in
+                     if on_handle || at_scroll_top target el
+                     then (
+                       press := Some (ev##.pointerId, Js.to_float ev##.clientY, now (), target, on_handle);
+                       allowed := false)));
                  Js._true))
               Js._false
           in
@@ -233,31 +256,45 @@ module Drag = Vdom.Attr.Hooks.Make (struct
               Dom_html.Event.pointermove
               (Dom_html.handler (fun (ev : Dom_html.pointerEvent Js.t) ->
                  (match !press with
-                  | Some (y0, _, target) ->
-                    let dragged_up = y0 -. Js.to_float ev##.clientY in
-                    if
-                      !allowed
-                      || Float.(!swipe > 0.)
-                      || should_drag target ~opened ~dragged_up
+                  | Some (pid, y0, _, target, on_handle) when pid = ev##.pointerId ->
+                    let dy = Js.to_float ev##.clientY -. y0 in
+                    let dragged_up = -.dy in
+                    if not !allowed
                     then (
-                      allowed := true;
+                      if Float.(dy < -.drag_slop) && not on_handle
+                      then press := None
+                      else if
+                        Float.(dy > drag_slop)
+                        && (on_handle || should_drag target el ~opened ~dragged_up)
+                      then (
+                        allowed := true;
+                        (try (Js.Unsafe.coerce el)##setPointerCapture ev##.pointerId with
+                         | _ -> ());
+                        let height = Float.of_int el##.offsetHeight in
+                        let y, opacity = Drag_rules.follow ~height ~dragged_up in
+                        set_y ~animate:false y;
+                        Option.iter opacity ~f:(set_opacity ~animate:false)))
+                    else (
                       let height = Float.of_int el##.offsetHeight in
                       let y, opacity = Drag_rules.follow ~height ~dragged_up in
                       set_y ~animate:false y;
                       Option.iter opacity ~f:(set_opacity ~animate:false))
-                  | None -> ());
+                  | _ -> ());
                  Js._true))
               Js._false
           in
           let finish ~cancel (ev : Dom_html.pointerEvent Js.t) =
             match !press with
-            | None -> ()
-            | Some (y0, t0, _) ->
+            | Some (pid, y0, t0, _, _) when pid = ev##.pointerId ->
               press := None;
               let was_allowed = !allowed in
               allowed := false;
+              if was_allowed
+              then (
+                try (Js.Unsafe.coerce el)##releasePointerCapture ev##.pointerId with
+                | _ -> ());
               if cancel
-              then reset ()
+              then (if was_allowed || Float.(!swipe <> 0.) then reset ())
               else if was_allowed && Float.(!swipe <> 0.)
               then (
                 let height = Float.of_int el##.offsetHeight in
@@ -268,8 +305,11 @@ module Drag = Vdom.Attr.Hooks.Make (struct
                     ~dragged_up:(y0 -. Js.to_float ev##.clientY)
                     ~ms:(now () -. t0)
                 with
-                | Close -> Effect.Expert.handle_non_dom_event_exn state.close
+                | Close ->
+                  clear_styles ();
+                  Effect.Expert.handle_non_dom_event_exn state.close
                 | Reset -> reset ())
+            | _ -> ()
           in
           let up =
             Dom_html.addEventListener
@@ -320,12 +360,12 @@ let content ?(attrs = []) ?class_ t children =
        @ (match t.direction with
           | Bottom ->
             [ Vdom.Attr.create_hook "loon-drawer-drag" (Drag.create (m.on_open_change false))
-            ; Attr.style (Css_gen.create ~field:"touch-action" ~value:"none")
+            ; Attr.style (Css_gen.create ~field:"touch-action" ~value:"pan-y")
             ]
           | Top | Left | Right -> [])
        @ attrs)
     m
-    (Node.div ~attrs:[ Attr.class_ handle_class ] [] :: children)
+    (Node.div ~attrs:[ data "slot" "drawer-handle"; Attr.class_ handle_class ] [] :: children)
 ;;
 
 let header ?(attrs = []) ?class_ children =
@@ -334,7 +374,7 @@ let header ?(attrs = []) ?class_ children =
       ([ data "slot" "drawer-header"
        ; Cn.with_class
            ?class_
-           [ "gap-0.5 p-4 md:gap-0.5 md:text-left flex flex-col \
+           [ "gap-0.5 p-4 md:gap-0.5 md:text-left flex flex-col touch-none \
               group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center \
               group-data-[vaul-drawer-direction=top]/drawer-content:text-center"
            ]

@@ -31,7 +31,7 @@ let transcript (m : Model.t) ~inject (a : Agents.Agent.t) =
         ~failed:true
         [ Node.text why
         ; button
-            ~cls:"ghost small"
+            ~cls:"ghost small narrow:min-h-11"
             ~title:"Ask the backend for its transcript again"
             ~on_click:(inject (Action.Open_subagent_chat a.id))
             [ Node.text "Retry" ]
@@ -73,7 +73,7 @@ let view (m : Model.t) ~inject id =
     note
       [ Node.text "That subagent is gone."
       ; button
-          ~cls:"ghost small"
+          ~cls:"ghost small narrow:min-h-11"
           ~on_click:(inject Action.Close_subagent_chat)
           [ Node.text "Back to the session" ]
       ]

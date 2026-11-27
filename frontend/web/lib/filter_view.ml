@@ -121,7 +121,9 @@ let note (m : App.Model.t) ~inject =
                  | 1 -> " · 1 item hidden"
                  | n -> sprintf " · %d items hidden" n))
          ; Html.button
-             ~cls:"filter-show-all order-2 h-auto shrink-0 px-0 text-primary"
+             ~cls:
+               "filter-show-all order-2 h-auto shrink-0 px-0 text-primary \
+                narrow:min-h-11"
              ~variant:Link
              ~size:Xs
              ~on_click:(inject (Action.Run "/filter all"))

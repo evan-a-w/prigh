@@ -450,6 +450,47 @@ module Measure = struct
   ;;
 end
 
+module Pointer_cancel = Vdom.Attr.Hooks.Make (struct
+    module Input = struct
+      type t = unit Effect.t
+
+      let sexp_of_t _ = Sexp.Atom "<pointercancel>"
+      let combine _ second = second
+    end
+
+    module State = struct
+      type t =
+        { mutable eff : Input.t
+        ; mutable listener : Dom.event_listener_id option
+        }
+    end
+
+    let init eff _ = { State.eff; listener = None }
+
+    let on_mount =
+      `Schedule_immediately_after_this_dom_patch_completes
+        (fun _ (state : State.t) el ->
+          state.listener
+          <- Some
+               (Dom_html.addEventListener
+                  el
+                  (Dom_html.Event.make "pointercancel")
+                  (Dom_html.handler (fun _ ->
+                     Effect.Expert.handle_non_dom_event_exn state.eff;
+                     Js._true))
+                  Js._false))
+    ;;
+
+    let update ~old_input:_ ~new_input (state : State.t) _ =
+      state.eff <- new_input
+    ;;
+
+    let destroy _ (state : State.t) _ =
+      Option.iter state.listener ~f:Dom_html.removeEventListener;
+      state.listener <- None
+    ;;
+  end)
+
 (* Sonner's close icon. *)
 let close_icon =
   let svg tag attrs children =
@@ -714,17 +755,27 @@ let toaster
                        [ "--offset-" ^ side, "24px"
                        ; "--mobile-offset-" ^ side, "16px"
                        ]))
-            ; Attr.on_mouseenter (fun _ -> inject (Set_expanded true))
-            ; Attr.on_mousemove (fun _ ->
-                if model.expanded
+            ; Attr.on_pointerenter (fun ev ->
+                if String.equal (Js.to_string ev##.pointerType) "mouse"
+                then inject (Set_expanded true)
+                else Effect.Ignore)
+            ; Attr.on_pointermove (fun ev ->
+                if
+                  (not (String.equal (Js.to_string ev##.pointerType) "mouse"))
+                  || model.expanded
                 then Effect.Ignore
                 else inject (Set_expanded true))
-            ; Attr.on_mouseleave (fun _ ->
-                if model.interacting
+            ; Attr.on_pointerleave (fun ev ->
+                if
+                  (not (String.equal (Js.to_string ev##.pointerType) "mouse"))
+                  || model.interacting
                 then Effect.Ignore
                 else inject (Set_expanded false))
             ; Attr.on_pointerdown (fun _ -> inject (Set_interacting true))
             ; Attr.on_pointerup (fun _ -> inject (Set_interacting false))
+            ; Vdom.Attr.create_hook
+                "loon-sonner-pointercancel"
+                (Pointer_cancel.create (inject (Set_interacting false)))
             ]
           (List.mapi
              model.toasts

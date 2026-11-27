@@ -279,48 +279,61 @@ let spread () =
 let down ev =
   match on_canvas ev with
   | None -> ()
-  | Some _ when Hashtbl.length fingers >= 1 ->
-    (* A second finger: a pinch, not a stroke; the one begun goes. *)
-    ignore (meth ev "preventDefault" [||] : Js.Unsafe.any);
-    (match !drawing with
-     | Some (stroke, _) ->
-       strokes := List.filter !strokes ~f:(fun s -> not (phys_equal s stroke));
-       drawing := None;
-       redraw ()
-     | None -> ());
-    let fx, fy = finger_xy ev in
-    Hashtbl.set fingers ~key:(pointer_id ev) ~data:{ fx; fy };
-    pinch := Option.map (spread ()) ~f:fst
   | Some c ->
-    ignore (meth ev "preventDefault" [||] : Js.Unsafe.any);
-    if String.equal (Js.to_string (get ev "pointerType")) "touch"
+    (* A first finger or mouse: forget any pointer whose up was lost. *)
+    if Js.to_bool (get ev "isPrimary") && Hashtbl.length fingers > 0
     then (
+      Hashtbl.clear fingers;
+      pinch := None);
+    if Hashtbl.length fingers >= 1
+    then (
+      (* A second finger: a pinch, not a stroke; the one begun goes. *)
+      ignore (meth ev "preventDefault" [||] : Js.Unsafe.any);
+      (try
+         ignore
+           (meth c "setPointerCapture" [| Js.Unsafe.inject (pointer_id ev) |]
+            : Js.Unsafe.any)
+       with
+       | _ -> ());
+      (match !drawing with
+       | Some (stroke, _) ->
+         strokes := List.filter !strokes ~f:(fun s -> not (phys_equal s stroke));
+         drawing := None;
+         redraw ()
+       | None -> ());
       let fx, fy = finger_xy ev in
-      Hashtbl.set fingers ~key:(pointer_id ev) ~data:{ fx; fy });
-    (try
-       ignore
-         (meth c "setPointerCapture" [| Js.Unsafe.inject (pointer_id ev) |]
-          : Js.Unsafe.any)
-     with
-     | _ -> ());
-    let x, y, scale = point c ev in
-    let color =
-      Js.Opt.case
-        (c##getAttribute (Js.string "data-color"))
-        (fun () -> "#ef4444")
-        Js.to_string
-    in
-    let size =
-      Js.Opt.case
-        (c##getAttribute (Js.string "data-size"))
-        (fun () -> 4.)
-        (fun s ->
-           Float.of_string_opt (Js.to_string s) |> Option.value ~default:4.)
-    in
-    let stroke = { color; width = size *. scale; points = [ x, y ] } in
-    strokes := stroke :: !strokes;
-    drawing := Some (stroke, pointer_id ev);
-    redraw ()
+      Hashtbl.set fingers ~key:(pointer_id ev) ~data:{ fx; fy };
+      pinch := Option.map (spread ()) ~f:fst)
+    else (
+      ignore (meth ev "preventDefault" [||] : Js.Unsafe.any);
+      if String.equal (Js.to_string (get ev "pointerType")) "touch"
+      then (
+        let fx, fy = finger_xy ev in
+        Hashtbl.set fingers ~key:(pointer_id ev) ~data:{ fx; fy });
+      (try
+         ignore
+           (meth c "setPointerCapture" [| Js.Unsafe.inject (pointer_id ev) |]
+            : Js.Unsafe.any)
+       with
+       | _ -> ());
+      let x, y, scale = point c ev in
+      let color =
+        Js.Opt.case
+          (c##getAttribute (Js.string "data-color"))
+          (fun () -> "#ef4444")
+          Js.to_string
+      in
+      let size =
+        Js.Opt.case
+          (c##getAttribute (Js.string "data-size"))
+          (fun () -> 4.)
+          (fun s ->
+             Float.of_string_opt (Js.to_string s) |> Option.value ~default:4.)
+      in
+      let stroke = { color; width = size *. scale; points = [ x, y ] } in
+      strokes := stroke :: !strokes;
+      drawing := Some (stroke, pointer_id ev);
+      redraw ())
 ;;
 
 let move_stroke ev =
@@ -394,6 +407,25 @@ let install ~schedule:f =
   listen "pointermove" move;
   listen "pointerup" up;
   listen "pointercancel" up;
+  ignore
+    (Dom_html.addEventListener
+       Dom_html.window
+       Dom_html.Event.blur
+       (Dom.handler (fun _ ->
+          Hashtbl.clear fingers;
+          pinch := None;
+          drawing := None;
+          Js._true))
+       Js._false
+     : Dom_html.event_listener_id);
+  Browser.on_viewport_change (fun () ->
+    match !zoom, stage () with
+    | Some z, Some s ->
+      let sw = Float.max 1. (Float.of_int s##.clientWidth -. 16.) in
+      let sh = Float.max 1. (Float.of_int s##.clientHeight -. 16.) in
+      zoom := Some (Zoom.resize z ~stage:{ w = sw; h = sh });
+      render_zoom ()
+    | _ -> ());
   (* Not passive: a wheel over the stage zooms or pans it, not the page. *)
   ignore
     (meth
@@ -404,11 +436,7 @@ let install ~schedule:f =
             (Js.wrap_callback (fun ev ->
                let target : Dom_html.element Js.t = get ev "target" in
                let in_stage =
-                 Js.Opt.test
-                   (meth
-                      target
-                      "closest"
-                      [| Js.Unsafe.inject (Js.string ".annotate-stage") |])
+                 Option.is_some (Browser.closest target ".annotate-stage")
                in
                if in_stage && Option.is_some !zoom
                then (
@@ -440,15 +468,10 @@ let install ~schedule:f =
      : Js.Unsafe.any);
   listen "click" (fun ev ->
     let target : Dom_html.element Js.t = get ev "target" in
-    Js.Opt.iter
-      (meth
-         target
-         "closest"
-         [| Js.Unsafe.inject (Js.string "[data-annotate-zoom]") |])
-      (fun (el : Dom_html.element Js.t) ->
-         Js.Opt.iter
-           (el##getAttribute (Js.string "data-annotate-zoom"))
-           (fun a -> zoom_action (Js.to_string a))));
+    Option.iter (Browser.closest target "[data-annotate-zoom]") ~f:(fun el ->
+      Js.Opt.iter
+        (el##getAttribute (Js.string "data-annotate-zoom"))
+        (fun a -> zoom_action (Js.to_string a))));
   (* Ctrl+Z (Cmd+Z) while drawing takes back the last stroke. *)
   listen "keydown" (fun ev ->
     let key = Js.to_string (get ev "key") in

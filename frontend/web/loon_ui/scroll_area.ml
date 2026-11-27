@@ -326,12 +326,15 @@ module Controller = struct
           | _, _, Some vp -> thumb_size vp sb o /. 2.
           | _ -> 0.
         in
-        ignore
-          (Js.Unsafe.meth_call
-             sb
-             "setPointerCapture"
-             [| Js.Unsafe.get ev "pointerId" |]
-           : unit);
+        (try
+           ignore
+             (Js.Unsafe.meth_call
+                sb
+                "setPointerCapture"
+                [| Js.Unsafe.get ev "pointerId" |]
+              : unit)
+         with
+         | _ -> ());
         Dom.preventDefault ev;
         t.dragging <- Some (sb, o, offset);
         scroll_to_pointer t sb o ~offset ev
@@ -346,12 +349,15 @@ module Controller = struct
       match t.dragging with
       | Some (sb, _, _) ->
         t.dragging <- None;
-        ignore
-          (Js.Unsafe.meth_call
-             sb
-             "releasePointerCapture"
-             [| Js.Unsafe.get ev "pointerId" |]
-           : unit);
+        (try
+           ignore
+             (Js.Unsafe.meth_call
+                sb
+                "releasePointerCapture"
+                [| Js.Unsafe.get ev "pointerId" |]
+              : unit)
+         with
+         | _ -> ());
         if not t.hovering then later t (fun () -> ()) else update t
       | None -> ()
     in
@@ -482,11 +488,12 @@ let scroll_bar ?(attrs = []) ?class_ ?(orientation = Orientation.Vertical) () =
        ; data "slot" "scroll-area-scrollbar"
        ; Cn.with_class
            ?class_
-           [ "data-horizontal:h-2.5 data-horizontal:flex-col data-horizontal:border-t \
-              data-horizontal:border-t-transparent data-vertical:h-full \
-              data-vertical:w-2.5 data-vertical:border-l \
-              data-vertical:border-l-transparent flex touch-none p-px transition-colors \
-              select-none" ]
+           [ "data-horizontal:h-2.5 data-horizontal:flex-col \
+              data-horizontal:border-t data-horizontal:border-t-transparent \
+              data-vertical:h-full data-vertical:w-2.5 data-vertical:border-l \
+              data-vertical:border-l-transparent flex touch-none p-px \
+              transition-colors select-none"
+           ]
        ; Attr.create
            "style"
            (match orientation with
@@ -539,9 +546,9 @@ let root
           [ Attr.create "data-radix-scroll-area-viewport" ""
           ; data "slot" "scroll-area-viewport"
           ; Attr.class_
-              "size-full rounded-[inherit] transition-[color,box-shadow] outline-none \
-               focus-visible:ring-[3px] focus-visible:ring-ring/50 \
-               focus-visible:outline-1"
+              "size-full rounded-[inherit] transition-[color,box-shadow] \
+               outline-none focus-visible:ring-[3px] \
+               focus-visible:ring-ring/50 focus-visible:outline-1"
           ; Attr.create "style" "overflow: hidden;"
           ]
         [ Node.div

@@ -28,7 +28,7 @@ let%expect_test "hanging indent: the line's own indent, plus 2" =
     "    foo bar"              6
     "        deeply nested"    10
     "\tone tab"                8
-    "\t\ttwo tabs"             16
+    "\t\ttwo tabs"             12
     "  \tmixed"                8
     ""                         2
     "      "                   8
@@ -537,7 +537,7 @@ let%expect_test
     Clear_text_selection
     (Review Start_comment)
     (Focus review-draft)
-    <textarea class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 field-sizing-content flex focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm min-h-16 outline-none placeholder:text-muted-foreground px-2.5 py-2 review-field rounded-lg text-base transition-colors w-full">
+    <textarea class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 field-sizing-content flex focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm min-h-16 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-2 review-field rounded-lg text-base transition-colors w-full">
     |}]
 ;;
 

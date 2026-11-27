@@ -10,6 +10,12 @@ let sheet_row = Sheet_view.row
 
 let sheet (m : App.Model.t) ~inject =
   let go a = Effect.Many [ inject Action.Toggle_status_tray; inject a ] in
+  let sheet_inject = function
+    | Action.Toggle_status_tray as a -> inject a
+    | Action.Run cmd when String.is_prefix cmd ~prefix:"/verbosity " ->
+      inject (Action.Run cmd)
+    | a -> go a
+  in
   let hidden = List.length (Transcript_filter.hidden m.transcript_filter) in
   Node.div
     ~attrs:
@@ -19,8 +25,8 @@ let sheet (m : App.Model.t) ~inject =
       ; Attr.create "aria-label" "Panels and settings"
       ]
     ([ Sheet_view.grip ()
-     ; Chip_popover_view.session_sections m ~inject
-     ; Status_view.notes m ~inject
+     ; Chip_popover_view.session_sections m ~inject:sheet_inject
+     ; Status_view.notes m ~inject:sheet_inject
      ; sheet_row
          ~cls:"jump-row"
          ~name:"Jump to a message"

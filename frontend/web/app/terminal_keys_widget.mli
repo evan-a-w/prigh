@@ -21,3 +21,6 @@ val element : t -> Dom_html.element Js.t
 
 (** Text typed on the keyboard with the latched Ctrl and Alt applied. *)
 val transform : t -> string -> string
+
+(** Stops any active repeat timers and removes global listeners. *)
+val destroy : t -> unit

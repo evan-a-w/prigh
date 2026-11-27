@@ -71,11 +71,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   in
   let cache_rate =
     if Float.(state.usage.input > 0.)
-    then
-      Some
-        (100.
-         *. state.usage.cache_read
-         /. state.usage.input)
+    then Some (100. *. state.usage.cache_read /. state.usage.input)
     else None
   in
   Node.div
@@ -90,7 +86,9 @@ let card (m : App.Model.t) (state : State.t) ~inject =
            narrow:pt-3.5 narrow:pr-[max(16px,var(--safe-r))] \
            narrow:pb-[max(14px,var(--safe-b))] \
            narrow:pl-[max(16px,var(--safe-l))] narrow:text-[13.5px] \
-           narrow:ring-0 narrow:border-t narrow:border-border"
+           narrow:max-h-[min(78dvh,calc(var(--vvh,100dvh)-var(--safe-t)-24px))] \
+           narrow:overflow-y-auto narrow:overscroll-contain narrow:ring-0 \
+           narrow:border-t narrow:border-border"
       ; Attr.create "data-slot" "hover-card-content"
       ; Attr.role "dialog"
       ; Attr.create "aria-label" "Context and cost"

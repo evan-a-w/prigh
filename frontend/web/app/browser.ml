@@ -135,11 +135,23 @@ module Viewport = struct
   ;;
 
   let on_change f =
-    listen Dom_html.window "resize" f;
+    let pending = ref false in
+    let schedule () =
+      if not !pending
+      then (
+        pending := true;
+        ignore
+          (Dom_html.window##requestAnimationFrame
+             (Js.wrap_callback (fun (_ : Js.number_t) ->
+                pending := false;
+                f ()))
+           : Dom_html.animation_frame_request_id))
+    in
+    listen Dom_html.window "resize" schedule;
     Option.iter (visual ()) ~f:(fun vv ->
       let vv : Dom_html.eventTarget Js.t = Js.Unsafe.coerce vv in
-      listen vv "resize" f;
-      listen vv "scroll" f)
+      listen vv "resize" schedule;
+      listen vv "scroll" schedule)
   ;;
 end
 
@@ -278,6 +290,33 @@ let input_value id =
 let visual_height () =
   Option.map (Viewport.visual ()) ~f:(fun vv ->
     Js.float_of_number (Js.Unsafe.get vv (Js.string "height")))
+;;
+
+let visual_viewport () =
+  Option.map (Viewport.visual ()) ~f:(fun vv ->
+    ( Js.float_of_number (Js.Unsafe.get vv (Js.string "height"))
+    , Js.float_of_number (Js.Unsafe.get vv (Js.string "offsetTop")) ))
+;;
+
+let element_of (el : Dom_html.element Js.t) : Dom_html.element Js.t option =
+  let node_type = Js.Unsafe.get el (Js.string "nodeType") in
+  if Js.Optdef.test node_type && Int.equal (Obj.magic node_type : int) 1
+  then Some el
+  else (
+    let parent = Js.Unsafe.get el (Js.string "parentElement") in
+    if Js.Optdef.test parent && Js.Opt.test parent
+    then Some (Js.Unsafe.coerce parent)
+    else None)
+;;
+
+let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
+  =
+  Option.bind (element_of el) ~f:(fun el ->
+    Js.Opt.to_option
+      (Js.Unsafe.meth_call
+         el
+         "closest"
+         [| Js.Unsafe.inject (Js.string selector) |]))
 ;;
 
 let post_status ~content_type ~url ~body ~f =

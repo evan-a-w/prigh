@@ -17,7 +17,8 @@ let swatches (a : Annotate.t) ~inject =
            [ classes
                [ "annotate-swatch size-6 cursor-pointer rounded-full border-2 \
                   border-transparent bg-(--swatch) p-0 \
-                  shadow-[inset_0_0_0_1px_#0000003d] [&.on]:border-foreground \
+                  shadow-[inset_0_0_0_1px_#0000003d] narrow:size-11 \
+                  [&.on]:border-foreground \
                   [&.on]:shadow-[0_0_0_2px_var(--popover),inset_0_0_0_1px_#0000003d]"
                ]
                [ "on", on ]
@@ -46,7 +47,8 @@ let widths (a : Annotate.t) ~inject =
            [ classes
                [ "annotate-size grid size-[30px] cursor-pointer \
                   place-items-center rounded-md border border-transparent p-0 \
-                  hover:bg-accent [&.on]:border-border [&.on]:bg-accent"
+                  hover:bg-accent narrow:size-11 [&.on]:border-border \
+                  [&.on]:bg-accent"
                ]
                [ "on", on ]
            ; Attr.type_ "button"
@@ -81,7 +83,8 @@ let zoom_controls =
               text-[11.5px] font-semibold text-foreground \
               hover:enabled:bg-accent disabled:cursor-default \
               disabled:text-muted-foreground/50 focus-visible:outline-2 \
-              focus-visible:outline-ring [&_.icon]:size-[15px] "
+              focus-visible:outline-ring narrow:h-11 narrow:min-w-11 \
+              [&_.icon]:size-[15px] "
              ^ cls)
         ; Attr.title label
         ; Attr.create "aria-label" label
@@ -114,9 +117,8 @@ let view (a : Annotate.t) ~inject =
       "annotate-dialog h-[min(860px,100%)] max-h-none \
        w-[min(1100px,calc(100vw-32px))] max-w-none [&_.modal-body]:flex \
        [&_.modal-body]:flex-1 [&_.modal-body]:flex-col [&_.modal-body]:gap-2.5 \
-       [&_.modal-body]:overflow-hidden max-[760px]:h-dvh max-[760px]:w-screen \
-       max-[760px]:rounded-none narrow:h-(--vvh,100dvh) narrow:rounded-none \
-       narrow:border-0 narrow:pt-(--safe-t) narrow:pb-(--safe-b)"
+       [&_.modal-body]:overflow-hidden narrow:h-(--vvh,100dvh) narrow:w-screen \
+       narrow:rounded-none narrow:border-0 narrow:pt-(--safe-t)"
     ~title:"Draw on the image"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
@@ -150,13 +152,13 @@ let view (a : Annotate.t) ~inject =
         ; Node.span ~attrs:[ Attr.class_ "annotate-spacer flex-1" ] []
         ; zoom_controls
         ; button
-            ~cls:"ghost small annotate-undo"
+            ~cls:"ghost small annotate-undo narrow:min-h-11"
             ~title:"Undo the last stroke (Ctrl+Z)"
             ~disabled:nothing
             ~on_click:(inject Action.Annotate_undo)
             [ icon Undo; Node.text "Undo" ]
         ; button
-            ~cls:"ghost small annotate-clear"
+            ~cls:"ghost small annotate-clear narrow:min-h-11"
             ~title:"Rub out every stroke"
             ~disabled:nothing
             ~on_click:(inject Action.Annotate_clear)

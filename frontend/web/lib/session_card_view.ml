@@ -77,12 +77,11 @@ let section
       (m : Model.t)
       ~inject
       ~(which : Session_card.Section.t)
-      ?count
+      ~count
       ~glyph
       ~name
       items
   =
-  let count = Option.value count ~default:(List.length items) in
   let open_ = Session_card.is_open m.session_card which in
   let id =
     match which with
@@ -115,7 +114,9 @@ let section
                      "flex items-center gap-1 text-[11px] tabular-nums \
                       text-muted-foreground"
                  ]
-               [ Node.text (Int.to_string count)
+               [ (match count with
+                  | Some n -> Node.text (Int.to_string n)
+                  | None -> Node.none)
                ; Icon.view
                    ~class_:
                      (if open_
@@ -490,42 +491,53 @@ let sections (m : Model.t) ~inject =
   in
   [ (if not in_subagent
      then Node.none
-     else
+     else (
+       let rows =
+         parent_row ~inject ~label:"Root" ~title:session None
+         :: List.map (parents m) ~f:(fun (a : Agents.Agent.t) ->
+           parent_row
+             ~inject
+             ~label:(Agents.Agent.title a)
+             ~title:(String.strip a.task)
+             (Some a.id))
+       in
        section
          m
          ~inject
          ~which:Parents
+         ~count:(Some (List.length rows))
          ~glyph:Arrow_up
          ~name:"Parents"
-         (parent_row ~inject ~label:"Root" ~title:session None
-          :: List.map (parents m) ~f:(fun (a : Agents.Agent.t) ->
-            parent_row
-              ~inject
-              ~label:(Agents.Agent.title a)
-              ~title:(String.strip a.task)
-              (Some a.id))))
+         rows))
   ; (if List.is_empty agents
      then Node.none
-     else
+     else (
+       let active =
+         List.count agents ~f:(fun ((a : Agents.Agent.t), _) ->
+           Agents.Status.equal a.status Running)
+       in
        section
          m
          ~inject
          ~which:Subagents
          ~glyph:Bot
          ~name:"Subagents"
-         ~count:(List.length agents)
-         (subagent_rows m ~inject agents))
+         ~count:(Option.some_if (active > 0) active)
+         (subagent_rows m ~inject agents)))
   ; (if List.is_empty jobs
      then Node.none
-     else
+     else (
+       let active =
+         List.count jobs ~f:(fun (j : Agents.Job.t) -> j.info.running)
+       in
        section
          m
          ~inject
          ~which:Jobs
          ~glyph:Square_terminal
          ~name:"Jobs"
-         ~count:(List.length jobs)
-         (job_rows m ~inject jobs))
+         ~count:(Option.some_if (active > 0) active)
+         (job_rows m ~inject jobs)))
   ; (if List.is_empty worktrees || in_subagent
      then Node.none
      else
@@ -533,6 +545,7 @@ let sections (m : Model.t) ~inject =
          m
          ~inject
          ~which:Worktrees
+         ~count:(Some (List.length worktrees))
          ~glyph:Git_branch
          ~name:"Worktrees"
          (List.map worktrees ~f:(worktree_row m ~inject)))
@@ -556,7 +569,8 @@ let view (m : Model.t) ~inject =
                  [ Loon.Drawer.title d [ Node.text "This session" ] ]
              ; div
                  ~cls:
-                   "flex flex-col gap-1 px-3 \
+                   "flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto \
+                    overscroll-contain px-3 \
                     pb-[max(12px,env(safe-area-inset-bottom))]"
                  (sections m ~inject)
              ]
@@ -569,8 +583,10 @@ let view (m : Model.t) ~inject =
       [ Node.aside
           ~attrs:
             [ Attr.class_
-                "session-card absolute top-13 right-3 flex w-[208px] flex-col \
-                 rounded-xl border bg-card p-1.5 text-card-foreground"
+                "session-card absolute top-13 right-3 flex \
+                 max-h-[calc(100dvh-5rem)] w-[208px] flex-col overflow-y-auto \
+                 overscroll-contain rounded-xl border bg-card p-1.5 \
+                 text-card-foreground"
             ; Attr.create "aria-label" "This session"
             ]
           (sections m ~inject)

@@ -1,14 +1,7 @@
 open! Core
 open Js_of_ocaml
 
-let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
-  =
-  Js.Opt.to_option
-    (Js.Unsafe.meth_call
-       el
-       "closest"
-       [| Js.Unsafe.inject (Js.string selector) |])
-;;
+let closest = Browser.closest
 
 let set_label (button : Dom_html.element Js.t) ~copied =
   if copied

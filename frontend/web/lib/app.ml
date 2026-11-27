@@ -1740,7 +1740,12 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
 let with_review (m : Model.t) ((review : Code_review.t), outs) =
   let m =
     if m.narrow && review.open_ && not m.review.open_
-    then { m with files = fst (Files.update m.files Close) }
+    then
+      { m with
+        files = fst (Files.update m.files Close)
+      ; sidebar_open = false
+      ; session_card = { m.session_card with sheet = false }
+      }
     else m
   in
   review_out { m with review } outs
@@ -1775,6 +1780,11 @@ let with_code (m : Model.t) ((code : Code_editor.t), outs) =
           (if m.review.open_
            then fst (Code_review.update m.review Close)
            else m.review)
+      ; sidebar_open = m.sidebar_open && not m.narrow
+      ; session_card =
+          (if m.narrow
+           then { m.session_card with sheet = false }
+           else m.session_card)
       }
     else m
   in
@@ -1824,8 +1834,17 @@ let rec touches_files (e : Event.t) =
   | _ -> false
 ;;
 
-let with_files (m : Model.t) (files, outs) =
+let with_files (m : Model.t) ((files : Files.t), outs) =
   let was_open = m.files.open_ in
+  let m =
+    if m.narrow && files.open_ && not was_open
+    then
+      { m with
+        sidebar_open = false
+      ; session_card = { m.session_card with sheet = false }
+      }
+    else m
+  in
   let m, cmds = files_out { m with files } outs in
   (* The browser marks what changed: it reads the changes when it opens. *)
   if m.files.open_ && not was_open
@@ -2399,6 +2418,7 @@ let open_dialog (m : Model.t) ?(focus = "dialog") dialog =
       dialog = Some dialog
     ; completion = None
     ; return_to_settings = false
+    ; session_card = { m.session_card with sheet = false }
     }
   , [ Command.Focus focus ] )
 ;;
@@ -3515,6 +3535,10 @@ let open_terminal (m : Model.t) =
       terminal = { m.terminal with open_ = true }
     ; sidebar_open = m.sidebar_open && not m.narrow
     ; review_drawer = false
+    ; session_card =
+        (if m.narrow
+         then { m.session_card with sheet = false }
+         else m.session_card)
     }
   , (if m.terminal.open_ then [] else save_pref m Key.terminal_open (Some `True))
     @ [ Command.Focus_terminal ] )
@@ -3597,7 +3621,12 @@ let open_subagent_chat (m : Model.t) id =
 let close_subagent_chat (m : Model.t) =
   match m.subagent_chat with
   | None -> m, []
-  | Some _ -> { m with subagent_chat = None }, [ focus_editor ]
+  | Some _ ->
+    ( { m with
+        subagent_chat = None
+      ; session_card = { m.session_card with sheet = false }
+      }
+    , [ focus_editor ] )
 ;;
 
 let subagent_back (m : Model.t) =
@@ -9047,6 +9076,7 @@ let run_plan (m : Model.t) (plan : Context_menu.Plan.t) =
     , rpc "switch_session" [ "path", str path ] ~tag:(Plan_switched plan)
       :: fetch )
   | _ ->
+    let m = if m.narrow then { m with sidebar_open = false } else m in
     let here dir =
       Option.exists m.state ~f:(fun s ->
         String.equal s.cwd dir || String.is_prefix s.cwd ~prefix:(dir ^ "/"))

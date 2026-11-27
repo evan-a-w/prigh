@@ -47,7 +47,7 @@ let%expect_test "a waiting build: the notice, and Reload hands over to it" =
           <button type="button"
                   title="Reload the page into it, in this session"
                   data-button=""
-                  class="bg-foreground cursor-pointer font-medium h-6 hover:bg-foreground/85 inline-flex items-center ml-1 px-2 rounded-[4px] shrink-0 text-background text-xs toast-undo"
+                  class="bg-foreground cursor-pointer font-medium h-6 hover:bg-foreground/85 inline-flex items-center ml-1 narrow:min-h-11 px-2 rounded-[4px] shrink-0 text-background text-xs toast-undo"
                   @on_click> Reload </button>
           <button type="button"
                   title="Later (the next page load uses it)"

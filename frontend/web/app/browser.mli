@@ -1,4 +1,5 @@
 open! Core
+open Js_of_ocaml
 
 (** The few browser facilities the platform needs; only callable in a page. *)
 
@@ -33,6 +34,16 @@ val on_viewport_change : (unit -> unit) -> unit
 (** The visual viewport's height (what the user sees, over the on-screen
     keyboard), if the browser has one. *)
 val visual_height : unit -> float option
+
+(** The visual viewport's [(height, offsetTop)], if the browser has one. *)
+val visual_viewport : unit -> (float * float) option
+
+(** Coerces an event target (which may be a [Text] node on Safari) to its
+    element, or its [parentElement] when not an element. *)
+val element_of : Dom_html.element Js.t -> Dom_html.element Js.t option
+
+(** [el.closest(selector)], safely handling non-Element [Text] node targets. *)
+val closest : Dom_html.element Js.t -> string -> Dom_html.element Js.t option
 
 val href_with_backend
   :  pathname:string

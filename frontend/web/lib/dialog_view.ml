@@ -132,7 +132,8 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
               [ button
                   ~cls:
                     "small picker-trim shrink-0 self-center \
-                     in-[.picker-item:not(.selected):not(:hover)]:invisible"
+                     in-[.picker-item:not(.selected):not(:hover)]:invisible \
+                     [@media(hover:none)]:visible narrow:visible"
                   ~title:"Trim everything before this (Delete)"
                   ~label:("Trim the context before " ^ item.label)
                   ~on_click:

@@ -163,7 +163,7 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
   Modal.view
     ~cls:
       "prompt-dialog [&_.text-input]:w-full [&_.text-input]:font-mono \
-       [&_.text-input]:text-[13px]"
+       [&_.text-input]:text-[13px] narrow:[&_.text-input]:text-base"
     ~title
     ~on_close:(inject Action.Close_dialog)
     ~footer:
@@ -320,8 +320,9 @@ let new_worktree (m : App.Model.t) (d : New_worktree.t) ~inject =
   Modal.view
     ~cls:
       "prompt-dialog [&_.text-input]:w-full [&_.text-input]:font-mono \
-       [&_.text-input]:text-[13px] worktree-dialog [&_.field+.field]:mt-3 \
-       [&_.dialog-note]:mt-3 [&_.dialog-note]:mb-0"
+       [&_.text-input]:text-[13px] narrow:[&_.text-input]:text-base \
+       worktree-dialog [&_.field+.field]:mt-3 [&_.dialog-note]:mt-3 \
+       [&_.dialog-note]:mb-0"
     ~title:"New worktree"
     ~on_close:(inject Action.Close_dialog)
     ~footer:

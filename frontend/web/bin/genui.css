@@ -661,13 +661,16 @@ th:is([aria-sort="ascending"], [aria-sort="descending"]) .ui-sort-mark { opacity
   gap: 10px;
   min-height: 34px;
   padding: 6px 8px;
-  margin: 0 -8px;
-  width: calc(100% + 16px);
+  width: 100%;
   border: 0;
   background: none;
   border-radius: calc(var(--radius) * 0.8);
   text-align: left;
   cursor: pointer;
+}
+:is(.genui, .ui-grid) > .ui-checklist .ui-check-item {
+  margin: 0 -8px;
+  width: calc(100% + 16px);
 }
 .ui-check-item > .check { margin-top: 3px; transition: background 0.12s, border-color 0.12s; }
 .ui-check-item:hover:not(:disabled) { background: var(--muted); }
@@ -714,6 +717,7 @@ th:is([aria-sort="ascending"], [aria-sort="descending"]) .ui-sort-mark { opacity
 .app.narrow .ui-acc-head { min-height: 44px; padding: 8px 12px; }
 .app.narrow .ui-acc-body { padding: 2px 12px 12px; }
 .app.narrow :is(.ui-choice, .ui-option, .ui-tab, .ui-btn, .ui-check-item, .ui-group > *) { min-height: 44px; }
+.app.narrow .ui-slider { height: 44px; }
 .app.narrow .ui-options { padding-left: 0; }
 .app.narrow .ui-verdict { margin-left: 0; }
 .app.narrow .ui-stat-value { font-size: 22px; }

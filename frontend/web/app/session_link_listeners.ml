@@ -6,13 +6,7 @@ let anchor (ev : Dom_html.mouseEvent Js.t) =
   Option.bind
     (Js.Opt.to_option ev##.target)
     ~f:(fun (el : Dom_html.element Js.t) ->
-      let found : Dom_html.element Js.t Js.opt =
-        Js.Unsafe.meth_call
-          el
-          "closest"
-          [| Js.Unsafe.inject (Js.string "a[href]") |]
-      in
-      Js.Opt.to_option found
+      Browser.closest el "a[href]"
       |> Option.filter ~f:(fun a -> String.equal (Js.to_string a##.tagName) "A")
       |> Option.map ~f:(fun a ->
         (Js.Unsafe.coerce a : Dom_html.anchorElement Js.t)))

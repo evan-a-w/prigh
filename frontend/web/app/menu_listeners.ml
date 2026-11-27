@@ -27,7 +27,11 @@ let place ?(id = "dialog") (anchor : Prigh_web.Context_menu.Anchor.t) =
       let width = Float.of_int menu##.offsetWidth in
       let height = Float.of_int menu##.offsetHeight in
       let window_width = Float.of_int Dom_html.window##.innerWidth in
-      let window_height = Float.of_int Dom_html.window##.innerHeight in
+      let window_height =
+        Option.value
+          (Browser.visual_height ())
+          ~default:(Float.of_int Dom_html.window##.innerHeight)
+      in
       let left =
         Float.max margin (Float.min x (window_width -. width -. margin))
       in
@@ -39,7 +43,7 @@ let place ?(id = "dialog") (anchor : Prigh_web.Context_menu.Anchor.t) =
           Float.max
             margin
             (Float.min (y -. height) (window_height -. height -. margin))
-        else y
+        else Float.max margin y
       in
       set menu "left" left;
       set menu "top" top;
@@ -47,14 +51,7 @@ let place ?(id = "dialog") (anchor : Prigh_web.Context_menu.Anchor.t) =
       menu##focus))
 ;;
 
-let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
-  =
-  Js.Opt.to_option
-    (Js.Unsafe.meth_call
-       el
-       "closest"
-       [| Js.Unsafe.inject (Js.string selector) |])
-;;
+let closest = Browser.closest
 
 let listen ?(capture = false) target event handler =
   ignore
@@ -178,6 +175,28 @@ let install () =
   let press = ref None in
   (* The menu opened from this press: the click it ends with is swallowed. *)
   let pressed = ref false in
+  let pressed_timer : Dom_html.timeout_id_safe option ref = ref None in
+  let clear_pressed () =
+    pressed := false;
+    Option.iter !pressed_timer ~f:Dom_html.clearTimeout;
+    pressed_timer := None
+  in
+  let arm_pressed () =
+    clear_pressed ();
+    pressed := true;
+    pressed_timer
+    := Some
+         (Dom_html.setTimeout
+            (fun () ->
+               pressed := false;
+               pressed_timer := None)
+            400.)
+  in
+  let clear_selectable () =
+    List.iter
+      (query_all (sprintf "[%s]" selectable_attribute))
+      ~f:(fun el -> el##removeAttribute (Js.string selectable_attribute))
+  in
   let cancel () =
     Option.iter !press ~f:(fun p ->
       List.iter p.timers ~f:Dom_html.clearTimeout;
@@ -191,61 +210,70 @@ let install () =
   let fire ~x ~y =
     Option.iter !press ~f:(fun p ->
       cancel ();
-      pressed := true;
-      clear_selection ();
-      List.iter
-        (query_all (sprintf "[%s]" selectable_attribute))
-        ~f:(fun el -> el##removeAttribute (Js.string selectable_attribute));
-      vibrate ();
-      let event =
-        Js.Unsafe.new_obj
-          Js.Unsafe.global##._MouseEvent
-          [| Js.Unsafe.inject (Js.string "contextmenu")
-           ; Js.Unsafe.obj
-               [| "bubbles", Js.Unsafe.inject Js._true
-                ; "cancelable", Js.Unsafe.inject Js._true
-                ; "clientX", Js.Unsafe.inject (Js.number_of_float x)
-                ; "clientY", Js.Unsafe.inject (Js.number_of_float y)
-               |]
-          |]
-      in
-      Js.Unsafe.set event long_press_field Js._true;
-      ignore (Js.Unsafe.meth_call p.row "dispatchEvent" [| event |] : bool Js.t))
+      if Js.to_bool (Js.Unsafe.get p.row (Js.string "isConnected"))
+      then (
+        arm_pressed ();
+        clear_selection ();
+        clear_selectable ();
+        vibrate ();
+        let event =
+          Js.Unsafe.new_obj
+            Js.Unsafe.global##._MouseEvent
+            [| Js.Unsafe.inject (Js.string "contextmenu")
+             ; Js.Unsafe.obj
+                 [| "bubbles", Js.Unsafe.inject Js._true
+                  ; "cancelable", Js.Unsafe.inject Js._true
+                  ; "clientX", Js.Unsafe.inject (Js.number_of_float x)
+                  ; "clientY", Js.Unsafe.inject (Js.number_of_float y)
+                 |]
+            |]
+        in
+        Js.Unsafe.set event long_press_field Js._true;
+        ignore
+          (Js.Unsafe.meth_call p.row "dispatchEvent" [| event |] : bool Js.t)))
   in
   listen
     doc
     Dom_html.Event.pointerdown
     (fun (ev : Dom_html.pointerEvent Js.t) ->
        cancel ();
-       pressed := false;
+       clear_pressed ();
        let touch =
          String.equal (Js.to_string (Js.Unsafe.coerce ev)##.pointerType) "touch"
        in
        (match Js.Opt.to_option ev##.target with
-        | Some target when touch ->
-          (match closest target rows with
-           | Some row
-             when Option.is_none
-                    (closest target (sprintf "[%s]" selectable_attribute)) ->
-             let x = Js.to_float ev##.clientX
-             and y = Js.to_float ev##.clientY in
-             let pointer = (Js.Unsafe.coerce ev)##.pointerId in
-             press
-             := Some
-                  { row
-                  ; pointer
-                  ; x
-                  ; y
-                  ; timers =
-                      [ Dom_html.setTimeout
-                          (fun () ->
-                             row##.classList##add (Js.string "pressing"))
-                          pressing_ms
-                      ; Dom_html.setTimeout (fun () -> fire ~x ~y) hold_ms
-                      ]
-                  }
-           | Some _ | None -> ())
-        | Some _ | None -> ());
+        | Some target ->
+          if
+            Option.is_none
+              (closest target (sprintf "[%s]" selectable_attribute))
+          then clear_selectable ();
+          if touch
+          then (
+            match closest target rows with
+            | Some row
+              when Option.is_none (closest target "a[href], img")
+                   && Option.is_none
+                        (closest target (sprintf "[%s]" selectable_attribute))
+              ->
+              let x = Js.to_float ev##.clientX
+              and y = Js.to_float ev##.clientY in
+              let pointer = (Js.Unsafe.coerce ev)##.pointerId in
+              press
+              := Some
+                   { row
+                   ; pointer
+                   ; x
+                   ; y
+                   ; timers =
+                       [ Dom_html.setTimeout
+                           (fun () ->
+                              row##.classList##add (Js.string "pressing"))
+                           pressing_ms
+                       ; Dom_html.setTimeout (fun () -> fire ~x ~y) hold_ms
+                       ]
+                   }
+            | Some _ | None -> ())
+        | None -> clear_selectable ());
        Js._true);
   listen
     doc
@@ -265,6 +293,12 @@ let install () =
       listen doc e (fun _ ->
         cancel ();
         Js._true));
+  listen Dom_html.window Dom_html.Event.blur (fun _ ->
+    cancel ();
+    Js._true);
+  listen doc (Dom.Event.make "visibilitychange") (fun _ ->
+    cancel ();
+    Js._true);
   (* The browser's own long press, while a press is held still on a row:
      ours, ahead of every other listener (the message's would leave a
      selection's menu to the browser). One with no press of its own (the end
@@ -288,7 +322,7 @@ let install () =
   listen ~capture:true doc Dom_html.Event.click (fun ev ->
     if !pressed
     then (
-      pressed := false;
+      clear_pressed ();
       Dom_html.stopPropagation ev;
       Dom.preventDefault ev;
       Js._false)

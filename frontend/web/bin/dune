@@ -95,8 +95,9 @@
     (cat highlight.css)
     (cat status.css)
     (cat temporary.css)
+    (echo "\n}\n}\n@layer phone {\n")
     (cat phone.css)
-    (echo "\n}\n}\n")
+    (echo "\n}\n")
     ; Unlayered: it overrides CodeMirror's own theme, which CodeMirror
     ; injects unlayered and which would beat any layer.
     (cat editor.css)))))

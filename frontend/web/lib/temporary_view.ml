@@ -64,7 +64,7 @@ let chip (m : App.Model.t) ~inject =
              font-medium text-muted-foreground hover:bg-accent \
              hover:text-foreground focus-visible:outline-2 \
              focus-visible:outline-offset-1 focus-visible:outline-ring \
-             narrow:h-9 max-[359px]:px-2.5 [&_.icon]:size-4 \
+             narrow:min-h-11 max-[359px]:px-2.5 [&_.icon]:size-4 \
              [&.on]:border-foreground/30 [&.on]:bg-foreground/10 \
              [&.on]:text-foreground"
           ]
@@ -96,8 +96,8 @@ let engine_chip (m : App.Model.t) ~inject =
         "ghost tray-engine h-[30px] min-w-0 gap-1.5 border-transparent \
          bg-transparent px-2 text-[12.5px] font-normal text-muted-foreground \
          hover:bg-accent hover:text-foreground focus-visible:outline-2 \
-         focus-visible:outline-offset-1 focus-visible:outline-ring narrow:h-9 \
-         [&_.icon]:size-[15px] [&_.icon]:flex-none \
+         focus-visible:outline-offset-1 focus-visible:outline-ring \
+         narrow:min-h-11 [&_.icon]:size-[15px] [&_.icon]:flex-none \
          max-[359px]:[&_.icon]:hidden [&>span]:truncate"
       ~title:
         (sprintf "Runs on %s: start it on another engine (/new ENGINE)" label)
@@ -148,7 +148,7 @@ let tray (m : App.Model.t) ~inject =
                 text-muted-foreground first:flex-initial hover:bg-accent \
                 hover:text-foreground focus-visible:outline-2 \
                 focus-visible:outline-offset-1 focus-visible:outline-ring \
-                narrow:h-9 [&_.icon]:size-[15px] [&_.icon]:flex-none \
+                narrow:min-h-11 [&_.icon]:size-[15px] [&_.icon]:flex-none \
                 [&_.icon.chevron]:-ml-0.5 [&_.icon.chevron]:size-[13px] \
                 max-[359px]:[&_.icon.chevron]:hidden [&>span]:truncate"
              ~title:"Start in another folder (/cd)"
@@ -170,7 +170,7 @@ let tray (m : App.Model.t) ~inject =
                 text-muted-foreground first:flex-initial hover:bg-accent \
                 hover:text-foreground focus-visible:outline-2 \
                 focus-visible:outline-offset-1 focus-visible:outline-ring \
-                narrow:h-9 [&_.icon]:size-[15px] [&_.icon]:flex-none \
+                narrow:min-h-11 [&_.icon]:size-[15px] [&_.icon]:flex-none \
                 [&_.icon.chevron]:-ml-0.5 [&_.icon.chevron]:size-[13px] \
                 max-[359px]:[&_.icon.chevron]:hidden [&>span]:truncate"
              ~title:"Work in another worktree (/worktree)"

@@ -16,16 +16,7 @@ end
 
 let target : Target.t option ref = ref None
 let text_types = [ "text"; "search"; "url"; "tel"; "email"; "password" ]
-
-let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
-  =
-  Js.Opt.to_option
-    (Js.Unsafe.meth_call
-       el
-       "closest"
-       [| Js.Unsafe.inject (Js.string selector) |])
-;;
-
+let closest = Browser.closest
 let terminal_handle el = Js.Unsafe.get el (Js.string "prighTerminal")
 
 let text_field (el : Dom_html.element Js.t) =

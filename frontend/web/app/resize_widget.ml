@@ -17,7 +17,7 @@ module Drag = struct
     ; min : int
     ; max : int
     ; mutable value : int
-    ; mutable frame : bool
+    ; mutable frame : Dom_html.animation_frame_request_id option
     }
 end
 
@@ -27,15 +27,7 @@ let attribute (el : Dom_html.element Js.t) name =
 ;;
 
 let int_attribute el name = Option.bind (attribute el name) ~f:Int.of_string_opt
-
-let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
-  =
-  Js.Opt.to_option
-    (Js.Unsafe.meth_call
-       el
-       "closest"
-       [| Js.Unsafe.inject (Js.string selector) |])
-;;
+let closest = Browser.closest
 
 let set_var (el : Dom_html.element Js.t) var value =
   ignore
@@ -108,17 +100,22 @@ let start (handle_el : Dom_html.element Js.t) (ev : Dom_html.pointerEvent Js.t) 
   ; min
   ; max
   ; value = start
-  ; frame = false
+  ; frame = None
   }
 ;;
 
-let finish (d : Drag.t) =
+let finish ~committed (d : Drag.t) =
+  Option.iter d.frame ~f:(fun id -> Dom_html.window##cancelAnimationFrame id);
+  d.frame <- None;
   Dom_html.document##.body##.classList##remove (body_class d);
   d.handle_el##.classList##remove (Js.string "dragging");
   (* A click focuses the handle: the sodium ring is for the keyboard's. *)
   d.handle_el##blur;
-  (* Once the model has the size, the page's root shows it. *)
-  Browser.after_render (fun () -> remove_var d.target d.var)
+  (* Once the model has the size, the page's root shows it; when nothing was
+     committed there is no render to wait for. *)
+  if committed
+  then Browser.after_render (fun () -> remove_var d.target d.var)
+  else remove_var d.target d.var
 ;;
 
 let install_drag ~schedule =
@@ -138,12 +135,15 @@ let install_drag ~schedule =
              Option.iter (start handle_el ev) ~f:(fun d ->
                (* No text selection, and no focus ring after a drag. *)
                Dom.preventDefault ev;
-               ignore
-                 (Js.Unsafe.meth_call
-                    handle_el
-                    "setPointerCapture"
-                    [| Js.Unsafe.inject d.pointer |]
-                  : Js.Unsafe.any);
+               (try
+                  ignore
+                    (Js.Unsafe.meth_call
+                       handle_el
+                       "setPointerCapture"
+                       [| Js.Unsafe.inject d.pointer |]
+                     : Js.Unsafe.any)
+                with
+                | _ -> ());
                Dom_html.document##.body##.classList##add (body_class d);
                handle_el##.classList##add (Js.string "dragging");
                dragging := Some d)));
@@ -165,27 +165,35 @@ let install_drag ~schedule =
          if value <> d.value
          then (
            d.value <- value;
-           if not d.frame
-           then (
-             d.frame <- true;
-             ignore
-               (Dom_html.window##requestAnimationFrame
-                  (Js.wrap_callback (fun (_ : Js.number_t) ->
-                     d.frame <- false;
-                     set_var d.target d.var (sprintf "%dpx" d.value)))
-                : Dom_html.animation_frame_request_id)))
+           if Option.is_none d.frame
+           then
+             d.frame
+             <- Some
+                  (Dom_html.window##requestAnimationFrame
+                     (Js.wrap_callback (fun (_ : Js.number_t) ->
+                        d.frame <- None;
+                        set_var d.target d.var (sprintf "%dpx" d.value)))))
        | _ -> ());
   let stop (ev : Dom_html.pointerEvent Js.t) =
     match !dragging with
     | Some (d : Drag.t) when pointer_id ev = d.pointer ->
       dragging := None;
-      finish d;
-      if d.value <> d.start
-      then schedule (Action.Resize (Set (d.handle, d.value)))
+      let committed = d.value <> d.start in
+      finish ~committed d;
+      if committed then schedule (Action.Resize (Set (d.handle, d.value)))
     | _ -> ()
+  in
+  let cancel () =
+    match !dragging with
+    | Some d ->
+      dragging := None;
+      finish ~committed:false d
+    | None -> ()
   in
   listen doc Dom_html.Event.pointerup stop;
   listen doc (Dom_html.Event.make "pointercancel") stop;
+  listen doc (Dom_html.Event.make "lostpointercapture") (fun _ -> cancel ());
+  listen Dom_html.window Dom_html.Event.blur (fun _ -> cancel ());
   (* Esc while dragging puts it back. *)
   listen
     ~capture:true
@@ -193,15 +201,13 @@ let install_drag ~schedule =
     Dom_html.Event.keydown
     (fun (ev : Dom_html.keyboardEvent Js.t) ->
        match !dragging with
-       | Some d
+       | Some _
          when String.equal
                 (Js.Optdef.case ev##.key (fun () -> "") Js.to_string)
                 "Escape" ->
-         dragging := None;
          Dom.preventDefault ev;
          Dom_html.stopPropagation ev;
-         remove_var d.target d.var;
-         finish d
+         cancel ()
        | _ -> ())
 ;;
 

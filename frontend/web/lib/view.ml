@@ -325,7 +325,10 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
   in
   (* On a phone the file browser and the session card are sheets over the
      page: they have the keyboard while open. *)
-  let sheet = m.narrow && (m.files.open_ || m.session_card.sheet) in
+  let sheet =
+    m.narrow
+    && (m.files.open_ || (m.session_card.sheet && Session_card_view.something m))
+  in
   (* So is the drawer, over the page. *)
   let drawer = Model.drawer m in
   let layered covered = inert_if (covered || sheet || drawer) in

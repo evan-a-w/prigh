@@ -199,24 +199,18 @@ let place_popover () =
         let anchor : Dom_html.element Js.t = Js.Unsafe.coerce anchor in
         let chip = anchor##getBoundingClientRect in
         let box =
-          match
-            Js.Opt.to_option
-              (Js.Unsafe.meth_call
-                 anchor
-                 "closest"
-                 [| Js.Unsafe.inject (Js.string "[data-popover-box]") |]
-               : Dom_html.element Js.t Js.opt)
-          with
+          match Browser.closest anchor "[data-popover-box]" with
           | Some box -> box##getBoundingClientRect
           | None -> chip
         in
         let margin = 8. in
         let above = Js.to_float chip##.top -. margin in
-        let below =
-          Float.of_int Dom_html.window##.innerHeight
-          -. Js.to_float chip##.bottom
-          -. margin
+        let viewport_height =
+          Option.value
+            (Browser.visual_height ())
+            ~default:(Float.of_int Dom_html.window##.innerHeight)
         in
+        let below = viewport_height -. Js.to_float chip##.bottom -. margin in
         let wanted = Float.of_int el##.scrollHeight in
         let down = Float.(above < wanted && below > above) in
         let set name value =
@@ -248,7 +242,9 @@ let place_popover () =
           let over = Js.to_float menu##.right -. right in
           if Float.(over > 0.)
           then (
-            let room = Js.to_float menu##.left -. Js.to_float box##.left in
+            let room =
+              Float.max 0. (Js.to_float menu##.left -. Js.to_float box##.left)
+            in
             set "--popover-shift" (-.Float.min over room)));
         (* The current choice in the middle of a long list. *)
         Js.Opt.iter
@@ -1013,10 +1009,23 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
         true))
 ;;
 
-(* A phone: a narrow window, or a phone on its side (short, and touched). *)
+let input_focused () =
+  Js.Opt.case
+    Dom_html.document##.activeElement
+    (fun () -> false)
+    (fun el ->
+       let tag = String.lowercase (Js.to_string el##.tagName) in
+       String.equal tag "input"
+       || String.equal tag "textarea"
+       || Js.to_bool (Js.Unsafe.get el (Js.string "isContentEditable")))
+;;
+
+(* A phone: a narrow window, or a phone on its side (short, and touched),
+   unless a wide screen merely shrank under an on-screen keyboard. *)
 let narrow () =
   Dom_html.window##.innerWidth < 760
   || (Dom_html.window##.innerHeight < 500
+      && (not (input_focused ()))
       && Js.to_bool
            (Dom_html.window##matchMedia (Js.string "(pointer: coarse)"))##.matches)
 ;;
@@ -1024,15 +1033,24 @@ let narrow () =
 (* The app is as tall as what the user sees: the on-screen keyboard shrinks
    the visual viewport, and the composer stays over it (phone.css). *)
 let set_visual_height () =
-  Option.iter (Browser.visual_height ()) ~f:(fun h ->
-    ignore
-      (Js.Unsafe.meth_call
-         (Js.Unsafe.get Dom_html.document##.documentElement (Js.string "style"))
-         "setProperty"
-         [| Js.Unsafe.inject (Js.string "--vvh")
-          ; Js.Unsafe.inject (Js.string (sprintf "%.0fpx" h))
-         |]
-       : unit))
+  Option.iter (Browser.visual_viewport ()) ~f:(fun (h, top) ->
+    let style =
+      Js.Unsafe.get Dom_html.document##.documentElement (Js.string "style")
+    in
+    let set name value =
+      ignore
+        (Js.Unsafe.meth_call
+           style
+           "setProperty"
+           [| Js.Unsafe.inject (Js.string name)
+            ; Js.Unsafe.inject (Js.string (sprintf "%.0fpx" value))
+           |]
+         : unit)
+    in
+    let inner = Float.of_int Dom_html.window##.innerHeight in
+    set "--vvh" h;
+    set "--vvt" top;
+    set "--vvb" (Float.max 0. (inner -. (h +. top))))
 ;;
 
 let install_listeners ~schedule ~current =
@@ -1152,14 +1170,11 @@ let install_listeners ~schedule ~current =
   (* A context menu's item: its copy, in the click (see [Gesture_copy]). *)
   listen Dom_html.Event.click (fun ev ->
     Js.Opt.iter ev##.target (fun target ->
-      Js.Opt.iter
-        (Js.Unsafe.meth_call
+      Option.iter
+        (Browser.closest
            target
-           "closest"
-           [| Js.Unsafe.inject
-                (Js.string ".context-menu [data-item]:not([aria-disabled])")
-           |])
-        (fun (item : Dom_html.element Js.t) ->
+           ".context-menu:not(.field-menu) [data-item]:not([aria-disabled])")
+        ~f:(fun item ->
           Js.Opt.iter
             (item##getAttribute (Js.string "data-item"))
             (fun id ->
@@ -1167,9 +1182,11 @@ let install_listeners ~schedule ~current =
                 (snd
                    (App.update !current (Picker_choose (Js.to_string id)))))));
     Js._true);
+  (* Click-swallowing capture listeners first, before chat/link/paging clicks. *)
+  Gesture_listeners.install ~schedule;
+  Menu_listeners.install ();
   Chat_listeners.install ~schedule;
   Session_link_listeners.install ~schedule;
-  Gesture_listeners.install ~schedule;
   Annotate_widget.install ~schedule;
   Downsize.install ~schedule;
   Viewer_widget.install ~schedule;
@@ -1187,7 +1204,6 @@ let install_listeners ~schedule ~current =
   Agents_listeners.install ~schedule;
   Jump_listeners.install ();
   Selection_listeners.install ~schedule;
-  Menu_listeners.install ();
   Field_menu_listeners.install ~schedule;
   Review_margin.install ();
   (* The chat follows new output unless the user has scrolled up. The page
@@ -1313,13 +1329,34 @@ let install_listeners ~schedule ~current =
        |> Option.map ~f:(fun t -> Js.to_float t##.clientY);
     Js._true);
   List.iter [ Dom_html.Event.touchend; Dom_html.Event.touchcancel ] ~f:(fun event ->
-    listen event (fun (ev : Dom_html.touchEvent Js.t) ->
+    listen ~capture:true event (fun (ev : Dom_html.touchEvent Js.t) ->
       touching := ev##.touches##.length > 0;
+      if not !touching then touch_y := None;
       Js._true));
+  ignore
+    (Dom_html.addEventListener
+       Dom_html.window
+       Dom_html.Event.blur
+       (Dom.handler (fun _ ->
+          touching := false;
+          touch_y := None;
+          Js._true))
+       Js._false
+     : Dom_html.event_listener_id);
+  listen (Dom_html.Event.make "visibilitychange") (fun _ ->
+    if Js.to_bool (Js.Unsafe.get Dom_html.document "hidden")
+    then (
+      touching := false;
+      touch_y := None);
+    Js._true);
   listen Dom_html.Event.touchmove (fun (ev : Dom_html.touchEvent Js.t) ->
     (match !touch_y, Js.Optdef.to_option (ev##.touches##item 0) with
-     | Some y0, Some t when in_chat ev && Float.(Js.to_float t##.clientY > y0 +. 4.)
-       -> turned_up ()
+     | Some y0, Some t when in_chat ev ->
+       let y = Js.to_float t##.clientY in
+       if Float.(y > y0 +. 4.)
+       then turned_up ()
+       else if Float.(y < y0)
+       then touch_y := Some y
      | _ -> ());
     Js._true);
   (* Scroll events do not bubble: only capturing sees the chat's. Scrolling
@@ -1336,19 +1373,57 @@ let install_listeners ~schedule ~current =
        in
        if at_end el
        then (
-         turn_up := None;
-         set_following true)
+         if Option.is_none !turn_up then set_following true)
        else if not ours
        then (
          turn_up := None;
          set_following false)
      | _ -> ());
     Js._true);
+  let touches_chat
+        (chat : Dom_html.element Js.t)
+        (records : MutationObserver.mutationRecord Js.t Js.js_array Js.t)
+    =
+    let contains (node : Dom.node Js.t) =
+      Js.to_bool ((Js.Unsafe.coerce chat)##contains node : bool Js.t)
+    in
+    let rec check i =
+      if i >= records##.length
+      then false
+      else
+        Js.Optdef.case
+          (Js.array_get records i)
+          (fun () -> check (i + 1))
+          (fun (record : MutationObserver.mutationRecord Js.t) ->
+             if contains record##.target
+             then true
+             else (
+               let added = record##.addedNodes in
+               let rec check_added j =
+                 if j >= added##.length
+                 then false
+                 else
+                   Js.Opt.case
+                     (added##item j)
+                     (fun () -> check_added (j + 1))
+                     (fun node ->
+                        phys_equal node (chat :> Dom.node Js.t)
+                        || contains node
+                        || Js.to_bool
+                             ((Js.Unsafe.coerce node)##contains chat : bool Js.t)
+                        || check_added (j + 1))
+               in
+               check_added 0 || check (i + 1)))
+    in
+    check 0
+  in
   let observer =
     new%js MutationObserver.mutationObserver
       (Js.wrap_callback (fun records _ ->
          if !following && not (Terminal_widget.only_inside records)
-         then Option.iter (chat_element ()) ~f:follow_to_end))
+         then
+           Option.iter (chat_element ()) ~f:(fun chat ->
+             if touches_chat chat records then follow_to_end chat)))
   in
   let options = MutationObserver.empty_mutation_observer_init () in
   options##.childList := true;

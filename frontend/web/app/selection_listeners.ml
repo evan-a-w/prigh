@@ -97,12 +97,17 @@ let pop_at (code : Dom_html.element Js.t) range =
     let r = rect i in
     let box = code##getBoundingClientRect in
     let get name = Js.to_float (Js.Unsafe.get r name) in
-    let left = get "right" -. Js.to_float box##.left in
+    let scroll_left =
+      Js.to_float (Js.Unsafe.get code (Js.string "scrollLeft"))
+    in
+    let left = get "right" -. Js.to_float box##.left +. scroll_left in
     let top = get "bottom" -. Js.to_float box##.top +. 4. in
-    let max_left = Js.to_float box##.right -. Js.to_float box##.left -. 132. in
+    let max_left =
+      scroll_left +. Js.to_float box##.right -. Js.to_float box##.left -. 132.
+    in
     { Prigh_web.Code_review.Pop.left =
         Float.iround_nearest_exn
-          (Float.max 0. (Float.min (left -. 24.) max_left))
+          (Float.max scroll_left (Float.min (left -. 24.) max_left))
     ; top = Float.iround_nearest_exn top
     })
 ;;
@@ -198,6 +203,17 @@ let install ~schedule =
   listen Dom_html.Event.mouseup (fun (_ : Dom_html.mouseEvent Js.t) ->
     pressed := false;
     report_soon ~schedule);
+  listen (Dom_html.Event.make "dragstart") (fun (_ : Dom_html.event Js.t) ->
+    pressed := false);
+  ignore
+    (Dom_html.addEventListener
+       Dom_html.window
+       Dom_html.Event.blur
+       (Dom.handler (fun _ ->
+          pressed := false;
+          Js._true))
+       Js._false
+     : Dom_html.event_listener_id);
   listen
     (Dom_html.Event.make "selectionchange")
     (fun (_ : Dom_html.event Js.t) ->

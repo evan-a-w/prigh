@@ -86,7 +86,7 @@ let%expect_test
     (Set_temporary true)
     (Rpc (method_ new_session) (params ((temporary true))) (tag Reload_state))
     (Focus editor)
-    <button class="[&.on]:bg-foreground/10 [&.on]:border-foreground/30 [&.on]:text-foreground [&_.icon]:size-4 bg-transparent border-transparent btn flex-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring font-medium gap-[7px] h-[30px] hover:bg-accent hover:text-foreground max-[359px]:px-2.5 ml-auto narrow:h-9 on pl-2.5 pr-3 rounded-full temporary-chip text-[13px] text-muted-foreground">
+    <button class="[&.on]:bg-foreground/10 [&.on]:border-foreground/30 [&.on]:text-foreground [&_.icon]:size-4 bg-transparent border-transparent btn flex-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring font-medium gap-[7px] h-[30px] hover:bg-accent hover:text-foreground max-[359px]:px-2.5 ml-auto narrow:min-h-11 on pl-2.5 pr-3 rounded-full temporary-chip text-[13px] text-muted-foreground">
     |}];
   H.quiet h (fun () -> H.reply h "new_session" (started ()));
   [%expect {| |}];

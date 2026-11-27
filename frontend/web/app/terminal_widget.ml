@@ -242,6 +242,7 @@ module Widget = struct
 
   let destroy ~prev_input:_ ~(state : State.t) ~element:_ =
     state.disposed <- true;
+    Terminal_keys_widget.destroy state.keys;
     Option.iter state.handle ~f:(fun handle -> handle##dispose);
     match !current with
     | Some mounted when phys_equal mounted state -> current := None

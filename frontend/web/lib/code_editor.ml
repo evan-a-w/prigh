@@ -709,7 +709,7 @@ end
 let update t (action : Action.t) =
   match action with
   | Enter path ->
-    let t = { t with open_ = true; menu = false } in
+    let t = { t with open_ = true; menu = false; strip_hidden = false } in
     let t, listing = if Option.is_none t.dir then list t None else t, [] in
     let t, index = if t.index.loaded then t, [] else index_files t in
     let listing = listing @ index in
@@ -731,11 +731,12 @@ let update t (action : Action.t) =
       ; goto = None
       ; drawer = false
       ; sheet = false
+      ; strip_hidden = false
       }
     , [] )
   | Open path ->
     (* On a phone the drawer gives way to the file. *)
-    open_ { t with drawer = false; filter = "" } path
+    open_ { t with drawer = false; filter = ""; strip_hidden = false } path
   | Switch path ->
     if Option.is_some (find t path)
     then
@@ -743,15 +744,18 @@ let update t (action : Action.t) =
           current = Some path
         ; selection = None
         ; asking = None
+        ; drawer = false
         ; menu = false
+        ; strip_hidden = false
         }
       , [] )
     else t, []
-  | Step n -> step t n, []
+  | Step n -> { (step t n) with strip_hidden = false }, []
   | Swiped n ->
     (match t.buffers with
      | [] | [ _ ] -> t, []
-     | _ :: _ :: _ -> { (step t n) with asking = None }, [])
+     | _ :: _ :: _ ->
+       { (step t n) with asking = None; strip_hidden = false }, [])
   | Close path ->
     (match find t path with
      | Some b when Buffer.dirty b ->
@@ -763,7 +767,7 @@ let update t (action : Action.t) =
                  Reload) first"
                 (relative t path))
          ] )
-     | Some _ -> { (close t path) with menu = false }, []
+     | Some _ -> { (close t path) with menu = false; strip_hidden = false }, []
      | None -> t, [])
   | Edited { path; text } ->
     ( map_buffer t path ~f:(fun b ->
@@ -826,8 +830,10 @@ let update t (action : Action.t) =
     ( { t with tree = true; drawer = true; menu = false }
     , index @ [ Focus "code-filter" ] )
   | Toggle_chat -> { t with chat = not t.chat; menu = false }, []
-  | Toggle_sheet -> { t with sheet = not t.sheet; menu = false }, []
-  | Toggle_drawer -> { t with drawer = not t.drawer; menu = false }, []
+  | Toggle_sheet ->
+    { t with sheet = not t.sheet; menu = false; strip_hidden = false }, []
+  | Toggle_drawer ->
+    { t with drawer = not t.drawer; menu = false; strip_hidden = false }, []
   | Toggle_menu -> { t with menu = not t.menu }, []
   | Goto_open -> { t with goto = Some ""; menu = false }, [ Focus "code-goto" ]
   | Goto_input s -> { t with goto = Some s }, []
@@ -847,7 +853,7 @@ let update t (action : Action.t) =
            | `Up -> false)
       }
     , [] )
-  | Command c -> t, [ Command c ]
+  | Command c -> { t with menu = false }, [ Command c ]
 ;;
 
 let of_preview json =

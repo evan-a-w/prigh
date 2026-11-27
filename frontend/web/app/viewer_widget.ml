@@ -18,11 +18,7 @@ let attribute (el : #Dom_html.element Js.t) name =
   |> Option.map ~f:Js.to_string
 ;;
 
-let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
-  =
-  Js.Opt.to_option
-    (meth el "closest" [| Js.Unsafe.inject (Js.string selector) |])
-;;
+let closest = Browser.closest
 
 (* One image the viewer can show: its thumbnail's button (focus goes back to
    it), the source, a caption and whether Draw is offered. *)
@@ -38,6 +34,17 @@ type pointer =
   ; mutable py : float
   }
 
+type axis =
+  | Horizontal
+  | Vertical
+
+type swipe =
+  { x0 : float
+  ; y0 : float
+  ; t0 : float
+  ; mutable axis : axis option
+  }
+
 type t =
   { dialog : Dom_html.element Js.t
   ; stage : Dom_html.element Js.t
@@ -50,9 +57,9 @@ type t =
   ; mutable pinch : float option (* the two pointers' distance *)
   ; mutable last_tap : (float * float * float) option (* time, x, y *)
   ; mutable mouse : bool (* the last pointer down was a mouse's *)
-  ; mutable swipe : (float * float * float) option
-  (* A finger down on the image at fit: where and when (a swipe between
-     images, or down to close) *)
+  ; mutable swipe : swipe option
+    (* A finger down on the image at fit: where, when, and locked axis (a swipe
+     between images, or down to close) *)
   ; restore : Dom_html.element Js.t option
   }
 
@@ -264,6 +271,15 @@ let show v index =
   := Dom.handler (fun _ ->
        sized v;
        Js._true);
+  v.img##.onerror
+  := Dom.handler (fun _ ->
+       v.dialog##.classList##add (Js.string "ready");
+       set_text v ".viewer-pct" "";
+       set_disabled v "in" true;
+       set_disabled v "out" true;
+       set_disabled v "fit" true;
+       set_disabled v "actual" true;
+       Js._true);
   v.img##.src := Js.string item.src;
   if Js.to_bool v.img##.complete then sized v
 ;;
@@ -405,19 +421,36 @@ let swiped v ~dx ~dy =
   let style = v.img##.style in
   if Float.(dx = 0. && dy = 0.)
   then (
-    ignore (meth style "removeProperty" [| Js.Unsafe.inject (Js.string "translate") |] : Js.Unsafe.any);
-    ignore (meth v.dialog##.style "removeProperty" [| Js.Unsafe.inject (Js.string "--swipe") |] : Js.Unsafe.any))
+    ignore
+      (meth
+         style
+         "removeProperty"
+         [| Js.Unsafe.inject (Js.string "translate") |]
+       : Js.Unsafe.any);
+    ignore
+      (meth
+         v.dialog##.style
+         "removeProperty"
+         [| Js.Unsafe.inject (Js.string "--swipe") |]
+       : Js.Unsafe.any))
   else (
     ignore
-      (meth style "setProperty"
+      (meth
+         style
+         "setProperty"
          [| Js.Unsafe.inject (Js.string "translate")
-          ; Js.Unsafe.inject (Js.string (sprintf "%.0fpx %.0fpx" dx (Float.max 0. dy)))
+          ; Js.Unsafe.inject
+              (Js.string (sprintf "%.0fpx %.0fpx" dx (Float.max 0. dy)))
          |]
        : Js.Unsafe.any);
     ignore
-      (meth v.dialog##.style "setProperty"
+      (meth
+         v.dialog##.style
+         "setProperty"
          [| Js.Unsafe.inject (Js.string "--swipe")
-          ; Js.Unsafe.inject (Js.string (sprintf "%.3f" (Float.min 1. (Float.max 0. dy /. 400.))))
+          ; Js.Unsafe.inject
+              (Js.string
+                 (sprintf "%.3f" (Float.min 1. (Float.max 0. dy /. 400.))))
          |]
        : Js.Unsafe.any))
 ;;
@@ -448,7 +481,7 @@ let pointer_down v ev =
           Hashtbl.length v.pointers = 1
           && String.equal (Js.to_string (get ev "pointerType")) "touch"
           && Option.value_map v.zoom ~default:false ~f:Zoom.at_fit
-        then Some (x, y, now ())
+        then Some { x0 = x; y0 = y; t0 = now (); axis = None }
         else (
           swiped v ~dx:0. ~dy:0.;
           None));
@@ -467,26 +500,32 @@ let pointer_move v ev =
     p.px <- x;
     p.py <- y;
     v.moved <- v.moved +. Float.abs dx +. Float.abs dy;
-    match v.swipe with
-    | Some (x0, y0, _) when Hashtbl.length v.pointers = 1 ->
-      let dx = x -. x0
-      and dy = y -. y0 in
-      (* Locked to the way it started: aside, or down. *)
-      if Float.(abs dx > abs dy) then swiped v ~dx ~dy:0. else swiped v ~dx:0. ~dy
-    | _ ->
-    (match before, distance v with
-     | Some (d0, (mx0, my0)), Some (d1, (mx1, my1)) ->
-       let d0 = Option.value v.pinch ~default:d0 in
-       v.pinch <- Some d1;
-       update v (fun z ->
-         Zoom.pan
-           (Zoom.zoom
-              ~at:(at v ~x:mx1 ~y:my1)
-              z
-              ~factor:(d1 /. Float.max 1. d0))
-           ~dx:(mx1 -. mx0)
-           ~dy:(my1 -. my0))
-     | _ -> update v (fun z -> Zoom.pan z ~dx ~dy))
+    (match v.swipe with
+     | Some s when Hashtbl.length v.pointers = 1 ->
+       let dx = x -. s.x0
+       and dy = y -. s.y0 in
+       if Option.is_none s.axis && Float.(abs dx > 8. || abs dy > 8.)
+       then
+         s.axis
+         <- Some (if Float.(abs dx > abs dy) then Horizontal else Vertical);
+       (match s.axis with
+        | Some Horizontal -> swiped v ~dx ~dy:0.
+        | Some Vertical -> swiped v ~dx:0. ~dy
+        | None -> ())
+     | _ ->
+       (match before, distance v with
+        | Some (d0, (mx0, my0)), Some (d1, (mx1, my1)) ->
+          let d0 = Option.value v.pinch ~default:d0 in
+          v.pinch <- Some d1;
+          update v (fun z ->
+            Zoom.pan
+              (Zoom.zoom
+                 ~at:(at v ~x:mx1 ~y:my1)
+                 z
+                 ~factor:(d1 /. Float.max 1. d0))
+              ~dx:(mx1 -. mx0)
+              ~dy:(my1 -. my0))
+        | _ -> update v (fun z -> Zoom.pan z ~dx ~dy)))
 ;;
 
 let pointer_up v ev =
@@ -505,21 +544,25 @@ let pointer_up v ev =
       swiped v ~dx:0. ~dy:0.;
       let flung =
         match swipe with
-        | Some (x0, y0, t0)
-          when not (String.equal (get ev "type" |> Js.to_string) "pointercancel") ->
-          let dx = x -. x0
-          and dy = y -. y0 in
-          let speed d = Float.abs d /. Float.max 1. (now () -. t0) in
-          if Float.(abs dy > abs dx && dy > 0. && (dy > 120. || (dy > 30. && speed dy > 0.5)))
-          then (
-            close ();
-            true)
-          else if Float.(abs dx > abs dy && (abs dx > 70. || (abs dx > 30. && speed dx > 0.4)))
-                  && Array.length v.items > 1
-          then (
-            act v (if Float.(dx < 0.) then "next" else "prev");
-            true)
-          else false
+        | Some s
+          when not
+                 (String.equal (get ev "type" |> Js.to_string) "pointercancel")
+          ->
+          let dx = x -. s.x0
+          and dy = y -. s.y0 in
+          let speed d = Float.abs d /. Float.max 1. (now () -. s.t0) in
+          (match s.axis with
+           | Some Vertical
+             when Float.(dy > 0. && (dy > 120. || (dy > 30. && speed dy > 0.5)))
+             ->
+             close ();
+             true
+           | Some Horizontal
+             when Float.(abs dx > 70. || (abs dx > 30. && speed dx > 0.4))
+                  && Array.length v.items > 1 ->
+             act v (if Float.(dx < 0.) then "next" else "prev");
+             true
+           | _ -> false)
         | _ -> false
       in
       if flung
@@ -691,6 +734,20 @@ let install ~schedule:f =
        Dom_html.Event.resize
        (Dom.handler (fun _ ->
           Option.iter !current ~f:resize;
+          Js._true))
+       Js._false
+     : Dom_html.event_listener_id);
+  ignore
+    (Dom_html.addEventListener
+       Dom_html.window
+       Dom_html.Event.blur
+       (Dom.handler (fun _ ->
+          Option.iter !current ~f:(fun v ->
+            Hashtbl.clear v.pointers;
+            v.pinch <- None;
+            v.swipe <- None;
+            swiped v ~dx:0. ~dy:0.;
+            v.dialog##.classList##remove (Js.string "dragging"));
           Js._true))
        Js._false
      : Dom_html.event_listener_id)

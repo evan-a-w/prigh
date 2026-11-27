@@ -6,15 +6,11 @@
 
 (() => {
   const PING_MS = 10_000;
+  const CONNECT_MS = 10_000;
   // The backend drops a socket after 30s of silence; we give up on one that
   // has not answered our pings for as long and reconnect.
   const SILENT_MS = 30_000;
   const MAX_RETRY_MS = 5_000;
-
-  const whenConnected = (element, f) => {
-    if (element.isConnected) f();
-    else requestAnimationFrame(() => whenConnected(element, f));
-  };
 
   /**
    * @param {HTMLElement} host
@@ -49,6 +45,7 @@
     let lastHeard = 0;
     let retryMs = 250;
     let retryTimer;
+    let connectTimer;
     let resizeTimer;
     let pingTimer;
     let observer;
@@ -56,6 +53,18 @@
     let state = "open";
     // While [press] feeds xterm.js its bytes, which are not to be transformed.
     let pressing = false;
+
+    const whenConnected = (element, f) => {
+      if (state === "disposed") return;
+      if (element.isConnected) f();
+      else requestAnimationFrame(() => whenConnected(element, f));
+    };
+
+    const safeFit = () => {
+      if (state === "disposed" || !fit) return;
+      if (host.clientWidth === 0 || host.clientHeight === 0) return;
+      fit.fit();
+    };
 
     const send = data => {
       if (ws?.readyState === WebSocket.OPEN) ws.send(data);
@@ -69,7 +78,16 @@
       ws = socket;
       if (retryMs === 250) report("connecting");
       socket.binaryType = "arraybuffer";
+      clearTimeout(connectTimer);
+      connectTimer = setTimeout(() => {
+        if (ws === socket && socket.readyState === WebSocket.CONNECTING) {
+          ws = undefined;
+          socket.close();
+          if (state === "open") reconnect();
+        }
+      }, CONNECT_MS);
       socket.onopen = () => {
+        clearTimeout(connectTimer);
         // The first message is a replay of the whole screen.
         term.reset();
         retryMs = 250;
@@ -82,7 +100,12 @@
           term.write(new Uint8Array(event.data));
           return;
         }
-        const message = JSON.parse(event.data);
+        let message;
+        try {
+          message = JSON.parse(event.data);
+        } catch {
+          return;
+        }
         if (message.type === "exit") {
           state = "exited";
           report("exited");
@@ -93,6 +116,7 @@
       };
       socket.onclose = () => {
         if (ws !== socket) return;
+        clearTimeout(connectTimer);
         ws = undefined;
         if (state === "open") reconnect();
       };
@@ -164,6 +188,22 @@
       return true;
     };
 
+    const wake = () => {
+      if (state !== "open" || !term) return;
+      if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        clearTimeout(retryTimer);
+        retryMs = 250;
+        connect();
+      } else if (ws.readyState === WebSocket.OPEN) {
+        heartbeat();
+      }
+    };
+    const onVisibility = () => {
+      if (!document.hidden) wake();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", wake);
+
     const start = () => {
       if (state === "disposed") return;
       term = new Terminal({
@@ -194,7 +234,7 @@
         selectAll: () => term.selectAll(),
         focus: () => term.focus(),
       };
-      fit.fit();
+      safeFit();
       term.onData(data => {
         if (options.transform && !pressing) data = options.transform(data);
         if (state === "exited") {
@@ -209,7 +249,7 @@
         send(JSON.stringify({ type: "resize", cols, rows })));
       observer = new ResizeObserver(() => {
         clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => fit.fit(), 50);
+        resizeTimer = setTimeout(safeFit, 50);
       });
       observer.observe(host);
       pingTimer = setInterval(heartbeat, PING_MS);
@@ -236,8 +276,11 @@
       dispose: () => {
         state = "disposed";
         clearTimeout(retryTimer);
+        clearTimeout(connectTimer);
         clearTimeout(resizeTimer);
         clearInterval(pingTimer);
+        document.removeEventListener("visibilitychange", onVisibility);
+        window.removeEventListener("online", wake);
         observer?.disconnect();
         const socket = ws;
         ws = undefined;

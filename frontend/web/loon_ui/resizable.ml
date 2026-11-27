@@ -169,6 +169,66 @@ let body_style field value =
 
 let in_browser () = Js.Optdef.test (Js.Unsafe.global##.document : _ Js.Optdef.t)
 
+let end_drag ~id el =
+  if Hashtbl.mem drags id
+  then (
+    Hashtbl.remove drags id;
+    body_style "cursor" "";
+    body_style "user-select" "";
+    (* As react-resizable-panels: the handle lets go of the focus
+       it took on the pointer down. *)
+    Option.iter el ~f:(fun (el : Dom_html.element Js.t) ->
+      el##blur;
+      set_state el "inactive"))
+;;
+
+module Drag_cleanup = Vdom.Attr.Hooks.Make (struct
+    module Input = struct
+      type t = string [@@deriving sexp_of]
+
+      let combine _ second = second
+    end
+
+    module State = struct
+      type t =
+        { mutable id : string
+        ; mutable listeners : Dom.event_listener_id list
+        }
+    end
+
+    let init id _ = { State.id; listeners = [] }
+
+    let on_mount =
+      `Schedule_immediately_after_this_dom_patch_completes
+        (fun _ (state : State.t) (el : Dom_html.element Js.t) ->
+          let finish () = end_drag ~id:state.id (Some el) in
+          let listen target event =
+            Dom_html.addEventListener
+              target
+              event
+              (Dom_html.handler (fun _ ->
+                 finish ();
+                 Js._true))
+              Js._false
+          in
+          state.listeners
+          <- [ listen el (Dom_html.Event.make "pointercancel")
+             ; listen el (Dom_html.Event.make "lostpointercapture")
+             ; listen Dom_html.window Dom_html.Event.blur
+             ])
+    ;;
+
+    let update ~old_input:_ ~new_input (state : State.t) _ =
+      state.id <- new_input
+    ;;
+
+    let destroy _ (state : State.t) el =
+      List.iter state.listeners ~f:Dom_html.removeEventListener;
+      state.listeners <- [];
+      end_drag ~id:state.id (Some el)
+    ;;
+  end)
+
 let view
       ?(attrs = [])
       ?class_
@@ -304,17 +364,7 @@ let view
       | _ -> Effect.Ignore
     in
     let on_pointerup (ev : Dom_html.pointerEvent Js.t) =
-      Effect.of_thunk (fun () ->
-        if Hashtbl.mem drags id
-        then (
-          Hashtbl.remove drags id;
-          body_style "cursor" "";
-          body_style "user-select" "";
-          (* As react-resizable-panels: the handle lets go of the focus
-             it took on the pointer down. *)
-          Option.iter (current_target ev) ~f:(fun el ->
-            el##blur;
-            set_state el "inactive")))
+      Effect.of_thunk (fun () -> end_drag ~id (current_target ev))
     in
     let cursor = if horizontal then "ew-resize" else "ns-resize" in
     (* Hovering a handle sets the page's cursor, as react-resizable-panels'
@@ -376,6 +426,9 @@ let view
               ; Attr.on_pointerdown on_pointerdown
               ; Attr.on_pointermove on_pointermove
               ; Attr.on_pointerup on_pointerup
+              ; Vdom.Attr.create_hook
+                  "loon-resizable-cleanup"
+                  (Drag_cleanup.create id)
               ; Attr.on_pointerenter (dom_state (fun _ -> "hover"))
               ; Attr.on_pointerenter (hover_cursor cursor)
               ; Attr.on_pointerleave (hover_cursor "")

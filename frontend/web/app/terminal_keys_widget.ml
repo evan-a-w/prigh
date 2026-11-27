@@ -6,6 +6,8 @@ type t =
   { element : Dom_html.element Js.t
   ; mutable keys : Keys.t
   ; mutable modifiers : (Keys.Modifier.t * Dom_html.buttonElement Js.t) list
+  ; mutable stops : (unit -> unit) list
+  ; mutable listeners : Dom_html.event_listener_id list
   ; press : string -> unit
   ; app_cursor : unit -> bool
   ; refocus : unit -> unit
@@ -82,19 +84,11 @@ let button t key =
   let timer = ref None in
   let held = ref false in
   let fired = ref false in
+  let start_x = ref 0. in
+  let start_y = ref 0. in
   let stop () =
     Option.iter !timer ~f:Dom_html.clearTimeout;
     timer := None
-  in
-  let rec repeat delay =
-    timer
-    := Some
-         (Dom_html.setTimeout
-            (fun () ->
-               fired := true;
-               fire t key;
-               repeat repeat_ms)
-            delay)
   in
   let release ~act =
     if !held
@@ -108,15 +102,41 @@ let button t key =
               if not !held then button##.classList##remove (Js.string "pressed"))
            pressed_ms
          : Dom_html.timeout_id_safe))
+    else stop ()
   in
+  let rec repeat delay =
+    timer
+    := Some
+         (Dom_html.setTimeout
+            (fun () ->
+               if
+                 not
+                   (Js.to_bool (Js.Unsafe.get button (Js.string "isConnected")))
+               then release ~act:false
+               else (
+                 fired := true;
+                 fire t key;
+                 repeat repeat_ms))
+            delay)
+  in
+  t.stops <- (fun () -> release ~act:false) :: t.stops;
   (* Not the focus: the shell keeps it, and the phone its keyboard. *)
-  on button "pointerdown" (fun ev ->
+  on button "pointerdown" (fun (ev : Dom_html.pointerEvent Js.t) ->
     Dom.preventDefault ev;
     held := true;
     fired := false;
+    start_x := Js.to_float ev##.clientX;
+    start_y := Js.to_float ev##.clientY;
     button##.classList##add (Js.string "pressed");
     stop ();
     if Keys.Key.repeats key then repeat repeat_after_ms);
+  on button "pointermove" (fun (ev : Dom_html.pointerEvent Js.t) ->
+    if
+      !held
+      && Float.(
+           abs (Js.to_float ev##.clientX -. !start_x) > 10.
+           || abs (Js.to_float ev##.clientY -. !start_y) > 10.)
+    then release ~act:false);
   on button "mousedown" Dom.preventDefault;
   on button "pointerup" (fun _ -> release ~act:true);
   (* A swipe that scrolls the bar, or a finger slid off the key. *)
@@ -129,6 +149,14 @@ let button t key =
   button
 ;;
 
+let stop_all t = List.iter t.stops ~f:(fun f -> f ())
+
+let destroy t =
+  stop_all t;
+  List.iter t.listeners ~f:Dom_html.removeEventListener;
+  t.listeners <- []
+;;
+
 let create ~press ~app_cursor ~refocus =
   let element = Dom_html.createDiv Dom_html.document in
   element##.className := Js.string "terminal-keys";
@@ -138,6 +166,8 @@ let create ~press ~app_cursor ~refocus =
     { element :> Dom_html.element Js.t
     ; keys = Keys.empty
     ; modifiers = []
+    ; stops = []
+    ; listeners = []
     ; press
     ; app_cursor
     ; refocus
@@ -149,6 +179,19 @@ let create ~press ~app_cursor ~refocus =
      | Modifier m -> t.modifiers <- t.modifiers @ [ m, b ]
      | _ -> ());
     Dom.appendChild element b);
+  let listen (target : #Dom_html.eventTarget Js.t) name =
+    Dom_html.addEventListener
+      target
+      (Dom_html.Event.make name)
+      (Dom.handler (fun _ ->
+         stop_all t;
+         Js._true))
+      Js._false
+  in
+  t.listeners
+  <- [ listen Dom_html.window "blur"
+     ; listen Dom_html.document "visibilitychange"
+     ];
   show_latches t;
   t
 ;;

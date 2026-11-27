@@ -18,9 +18,9 @@ let action ~title ~on_click text =
     ~attrs:
       [ Attr.type_ "button"
       ; Attr.class_
-          "toast-undo ml-1 inline-flex h-6 shrink-0 cursor-pointer items-center \
-           rounded-[4px] bg-foreground px-2 text-xs font-medium text-background \
-           hover:bg-foreground/85"
+          "toast-undo ml-1 inline-flex h-6 shrink-0 cursor-pointer \
+           items-center rounded-[4px] bg-foreground px-2 text-xs font-medium \
+           text-background hover:bg-foreground/85 narrow:min-h-11"
       ; Attr.title title
       ; Attr.create "data-button" ""
       ; Attr.on_click (fun _ -> on_click)
@@ -30,7 +30,8 @@ let action ~title ~on_click text =
 
 let close ~title ~on_click =
   Html.button
-    ~cls:"toast-close -my-0.5 -mr-1.5 text-muted-foreground hover:text-foreground"
+    ~cls:
+      "toast-close -my-0.5 -mr-1.5 text-muted-foreground hover:text-foreground"
     ~variant:Ghost
     ~size:Icon_xs
     ~title
@@ -85,12 +86,16 @@ let toast ~inject (t : App.Toast.t) =
        [ (if t.error
           then
             Some
-              (Loon.Icon.view ~class_:"mt-0.5 size-4 shrink-0 text-destructive" Circle_x)
+              (Loon.Icon.view
+                 ~class_:"mt-0.5 size-4 shrink-0 text-destructive"
+                 Circle_x)
           else None)
        ; Some
            (Node.span
               ~attrs:
-                [ Attr.class_ "min-w-0 flex-1 font-medium"; Attr.create "dir" "auto" ]
+                [ Attr.class_ "min-w-0 flex-1 font-medium"
+                ; Attr.create "dir" "auto"
+                ]
               [ Node.text shown ])
        ; (if t.repeats > 0
           then
@@ -112,7 +117,10 @@ let toast ~inject (t : App.Toast.t) =
              "Undo")
        ; (if t.error
           then
-            Some (close ~title:"Dismiss" ~on_click:(inject (Action.Dismiss_toast t.id)))
+            Some
+              (close
+                 ~title:"Dismiss"
+                 ~on_click:(inject (Action.Dismiss_toast t.id)))
           else None)
        ])
 ;;
