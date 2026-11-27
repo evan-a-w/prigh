@@ -1121,3 +1121,266 @@ let%expect_test "claude: no token, or an apiKeyHelper: its own login, saying so"
     assistant (claude/claude-sonnet-4-6, End_turn): "ok"
     |}]
 ;;
+
+let%expect_test "codex: steer wakes immediately without polling delay" =
+  let in_turn, mark_in_turn = Eio.Promise.create () in
+  let steer_recorded, mark_steer_recorded = Eio.Promise.create () in
+  let steered_at = ref None in
+  with_composer
+    ~adapter:(module Codex_adapter)
+    ~peer:(fun _ p ->
+      let read () =
+        Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+          Json.parse l |> Or_error.ok_exn)
+      in
+      let write j = Line_transport.Peer.write_line p (Json.to_string j) in
+      let reply j result =
+        write
+          (`Object
+              [ "id", Option.value_exn (Json.member "id" j); "result", result ])
+      in
+      let rec loop () =
+        match read () with
+        | None -> ()
+        | Some j ->
+          (match Option.bind (Json.member "method" j) ~f:Json.string with
+           | Some "initialize" ->
+             reply j (`Object [ "userAgent", `String "codex/0.166.0" ])
+           | Some "thread/start" ->
+             reply
+               j
+               (`Object
+                   [ "thread", `Object [ "id", `String "th-1" ]
+                   ; "model", `String "gpt-5"
+                   ])
+           | Some "turn/start" ->
+             reply
+               j
+               (`Object
+                   [ ( "turn"
+                     , `Object
+                         [ "id", `String "tu-1"
+                         ; "status", `String "inProgress"
+                         ] )
+                   ]);
+             write
+               (`Object
+                   [ "method", `String "turn/started"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; "turn", `Object [ "id", `String "tu-1" ]
+                         ] )
+                   ]);
+             Eio.Promise.resolve mark_in_turn ()
+           | Some "turn/steer" ->
+             steered_at := Some (Time_float.now ());
+             reply j (`Object [ "turnId", `String "tu-1" ]);
+             Eio.Promise.await steer_recorded;
+             write
+               (`Object
+                   [ "method", `String "item/completed"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; ( "item"
+                           , `Object
+                               [ "type", `String "agentMessage"
+                               ; "id", `String "m1"
+                               ; "text", `String "Steered!"
+                               ] )
+                         ] )
+                   ]);
+             write
+               (`Object
+                   [ "method", `String "turn/completed"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; ( "turn"
+                           , `Object
+                               [ "id", `String "tu-1"
+                               ; "status", `String "completed"
+                               ] )
+                         ] )
+                   ])
+           | Some _ | None -> ());
+          loop ()
+      in
+      loop ())
+  @@ fun _ agent _ ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Message_end (User u)) when String.equal u.text "pivot now" ->
+      ignore (Eio.Promise.try_resolve mark_steer_recorded () : bool)
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "start");
+  Eio.Promise.await in_turn;
+  let sent_at = Time_float.now () in
+  Or_error.ok_exn (Agent.steer agent "pivot now");
+  Agent.wait_idle agent;
+  let fast =
+    match !steered_at with
+    | Some at ->
+      Float.(Time_float.Span.to_ms (Time_float.diff at sent_at) < 150.)
+    | None -> false
+  in
+  printf "steered_fast=%b\n" fast;
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nstart"
+    spawn #1: codex app-server
+    user: "pivot now"
+    assistant (codex/gpt-5, End_turn): "Steered!"
+    steered_fast=true
+    |}]
+;;
+
+let%expect_test
+    "codex: thread/name/updated sets native session description, preserving \
+     manual name"
+  =
+  let send_between, trigger_between = Eio.Promise.create () in
+  let between_sent, mark_between_sent = Eio.Promise.create () in
+  let send_after_manual, trigger_after_manual = Eio.Promise.create () in
+  let after_manual_sent, mark_after_manual_sent = Eio.Promise.create () in
+  with_composer
+    ~adapter:(module Codex_adapter)
+    ~peer:(fun _ p ->
+      let read () =
+        Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+          Json.parse l |> Or_error.ok_exn)
+      in
+      let write j = Line_transport.Peer.write_line p (Json.to_string j) in
+      let reply j result =
+        write
+          (`Object
+              [ "id", Option.value_exn (Json.member "id" j); "result", result ])
+      in
+      let notify_title title =
+        write
+          (`Object
+              [ "method", `String "thread/name/updated"
+              ; ( "params"
+                , `Object
+                    [ "threadId", `String "th-1"; "threadName", `String title ]
+                )
+              ])
+      in
+      let rec loop () =
+        match read () with
+        | None -> ()
+        | Some j ->
+          (match Option.bind (Json.member "method" j) ~f:Json.string with
+           | Some "initialize" ->
+             reply j (`Object [ "userAgent", `String "codex/0.166.0" ])
+           | Some "thread/start" ->
+             reply
+               j
+               (`Object
+                   [ "thread", `Object [ "id", `String "th-1" ]
+                   ; "model", `String "gpt-5"
+                   ])
+           | Some "turn/start" ->
+             reply
+               j
+               (`Object
+                   [ ( "turn"
+                     , `Object
+                         [ "id", `String "tu-1"
+                         ; "status", `String "inProgress"
+                         ] )
+                   ]);
+             write
+               (`Object
+                   [ "method", `String "turn/started"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; "turn", `Object [ "id", `String "tu-1" ]
+                         ] )
+                   ]);
+             notify_title "Initial Codex title";
+             write
+               (`Object
+                   [ "method", `String "item/completed"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; ( "item"
+                           , `Object
+                               [ "type", `String "agentMessage"
+                               ; "id", `String "m1"
+                               ; "text", `String "Done."
+                               ] )
+                         ] )
+                   ]);
+             write
+               (`Object
+                   [ "method", `String "turn/completed"
+                   ; ( "params"
+                     , `Object
+                         [ "threadId", `String "th-1"
+                         ; ( "turn"
+                           , `Object
+                               [ "id", `String "tu-1"
+                               ; "status", `String "completed"
+                               ] )
+                         ] )
+                   ]);
+             Eio.Promise.await send_between;
+             notify_title "Refined Codex title";
+             Eio.Promise.resolve mark_between_sent ();
+             Eio.Promise.await send_after_manual;
+             notify_title "Should not overwrite manual";
+             Eio.Promise.resolve mark_after_manual_sent ()
+           | Some _ | None -> ());
+          loop ()
+      in
+      loop ())
+  @@ fun _ agent _ ->
+  let title_updated = Eio.Condition.create () in
+  Agent.subscribe agent ~f:(function
+    | State_changed _ -> Eio.Condition.broadcast title_updated
+    | _ -> ());
+  prompt agent "fix bug";
+  let show label =
+    let s = Agent.session agent in
+    printf
+      "%s: name=%s desc=%s native=%b wanted=%b\n"
+      label
+      (Option.value (Session.name s) ~default:"-")
+      (Option.value (Session.description s) ~default:"-")
+      (Session_description.has_native s)
+      (Session_description.wanted s)
+  in
+  show "in-turn";
+  Eio.Promise.resolve trigger_between ();
+  Eio.Promise.await between_sent;
+  while
+    not
+      (Option.equal
+         String.equal
+         (Session.description (Agent.session agent))
+         (Some "Refined Codex title"))
+  do
+    Eio.Condition.await_no_mutex title_updated
+  done;
+  show "between-turns";
+  ignore
+    (Session.set_name (Agent.session agent) ~name:"My manual name"
+     : Session.Entry.t);
+  Eio.Promise.resolve trigger_after_manual ();
+  Eio.Promise.await after_manual_sent;
+  Eio.Fiber.yield ();
+  Eio.Fiber.yield ();
+  show "after-manual";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nfix bug"
+    spawn #1: codex app-server
+    assistant (codex/gpt-5, End_turn): "Done."
+    in-turn: name=- desc=Initial Codex title native=true wanted=false
+    between-turns: name=- desc=Refined Codex title native=true wanted=false
+    after-manual: name=My manual name desc=Refined Codex title native=true wanted=false
+    |}]
+;;

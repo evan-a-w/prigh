@@ -56,9 +56,11 @@ val create
   -> ?start:(cwd:string -> Adapter.Start.t)
   -> ?interrupt_grace:Time_float.Span.t
   -> ?request_timeout:Time_float.Span.t
-  -> ?steer_poll:Time_float.Span.t
   -> ?on_thread:(string -> unit)
   -> ?on_start:(Adapter.Start.t -> unit Or_error.t -> unit)
+  -> ?on_prewarm:(Adapter.Start.t -> Adapter.Catalog.t Or_error.t -> unit)
+       (** called when {!Runner.prewarm} finishes starting (or fails to start)
+           the process, unless cancelled first *)
   -> ?host:(unit -> string)
   -> ?host_id:string
        (** [Tool.Context.host] for approvals and injected MCP tools, when this

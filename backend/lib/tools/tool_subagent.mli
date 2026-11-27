@@ -73,6 +73,7 @@ module External : sig
         -> context:Tool.Context.t
         -> emit:(Agent_event.t -> unit)
         -> steer:(unit -> Message.t list)
+        -> await_steer:(unit -> unit)
         -> wake:(unit -> Message.t list)
         -> cancel:Cancellation.t
         -> prompts:Message.t list

@@ -17,18 +17,19 @@ let typed (u : Message.User.t) =
 ;;
 
 (* The user's messages in the session's entries, newest first, and how
-   many of them come before its latest description. *)
+   many of them come before its latest description (plus whether that
+   description came natively from an external harness). *)
 let users_and_described_at session =
   let users_after, described =
     List.fold_until
       (Session.entries session)
-      ~init:(0, false)
+      ~init:(0, None)
       ~f:(fun (n, _) (e : Session.Entry.t) ->
         match e.payload with
-        | Description _ -> Stop (n, true)
+        | Description { native; _ } -> Stop (n, Some native)
         | Message (User u) when Option.is_some (typed u) ->
-          Continue (n + 1, false)
-        | _ -> Continue (n, false))
+          Continue (n + 1, None)
+        | _ -> Continue (n, None))
       ~finish:Fn.id
   in
   let total =
@@ -37,7 +38,13 @@ let users_and_described_at session =
       | Message (User u) -> Option.is_some (typed u)
       | _ -> false)
   in
-  total, Option.some_if described (total - users_after)
+  total, Option.map described ~f:(fun native -> total - users_after, native)
+;;
+
+let has_native session =
+  match snd (users_and_described_at session) with
+  | Some (_, true) -> true
+  | Some (_, false) | None -> false
 ;;
 
 (* A turn that failed (not logged in, the provider down) has nothing to
@@ -56,7 +63,8 @@ let wanted session =
   match users_and_described_at session with
   | 0, _ -> false
   | _, None -> true
-  | total, Some at -> at < refine_after && total >= refine_after
+  | _, Some (_, true) -> false
+  | total, Some (at, false) -> at < refine_after && total >= refine_after
 ;;
 
 let instructions =
@@ -132,6 +140,7 @@ let describe ~provider ~model ?cancel session =
        ~system:instructions
        user)
     ~f:(fun text ->
-      let (_ : Session.Entry.t) = Session.set_description session ~text in
+      if not (has_native session)
+      then ignore (Session.set_description session ~text : Session.Entry.t);
       text)
 ;;

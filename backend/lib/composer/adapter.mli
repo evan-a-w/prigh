@@ -64,6 +64,11 @@ module Driver : sig
       {!next_event}, and invokes [f] so the session can drive the turn. *)
   val on_autonomous : _ t -> (unit -> unit) -> unit
 
+  (** Called when a [Session_title] event arrives while no turn is running
+      (between prompts), so the session records it without waiting for the
+      next turn. *)
+  val on_title : _ t -> (string -> unit) -> unit
+
   val next_event : _ t -> Adapter_event.t
 
   (** Gives an answer to the first request waiting for one like it. *)

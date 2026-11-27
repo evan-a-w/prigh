@@ -26,7 +26,6 @@ let create
       ?(login = fun ~adapter:_ -> None)
       ?(no_sandbox = fun ~host:_ ~host_name:_ ~cwd:_ _ -> None)
       ?(catalog = fun ~host:_ _ -> None)
-      ?steer_poll
       ?request_timeout
       ?interrupt_grace
       ()
@@ -53,6 +52,7 @@ let create
         ~(context : Tool.Context.t)
         ~emit
         ~steer
+        ~await_steer
         ~wake
         ~cancel
         ~prompts
@@ -98,7 +98,6 @@ let create
           ~start
           ?interrupt_grace
           ?request_timeout
-          ?steer_poll
           ~on_thread:(fun tid ->
             ignore
               (Session.record_thread
@@ -146,11 +145,13 @@ let create
         ; execute = context.execute
         ; background
         ; steer
+        ; await_steer
         ; halt = context.halt
         ; add_spend =
             (fun ~usage ~cost_usd ->
               run_cost := !run_cost +. cost_usd;
               add_spend ~usage ~cost_usd)
+        ; set_title = ignore
         }
       in
       let input : Engine_intf.Turn.Input.t =

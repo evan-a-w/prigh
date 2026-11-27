@@ -31,6 +31,7 @@ module Driver = struct
     ; idle : Eio.Condition.t (* the orphan turn ended, or the process *)
     ; mutable on_orphan_request : Adapter_event.t -> unit
     ; mutable on_autonomous : (unit -> unit) option
+    ; mutable on_title : (string -> unit) option
     ; mutable exit : Line_transport.Exit.t option
     }
 
@@ -56,6 +57,7 @@ module Driver = struct
     ; idle = Eio.Condition.create ()
     ; on_orphan_request = ignore
     ; on_autonomous = None
+    ; on_title = None
     ; exit = None
     }
   ;;
@@ -64,6 +66,7 @@ module Driver = struct
   let write t line = if alive t then Line_transport.write_line t.transport line
   let on_orphan_request t f = t.on_orphan_request <- f
   let on_autonomous t f = t.on_autonomous <- Some f
+  let on_title t f = t.on_title <- Some f
 
   (* Events that belong to no turn in particular go to whoever reads. *)
   let of_no_turn : Adapter_event.t -> bool = function
@@ -72,7 +75,8 @@ module Driver = struct
     | Notice _
     | Compacted _
     | Retrying _
-    | Request_withdrawn _ -> true
+    | Request_withdrawn _
+    | Session_title _ -> true
     | Turn_started _
     | Text_delta _
     | Text_done _
@@ -110,6 +114,10 @@ module Driver = struct
     | Turn_end _ when t.in_turn ->
       t.in_turn <- false;
       Eio.Stream.add t.events event
+    | Session_title title when not t.in_turn ->
+      (match t.on_title with
+       | Some f -> f title
+       | None -> Eio.Stream.add t.events event)
     | _ when t.in_turn || of_no_turn event -> Eio.Stream.add t.events event
     | Turn_end _ ->
       (* A turn of its own ended, or one that was ended for it already (an

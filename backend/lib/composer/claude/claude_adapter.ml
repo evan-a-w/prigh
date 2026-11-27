@@ -503,6 +503,7 @@ let models t = t.models
 let limits t = Claude_codec.limits t.codec
 let on_change t f = t.on_change <- f
 let on_autonomous t f = Adapter.Driver.on_autonomous t.driver f
+let on_title t f = Adapter.Driver.on_title t.driver f
 
 let compact t settings ~instructions =
   Adapter.Driver.await_idle t.driver;

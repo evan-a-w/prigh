@@ -38,7 +38,6 @@ val create
         -> Adapter_id.t
         -> string option)
   -> ?catalog:(host:string -> Adapter_id.t -> Adapter.Catalog.t option)
-  -> ?steer_poll:Time_float.Span.t
   -> ?request_timeout:Time_float.Span.t
   -> ?interrupt_grace:Time_float.Span.t
   -> unit

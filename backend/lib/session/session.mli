@@ -61,8 +61,16 @@ module Entry : sig
           active path up to the entry [through] are sent masked from here
           on; the last one on the path counts *)
       | Name of { name : string }
-      | Description of { text : string }
-      (** model-written one-line summary, see [Session_description] *)
+      | Description of
+          { text : string
+          ; native : bool
+                [@jsonaf.default false]
+                [@jsonaf_drop_default.equal]
+                [@sexp.default false]
+                [@sexp_drop_default.equal]
+          }
+      (** model-written or external-harness one-line summary, see
+          [Session_description] *)
       | Cwd of
           { cwd : string
           ; host : Host.t option
@@ -593,7 +601,7 @@ val set_model
   -> thinking:Thinking.t
   -> Entry.t
 val set_name : t -> name:string -> Entry.t
-val set_description : t -> text:string -> Entry.t
+val set_description : ?native:bool -> t -> text:string -> Entry.t
 (** Archiving a pinned session unpins it too. *)
 val set_archived : t -> archived:bool -> Entry.t
 

@@ -3,6 +3,15 @@ open! Import
 
 type live = Live : (module Adapter.S with type t = 'a) * 'a -> live
 
+module Warming = struct
+  type t =
+    { host : string
+    ; cwd : string
+    ; done_ : unit Promise.t
+    ; cancel : Cancellation.t
+    }
+end
+
 type t =
   { sw : Switch.t
   ; adapter : Adapter.t
@@ -10,7 +19,6 @@ type t =
   ; start : cwd:string -> Adapter.Start.t
   ; interrupt_grace : Time_float.Span.t option
   ; request_timeout : Time_float.Span.t option
-  ; steer_poll : Time_float.Span.t
   ; host : unit -> string
   ; host_id : string option
   ; home : (unit -> string option) option
@@ -19,6 +27,7 @@ type t =
   ; wake : unit -> Message.t list
   ; mutable live : live option
   ; mutable live_host : string option
+  ; mutable live_cwd : string option
   ; mutable live_login : Account_ref.t option
     (** the login of prigh's the live process was given ([Start.login]) *)
   ; mutable login_refused : string option
@@ -34,6 +43,8 @@ type t =
   ; mutable thread_model : string option (* the model the CLI said it runs *)
   ; on_thread : string -> unit
   ; on_start : Adapter.Start.t -> unit Or_error.t -> unit
+  ; on_prewarm : Adapter.Start.t -> Adapter.Catalog.t Or_error.t -> unit
+  ; mutable on_title : (string -> unit) option
   ; checkpoint : (Json.t -> Tool.Result.t) option (* runs [Checkpoint.op] *)
   ; mutable not_git : (string * string) option
     (* a cwd whose files have no checkpoints, and why *)
@@ -52,7 +63,7 @@ type t =
   ; catalog : unit -> Adapter.Catalog.t option
   ; on_change : unit -> unit
   ; on_autonomous : (unit -> unit) option
-  ; mutable warming : unit Promise.t option (* a [prewarm] starting *)
+  ; mutable warming : Warming.t option (* a [prewarm] starting *)
   ; mutable epoch : int (* [close]s: a start that outlived one stops *)
   }
 
@@ -63,9 +74,9 @@ let create
       ?(start = fun ~cwd -> Adapter.Start.default ~cwd)
       ?interrupt_grace
       ?request_timeout
-      ?(steer_poll = Time_float.Span.of_sec 0.2)
       ?(on_thread = ignore)
       ?(on_start = fun _ _ -> ())
+      ?(on_prewarm = fun _ _ -> ())
       ?(host = fun () -> "local")
       ?host_id
       ?home
@@ -85,7 +96,6 @@ let create
   ; start
   ; interrupt_grace
   ; request_timeout
-  ; steer_poll
   ; host
   ; host_id
   ; home
@@ -94,6 +104,7 @@ let create
   ; wake
   ; live = None
   ; live_host = None
+  ; live_cwd = None
   ; live_login = None
   ; login_refused = None
   ; login_dropped = None
@@ -106,6 +117,8 @@ let create
   ; thread_model = None
   ; on_thread
   ; on_start
+  ; on_prewarm
+  ; on_title = None
   ; checkpoint
   ; not_git = None
   ; checkpoint_noted = false
@@ -131,10 +144,14 @@ let thread_id t = t.thread_id
 
 let close t =
   t.epoch <- t.epoch + 1;
+  Option.iter t.warming ~f:(fun w -> Cancellation.cancel w.cancel);
+  t.warming <- None;
   Option.iter t.live ~f:(fun (Live ((module A), a)) ->
     t.known <- Some (A.current_capabilities a);
     A.stop a);
-  t.live <- None
+  t.live <- None;
+  t.live_cwd <- None;
+  t.models <- []
 ;;
 
 let context
@@ -403,11 +420,13 @@ let renew_login t (s : Engine_intf.Services.t) ~login =
 ;;
 
 let live_now
+      ?(on_result = fun _ _ -> ())
       t
       (s : Engine_intf.Services.t)
       (input : Engine_intf.Turn.Input.t)
       ~starting
   =
+  t.on_title <- Some s.set_title;
   match input.kind, t.live with
   | Autonomous, Some (Live ((module A), a) as live) when A.alive a -> Ok live
   | _ ->
@@ -419,7 +438,15 @@ let live_now
        when not (Option.equal String.equal t.live_host (Some host)) ->
        A.stop a;
        t.live <- None;
-       t.thread_id <- None
+       t.live_cwd <- None;
+       t.thread_id <- None;
+       t.models <- []
+     | Some (Live ((module A), a))
+       when A.starts_early
+            && not (Option.equal String.equal t.live_cwd (Some s.cwd)) ->
+       A.stop a;
+       t.live <- None;
+       t.live_cwd <- None
      | Some _ | None -> ());
     let base =
       Turn_timings.phase "login" (fun () ->
@@ -441,7 +468,9 @@ let live_now
      | Some (Live ((module A), a))
        when not (Option.equal Account_ref.equal t.live_login login) ->
        A.stop a;
-       t.live <- None
+       t.live <- None;
+       t.live_cwd <- None;
+       t.models <- []
      | Some _ | None -> ());
     (match t.live with
      | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
@@ -544,51 +573,101 @@ let live_now
           L.stop a;
           Or_error.errorf "%s was stopped while it started" A.display_name
         | Ok (Live ((module L), a) as live) ->
+          (match L.models a with
+           | [] -> ()
+           | models -> t.models <- models);
           L.on_change a (fun () ->
             (match L.models a with
              | [] -> ()
              | models -> t.models <- models);
             t.on_change ());
           Option.iter t.on_autonomous ~f:(L.on_autonomous a);
+          L.on_title a (fun title ->
+            Option.iter t.on_title ~f:(fun f -> f title));
           t.live <- Some live;
-          t.on_change ();
           t.live_host <- Some host;
+          t.live_cwd <- Some s.cwd;
           t.live_login <- login;
+          on_result
+            start
+            (Ok { Adapter.Catalog.models = L.models a; limits = L.limits a });
+          t.on_change ();
           Ok live
-        | Error (`Spawn e | `Start e) -> Error e))
+        | Error (`Spawn e | `Start e) ->
+          if t.epoch = epoch then on_result start (Error e);
+          Error e))
 ;;
 
 (* A process [prewarm] is starting for the session is this turn's. *)
 let live t s input ~starting =
-  Option.iter t.warming ~f:(fun warming ->
-    Turn_timings.phase "warming_up" (fun () -> Promise.await warming));
+  Option.iter t.warming ~f:(fun (w : Warming.t) ->
+    Turn_timings.phase "warming_up" (fun () -> Promise.await w.done_));
   live_now t s input ~starting
 ;;
 
-let prewarm t s input =
-  let up =
-    match t.live with
-    | Some (Live ((module L), a)) ->
-      L.alive a && Option.equal String.equal t.live_host (Some (t.host ()))
-    | None -> false
-  in
+let prewarm t (s : Engine_intf.Services.t) input =
+  let host = t.host () in
   let (module A) = t.adapter in
-  if
-    A.starts_early
-    && (not up)
-    && Option.is_none t.warming
-    && Option.is_none t.services
+  if A.starts_early && Option.is_none t.services
   then (
-    let warming, warmed = Promise.create () in
-    t.warming <- Some warming;
-    Guarded.fork ~sw:t.sw ~what:"starting an external harness early" (fun () ->
-      Exn.protect
-        ~finally:(fun () ->
+    let up =
+      match t.live with
+      | Some (Live ((module L), a)) ->
+        L.alive a
+        && Option.equal String.equal t.live_host (Some host)
+        && Option.equal String.equal t.live_cwd (Some s.cwd)
+      | None -> false
+    in
+    if not up
+    then (
+      let already_warming =
+        match t.warming with
+        | Some w when String.equal w.host host && String.equal w.cwd s.cwd ->
+          true
+        | Some w ->
+          t.epoch <- t.epoch + 1;
+          Cancellation.cancel w.cancel;
           t.warming <- None;
-          Promise.resolve warmed ())
-        ~f:(fun () ->
-          (* What goes wrong is said by the turn, which tries again. *)
-          ignore (live_now t s input ~starting:ignore : live Or_error.t))))
+          false
+        | None -> false
+      in
+      if not already_warming
+      then (
+        Option.iter t.live ~f:(fun (Live ((module L), a)) ->
+          L.stop a;
+          t.live <- None;
+          t.live_cwd <- None;
+          if not (Option.equal String.equal t.live_host (Some host))
+          then (
+            t.thread_id <- None;
+            t.models <- []));
+        let done_, warmed = Promise.create () in
+        let cancel = Cancellation.create () in
+        let w = { Warming.host; cwd = s.cwd; done_; cancel } in
+        t.warming <- Some w;
+        Guarded.fork
+          ~sw:t.sw
+          ~what:"starting an external harness early"
+          (fun () ->
+             Exn.protect
+               ~finally:(fun () ->
+                 (match t.warming with
+                  | Some cur when phys_equal cur w -> t.warming <- None
+                  | Some _ | None -> ());
+                 Promise.resolve warmed ())
+               ~f:(fun () ->
+                 (* What goes wrong is said by the turn, which tries again. *)
+                 ignore
+                   (Cancellation.protect cancel ~f:(fun () ->
+                      live_now
+                        ~on_result:(fun start result ->
+                          if not (Cancellation.is_cancelled cancel)
+                          then t.on_prewarm start result)
+                        t
+                        s
+                        input
+                        ~starting:ignore)
+                    : live Or_error.t option))))))
 ;;
 
 (* What the harness has not seen of the session, handed to it before the
@@ -869,12 +948,14 @@ and run_turn'
           ]))
   in
   (* The files are checkpointed while the harness starts: it is sent
-     nothing before they are. *)
+     nothing before they are. Skipped for adapters that cannot roll back. *)
   let before_checkpoint =
-    match input.kind, t.checkpoint, t.not_git with
-    | (Compact _ | Autonomous), _, _ | Prompt, None, _ -> None
-    | Prompt, Some _, Some (cwd, _) when String.equal cwd s.cwd -> None
-    | Prompt, Some _, _ ->
+    match input.kind, A.rollback, t.checkpoint, t.not_git with
+    | (Compact _ | Autonomous), _, _, _
+    | Prompt, Unsupported, _, _
+    | Prompt, _, None, _ -> None
+    | Prompt, _, Some _, Some (cwd, _) when String.equal cwd s.cwd -> None
+    | Prompt, _, Some _, _ ->
       Some
         (Fiber.fork_promise ~sw:t.sw (fun () ->
            Turn_timings.phase ~alongside:true "checkpoint" (fun () ->
@@ -977,7 +1058,8 @@ and run_turn'
             | Turn_started _
             | Thread_started _
             | Retrying _
-            | Request_withdrawn _ -> ()
+            | Request_withdrawn _
+            | Session_title _ -> ()
             | _ -> output ());
            match event with
            | Turn_end { stop = st; turn_id } as e ->
@@ -1061,6 +1143,9 @@ and run_turn'
                (Hashtbl.find requests request_id)
                ~f:Cancellation.cancel;
              events ~sw
+           | Session_title title ->
+             s.set_title title;
+             events ~sw
            | e ->
              (match e with
               | Thread_started { model = Some model; _ } ->
@@ -1082,17 +1167,18 @@ and run_turn'
          in
          let steer () =
            let rec loop () =
-             Eio_unix.sleep (Time_float.Span.to_sec t.steer_poll);
-             (match s.steer () with
-              | [] -> ()
-              | messages ->
-                (match L.steer a (input_of messages) with
-                 | Ok () ->
-                   List.iter
-                     messages
-                     ~f:(Composer_recorder.user_message recorder)
-                 | Error _ -> Queue.enqueue_all leftover messages));
-             loop ()
+             match s.steer () with
+             | [] ->
+               s.await_steer ();
+               loop ()
+             | messages ->
+               (match L.steer a (input_of messages) with
+                | Ok () ->
+                  List.iter
+                    messages
+                    ~f:(Composer_recorder.user_message recorder)
+                | Error _ -> Queue.enqueue_all leftover messages);
+               loop ()
            in
            loop ()
          in

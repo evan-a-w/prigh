@@ -213,12 +213,21 @@ let fake_claude (p : Line_transport.Peer.t) =
 (* How many sessions the fake Antigravities opened, for a test to wait on. *)
 let agy_sessions = ref 0
 let agy_session_opened = Eio.Condition.create ()
+let agy_model_sets = ref 0
+let agy_model_set = Eio.Condition.create ()
 
 let rec await_agy_sessions n =
   if !agy_sessions < n
   then (
     Eio.Condition.await_no_mutex agy_session_opened;
     await_agy_sessions n)
+;;
+
+let rec await_agy_model_sets n =
+  if !agy_model_sets < n
+  then (
+    Eio.Condition.await_no_mutex agy_model_set;
+    await_agy_model_sets n)
 ;;
 
 (* Antigravity: its models through the session model API. *)
@@ -261,6 +270,10 @@ let fake_agy ~logged_in (p : Line_transport.Peer.t) =
                {"modelId":"flash","name":"Gemini 3.8 Flash"}]}}|};
          incr agy_sessions;
          Eio.Condition.broadcast agy_session_opened
+       | "session/set_model" ->
+         reply j "{}";
+         incr agy_model_sets;
+         Eio.Condition.broadcast agy_model_set
        | _ -> ());
       loop ()
   in
@@ -634,8 +647,8 @@ let%expect_test
   [%expect
     {|
     event: state, harness_models loading
-    list_models, before Antigravity said:
     spawn agy on backend
+    list_models, before Antigravity said:
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
     agy got initialize
     agy got session/new
@@ -716,9 +729,12 @@ let%expect_test
     harness: chip: deepseek/deepseek-flash (DeepSeek V4.1 Flash)
     |}];
   let opened = !agy_sessions in
+  let model_sets = !agy_model_sets in
   switch "acp:antigravity";
-  (* Switched to, it is started at once (Runner.prewarm). *)
+  (* Switched to, it is started at once (Runner.prewarm) and applies the
+     remembered model during startup. *)
   await_agy_sessions (opened + 1);
+  await_agy_model_sets (model_sets + 1);
   [%expect
     {|
     spawn agy on backend
@@ -726,6 +742,7 @@ let%expect_test
     acp:antigravity: chip: acp:antigravity/gpt-oss (GPT-OSS 120B (Medium))
     agy got initialize
     agy got session/new
+    agy got session/set_model
     |}]
 ;;
 
@@ -948,5 +965,117 @@ let%expect_test "prigh's login refused: what to do is about that login" =
     event: state, harness_models failed login_refused "login refused" fixes=[login:google-antigravity engines retry]
       Antigravity on <machine> could not list its models: it was refused prigh's google-antigravity login "Work", or could not use it: /login google-antigravity logs in again, or Settings → Engines runs Antigravity on its own login.
       acp:antigravity/default "loading models\226\128\166" thinking=[off]
+    |}]
+;;
+
+let%expect_test
+    "catalog fetch skips MCP sockets; new_session prewarms and cwd change \
+     re-prewarms"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let sub = Filename.concat t.dir "sub" in
+  Core_unix.mkdir_p sub;
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let new_agent ?session ~cwd () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir
+      ~home:t.dir
+      ?session
+      ~backend_host:true
+      ~cwd
+      ()
+  in
+  let spawn_external _agent ~host:_ (launch : Adapter.Launch.t) =
+    let program =
+      List.find_exn launch.argv ~f:(fun a ->
+        List.mem [ "codex"; "agy" ] a ~equal:String.equal)
+    in
+    printf "spawn %s mcp=%b cwd=%s\n" program launch.mcp (mask t launch.cwd);
+    Ok
+      (Line_transport.Peer.spawn
+         ~sw
+         (match program with
+          | "codex" -> fake_codex ~logged_in:true
+          | _ -> fake_agy ~logged_in:true))
+  in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~login:
+        (Login_manager.create
+           ~env:t.env
+           ~sw
+           ~getenv:(fun _ -> None)
+           ~store:(Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+           ())
+      ~sessions_dir
+      ~cwd:t.dir
+      ~engines:composer
+      ~spawn_external
+      ~new_agent
+      ()
+  in
+  let note_changed = ref None in
+  let next_change () =
+    let p, r = Eio.Promise.create () in
+    note_changed := Some r;
+    p
+  in
+  let client =
+    Rpc_server.connect server ~send:(fun json ->
+      match string_at [ "event" ] json with
+      | Some "models_changed" ->
+        Option.iter !note_changed ~f:(fun r ->
+          note_changed := None;
+          Eio.Promise.resolve r ())
+      | _ -> ())
+  in
+  let call ?(params = "{}") meth =
+    match
+      Rpc_server.handle
+        server
+        client
+        (Json.of_string
+           (sprintf {|{"id":"r","method":%S,"params":%s}|} meth params))
+    with
+    | `Object fields
+      when Option.is_some (List.Assoc.find fields "result" ~equal:String.equal)
+      -> ()
+    | json -> raise_s [%message "rpc failed" meth (Json.to_string json)]
+  in
+  (* Codex catalog fetch uses mcp=false. *)
+  call "hello";
+  call ~params:{|{"adapter":"codex"}|} "new_session";
+  let changed = next_change () in
+  call "list_models";
+  Eio.Promise.await changed;
+  (* ACP new_session prewarms immediately (mcp=true), and changing cwd
+     re-prewarms in the new directory. *)
+  let opened = !agy_sessions in
+  call ~params:{|{"adapter":"acp:antigravity"}|} "new_session";
+  await_agy_sessions (opened + 1);
+  call ~params:(sprintf {|{"path":%S}|} sub) "set_cwd";
+  await_agy_sessions (opened + 2);
+  Rpc_server.shutdown server;
+  [%expect
+    {|
+    spawn codex mcp=false cwd=$DIR
+    codex got initialize
+    codex got model/list
+    codex got account/rateLimits/read
+    spawn agy mcp=true cwd=$DIR
+    agy got initialize
+    agy got session/new
+    spawn agy mcp=true cwd=$DIR/sub
+    agy got initialize
+    agy got session/new
     |}]
 ;;

@@ -37,25 +37,41 @@ let provider_of_arg models s =
        exit 2)
 ;;
 
+let provider_configured ~getenv ~models ?member store (provider : Provider_id.t)
+  =
+  match provider with
+  | Google_antigravity -> false
+  | Custom name -> Option.is_some (Model_registry.find_provider models name)
+  | Anthropic | Openai_codex | Openai | Deepseek ->
+    let has_account =
+      match Login_choice.list ?member store provider with
+      | Ok (_ :: _) -> true
+      | Ok [] | Error _ -> false
+    in
+    has_account
+    || List.exists (Provider_auth.env_vars provider) ~f:(fun var ->
+      match getenv var with
+      | Some v -> not (String.is_empty v)
+      | None -> false)
+;;
+
 (* With no explicit or configured default model, prefer a provider the user is
-   logged in to, then the first custom provider's first known model. *)
-let default_model ~getenv ~models store =
+   logged in to (including shared accounts), then the first custom provider's
+   first known model. *)
+let default_model ~getenv ~models ?member store =
   let custom () =
     List.find (Model_registry.models models) ~f:(fun m ->
       Provider_id.is_custom m.provider)
   in
-  match Provider_auth.status ~getenv store with
-  | Error _ -> Model.default
-  | Ok statuses ->
-    List.find_map
-      [ Provider_id.Anthropic; Openai_codex; Openai; Deepseek ]
-      ~f:(fun provider ->
-        List.find statuses ~f:(fun s ->
-          Provider_id.equal s.provider provider && Option.is_some s.configured))
-    |> Option.bind ~f:(fun s -> Model.default_for s.provider)
-    |> (function
-     | Some m -> m
-     | None -> Option.value (custom ()) ~default:Model.default)
+  List.find_map
+    [ Provider_id.Anthropic; Openai_codex; Openai; Deepseek ]
+    ~f:(fun provider ->
+      if provider_configured ~getenv ~models ?member store provider
+      then Model.default_for provider
+      else None)
+  |> function
+  | Some m -> m
+  | None -> Option.value (custom ()) ~default:Model.default
 ;;
 
 module Setup = struct
@@ -296,6 +312,8 @@ let common_params =
             Login_choice.list ?member store provider
             |> Result.ok
             |> Option.value ~default:[])
+          ~provider_configured:
+            (provider_configured ~getenv ~models ?member store)
           ~tools:
             (if no_tools
              then []
@@ -335,7 +353,7 @@ let common_params =
           ?session
           ?model
           ?thinking
-          ~fallback_model:(default_model ~getenv ~models store)
+          ~fallback_model:(default_model ~getenv ~models ?member store)
           ~models
           ~auto_describe
           ~backend_host

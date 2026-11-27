@@ -2001,3 +2001,29 @@ let%expect_test "the effort sent is one the model supports" =
     ((On (Xhigh)) (()) -> (xhigh))
     |}]
 ;;
+
+let%expect_test "thread/name/updated emits Session_title for main thread only" =
+  let codec = started () in
+  let thread = Option.value_exn (C.thread_id codec) in
+  let show label params =
+    printf "%s:\n" label;
+    feed codec [ notify "thread/name/updated" (`Object params) ]
+  in
+  show
+    "threadName"
+    [ "threadId", `String thread; "threadName", `String "  Fix parser bug  " ];
+  show "name" [ "threadId", `String thread; "name", `String "Refine tests" ];
+  show "blank" [ "threadId", `String thread; "threadName", `String "   " ];
+  show
+    "other thread"
+    [ "threadId", `String "other-thread"; "threadName", `String "Ignored" ];
+  [%expect
+    {|
+    threadName:
+    (Session_title "Fix parser bug")
+    name:
+    (Session_title "Refine tests")
+    blank:
+    other thread:
+    |}]
+;;

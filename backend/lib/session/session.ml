@@ -47,7 +47,14 @@ module Entry = struct
           }
       | Masked of { through : string }
       | Name of { name : string }
-      | Description of { text : string }
+      | Description of
+          { text : string
+          ; native : bool
+                [@jsonaf.default false]
+                [@jsonaf_drop_default.equal]
+                [@sexp.default false]
+                [@sexp_drop_default.equal]
+          }
       | Cwd of
           { cwd : string
           ; host : Host.t option [@jsonaf.option] [@sexp.option]
@@ -323,7 +330,7 @@ module Totals = struct
           | Some (n, c) -> n + 1, c +. cost_usd))
     | Message (Assistant a) -> t.replies <- (a.model, a.usage) :: t.replies
     | Name { name } -> t.name <- Some name
-    | Description { text } -> t.description <- Some text
+    | Description { text; native = _ } -> t.description <- Some text
     | Resume_at { at } -> t.resume_at <- at
     | _ -> ()
   ;;
@@ -1313,7 +1320,11 @@ let set_model ?account t ~model ~thinking =
 
 let account t = (derived t).state.account
 let set_name t ~name = append t (Name { name })
-let set_description t ~text = append t (Description { text })
+
+let set_description ?(native = false) t ~text =
+  append t (Description { text; native })
+;;
+
 let set_cwd t ?host ~cwd () = append t (Cwd { cwd; host })
 let set_system_prompt t ~text = append t (System_prompt { text })
 let set_goal t goal = append t (Goal { goal })
@@ -2859,7 +2870,7 @@ module For_testing = struct
            | _ -> None))
       ~description:
         (last entries ~f:(function
-           | Description { text } -> Some text
+           | Description { text; native = _ } -> Some text
            | _ -> None))
       ~resume_at:
         (last entries ~f:(function
