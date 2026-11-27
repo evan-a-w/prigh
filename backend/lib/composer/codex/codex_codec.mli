@@ -31,6 +31,9 @@ module Settings : sig
     ; sandbox : bool
       (** Codex's sandbox for the mode; [false] where it cannot run: none,
           Codex still asking before what it does not know to be read-only *)
+    ; writable_roots : string list
+      (** extra absolute directories writable in [workspaceWrite] mode
+          alongside [cwd] (e.g. session worktrees under [worktrees_dir]) *)
     }
   [@@deriving sexp_of]
 end

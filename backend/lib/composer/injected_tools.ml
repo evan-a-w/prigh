@@ -110,16 +110,32 @@ let initialize params =
       , `String
           "prigh's tools for the user's session: components shown in the chat, \
            the user's memory, other sessions, pull requests, issues and CI \
-           through the user's sign-in, worktrees, and prigh subagents (for \
-           delegating work to another host or engine when the user explicitly \
-           asks; defaults to this session's engine and host)." )
+           through the user's sign-in, worktrees, and subagents. Always use \
+           prigh's subagent (and subagent_*) tools — not your own built-in or \
+           native subagent, agent, task or swarm tools — when spawning or \
+           managing subagents, so they run in prigh's UI with live progress, \
+           worktree tracking and steering (defaults to this session's engine, \
+           model and host; only switch engine, model or host when the user \
+           explicitly asks)." )
     ]
 ;;
 
+let subagent_mcp_prefix =
+  "PREFERRED: Always use this prigh subagent tool (and subagent_*) instead of \
+   any built-in or native subagent, invoke_subagent, Agent, Task or swarm \
+   tool, so subagents appear in prigh's UI with live progress, worktree \
+   tracking and steering. "
+;;
+
 let tool_json (tool : Tool.t) =
+  let description =
+    if String.equal tool.spec.name Tool_subagent.name
+    then subagent_mcp_prefix ^ tool.spec.description
+    else tool.spec.description
+  in
   `Object
     [ "name", `String tool.spec.name
-    ; "description", `String tool.spec.description
+    ; "description", `String description
     ; "inputSchema", tool.spec.parameters
     ]
 ;;

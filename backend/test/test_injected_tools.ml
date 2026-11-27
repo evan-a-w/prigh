@@ -125,7 +125,7 @@ let%expect_test "initialize and list" =
   [%expect
     {|
     > {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"codex","version":"0.166.0"}}}
-    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and prigh subagents (for delegating work to another host or engine when the user explicitly asks; defaults to this session's engine and host)."}}
+    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Always use prigh's subagent (and subagent_*) tools — not your own built-in or native subagent, agent, task or swarm tools — when spawning or managing subagents, so they run in prigh's UI with live progress, worktree tracking and steering (defaults to this session's engine, model and host; only switch engine, model or host when the user explicitly asks)."}}
     > {"jsonrpc":"2.0","method":"notifications/initialized"}
     < (nothing)
     > {"jsonrpc":"2.0","id":"p","method":"ping"}
@@ -138,7 +138,7 @@ let%expect_test "initialize and list" =
   [%expect
     {|
     > {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}
-    < {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and prigh subagents (for delegating work to another host or engine when the user explicitly asks; defaults to this session's engine and host)."}}
+    < {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Always use prigh's subagent (and subagent_*) tools — not your own built-in or native subagent, agent, task or swarm tools — when spawning or managing subagents, so they run in prigh's UI with live progress, worktree tracking and steering (defaults to this session's engine, model and host; only switch engine, model or host when the user explicitly asks)."}}
     |}];
   (match
      Injected_tools.handle
@@ -182,7 +182,7 @@ let%expect_test "initialize and list" =
     worktree: the worktree tool
     reply_to_comment: the reply_to_comment tool
     goal_complete: the goal_complete tool
-    subagent: the subagent tool
+    subagent: PREFERRED: Always use this prigh subagent tool (an
     |}]
 ;;
 

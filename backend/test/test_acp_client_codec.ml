@@ -1043,3 +1043,54 @@ let%expect_test "Antigravity's web searches, a fetch and code searches" =
       agent_end (16 new messages)
     |}]
 ;;
+
+let%expect_test
+    "ACP tool_kind and Canonical_tool handle prigh MCP tools, Antigravity \
+     edit_file/run_command, and locations"
+  =
+  let codec = C.create () in
+  let step line =
+    List.iter (C.handle_line codec line) ~f:(function
+      | Event (Tool_start { kind; native_name; input; _ }) ->
+        let c = Canonical_tool.of_start ~kind ~native_name ~input in
+        printf
+          "tool_start kind=%s -> %s %s\n"
+          (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
+          c.name
+          (Jsonaf.to_string c.arguments)
+      | Event (Approval_request { kind; input; _ }) ->
+        let c = Canonical_tool.of_start ~kind ~native_name:"perm" ~input in
+        printf
+          "approval kind=%s -> %s %s\n"
+          (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
+          c.name
+          (Jsonaf.to_string c.arguments)
+      | _ -> ())
+  in
+  ignore (C.new_session codec ~cwd:"/work" ~mcp_servers:[] : string);
+  step {|{"jsonrpc":"2.0","id":0,"result":{"sessionId":"s1"}}|};
+  ignore (Or_error.ok_exn (C.prompt codec [ Text "go" ]) : C.Output.t list);
+  (* Antigravity MCP tool permission request for prigh's worktree tool *)
+  step
+    {|{"jsonrpc":"2.0","id":10,"method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc-1","kind":"other","title":"mcp_prigh_worktree","rawInput":{"action":"list"}},"options":[{"optionId":"a","kind":"allow_once"}]}}|};
+  (* Antigravity edit_file with Path/Target/Replacement *)
+  step
+    {|{"jsonrpc":"2.0","id":11,"method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc-2","kind":"edit","title":"edit_file","rawInput":{"Path":"/home/u/.prigh/worktrees/app/feat/a.ml","Target":"old","Replacement":"new"}},"options":[{"optionId":"a","kind":"allow_once"}]}}|};
+  (* ACP edit permission with path only in locations *)
+  step
+    {|{"jsonrpc":"2.0","id":12,"method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc-3","kind":"edit","title":"Edit","locations":[{"path":"/home/u/.prigh/worktrees/app/feat/b.ml"}],"rawInput":{}},"options":[{"optionId":"a","kind":"allow_once"}]}}|};
+  (* Antigravity run_command with CommandLine *)
+  step
+    {|{"jsonrpc":"2.0","id":13,"method":"session/request_permission","params":{"sessionId":"s1","toolCall":{"toolCallId":"tc-4","kind":"execute","title":"Run command","rawInput":{"CommandLine":"dune build @runtest"}},"options":[{"optionId":"a","kind":"allow_once"}]}}|};
+  [%expect
+    {|
+    tool_start kind=(Mcp(server prigh)(tool worktree)) -> worktree {"action":"list"}
+    approval kind=(Mcp(server prigh)(tool worktree)) -> worktree {"action":"list"}
+    tool_start kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/a.ml","edits":[{"old_text":"old","new_text":"new"}]}
+    approval kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/a.ml","edits":[{"old_text":"old","new_text":"new"}]}
+    tool_start kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/b.ml"}
+    approval kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/b.ml"}
+    tool_start kind=Command -> bash {"command":"dune build @runtest"}
+    approval kind=Command -> bash {"command":"dune build @runtest"}
+    |}]
+;;

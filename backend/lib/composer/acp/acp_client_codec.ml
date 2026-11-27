@@ -1131,6 +1131,32 @@ module Tool_class = struct
   ;;
 end
 
+let mcp_of_name name =
+  match String.chop_prefix name ~prefix:"mcp__" with
+  | Some rest ->
+    (match String.substr_index rest ~pattern:"__" with
+     | Some i ->
+       Some
+         (Adapter_event.Tool_kind.Mcp
+            { server = String.prefix rest i
+            ; tool = String.drop_prefix rest (i + 2)
+            })
+     | None -> None)
+  | None ->
+    (match
+       String.chop_prefix
+         name
+         ~prefix:("mcp_" ^ Injected_tools.server_name ^ "_")
+     with
+     | Some tool
+       when Option.is_some
+              (Injected_tools.canonical_of_mcp
+                 ~server:Injected_tools.server_name
+                 ~tool) ->
+       Some (Mcp { server = Injected_tools.server_name; tool })
+     | Some _ | None -> None)
+;;
+
 (* What a call is, and the name it goes by: when not sure, [Other] with the
    agent's own title, rather than a wrong prigh tool. *)
 let tool_kind ~acp_kind ~name ~meta ~title ~raw_input
@@ -1138,33 +1164,38 @@ let tool_kind ~acp_kind ~name ~meta ~title ~raw_input
   =
   let tool_name = Tool_class.tool_name ~name ~meta ~title in
   let native default = Option.value tool_name ~default in
-  let classified =
-    match acp_kind with
-    | "search" | "fetch" | "other" ->
-      let by_name = Option.bind tool_name ~f:Tool_class.of_name in
-      (match by_name, acp_kind with
-       | Some c, _ -> Some c
-       | None, "other" -> None
-       | None, _ ->
-         Option.first_some
-           (Tool_class.of_input raw_input)
-           (Option.first_some
-              (Tool_class.of_title title)
-              (Option.some_if
-                 (String.equal acp_kind "fetch")
-                 Tool_class.Web_fetch)))
-    | _ -> None
-  in
-  match classified, acp_kind with
-  | Some (Web_search | Web_fetch), _ -> Web_search, native acp_kind
-  | Some Code_search, _ -> Search, native acp_kind
-  | None, "read" -> Read, native acp_kind
-  | None, ("edit" | "delete" | "move") -> File_change, native acp_kind
-  | None, "execute" -> Command, native acp_kind
-  | None, ("think" | "switch_mode") -> Other acp_kind, native acp_kind
-  | None, _ ->
-    let native = native title in
-    Other native, native
+  match
+    Option.first_some (Option.bind tool_name ~f:mcp_of_name) (mcp_of_name title)
+  with
+  | Some mcp -> mcp, native title
+  | None ->
+    let classified =
+      match acp_kind with
+      | "search" | "fetch" | "other" ->
+        let by_name = Option.bind tool_name ~f:Tool_class.of_name in
+        (match by_name, acp_kind with
+         | Some c, _ -> Some c
+         | None, "other" -> None
+         | None, _ ->
+           Option.first_some
+             (Tool_class.of_input raw_input)
+             (Option.first_some
+                (Tool_class.of_title title)
+                (Option.some_if
+                   (String.equal acp_kind "fetch")
+                   Tool_class.Web_fetch)))
+      | _ -> None
+    in
+    (match classified, acp_kind with
+     | Some (Web_search | Web_fetch), _ -> Web_search, native acp_kind
+     | Some Code_search, _ -> Search, native acp_kind
+     | None, "read" -> Read, native acp_kind
+     | None, ("edit" | "delete" | "move") -> File_change, native acp_kind
+     | None, "execute" -> Command, native acp_kind
+     | None, ("think" | "switch_mode") -> Other acp_kind, native acp_kind
+     | None, _ ->
+       let native = native title in
+       Other native, native)
 ;;
 
 let next_item (turn : Turn.t) prefix =
@@ -1263,7 +1294,28 @@ let chunk t ~thought ~message_id text =
       ]
 ;;
 
-let tool_input ~(kind : Adapter_event.Tool_kind.t) ~title raw : Json.t =
+let first_location_path update =
+  List.find_map (items "locations" update) ~f:(fun loc -> str "path" loc)
+;;
+
+let has_path_field fields =
+  List.exists fields ~f:(fun (k, _) ->
+    List.mem
+      [ "file_path"; "path"; "notebook_path" ]
+      (String.lowercase k)
+      ~equal:String.equal)
+;;
+
+let has_command_field fields =
+  List.exists fields ~f:(fun (k, _) ->
+    List.mem
+      [ "command"; "command_line"; "commandline" ]
+      (String.lowercase k)
+      ~equal:String.equal)
+;;
+
+let tool_input ?location ~(kind : Adapter_event.Tool_kind.t) ~title raw : Json.t
+  =
   let fields =
     match raw with
     | Some (`Object fields) -> fields
@@ -1271,8 +1323,13 @@ let tool_input ~(kind : Adapter_event.Tool_kind.t) ~title raw : Json.t =
     | Some other -> [ "input", other ]
   in
   match kind with
-  | Command when not (List.Assoc.mem fields ~equal:String.equal "command") ->
+  | Command when not (has_command_field fields) ->
     `Object (fields @ [ "command", `String title ])
+  | Read | File_change ->
+    (match location with
+     | Some path when not (has_path_field fields) ->
+       `Object (fields @ [ "path", `String path ])
+     | Some _ | None -> `Object fields)
   | _ -> `Object fields
 ;;
 
@@ -1418,7 +1475,12 @@ let tool_of_update t update =
               ; kind
               ; native_name
               ; title
-              ; input = tool_input ~kind ~title raw_input
+              ; input =
+                  tool_input
+                    ?location:(first_location_path update)
+                    ~kind
+                    ~title
+                    raw_input
               ; parent = None
               })
        in
@@ -1873,7 +1935,12 @@ let on_permission t ~id params =
              ; tool_id
              ; kind
              ; summary = title
-             ; input = tool_input ~kind ~title (field "rawInput" tool_call)
+             ; input =
+                 tool_input
+                   ?location:(first_location_path tool_call)
+                   ~kind
+                   ~title
+                   (field "rawInput" tool_call)
              ; offers_always =
                  List.exists options ~f:(fun (_, k) ->
                    String.equal k "allow_always")

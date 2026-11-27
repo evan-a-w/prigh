@@ -33,6 +33,9 @@ type t =
   ; strict_mcp_config : bool
     (** only the [mcp_config] servers start, not the project's [.mcp.json]
         (default) *)
+  ; add_dirs : string list
+    (** additional directories Claude Code may access alongside its [cwd]
+        ([--add-dir]) *)
   }
 [@@deriving sexp_of]
 

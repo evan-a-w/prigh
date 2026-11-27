@@ -94,6 +94,7 @@ let%expect_test "launch" =
     ; mcp_config = Some (Claude_launch.sdk_mcp_config [ "prigh" ])
     ; max_thinking_tokens = Some 8000
     ; effort = Some "high"
+    ; add_dirs = [ "/home/u/.prigh/worktrees"; "-weird" ]
     };
   [%expect
     {|
@@ -103,7 +104,8 @@ let%expect_test "launch" =
      --resume-session-at=-uuid --mcp-config
      "{\"mcpServers\":{\"prigh\":{\"type\":\"sdk\",\"name\":\"prigh\"}}}"
      --strict-mcp-config --setting-sources=user --include-partial-messages
-     --max-thinking-tokens 8000 --effort=high --input-format stream-json)
+     --max-thinking-tokens 8000 --effort=high --add-dir /home/u/.prigh/worktrees
+     --add-dir=-weird --input-format stream-json)
     |}];
   argv
     { Claude_launch.default with resume = New { session_id = Some "pinned" } };

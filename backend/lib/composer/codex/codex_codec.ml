@@ -10,6 +10,7 @@ module Settings = struct
     ; plan : bool
     ; efforts : string list option
     ; sandbox : bool
+    ; writable_roots : string list
     }
   [@@deriving sexp_of]
 end
@@ -317,14 +318,18 @@ let sandbox_mode (s : Settings.t) =
 ;;
 
 let sandbox_policy (s : Settings.t) =
-  let type_ =
-    match s.approval with
-    | _ when not s.sandbox -> "dangerFullAccess"
-    | Ask -> "readOnly"
-    | Auto_edit | Smart -> "workspaceWrite"
-    | Auto -> "dangerFullAccess"
-  in
-  `Object [ "type", `String type_ ]
+  match s.approval with
+  | _ when not s.sandbox -> `Object [ "type", `String "dangerFullAccess" ]
+  | Ask -> `Object [ "type", `String "readOnly" ]
+  | Auto_edit | Smart ->
+    let roots =
+      match s.writable_roots with
+      | [] -> []
+      | roots ->
+        [ "writableRoots", `Array (List.map roots ~f:(fun r -> `String r)) ]
+    in
+    `Object (("type", `String "workspaceWrite") :: roots)
+  | Auto -> `Object [ "type", `String "dangerFullAccess" ]
 ;;
 
 (* Codex's efforts, lowest first. *)
@@ -365,8 +370,17 @@ let thread_params
       (o : Thread_options.t)
   =
   let config =
+    let writable_roots =
+      match s.writable_roots, sandbox_mode s with
+      | (_ :: _ as roots), "workspace-write" ->
+        [ ( "sandbox_workspace_write.writable_roots"
+          , `Array (List.map roots ~f:(fun r -> `String r)) )
+        ]
+      | _ -> []
+    in
     ("tools.update_plan.enabled", `True)
-    :: (List.map o.mcp_servers ~f:(fun (name, server) ->
+    :: (writable_roots
+        @ List.map o.mcp_servers ~f:(fun (name, server) ->
           "mcp_servers." ^ name, server)
         @ o.config)
   in

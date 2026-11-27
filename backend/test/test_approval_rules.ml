@@ -465,6 +465,40 @@ let%expect_test "which built-in tools ask in each mode" =
     |}]
 ;;
 
+let%expect_test "smart: edits in recorded session worktrees are in-project" =
+  let worktrees = [ "/home/u/.prigh/worktrees/app/feat" ] in
+  List.iter
+    [ "/home/u/.prigh/worktrees/app/feat/src/a.ml"
+    ; "/home/u/.prigh/worktrees/app/feat/.git/config"
+    ; "/home/u/.prigh/worktrees/other/src/a.ml"
+    ]
+    ~f:(fun path ->
+      let args = `Object [ "path", `String path ] in
+      let decision =
+        Approval.decide
+          ~mode:Smart
+          ~plan:false
+          ~worktrees
+          ~rules:Approval.Rules.empty
+          ~session:[]
+          ~cwd:"/home/u/dev/app"
+          ~home:"/home/u"
+          ~destructive:true
+          ~changes_work:true
+          (Approval_rule.Call.create ~cwd:"/home/u/dev/app" ~tool:"edit" args)
+      in
+      printf
+        "%-48s %s\n"
+        path
+        (Sexp.to_string [%sexp (decision : Approval.Decision.t)]));
+  [%expect
+    {|
+    /home/u/.prigh/worktrees/app/feat/src/a.ml       Allow
+    /home/u/.prigh/worktrees/app/feat/.git/config    (Judge(rules(((tool edit)(pattern())))))
+    /home/u/.prigh/worktrees/other/src/a.ml          (Judge(rules(((tool edit)(pattern())))))
+    |}]
+;;
+
 let rule s = Or_error.ok_exn (Approval_rule.of_string s)
 
 let bash command =
