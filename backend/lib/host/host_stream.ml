@@ -231,7 +231,9 @@ let start
     | Ok (Mcp { conn; line }) -> on_mcp (Mcp_event.Line { conn; line })
     | Ok (Mcp_closed conn) -> on_mcp (Mcp_event.Closed conn)
     | Ok (Out { seq; line }) ->
-      if seq <> !expected
+      if seq < !expected
+      then ()
+      else if seq <> !expected
       then break (sprintf "expected line %d but got line %d" !expected seq)
       else (
         incr expected;

@@ -783,6 +783,31 @@ let answer_question t ~request_id (answer : User_question.Reply.t) =
   | Some _ | None -> None
 ;;
 
+let cancel_pending t =
+  let to_cancel =
+    Hashtbl.to_alist t.server_requests
+    |> List.filter ~f:(fun (_, (p : Pending.t)) ->
+      match p.request with
+      | Command_approval _
+      | File_approval
+      | Permissions _
+      | Mcp_tool_approval _
+      | Question _ -> true
+      | Tool | Token_refresh -> false)
+    |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+  in
+  List.concat_map to_cancel ~f:(fun (request_id, (p : Pending.t)) ->
+    let line =
+      match p.request with
+      | Question _ -> answer_question t ~request_id Cancelled
+      | Command_approval _ | File_approval | Permissions _ | Mcp_tool_approval _
+        -> reply_approval t ~request_id Cancel
+      | Tool | Token_refresh -> None
+    in
+    Option.to_list (Option.map line ~f:(fun l -> Output.Send l))
+    @ [ Output.Event (Request_withdrawn { request_id }) ])
+;;
+
 let reply_tool_call t ~request_id ~output ~success =
   match Hashtbl.find t.server_requests request_id with
   | Some { Pending.id; request = Tool } ->
@@ -1786,19 +1811,20 @@ let response t (kind : Request_kind.t) json =
     let message = Option.value (str "message" error) ~default:"error" in
     let failed = Output.Response (Failed { kind; code; message }) in
     (match kind with
-     | Turn_start ->
+     | Turn_start | Compact ->
        (match t.turn with
         | Some { id = None; _ } -> t.turn <- None
         | _ -> ());
+       let prefix =
+         match kind with
+         | Compact -> "Codex refused to compact: "
+         | _ -> "Codex refused the turn: "
+       in
        [ failed
        ; event
            (Turn_end
               { turn_id = None
-              ; stop =
-                  Failed
-                    { kind = Other
-                    ; message = "Codex refused the turn: " ^ message
-                    }
+              ; stop = Failed { kind = Other; message = prefix ^ message }
               })
        ]
      | _ -> [ failed ])

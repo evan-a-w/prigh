@@ -242,7 +242,6 @@ let%expect_test "job_output, job_status and job_kill" =
     assistant:  job_status{}
     tool_result job_status: j1  running  Ns  sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait  (last: 17 B, started-sleeping) | j2  exited 0, delivered  Ns  sleep 0.3; echo hi  (last: 3 B, hi)
     assistant:  job_kill{"id":"j1"}
-    state: running=true subagents=[] jobs=[j1 killed]
     state: running=true subagents=[] jobs=[]
     tool_result job_kill: [job j1 killed] sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait | started-sleeping
     assistant:  job_kill{"id":"j9"}

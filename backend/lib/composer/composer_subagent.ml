@@ -254,8 +254,11 @@ let create
               else if !autonomous_pending
               then (
                 autonomous_pending := false;
-                let more = run_one ~kind:Autonomous [] in
-                continue_loop (acc @ more))
+                if Composer_runner.alive runner
+                then (
+                  let more = run_one ~kind:Autonomous [] in
+                  continue_loop (acc @ more))
+                else continue_loop acc)
               else if Composer_runner.has_open_work runner
               then (
                 match await_open_work () with
@@ -264,8 +267,7 @@ let create
                   record_prompts msgs;
                   let more = run_one ~kind:Prompt msgs in
                   continue_loop (acc @ more)
-                | `Exited ->
-                  if !autonomous_pending then continue_loop acc else acc
+                | `Exited -> acc
                 | `Cancelled ->
                   acc @ [ aborted_assistant ~adapter:adapter_id ~model ]
                 | `Timeout ->

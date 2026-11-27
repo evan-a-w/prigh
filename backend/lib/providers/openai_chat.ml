@@ -478,11 +478,13 @@ let stream
   let builder = Assistant_builder.create ~model:(Model.key request.model) in
   let tool_calls = Tool_calls.create () in
   let finish_reason = ref None in
+  let saw_done = ref false in
   let usage = ref Usage.zero in
   let api_error = ref None in
   let handle_event (event : Sse.Event.t) =
-    if not (String.equal (String.strip event.data) "[DONE]")
-    then (
+    if String.equal (String.strip event.data) "[DONE]"
+    then saw_done := true
+    else (
       match Json.parse event.data with
       | Error e ->
         api_error
@@ -518,9 +520,12 @@ let stream
       (match !api_error with
        | Some e -> Error e
        | None ->
-         stop_reason_of_finish
-           ~saw_tool_call:(not (Set.is_empty tool_calls.started))
-           !finish_reason)
+         if Option.is_none !finish_reason && not !saw_done
+         then Error "the stream ended before the response finished"
+         else
+           stop_reason_of_finish
+             ~saw_tool_call:(not (Set.is_empty tool_calls.started))
+             !finish_reason)
   in
   Assistant_builder.finish builder ~stop_reason ~usage:!usage
   |> Tool_calls.attach_extras tool_calls

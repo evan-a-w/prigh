@@ -247,13 +247,16 @@ let dispatch t (output : Claude_codec.Output.t) =
        (* A tool may wait for the user: the other lines go on meanwhile. *)
        let abandoned, abandon = Promise.create () in
        Hashtbl.set t.mcp_calls ~key:request.request_id ~data:abandon;
-       Fiber.fork ~sw:t.sw (fun () ->
-         Fiber.first
-           (fun () ->
-              let reply = Injected_tools.claude_reply injected request in
-              Hashtbl.remove t.mcp_calls request.request_id;
-              Adapter.Driver.write t.driver reply)
-           (fun () -> Promise.await abandoned))
+       Guarded.fork ~sw:t.sw ~what:"Claude Code MCP request" (fun () ->
+         Exn.protect
+           ~finally:(fun () -> Hashtbl.remove t.mcp_calls request.request_id)
+           ~f:(fun () ->
+             Fiber.first
+               (fun () ->
+                  let reply = Injected_tools.claude_reply injected request in
+                  Hashtbl.remove t.mcp_calls request.request_id;
+                  Adapter.Driver.write t.driver reply)
+               (fun () -> Promise.await abandoned)))
      | None ->
        Adapter.Driver.write
          t.driver
@@ -466,15 +469,20 @@ let send t settings (input : Adapter.Input.t) =
   then Or_error.error_string "a Claude Code turn is already running"
   else (
     apply t settings;
-    Adapter.Driver.begin_turn t.driver;
-    Adapter.Driver.write
-      t.driver
-      (Claude_codec.user_message
-         t.codec
-         ~text:input.text
-         ~images:input.images
-         ());
-    Ok ())
+    if not (Adapter.Driver.alive t.driver)
+    then Or_error.error_string "Claude Code is not running"
+    else if Adapter.Driver.in_turn t.driver
+    then Or_error.error_string "a Claude Code turn is already running"
+    else (
+      Adapter.Driver.begin_turn t.driver;
+      Adapter.Driver.write
+        t.driver
+        (Claude_codec.user_message
+           t.codec
+           ~text:input.text
+           ~images:input.images
+           ());
+      Ok ()))
 ;;
 
 let complete
@@ -559,8 +567,11 @@ let complete
               ~next_event:(fun () -> next_event t)
               ~interrupt:(fun () ->
                 if Adapter.Driver.in_turn t.driver
-                then
-                  Adapter.Driver.write t.driver (Claude_codec.interrupt t.codec))
+                then (
+                  List.iter
+                    (Claude_codec.cancel_pending t.codec)
+                    ~f:(dispatch t);
+                  Adapter.Driver.write t.driver (Claude_codec.interrupt t.codec)))
               ~reply_approval:(fun ~request_id reply ->
                 Result.iter
                   (Claude_codec.respond_approval t.codec ~request_id reply)
@@ -582,6 +593,7 @@ let steer _ (_ : Adapter.Input.t) =
 let interrupt t =
   if Adapter.Driver.in_turn t.driver
   then (
+    List.iter (Claude_codec.cancel_pending t.codec) ~f:(dispatch t);
     Adapter.Driver.write t.driver (Claude_codec.interrupt t.codec);
     Adapter.Driver.watch_interrupt t.driver)
 ;;
@@ -640,7 +652,12 @@ let compact t settings ~instructions =
   then Or_error.error_string "a Claude Code turn is already running"
   else (
     apply t settings;
-    Adapter.Driver.begin_turn t.driver;
-    Adapter.Driver.write t.driver (Claude_codec.compact t.codec ~instructions);
-    Ok ())
+    if not (Adapter.Driver.alive t.driver)
+    then Or_error.error_string "Claude Code is not running"
+    else if Adapter.Driver.in_turn t.driver
+    then Or_error.error_string "a Claude Code turn is already running"
+    else (
+      Adapter.Driver.begin_turn t.driver;
+      Adapter.Driver.write t.driver (Claude_codec.compact t.codec ~instructions);
+      Ok ()))
 ;;

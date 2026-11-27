@@ -167,6 +167,12 @@ val user_message
 
 val compact : t -> instructions:string option -> string
 val interrupt : t -> string
+
+(** Cancels any pending approval or user-question requests from Claude Code,
+    returning their deny-with-interrupt replies and [Request_withdrawn]
+    events. *)
+val cancel_pending : t -> Output.t list
+
 val set_permission_mode : t -> Claude_permission_mode.t -> string
 
 (** [None]: Claude Code's default model. *)

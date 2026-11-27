@@ -301,6 +301,9 @@ val in_turn : t -> bool
     (e.g. a background task woke it), with no open [session/prompt] request. *)
 val is_autonomous_turn : t -> bool
 
+(** Whether the running turn has been cancelled ({!cancel}). *)
+val is_cancelled_turn : t -> bool
+
 (** Whether an autonomous turn has emitted assistant text since its last
     started tool call (so a short quiet spell means it finished speaking). *)
 val autonomous_has_text : t -> bool

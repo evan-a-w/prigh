@@ -495,7 +495,10 @@ module Stream_state = struct
     ; mutable tool_indices : (int * int) list (* content index -> tool index *)
     ; mutable server_tools : (int * (string * string * Buffer.t)) list
       (* content index -> id, name, input so far *)
+    ; mutable thinking_signatures : (int * Buffer.t) list
+      (* content index -> signature chunks so far *)
     ; mutable stop_reason : string option
+    ; mutable message_stop : bool
     ; mutable input : int
     ; mutable cache_read : int
     ; mutable output : int
@@ -509,7 +512,9 @@ module Stream_state = struct
     ; tool_index = 0
     ; tool_indices = []
     ; server_tools = []
+    ; thinking_signatures = []
     ; stop_reason = None
+    ; message_stop = false
     ; input = 0
     ; cache_read = 0
     ; output = 0
@@ -595,6 +600,8 @@ let parse_event ~tools ~computer (state : Stream_state.t) (event : Sse.Event.t)
                 default of newer models) its text stays empty, and nothing
                 else arrives until it ends. *)
              state.block_types <- (index, `Thinking) :: state.block_types;
+             state.thinking_signatures
+             <- (index, Buffer.create 64) :: state.thinking_signatures;
              [ Assistant_event.Thinking_delta "" ]
            | "redacted_thinking" ->
              let data = Option.value (member "data" block) ~default:"" in
@@ -669,10 +676,20 @@ let parse_event ~tools ~computer (state : Stream_state.t) (event : Sse.Event.t)
              Option.value_map (member "thinking" delta) ~default:[] ~f:(fun s ->
                [ Assistant_event.Thinking_delta s ])
            | "signature_delta" ->
-             Option.value_map
-               (member "signature" delta)
-               ~default:[]
-               ~f:(fun s -> [ Assistant_event.Thinking_signature s ])
+             Option.iter (member "signature" delta) ~f:(fun s ->
+               match
+                 List.Assoc.find
+                   state.thinking_signatures
+                   ~equal:Int.equal
+                   index
+               with
+               | Some buf -> Buffer.add_string buf s
+               | None ->
+                 let buf = Buffer.create (String.length s) in
+                 Buffer.add_string buf s;
+                 state.thinking_signatures
+                 <- (index, buf) :: state.thinking_signatures);
+             []
            | "input_json_delta"
              when List.Assoc.mem state.computer_calls ~equal:Int.equal index ->
              let _, _, input =
@@ -721,6 +738,18 @@ let parse_event ~tools ~computer (state : Stream_state.t) (event : Sse.Event.t)
              input
        in
        [ Tool_call_delta { index = tool_index; arguments } ]
+     | "content_block_stop"
+       when List.Assoc.mem state.thinking_signatures ~equal:Int.equal (index ())
+       ->
+       let buf =
+         List.Assoc.find_exn
+           state.thinking_signatures
+           ~equal:Int.equal
+           (index ())
+       in
+       if Buffer.length buf = 0
+       then []
+       else [ Assistant_event.Thinking_signature (Buffer.contents buf) ]
      | "content_block_stop" ->
        (match
           List.Assoc.find state.server_tools ~equal:Int.equal (index ())
@@ -742,6 +771,9 @@ let parse_event ~tools ~computer (state : Stream_state.t) (event : Sse.Event.t)
            state.stop_reason <- Some r));
        Option.iter (Json.member "usage" json) ~f:(apply_usage state);
        []
+     | "message_stop" ->
+       state.message_stop <- true;
+       []
      | "error" ->
        (* Typed, so that a transient one (overloaded_error, api_error) is
           retried. *)
@@ -759,12 +791,16 @@ let parse_event ~tools ~computer (state : Stream_state.t) (event : Sse.Event.t)
      | _ -> [])
 ;;
 
-let stop_reason_of_string = function
+let stop_reason_of_string ~message_stop = function
   | Some "tool_use" -> Stop_reason.Tool_use
   | Some "max_tokens" -> Length
-  | Some ("end_turn" | "stop_sequence" | "pause_turn") | None -> End_turn
+  | Some ("end_turn" | "stop_sequence" | "pause_turn") -> End_turn
   | Some "refusal" -> Error "refusal"
   | Some other -> Error ("unexpected stop_reason: " ^ other)
+  | None ->
+    if message_stop
+    then End_turn
+    else Error "the stream ended before the response finished"
 ;;
 
 (* How many times a turn the API paused ([pause_turn], e.g. during long
@@ -842,17 +878,26 @@ let stream
       | Completed ->
         (match state.error with
          | Some e -> Error e
-         | None -> stop_reason_of_string state.stop_reason)
+         | None ->
+           stop_reason_of_string
+             ~message_stop:state.message_stop
+             state.stop_reason)
     in
     match stop_reason, state.stop_reason with
     | End_turn, Some "pause_turn"
       when continuations < max_continuations
            && not (Cancellation.is_cancelled cancel) ->
-      go
-        { request with
-          messages =
-            original @ [ Assistant (Assistant_builder.snapshot builder) ]
+      let paused =
+        { (Assistant_builder.snapshot builder) with
+          account =
+            Option.bind request.account ~f:(fun account ->
+              Option.some_if
+                (not (Account_ref.equal account Account_ref.main))
+                (Account_ref.to_string account))
         }
+      in
+      go
+        { request with messages = original @ [ Assistant paused ] }
         ~continuations:(continuations + 1)
     | _ -> stop_reason
   in

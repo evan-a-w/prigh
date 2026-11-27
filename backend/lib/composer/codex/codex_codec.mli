@@ -232,6 +232,10 @@ val steer : t -> Input.t list -> string Or_error.t
     with the response. *)
 val interrupt : t -> [ `Send of string | `Deferred | `Idle ]
 
+(** Cancels any pending approval or user-question requests from Codex,
+    returning their protocol cancel replies and [Request_withdrawn] events. *)
+val cancel_pending : t -> Output.t list
+
 (** [thread/compact/start]: Codex compacts in a turn of its own (events as
     for {!start_turn}'s, ending with [Turn_end]). *)
 val compact : t -> string Or_error.t

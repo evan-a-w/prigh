@@ -366,15 +366,17 @@ let summarise
   | Error e -> Or_error.error_string ("compaction failed: " ^ e)
   | Aborted -> Or_error.error_string "compaction aborted"
   | End_turn | Tool_use | Length ->
-    Ok
-      { Outcome.summary =
-          Compaction_files.append
-            (String.strip (Message.Assistant.text reply))
-            files
-      ; usage = Usage.add usage reply.usage
-      ; cost_usd =
-          Model.cost_usd model usage +. Model.cost_usd model reply.usage
-      }
+    let text = String.strip (Message.Assistant.text reply) in
+    if String.is_empty text
+    then
+      Or_error.error_string "compaction failed: model returned an empty summary"
+    else
+      Ok
+        { Outcome.summary = Compaction_files.append text files
+        ; usage = Usage.add usage reply.usage
+        ; cost_usd =
+            Model.cost_usd model usage +. Model.cost_usd model reply.usage
+        }
 ;;
 
 (* A [compaction] span around [f], from [messages] to what [after] counts

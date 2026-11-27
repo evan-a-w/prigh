@@ -493,6 +493,9 @@ let live_now
   t.on_title <- Some s.set_title;
   match input.kind, t.live with
   | Autonomous, Some (Live ((module A), a) as live) when A.alive a -> Ok live
+  | Autonomous, _ ->
+    let (module A) = t.adapter in
+    Or_error.errorf "%s is not running" A.display_name
   | _ ->
     let host = t.host () in
     (* The session moved to another tool host: its harness runs there now,
@@ -611,6 +614,9 @@ let live_now
          | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
            (* The session was rewound: its thread drops the runs it lost. *)
            (match L.revert a ~before_turn_id:(Option.value_exn revert) with
+            | exception exn ->
+              L.stop a;
+              raise exn
             | Ok () -> Ok (Live ((module L), a))
             | Error e ->
               s.notice
@@ -1034,309 +1040,322 @@ and run_turn'
            Turn_timings.phase ~alongside:true "checkpoint" (fun () ->
              capture t s ~which:"before")))
   in
-  (match
-     Cancellation.protect cancel ~f:(fun () ->
-       live t s input ~starting:(fun () -> Composer_recorder.starting recorder))
-   with
-   | None ->
-     Composer_recorder.feed
-       recorder
-       (Turn_end { turn_id = None; stop = Interrupted })
-   | Some (Error e) ->
-     let why = Error.to_string_hum e in
-     fail
-       (if String.is_prefix why ~prefix:A.display_name
-        then why
-        else sprintf "%s could not start: %s" A.display_name why)
-   | Some (Ok (Live ((module L), a))) ->
-     note_thread t s (module L) a;
-     note_sandbox t s input;
-     if Option.is_none input.model
-     then
-       Option.iter
-         (List.hd (L.models a))
-         ~f:(fun (m : Model.t) -> Composer_recorder.default_model recorder m.id);
-     let settings = settings t input in
-     let leftover = Queue.create () in
-     let handoff =
-       ref
-         (Option.map
-            (Turn_timings.phase "handoff" (fun () ->
-               handoff t s ~pending:(List.length input.prompts)))
-            ~f:(fun (h : Handoff.t) -> h.text))
-     in
-     Option.iter before_checkpoint ~f:(fun p ->
-       before
-       := Turn_timings.phase "checkpoint_wait" (fun () -> Promise.await_exn p));
-     let with_handoff (input : Adapter.Input.t) =
-       match !handoff with
-       | None -> input
-       | Some text ->
-         handoff := None;
-         { input with text = text ^ "\n\nThe user's message:\n\n" ^ input.text }
-     in
-     let rec turn ~first messages =
-       Composer_recorder.waiting recorder;
-       let result =
-         match input.kind with
-         | Autonomous when first -> Ok ()
-         | Compact { instructions } when first ->
-           Turn_timings.phase "send" (fun () ->
-             L.compact a settings ~instructions)
-         | Compact _ | Prompt | Autonomous ->
-           Turn_timings.phase "send" (fun () ->
-             L.send a settings (with_handoff (input_of messages)))
-       in
-       match result with
-       | Error e -> fail (Error.to_string_hum e)
-       | Ok () ->
-         let sent_at = Time_float.now () in
-         let output () =
-           if not !reported
-           then (
-             Option.iter timings ~f:(fun timings ->
-               Turn_timings.record
-                 timings
-                 "first_output"
-                 ~seconds:
-                   (Time_float.Span.to_sec
-                      (Time_float.diff (Time_float.now ()) sent_at)));
-             report ())
-         in
-         sent := true;
-         cost_total := Some (fun () -> L.cost_total a);
-         let requests = String.Table.create () in
-         let stop = ref None in
-         (* Each request waits in a fiber of its own, until answered,
+  (match input.kind with
+   | Autonomous when not (alive t) ->
+     (* The process exited before this autonomous wakeup ran: do not spawn a
+        fresh idle process and block waiting for events that will not come. *)
+     Composer_recorder.feed recorder (Turn_end { turn_id = None; stop = Done })
+   | _ ->
+     (match
+        Cancellation.protect cancel ~f:(fun () ->
+          live t s input ~starting:(fun () ->
+            Composer_recorder.starting recorder))
+      with
+      | None ->
+        Composer_recorder.feed
+          recorder
+          (Turn_end { turn_id = None; stop = Interrupted })
+      | Some (Error e) ->
+        let why = Error.to_string_hum e in
+        fail
+          (if String.is_prefix why ~prefix:A.display_name
+           then why
+           else sprintf "%s could not start: %s" A.display_name why)
+      | Some (Ok (Live ((module L), a))) ->
+        note_thread t s (module L) a;
+        note_sandbox t s input;
+        if Option.is_none input.model
+        then
+          Option.iter
+            (List.hd (L.models a))
+            ~f:(fun (m : Model.t) ->
+              Composer_recorder.default_model recorder m.id);
+        let settings = settings t input in
+        let leftover = Queue.create () in
+        Option.iter before_checkpoint ~f:(fun p ->
+          before
+          := Turn_timings.phase "checkpoint_wait" (fun () ->
+               Promise.await_exn p));
+        let handoff_done = ref false in
+        let with_handoff ~pending (input : Adapter.Input.t) =
+          if !handoff_done
+          then input
+          else (
+            handoff_done := true;
+            match
+              Turn_timings.phase "handoff" (fun () -> handoff t s ~pending)
+            with
+            | None -> input
+            | Some (h : Handoff.t) ->
+              { input with
+                text = h.text ^ "\n\nThe user's message:\n\n" ^ input.text
+              })
+        in
+        let rec turn ~first messages =
+          Composer_recorder.waiting recorder;
+          let result =
+            match input.kind with
+            | Autonomous when first -> Ok ()
+            | Compact { instructions } when first ->
+              Turn_timings.phase "send" (fun () ->
+                L.compact a settings ~instructions)
+            | Compact _ | Prompt | Autonomous ->
+              let payload =
+                with_handoff ~pending:(List.length messages) (input_of messages)
+              in
+              Turn_timings.phase "send" (fun () -> L.send a settings payload)
+          in
+          match result with
+          | Error e -> fail (Error.to_string_hum e)
+          | Ok () ->
+            let sent_at = Time_float.now () in
+            let output () =
+              if not !reported
+              then (
+                Option.iter timings ~f:(fun timings ->
+                  Turn_timings.record
+                    timings
+                    "first_output"
+                    ~seconds:
+                      (Time_float.Span.to_sec
+                         (Time_float.diff (Time_float.now ()) sent_at)));
+                report ())
+            in
+            sent := true;
+            cost_total := Some (fun () -> L.cost_total a);
+            let requests = String.Table.create () in
+            let stop = ref None in
+            (* Each request waits in a fiber of its own, until answered,
             withdrawn, the run cancelled or the turn ended: its dialog
             closes then ({!Agent.confirm} and [ask_user] clean up when
             cancelled). Not daemons: the turn waits for them to close. *)
-         let handle_request ~sw request_id f =
-           let c = Cancellation.create () in
-           Hashtbl.set requests ~key:request_id ~data:c;
-           Fiber.fork ~sw (fun () ->
-             Fiber.first
-               (fun () -> f c)
-               (fun () ->
-                  Fiber.first
-                    (fun () -> Cancellation.await c)
-                    (fun () -> Cancellation.await cancel));
-             Hashtbl.remove requests request_id)
-         in
-         let rec events ~sw =
-           let event = L.next_event a in
-           (match event with
-            | Notice _
-            | Usage _
-            | Turn_started _
-            | Thread_started _
-            | Retrying _
-            | Request_withdrawn _
-            | Session_title _ -> ()
-            | _ -> output ());
-           match event with
-           | Turn_end { stop = st; turn_id } as e ->
-             Composer_recorder.feed recorder e;
-             Option.iter turn_id ~f:(fun id ->
-               if Option.is_none !first_turn then first_turn := Some id;
-               last_turn := Some id);
-             stop := Some st
-           | Approval_request { request_id; tool_id; kind; summary; input; _ }
-             ->
-             handle_request ~sw request_id (fun c ->
-               let reply =
-                 match kind with
-                 | Other "ExitPlanMode" ->
-                   approve_plan
-                     s
-                     ~display_name:A.display_name
-                     ~request_id
-                     ~summary
-                 | _ ->
-                   (* What is judged is what the harness asks to run: the
+            let handle_request ~sw request_id f =
+              let c = Cancellation.create () in
+              Hashtbl.set requests ~key:request_id ~data:c;
+              Fiber.fork ~sw (fun () ->
+                Fiber.first
+                  (fun () -> f c)
+                  (fun () ->
+                     Fiber.first
+                       (fun () -> Cancellation.await c)
+                       (fun () -> Cancellation.await cancel));
+                Hashtbl.remove requests request_id)
+            in
+            let rec events ~sw =
+              let event = L.next_event a in
+              (match event with
+               | Notice _
+               | Usage _
+               | Turn_started _
+               | Thread_started _
+               | Retrying _
+               | Request_withdrawn _
+               | Session_title _ -> ()
+               | _ -> output ());
+              match event with
+              | Turn_end { stop = st; turn_id } as e ->
+                Composer_recorder.feed recorder e;
+                Option.iter turn_id ~f:(fun id ->
+                  if Option.is_none !first_turn then first_turn := Some id;
+                  last_turn := Some id);
+                stop := Some st
+              | Approval_request
+                  { request_id; tool_id; kind; summary; input; _ } ->
+                handle_request ~sw request_id (fun c ->
+                  let reply =
+                    match kind with
+                    | Other "ExitPlanMode" ->
+                      approve_plan
+                        s
+                        ~display_name:A.display_name
+                        ~request_id
+                        ~summary
+                    | _ ->
+                      (* What is judged is what the harness asks to run: the
                       request's own input, not the call it announced
                       (a hook or the harness may have changed it). The
                       announced call only says what it is called and which
                       subagent runs it. *)
-                   let native_name, parent =
-                     match
-                       Option.bind tool_id ~f:(fun tool_id ->
-                         Composer_recorder.call_started recorder ~tool_id)
-                     with
-                     | Some ((announced : Canonical_tool.t), parent) ->
-                       announced.native_name, parent
-                     | None -> kind_name kind, None
-                   in
-                   let canonical =
-                     Canonical_tool.of_start ~kind ~native_name ~input
-                   in
-                   (* Where the harness runs it (Codex says), for the
+                      let native_name, parent =
+                        match
+                          Option.bind tool_id ~f:(fun tool_id ->
+                            Composer_recorder.call_started recorder ~tool_id)
+                        with
+                        | Some ((announced : Canonical_tool.t), parent) ->
+                          announced.native_name, parent
+                        | None -> kind_name kind, None
+                      in
+                      let canonical =
+                        Canonical_tool.of_start ~kind ~native_name ~input
+                      in
+                      (* Where the harness runs it (Codex says), for the
                       rules: else the session's. *)
-                   let cwd =
-                     match Json.member "cwd" input with
-                     | Some (`String cwd) when Filename.is_absolute cwd ->
-                       Some cwd
-                     | _ -> None
-                   in
-                   let tool =
-                     Option.first_some
-                       (List.find s.tools ~f:(fun t ->
-                          String.equal (Tool.name t) canonical.name))
-                       (Tools.find canonical.name)
-                     |> Option.value_or_thunk ~default:(fun () ->
-                       stand_in canonical.name)
-                   in
-                   let is_injected =
-                     match kind with
-                     | Mcp { server; tool = mcp_tool } ->
-                       Option.is_some
-                         (Injected_tools.canonical_of_mcp
-                            ~server
-                            ~tool:mcp_tool)
-                     | _ -> false
-                   in
-                   let ctx =
-                     context
-                       t
-                       s
-                       ~cancel:c
-                       ?cwd
-                       ~call_id:(Option.value tool_id ~default:request_id)
-                       ?agent_id:parent
-                       ()
-                   in
-                   (match s.approve ctx tool canonical.arguments with
-                    | None ->
-                      if is_injected && not (Cancellation.is_cancelled c)
-                      then
-                        t.preapproved
-                        <- (Tool.name tool, canonical.arguments)
-                           :: t.preapproved;
-                      Allow
-                    | Some refused -> reply_of_refusal refused)
-               in
-               if not (Cancellation.is_cancelled c)
-               then (
-                 Option.iter tool_id ~f:(fun tool_id ->
-                   Composer_recorder.note_approval recorder ~tool_id reply);
-                 L.reply_approval a ~request_id reply));
-             events ~sw
-           | User_question { request_id; questions } ->
-             handle_request ~sw request_id (fun c ->
-               let reply =
-                 s.ask_user ~call_id:request_id ~timeout_seconds:None questions
-               in
-               if not (Cancellation.is_cancelled c)
-               then L.answer a ~request_id reply);
-             events ~sw
-           | Request_withdrawn { request_id } ->
-             Option.iter
-               (Hashtbl.find requests request_id)
-               ~f:Cancellation.cancel;
-             events ~sw
-           | Session_title title ->
-             s.set_title title;
-             events ~sw
-           | e ->
-             let e =
-               match e with
-               | Tool_end ({ id; ok = false; output; _ } as te)
-                 when not (Hashtbl.is_empty t.injected_errors) ->
-                 let matched =
-                   Option.bind
-                     (Composer_recorder.call_canonical recorder ~tool_id:id)
-                     ~f:(fun canonical ->
-                       let matches_tool name =
-                         String.equal canonical.name name
-                         || String.is_substring
-                              canonical.native_name
-                              ~substring:
-                                (sprintf
-                                   "mcp_%s_%s"
-                                   Injected_tools.server_name
-                                   name)
-                         || String.is_substring
-                              canonical.native_name
-                              ~substring:
-                                (Injected_tools.server_name ^ "_" ^ name)
-                         || String.equal canonical.native_name name
-                       in
-                       Hashtbl.keys t.injected_errors
-                       |> List.find ~f:matches_tool
-                       |> Option.bind ~f:(fun name ->
-                         Option.bind
-                           (Hashtbl.find t.injected_errors name)
-                           ~f:(fun q ->
-                             let text = Queue.dequeue q in
-                             if Queue.is_empty q
-                             then Hashtbl.remove t.injected_errors name;
-                             text)))
-                 in
-                 (match matched with
-                  | Some err_text when String.is_empty output ->
-                    Adapter_event.Tool_end { te with output = err_text }
-                  | Some _ | None -> e)
-               | _ -> e
-             in
-             (match e with
-              | Thread_started { model = Some model; _ } ->
-                t.thread_model <- Some model
-              | Usage { usage; cost_usd; _ } ->
-                Option.iter (L.login a) ~f:(fun login ->
-                  Cli_credential.record
-                    login
-                    usage
-                    ~cost_usd:(Option.value cost_usd ~default:0.))
-              | _ -> ());
-             Composer_recorder.feed recorder e;
-             events ~sw
-         in
-         let interrupt_on_cancel () =
-           Cancellation.await cancel;
-           L.interrupt a;
-           Fiber.await_cancel ()
-         in
-         let steer () =
-           let rec loop () =
-             match s.steer () with
-             | [] ->
-               s.await_steer ();
-               loop ()
-             | messages ->
-               (match L.steer a (input_of messages) with
-                | Ok () ->
-                  List.iter
-                    messages
-                    ~f:(Composer_recorder.user_message recorder)
-                | Error _ -> Queue.enqueue_all leftover messages);
-               loop ()
-           in
-           loop ()
-         in
-         Switch.run (fun sw ->
-           Fiber.any [ (fun () -> events ~sw); interrupt_on_cancel; steer ];
-           Hashtbl.iter requests ~f:Cancellation.cancel);
-         note_thread t s (module L) a;
-         mark := L.mark a;
-         (match !stop with
-          | Some Done when not (Cancellation.is_cancelled cancel) ->
-            let next = Queue.to_list leftover @ s.steer () in
-            Queue.clear leftover;
-            let next =
-              if List.is_empty next && Option.is_none (s.halt ())
-              then t.wake ()
-              else next
+                      let cwd =
+                        match Json.member "cwd" input with
+                        | Some (`String cwd) when Filename.is_absolute cwd ->
+                          Some cwd
+                        | _ -> None
+                      in
+                      let tool =
+                        Option.first_some
+                          (List.find s.tools ~f:(fun t ->
+                             String.equal (Tool.name t) canonical.name))
+                          (Tools.find canonical.name)
+                        |> Option.value_or_thunk ~default:(fun () ->
+                          stand_in canonical.name)
+                      in
+                      let is_injected =
+                        match kind with
+                        | Mcp { server; tool = mcp_tool } ->
+                          Option.is_some
+                            (Injected_tools.canonical_of_mcp
+                               ~server
+                               ~tool:mcp_tool)
+                        | _ -> false
+                      in
+                      let ctx =
+                        context
+                          t
+                          s
+                          ~cancel:c
+                          ?cwd
+                          ~call_id:(Option.value tool_id ~default:request_id)
+                          ?agent_id:parent
+                          ()
+                      in
+                      (match s.approve ctx tool canonical.arguments with
+                       | None ->
+                         if is_injected && not (Cancellation.is_cancelled c)
+                         then
+                           t.preapproved
+                           <- (Tool.name tool, canonical.arguments)
+                              :: t.preapproved;
+                         Allow
+                       | Some refused -> reply_of_refusal refused)
+                  in
+                  if not (Cancellation.is_cancelled c)
+                  then (
+                    Option.iter tool_id ~f:(fun tool_id ->
+                      Composer_recorder.note_approval recorder ~tool_id reply);
+                    L.reply_approval a ~request_id reply));
+                events ~sw
+              | User_question { request_id; questions } ->
+                handle_request ~sw request_id (fun c ->
+                  let reply =
+                    s.ask_user
+                      ~call_id:request_id
+                      ~timeout_seconds:None
+                      questions
+                  in
+                  if not (Cancellation.is_cancelled c)
+                  then L.answer a ~request_id reply);
+                events ~sw
+              | Request_withdrawn { request_id } ->
+                Option.iter
+                  (Hashtbl.find requests request_id)
+                  ~f:Cancellation.cancel;
+                events ~sw
+              | Session_title title ->
+                s.set_title title;
+                events ~sw
+              | e ->
+                let e =
+                  match e with
+                  | Tool_end ({ id; ok = false; output; _ } as te)
+                    when not (Hashtbl.is_empty t.injected_errors) ->
+                    let matched =
+                      Option.bind
+                        (Composer_recorder.call_canonical recorder ~tool_id:id)
+                        ~f:(fun canonical ->
+                          let matches_tool name =
+                            String.equal canonical.name name
+                            || String.is_substring
+                                 canonical.native_name
+                                 ~substring:
+                                   (sprintf
+                                      "mcp_%s_%s"
+                                      Injected_tools.server_name
+                                      name)
+                            || String.is_substring
+                                 canonical.native_name
+                                 ~substring:
+                                   (Injected_tools.server_name ^ "_" ^ name)
+                            || String.equal canonical.native_name name
+                          in
+                          Hashtbl.keys t.injected_errors
+                          |> List.find ~f:matches_tool
+                          |> Option.bind ~f:(fun name ->
+                            Option.bind
+                              (Hashtbl.find t.injected_errors name)
+                              ~f:(fun q ->
+                                let text = Queue.dequeue q in
+                                if Queue.is_empty q
+                                then Hashtbl.remove t.injected_errors name;
+                                text)))
+                    in
+                    (match matched with
+                     | Some err_text when String.is_empty output ->
+                       Adapter_event.Tool_end { te with output = err_text }
+                     | Some _ | None -> e)
+                  | _ -> e
+                in
+                (match e with
+                 | Thread_started { model = Some model; _ } ->
+                   t.thread_model <- Some model
+                 | Usage { usage; cost_usd; _ } ->
+                   Option.iter (L.login a) ~f:(fun login ->
+                     Cli_credential.record
+                       login
+                       usage
+                       ~cost_usd:(Option.value cost_usd ~default:0.))
+                 | _ -> ());
+                Composer_recorder.feed recorder e;
+                events ~sw
             in
-            if (not (List.is_empty next)) && Option.is_none (s.halt ())
-            then (
-              List.iter next ~f:(Composer_recorder.user_message recorder);
-              turn ~first:false next)
-          | _ ->
-            (* Not sent: kept in the session, for the user to send again. *)
-            Queue.iter leftover ~f:(Composer_recorder.user_message recorder);
-            Queue.clear leftover)
-     in
-     turn ~first:true input.prompts);
+            let interrupt_on_cancel () =
+              Cancellation.await cancel;
+              L.interrupt a;
+              Fiber.await_cancel ()
+            in
+            let steer () =
+              let rec loop () =
+                match s.steer () with
+                | [] ->
+                  s.await_steer ();
+                  loop ()
+                | messages ->
+                  (match L.steer a (input_of messages) with
+                   | Ok () ->
+                     List.iter
+                       messages
+                       ~f:(Composer_recorder.user_message recorder)
+                   | Error _ -> Queue.enqueue_all leftover messages);
+                  loop ()
+              in
+              loop ()
+            in
+            Switch.run (fun sw ->
+              Fiber.any [ (fun () -> events ~sw); interrupt_on_cancel; steer ];
+              Hashtbl.iter requests ~f:Cancellation.cancel);
+            note_thread t s (module L) a;
+            mark := L.mark a;
+            (match !stop with
+             | Some Done
+               when (not (Cancellation.is_cancelled cancel))
+                    && Option.is_none (s.halt ()) ->
+               let next = Queue.to_list leftover @ s.steer () in
+               Queue.clear leftover;
+               let next = if List.is_empty next then t.wake () else next in
+               if not (List.is_empty next)
+               then (
+                 List.iter next ~f:(Composer_recorder.user_message recorder);
+                 if Option.is_none (s.halt ()) then turn ~first:false next)
+             | _ ->
+               (* Not sent: kept in the session, for the user to send again. *)
+               Queue.iter leftover ~f:(Composer_recorder.user_message recorder);
+               Queue.clear leftover)
+        in
+        turn ~first:true input.prompts));
   (match t.live with
    | Some (Live ((module L), a)) ->
      (match L.models a with

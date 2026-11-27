@@ -254,7 +254,8 @@ module Worker = struct
       if Lazy.is_val t.terminals
       then
         Option.iter (string_field json "key") ~f:(fun key ->
-          Terminals.kill (Lazy.force t.terminals) ~key)
+          Guarded.fork ~sw:t.sw ~what:"killing a terminal" (fun () ->
+            Terminals.kill (Lazy.force t.terminals) ~key))
     | _ -> ()
   ;;
 
@@ -290,7 +291,9 @@ module Link = struct
     ; mutable held_output : int
     }
 
-  let max_held_output = 1024 * 1024
+  (* Large enough for a [Host_process.max_line] JSON-escaped frame so a
+     reconnect does not drop a single line and break sequence numbers. *)
+  let max_held_output = Host_process.max_line * 2
   let create () = { send = None; held = Queue.create (); held_output = 0 }
 
   let hold t (reply : Reply.t) =
@@ -319,10 +322,11 @@ module Link = struct
   ;;
 
   let connect t send =
-    Queue.iter t.held ~f:send;
+    let held = Queue.to_list t.held in
     Queue.clear t.held;
     t.held_output <- 0;
-    t.send <- Some send
+    t.send <- Some send;
+    List.iter held ~f:send
   ;;
 
   let disconnect t = t.send <- None
@@ -336,7 +340,7 @@ module Outbox = struct
     ; mutable closed : bool
     }
 
-  let create ~sw ~write =
+  let create ~sw ?(on_error = ignore) ~write () =
     let t = { lines = Eio.Stream.create Int.max_value; closed = false } in
     Fiber.fork ~sw (fun () ->
       let rec loop () =
@@ -346,7 +350,9 @@ module Outbox = struct
           (match write line with
            | () -> loop ()
            | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
-           | exception _ -> t.closed <- true)
+           | exception _ ->
+             t.closed <- true;
+             on_error ())
       in
       loop ());
     t
@@ -390,8 +396,10 @@ let run ~env ?terminals ?computer ~input ~output () =
   in
   let mcp = Mcp_hub.create ~env ~sw () in
   let outbox =
-    Outbox.create ~sw ~write:(fun line ->
-      Eio.Flow.copy_string (line ^ "\n") output)
+    Outbox.create
+      ~sw
+      ~write:(fun line -> Eio.Flow.copy_string (line ^ "\n") output)
+      ()
   in
   let worker =
     Worker.create
@@ -441,7 +449,13 @@ let serve_connection
   =
   Switch.run
   @@ fun sw ->
-  let outbox = Outbox.create ~sw ~write:(Backend_socket.write_line socket) in
+  let outbox =
+    Outbox.create
+      ~sw
+      ~on_error:(fun () -> Backend_socket.close socket)
+      ~write:(Backend_socket.write_line socket)
+      ()
+  in
   (* Requests by id until answered, with the replies they carry: those
      unanswered when the connection ends go again on the next one. *)
   let pending = Int.Table.create () in
@@ -585,8 +599,8 @@ let serve_connection
       Hashtbl.to_alist pending
       |> List.sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
       |> List.iter ~f:(fun (_, reply) -> Link.hold link reply);
-      Worker.close_viewers worker);
-  Outbox.close outbox;
+      Worker.close_viewers worker;
+      Outbox.close outbox);
   !outcome
 ;;
 

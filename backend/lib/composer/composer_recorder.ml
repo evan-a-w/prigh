@@ -370,6 +370,12 @@ let denied_text : Adapter_event.Approval_reply.t option -> string option =
   | Some (Allow | Allow_always) | None -> None
 ;;
 
+let flush_steered t =
+  let steered = List.rev t.steered in
+  t.steered <- [];
+  List.iter steered ~f:(append_message t)
+;;
+
 let rec end_call t (c : Call.t) ~ok ~output ~changes ~images =
   if not c.ended
   then (
@@ -434,7 +440,10 @@ let rec end_call t (c : Call.t) ~ok ~output ~changes ~images =
              { assistant = step.assistant
              ; tool_results = List.rev step.results
              }));
-      if not (List.is_empty done_) then waiting_again t))
+      if not (List.is_empty done_)
+      then (
+        if List.is_empty t.steps && Option.is_none t.open_ then flush_steered t;
+        waiting_again t)))
 
 (* Ends, as cancelled (or denied), the calls still running: those under the
    subagent call [under], or all; the latest first, so a subagent's calls
@@ -485,12 +494,6 @@ let plan t (plan : Plan.t) =
            (List.length plan.steps))
       ~changes:[]
       ~images:[])
-;;
-
-let flush_steered t =
-  let steered = List.rev t.steered in
-  t.steered <- [];
-  List.iter steered ~f:(append_message t)
 ;;
 
 let user_message t m =
