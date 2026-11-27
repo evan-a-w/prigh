@@ -516,9 +516,12 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
                | None ->
                  Node.div
                    ~key:
-                     (query
-                      ^ "|"
-                      ^ Sexp.to_string (Model_menu.sexp_of_t m.model_menu))
+                     (sprintf
+                        "%s|%s|%b"
+                        query
+                        (Sexp.to_string
+                           (Model_menu.Tab.sexp_of_t m.model_menu.tab))
+                        m.model_menu.more)
                    ~attrs:
                      [ Attr.class_ "popover-items model-list"
                      ; Attr.create "data-slot" "command-list"

@@ -224,3 +224,62 @@ let%expect_test "ui_action: the request, and finding a reply in the transcript" 
     ()
     |}]
 ;;
+
+let%expect_test "non-finite and huge floats in int fields do not crash" =
+  parse
+    {|{"components":[
+      {"type":"table","columns":[{"key":"a","decimals":"NaN"},{"key":"b","decimals":"Infinity"},{"key":"c","decimals":1e30}],"rows":[]}
+    ]}|};
+  [%expect
+    {|
+    ((
+      (id ())
+      (body (
+        Table (
+          (title ())
+          (columns (
+            ((key      a)
+             (label    a)
+             (align    Left)
+             (format   Text)
+             (currency USD)
+             (decimals ()))
+            ((key      b)
+             (label    b)
+             (align    Left)
+             (format   Text)
+             (currency USD)
+             (decimals ()))
+            ((key      c)
+             (label    c)
+             (align    Left)
+             (format   Text)
+             (currency USD)
+             (decimals ()))))
+          (rows ())
+          (sortable true)
+          (caption ()))))))
+    [table · 0 rows]
+    |}]
+;;
+
+let%expect_test "shorten preserves UTF-8 codepoint boundaries" =
+  let text = String.concat (List.init 30 ~f:(fun _ -> "日")) in
+  let json =
+    Json.to_string
+      (`Object
+          [ ( "components"
+            , `Array
+                [ `Object [ "type", `String "markdown"; "text", `String text ] ]
+            )
+          ])
+  in
+  let t = Option.value_exn (Ui_spec.of_arguments json) in
+  let summary = Ui_spec.summary t in
+  List.iter summary ~f:(fun line ->
+    printf "valid=%b %s\n" (Stdlib.String.is_valid_utf_8 line) line);
+  [%expect
+    {|
+    valid=true markdown: 日日日日日日日日日日日日日日日日日日日…
+    |}]
+;;

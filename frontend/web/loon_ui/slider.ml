@@ -23,8 +23,18 @@ let decimals step =
 ;;
 
 let snap ~min ~max ~step v =
-  let v = (Float.round_nearest ((v -. min) /. step) *. step) +. min in
-  Float.clamp_exn (Float.round_decimal v ~decimal_digits:(decimals step)) ~min ~max
+  if not (Float.is_finite min && Float.is_finite max)
+  then 0.
+  else (
+    let lo, hi = if Float.( <= ) min max then min, max else max, min in
+    let v =
+      if Float.is_finite step && Float.(step > 0.) && Float.is_finite v
+      then (Float.round_nearest ((v -. lo) /. step) *. step) +. lo
+      else v
+    in
+    if Float.is_finite v
+    then Float.clamp_exn (Float.round_decimal v ~decimal_digits:(decimals step)) ~min:lo ~max:hi
+    else lo)
 ;;
 
 let update values ~index ~value ~min ~max ~step ~min_steps_between_thumbs =
@@ -107,7 +117,8 @@ let view
         (Js.to_float r##.bottom -. Js.to_float ev##.clientY)
         /. Float.max 1. (Js.to_float r##.bottom -. Js.to_float r##.top)
     in
-    min +. (Float.clamp_exn p ~min:0. ~max:1. *. (max -. min))
+    let p = if Float.is_finite p then Float.clamp_exn p ~min:0. ~max:1. else 0. in
+    min +. (p *. (max -. min))
   in
   let current_root (ev : Dom_html.pointerEvent Js.t) : Dom_html.element Js.t =
     Js.Unsafe.get ev "currentTarget"

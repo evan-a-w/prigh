@@ -192,31 +192,29 @@ let to_json t =
   let optional = Option.value_map ~default:`Null ~f:(fun s -> `String s) in
   let strings l = `Array (List.map l ~f:(fun s -> `String s)) in
   `Object
-    ([ "scoped_models", strings t.scoped_models
-     ; "approval_mode", `String (Approval_mode.to_string t.approval_mode)
-     ; ("default_chat_mode", if t.default_chat_mode then `True else `False)
-     ; "permissions", Permissions.to_json t.permissions
-     ; "default_model", optional t.default_model
-     ; "default_thinking", optional t.default_thinking
-     ; "fallback_models", strings t.fallback_models
-     ; "default_cwd", optional t.default_cwd
-     ; "default_host", optional t.default_host
-     ; ( "max_budget_usd"
-       , Option.value_map t.max_budget_usd ~default:`Null ~f:(fun usd ->
-           `Number (sprintf "%g" usd)) )
-     ; ( "resume_on_limit_reset"
-       , if t.resume_on_limit_reset then `True else `False )
-     ]
-     @ Option.value_map t.worktrees_dir ~default:[] ~f:(fun dir ->
-       [ "worktrees_dir", `String dir ])
-     @ [ "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
-       ; "notify", `String t.notify
-       ; "snippets", Snippet.list_to_json t.snippets
-       ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
-       ; "compaction_model", optional t.compaction_model
-       ; ("mask_observations", if t.mask_observations then `True else `False)
-       ; "generate_model", optional t.generate_model
-       ; "naming_model", optional t.naming_model
-       ; "approval_model", optional t.approval_model
-       ])
+    [ "scoped_models", strings t.scoped_models
+    ; "approval_mode", `String (Approval_mode.to_string t.approval_mode)
+    ; ("default_chat_mode", if t.default_chat_mode then `True else `False)
+    ; "permissions", Permissions.to_json t.permissions
+    ; "default_model", optional t.default_model
+    ; "default_thinking", optional t.default_thinking
+    ; "fallback_models", strings t.fallback_models
+    ; "default_cwd", optional t.default_cwd
+    ; "default_host", optional t.default_host
+    ; ( "max_budget_usd"
+      , Option.value_map t.max_budget_usd ~default:`Null ~f:(fun usd ->
+          `Number (sprintf "%g" usd)) )
+    ; ( "resume_on_limit_reset"
+      , if t.resume_on_limit_reset then `True else `False )
+    ; "worktrees_dir", optional t.worktrees_dir
+    ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
+    ; "notify", `String t.notify
+    ; "snippets", Snippet.list_to_json t.snippets
+    ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
+    ; "compaction_model", optional t.compaction_model
+    ; ("mask_observations", if t.mask_observations then `True else `False)
+    ; "generate_model", optional t.generate_model
+    ; "naming_model", optional t.naming_model
+    ; "approval_model", optional t.approval_model
+    ]
 ;;

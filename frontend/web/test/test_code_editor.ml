@@ -410,8 +410,7 @@ let%expect_test "Go to file: every match, a window of rows" =
   let h = entered () in
   H.quiet h (fun () -> H.act h (Code Find_file));
   let paths =
-    List.init 1_000 ~f:(fun i ->
-      sprintf "pkg%03d/src/file_%05d.ml" (i / 100) i)
+    List.init 1_000 ~f:(fun i -> sprintf "pkg%03d/src/file_%05d.ml" (i / 100) i)
   in
   (* Given as parsed: the harness's JSON parser is not the page's. *)
   H.quiet h (fun () ->
@@ -647,5 +646,28 @@ let%expect_test "/edit completes any file, fuzzily, from the same list" =
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/compact.ml)))
      (tag (Code (Opened /home/me/proj/src/compact.ml))))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    |}]
+;;
+
+let%expect_test "desktop sidebar drawer opens in the code editor" =
+  let h = entered () in
+  let show () =
+    let m = H.model h in
+    print_s
+      [%message
+        ""
+          ~focused:(Prigh_web.App.Model.focused m : bool)
+          ~drawer:(Prigh_web.App.Model.drawer m : bool)]
+  in
+  show ();
+  H.act h Toggle_sidebar;
+  show ();
+  H.act h (Code Leave);
+  show ();
+  [%expect
+    {|
+    ((focused true) (drawer false))
+    ((focused true) (drawer true))
+    ((focused false) (drawer false))
     |}]
 ;;

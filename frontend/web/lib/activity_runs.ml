@@ -30,7 +30,10 @@ module Step = struct
   let key = function
     | Thinking { n; index; _ } -> sprintf "think:%d:%d" n index
     | Call { call; _ } -> Tool_view.open_key call.id
-    | Server { n; index; _ } -> sprintf "server:%d:%d" n index
+    | Server { n; index; tool; _ } ->
+      if String.is_empty tool.id
+      then sprintf "server:%d:%d" n index
+      else Tool_view.open_key tool.id
     | Report { n; _ } -> sprintf "report:%d" n
   ;;
 
