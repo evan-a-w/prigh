@@ -102,6 +102,9 @@ module Driver : sig
   (** Whether the process runs and is not being stopped. *)
   val alive : _ t -> bool
 
+  (** Blocks until the process exits. *)
+  val await_exit : _ t -> unit
+
   (** Stops the process: a turn it runs ends at once ([Crashed]). *)
   val stop : _ t -> unit
 

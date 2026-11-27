@@ -90,5 +90,16 @@ val runner : t -> Runner.t
 (** The harness's thread, once it has one: what a later process resumes. *)
 val thread_id : t -> string option
 
+(** Whether the live external harness still has in-flight work after its last
+    turn ended (e.g. an ACP background tool call still open). *)
+val has_open_work : t -> bool
+
+(** Whether the live external harness process is still running. *)
+val alive : t -> bool
+
+(** Blocks until the live external harness process exits, or returns at once
+    when none is running. *)
+val await_exit : t -> unit
+
 (** Stops the harness's process, if it runs; a turn it runs ends at once. *)
 val close : t -> unit

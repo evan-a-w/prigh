@@ -33,6 +33,8 @@ module Driver = struct
     ; mutable on_autonomous : (unit -> unit) option
     ; mutable on_title : (string -> unit) option
     ; mutable exit : Line_transport.Exit.t option
+    ; exited : unit Promise.t
+    ; resolve_exit : unit Promise.u
     }
 
   let create
@@ -42,6 +44,7 @@ module Driver = struct
         ?(request_timeout = Time_float.Span.of_sec 60.)
         transport
     =
+    let exited, resolve_exit = Promise.create () in
     { sw
     ; name
     ; transport
@@ -59,10 +62,13 @@ module Driver = struct
     ; on_autonomous = None
     ; on_title = None
     ; exit = None
+    ; exited
+    ; resolve_exit
     }
   ;;
 
   let alive t = t.alive && not t.stopping
+  let await_exit t = Promise.await t.exited
   let write t line = if alive t then Line_transport.write_line t.transport line
   let on_orphan_request t f = t.on_orphan_request <- f
   let on_autonomous t f = t.on_autonomous <- Some f
@@ -290,6 +296,7 @@ module Driver = struct
       t.alive <- false;
       t.orphan <- None;
       Eio.Condition.broadcast t.idle;
+      ignore (Promise.try_resolve t.resolve_exit () : bool);
       let waiters = t.waiters in
       t.waiters <- [];
       List.iter waiters ~f:(fun w ->

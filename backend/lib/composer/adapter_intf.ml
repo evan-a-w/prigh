@@ -269,8 +269,15 @@ module type S = sig
 
   val in_turn : t -> bool
 
+  (** Whether the harness still has in-flight work after its last turn ended
+      (e.g. an ACP background tool call still open and waiting to complete). *)
+  val has_open_work : t -> bool
+
   (** Whether its process still runs. *)
   val alive : t -> bool
+
+  (** Blocks until the process exits. *)
+  val await_exit : t -> unit
 
   (** The login of prigh's its process runs on ([Start.login], unless it
       could not take it); [None]: its own. *)

@@ -128,11 +128,11 @@ let%expect_test
 
 let%expect_test "subagent_continue's errors say what to do instead" =
   let gates = Gates.create () in
-  Gates.hold gates "quick";
+  Gates.hold gates "cancelled_one";
   Gates.hold gates "slow";
   with_agent
     ~main:
-      [ spawn ~id:"c1" "quick"
+      [ spawn ~id:"c1" "cancelled_one"
       ; spawn ~id:"c2" "slow"
       ; Reply.text "spawned"
       ; Reply.tool_calls
@@ -145,12 +145,14 @@ let%expect_test "subagent_continue's errors say what to do instead" =
       ; Reply.text "ok"
       ]
     ~before:(Gates.before gates)
-    [ "quick", [ Reply.text "quick done" ]; "slow", [ Reply.text "slow done" ] ]
+    [ "cancelled_one", [ Reply.text "never" ]
+    ; "slow", [ Reply.text "slow done" ]
+    ]
   @@ fun _t agent ->
   let runs = count_runs agent in
   Or_error.ok_exn (Agent.prompt agent "go");
   runs 1;
-  Gates.release gates "quick";
+  Or_error.ok_exn (Agent.cancel_subagent agent ~agent_id:"a1");
   runs 2;
   Gates.release gates "slow";
   Agent.wait_idle agent;
@@ -159,10 +161,10 @@ let%expect_test "subagent_continue's errors say what to do instead" =
     state: running=true subagents=[]
     agent_start
     user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
-    assistant:  subagent{"task":"quick"}
-    subagent_start a1: quick
+    assistant:  subagent{"task":"cancelled_one"}
+    subagent_start a1: cancelled_one
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    tool_result subagent: started agent a1 (cancelled_one); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant:  subagent{"task":"slow"}
     subagent_start a2: slow
     state: running=true subagents=[a1 running; a2 running]
@@ -170,14 +172,14 @@ let%expect_test "subagent_continue's errors say what to do instead" =
     assistant: spawned
     agent_end
     state: running=false subagents=[a1 running; a2 running]
-    subagent_end a1: ok quick done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    subagent_end a1: error [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     state: running=true subagents=[a2 running]
     agent_start
-    user: [subagent a1 finished] quick | quick done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    user: [subagent a1 failed] cancelled_one | [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_continue{"id":"a1"} subagent_continue{"id":"a2"} subagent_continue{"id":"a9"} subagent_continue{"id":"a2","max_turns":0}
-    tool_result subagent_continue: invalid arguments: a1 finished and cannot be continued: only a subagent that ran out of turns can (those that can: none); start a new subagent for more work
+    tool_result subagent_continue: invalid arguments: a1 ended (failed) and cannot be continued (those that can: none); start a new subagent for more work
     tool_result subagent_continue: invalid arguments: a2 is still running: use subagent_message to tell it something
-    tool_result subagent_continue: invalid arguments: unknown subagent "a9": only a subagent of yours that ran out of turns can be continued (those that can: none)
+    tool_result subagent_continue: invalid arguments: unknown subagent "a9": only a finished, failed, or out-of-turns subagent of yours can be continued (those that can: none)
     tool_result subagent_continue: invalid arguments: max_turns must be at least 1
     assistant: ok
     agent_end
@@ -275,16 +277,18 @@ let%expect_test "cancelling or resetting forgets an out-of-turns subagent" =
     agent_start
     user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | again
     assistant:  subagent_continue{"id":"a2"}
-    tool_result subagent_continue: invalid arguments: unknown subagent "a2": only a subagent of yours that ran out of turns can be continued (those that can: none)
+    tool_result subagent_continue: invalid arguments: unknown subagent "a2": only a finished, failed, or out-of-turns subagent of yours can be continued (those that can: none)
     assistant: ok
     agent_end
     state: running=false subagents=[]
     |}]
 ;;
 
-(* A background subagent's own subagents are synchronous: one out of turns
-   is continued by its caller, in its caller's run. *)
-let%expect_test "a synchronous subagent out of turns is continued by its caller"
+(* A background subagent's own subagents are synchronous: one that ran out of
+   turns or finished can be continued by its caller, in its caller's run. *)
+let%expect_test
+    "a synchronous subagent (out of turns or finished) is continued by its \
+     caller"
   =
   let subagent_events = ref [] in
   with_agent
@@ -294,10 +298,12 @@ let%expect_test "a synchronous subagent out of turns is continued by its caller"
     [ ( "outer"
       , [ spawn_limited ~id:"n1" ~max_turns:1 "inner"
         ; continue_ ~id:"k1" {|{"id":"a1/n1","message":"wrap up"}|}
-        ; continue_ ~id:"k2" {|{"id":"a1/n1"}|}
+        ; continue_ ~id:"k2" {|{"id":"a1/n1","message":"one more check"}|}
+        ; continue_ ~id:"k3" {|{"id":"a1/n9"}|}
         ; Reply.text "outer done"
         ] )
-    ; "inner", [ step; Reply.text "inner done" ]
+    ; ( "inner"
+      , [ step; Reply.text "inner done"; Reply.text "extra check passed" ] )
     ]
   @@ fun _t agent ->
   Agent.subscribe agent ~f:(function
@@ -341,10 +347,17 @@ let%expect_test "a synchronous subagent out of turns is continued by its caller"
         assistant:  step{}
         tool_result step: stepped
         user: [Your caller sends you this while you work.] |  | wrap up
-    subagent_end a1: ok outer done | [subagent: 4 turns, 100 in / 42 out tokens, $0.0001]
+    --- inner's request:
+        user: inner
+        assistant:  step{}
+        tool_result step: stepped
+        user: [Your caller sends you this while you work.] |  | wrap up
+        assistant: inner done
+        user: [Your caller sends you this while you work.] |  | one more check
+    subagent_end a1: ok outer done | [subagent: 5 turns, 130 in / 55 out tokens, $0.0001]
     state: running=true subagents=[]
     agent_start
-    user: [subagent a1 finished] outer | outer done | [subagent: 4 turns, 100 in / 42 out tokens, $0.0001]
+    user: [subagent a1 finished] outer | outer done | [subagent: 5 turns, 130 in / 55 out tokens, $0.0001]
     assistant: thanks
     agent_end
     state: running=false subagents=[]
@@ -355,7 +368,169 @@ let%expect_test "a synchronous subagent out of turns is continued by its caller"
     start a1/n1 (call k1, continued true)
     end a1/n1 (2 turns)
     outer's tool result: inner done | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
-    outer's tool result: invalid arguments: unknown subagent "a1/n1": only a subagent of yours that ran out of turns can be continued (those that can: none)
-    session spend: 100 in / 42 out tokens
+    start a1/n1 (call k2, continued true)
+    end a1/n1 (3 turns)
+    outer's tool result: extra check passed | [subagent: 3 turns, 40 in / 18 out tokens, $0.0000]
+    outer's tool result: invalid arguments: unknown subagent "a1/n9": only a finished, failed, or out-of-turns subagent of yours can be continued (those that can: a1/n1)
+    session spend: 130 in / 55 out tokens
+    |}]
+;;
+
+let%expect_test
+    "continuing a finished background subagent carries on with its context"
+  =
+  let gates = Gates.create () in
+  Gates.hold gates "worker";
+  with_agent
+    ~before:(Gates.before gates)
+    ~on_request:(print_subagent_requests ~task:"worker")
+    ~main:
+      [ spawn "worker"
+      ; Reply.text "spawned"
+      ; continue_ ~id:"k1" {|{"id":"a1","message":"now check edge cases"}|}
+      ; Reply.text "asked for follow-up"
+      ; continue_ ~id:"k2" {|{"id":"a1"}|}
+      ; Reply.text "continued without message"
+      ; Reply.text "all set"
+      ]
+    [ ( "worker"
+      , [ Reply.text "initial result"
+        ; Reply.text "edge cases ok"
+        ; Reply.text "final confirmation"
+        ] )
+    ]
+  @@ fun _t agent ->
+  let runs = count_runs agent in
+  Or_error.ok_exn (Agent.prompt agent "go");
+  runs 1;
+  Gates.release gates "worker";
+  Gates.hold gates "worker";
+  runs 2;
+  Gates.release gates "worker";
+  Gates.hold gates "worker";
+  runs 3;
+  Gates.release gates "worker";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
+    assistant:  subagent{"task":"worker"}
+    subagent_start a1: worker
+    --- worker's request:
+        user: worker
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (worker); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: spawned
+    agent_end
+    state: running=false subagents=[a1 running]
+    subagent_end a1: ok initial result | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] worker | initial result | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant:  subagent_continue{"id":"a1","message":"now check edge cases"}
+    subagent_start a1: worker
+    --- worker's request:
+        user: worker
+        assistant: initial result
+        user: [Your caller sends you this while you work.] |  | now check edge cases
+    state: running=true subagents=[a1 running]
+    tool_result subagent_continue: continuing a1; its report will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: asked for follow-up
+    agent_end
+    state: running=false subagents=[a1 running]
+    subagent_end a1: ok edge cases ok | [subagent: 2 turns, 20 in / 10 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] worker | edge cases ok | [subagent: 2 turns, 20 in / 10 out tokens, $0.0000]
+    assistant:  subagent_continue{"id":"a1"}
+    subagent_start a1: worker
+    --- worker's request:
+        user: worker
+        assistant: initial result
+        user: [Your caller sends you this while you work.] |  | now check edge cases
+        assistant: edge cases ok
+        user: [Your caller sends you this while you work.] |  | Continue.
+    state: running=true subagents=[a1 running]
+    tool_result subagent_continue: continuing a1; its report will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: continued without message
+    agent_end
+    state: running=false subagents=[a1 running]
+    subagent_end a1: ok final confirmation | [subagent: 3 turns, 30 in / 15 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] worker | final confirmation | [subagent: 3 turns, 30 in / 15 out tokens, $0.0000]
+    assistant: all set
+    agent_end
+    state: running=false subagents=[]
+    |}]
+;;
+
+let%expect_test
+    "continuing a failed background subagent carries on, while cancelled \
+     subagent_cancel unparks it"
+  =
+  let gates = Gates.create () in
+  Gates.hold gates "flaky";
+  with_agent
+    ~before:(Gates.before gates)
+    ~main:
+      [ spawn "flaky"
+      ; Reply.text "spawned"
+      ; continue_ ~id:"k1" {|{"id":"a1","message":"retry with fallback"}|}
+      ; Reply.text "retrying"
+      ; Reply.tool_call
+          ~id:"x1"
+          ~name:"subagent_cancel"
+          ~arguments:{|{"id":"a1"}|}
+          ()
+      ; continue_ ~id:"k2" {|{"id":"a1","message":"too late"}|}
+      ; Reply.text "done"
+      ]
+    [ "flaky", [ Reply.error "bad request"; Reply.text "recovered!" ] ]
+  @@ fun _t agent ->
+  let runs = count_runs agent in
+  Or_error.ok_exn (Agent.prompt agent "go");
+  runs 1;
+  Gates.release gates "flaky";
+  Gates.hold gates "flaky";
+  runs 2;
+  Gates.release gates "flaky";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
+    assistant:  subagent{"task":"flaky"}
+    subagent_start a1: flaky
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (flaky); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: spawned
+    agent_end
+    state: running=false subagents=[a1 running]
+    subagent_end a1: error subagent failed: bad request | [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 failed] flaky | subagent failed: bad request | [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+    assistant:  subagent_continue{"id":"a1","message":"retry with fallback"}
+    subagent_start a1: flaky
+    state: running=true subagents=[a1 running]
+    tool_result subagent_continue: continuing a1; its report will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: retrying
+    agent_end
+    state: running=false subagents=[a1 running]
+    subagent_end a1: ok recovered! | [subagent: 2 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] flaky | recovered! | [subagent: 2 turns, 10 in / 5 out tokens, $0.0000]
+    assistant:  subagent_cancel{"id":"a1"}
+    tool_result subagent_cancel: [subagent a1 finished] flaky | recovered! | [subagent: 2 turns, 10 in / 5 out tokens, $0.0000]
+    assistant:  subagent_continue{"id":"a1","message":"too late"}
+    tool_result subagent_continue: invalid arguments: a1 finished and cannot be continued (those that can: none); start a new subagent for more work
+    assistant: done
+    agent_end
+    state: running=false subagents=[]
     |}]
 ;;

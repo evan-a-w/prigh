@@ -2027,3 +2027,100 @@ let%expect_test
     after-manual: name=Manual title desc=ACP refined title native=true wanted=false
     |}]
 ;;
+
+let%expect_test
+    "failed injected MCP tool substitutes error text when ACP agent omits \
+     output"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let injected_ref = ref None in
+  let mcp_reply_ref = ref "" in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.2) antigravity
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ ->
+        let inner =
+          Line_transport.Peer.spawn ~sw (fun p ->
+            P.initialize p;
+            P.new_session p "ses_mcp";
+            let req = P.expect p "session/prompt" in
+            P.update
+              p
+              "ses_mcp"
+              {|{"sessionUpdate":"tool_call","toolCallId":"m1","title":"Running mcp_prigh_subagent_continue","kind":"other","status":"in_progress","rawInput":{"id":"a9"}}|};
+            (* Agent calls prigh's MCP server; prigh returns isError:true with
+               the real error text. *)
+            let injected = Option.value_exn !injected_ref in
+            mcp_reply_ref
+            := Injected_tools.handle_line
+                 injected
+                 {|{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"subagent_continue","arguments":{"id":"a9"}}}|}
+               |> Option.value_exn;
+            (* Agent drops the MCP error text in its ACP tool_call_update. *)
+            P.update
+              p
+              "ses_mcp"
+              {|{"sessionUpdate":"tool_call_update","toolCallId":"m1","status":"failed"}|};
+            P.text p "ses_mcp" "Done.";
+            P.result p req {|{"stopReason":"end_turn"}|};
+            ignore (P.read p : Json.t option))
+        in
+        let mcp : Line_transport.Mcp.t =
+          { bridge =
+              Injected_tools.Bridge.create
+                ~prigh:"prigh"
+                ~socket:"/tmp/test.sock"
+                ~token:"tok"
+          ; serve = (fun injected -> injected_ref := Some injected)
+          }
+        in
+        Ok
+          (Line_transport.create
+             ~read_line:(fun () -> Line_transport.read_line inner)
+             ~write_line:(Line_transport.write_line inner)
+             ~stop:(fun () -> Line_transport.stop inner)
+             ~ended:(fun () -> Line_transport.ended inner)
+             ~is_ended:(fun () -> Line_transport.is_ended inner)
+             ~mcp
+             ()))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:(Tools.interaction @ Tool_subagent.control_tools)
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine
+    agent
+    { engine = Composer; adapter = Some (Acp "antigravity") };
+  Agent.set_mode agent ~approval:Auto;
+  Agent.subscribe agent ~f:print_event;
+  prompt agent "continue a9";
+  printf "mcp reply: %s\n" !mcp_reply_ref;
+  Composer_runner.close composer;
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[prigh]
+    agent got session/prompt "continue a9"
+    assistant (acp:antigravity/default, Tool_use): ""
+    tool_start Running mcp_prigh_subagent_continue
+    tool_end Running mcp_prigh_subagent_continue -> ERROR "invalid arguments: unknown subagent \"a9\": only a finished, failed, or out-of-turns subagent of yours can be continued (those that can: none)"
+    assistant (acp:antigravity/default, End_turn): "Done."
+    mcp reply: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"invalid arguments: unknown subagent \"a9\": only a finished, failed, or out-of-turns subagent of yours can be continued (those that can: none)"}],"isError":true}}
+    |}]
+;;

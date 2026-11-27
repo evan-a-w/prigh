@@ -253,11 +253,18 @@ module Tool = struct
   type t =
     { acp_kind : string
     ; kind : Adapter_event.Tool_kind.t
+    ; native_name : string
+    ; title : string
+    ; input : Json.t
     ; mutable output : string
     ; mutable changes : Adapter_event.Change.t list
     ; mutable images : Image.t list
     ; mutable running : bool (* said to be [in_progress] *)
     ; mutable ended : bool
+    ; mutable backgrounded : bool
+      (* still running across [end_turn Done]: settled in the prior turn so
+         its recorder closes cleanly, kept in [t.tools] so [has_open_work]
+         stays true and a later update re-opens it in the next turn *)
     }
 end
 
@@ -1297,9 +1304,35 @@ let change ~acp_kind diff : Adapter_event.Change.t option =
   | _ -> None
 ;;
 
+let error_field_text = function
+  | Some (`String s) when not (String.is_empty s) -> Some s
+  | Some (`Object _ as o) -> Option.first_some (str "message" o) (str "error" o)
+  | _ -> None
+;;
+
+let content_texts blocks =
+  List.filter_map blocks ~f:(fun b ->
+    match str "type" b with
+    | Some "content" -> block_text (obj (field "content" b))
+    | _ -> block_text b)
+;;
+
 let raw_output_text = function
   | None | Some `Null -> None
-  | Some (`String s) -> Some s
+  | Some (`String s) -> Option.some_if (not (String.is_empty s)) s
+  | Some (`Object _ as json) ->
+    (match field "content" json with
+     | Some (`Array blocks) ->
+       (match content_texts blocks with
+        | _ :: _ as texts -> Some (String.concat ~sep:"\n" texts)
+        | [] ->
+          Option.first_some
+            (error_field_text (field "error" json))
+            (Some (Json.to_string json)))
+     | _ ->
+       Option.first_some
+         (error_field_text (field "error" json))
+         (Some (Json.to_string json)))
   | Some json -> Some (Json.to_string json)
 ;;
 
@@ -1315,25 +1348,27 @@ let apply_tool t id (tool : Tool.t) update =
     match content with
     | None -> []
     | Some blocks ->
-      let texts =
+      let texts = content_texts blocks in
+      let output = String.concat ~sep:"\n" texts in
+      let changes =
         List.filter_map blocks ~f:(fun b ->
           match str "type" b with
-          | Some "content" -> block_text (obj (field "content" b))
+          | Some "diff" -> change ~acp_kind:tool.acp_kind b
           | _ -> None)
       in
-      let output = String.concat ~sep:"\n" texts in
-      tool.changes
-      <- List.filter_map blocks ~f:(fun b ->
-           match str "type" b with
-           | Some "diff" -> change ~acp_kind:tool.acp_kind b
-           | _ -> None);
-      tool.images
-      <- List.filter_map blocks ~f:(fun b ->
-           match str "type" b with
-           | Some "content" -> block_image (obj (field "content" b))
-           | _ -> None);
+      let images =
+        List.filter_map blocks ~f:(fun b ->
+          match str "type" b with
+          | Some "content" -> block_image (obj (field "content" b))
+          | _ -> block_image b)
+      in
+      if not (List.is_empty blocks)
+      then (
+        tool.changes <- changes;
+        tool.images <- images);
       let previous = tool.output in
-      tool.output <- output;
+      if (not (List.is_empty texts)) || String.is_empty previous
+      then tool.output <- output;
       if
         String.length output > String.length previous
         && String.is_prefix output ~prefix:previous
@@ -1363,7 +1398,10 @@ let apply_tool t id (tool : Tool.t) update =
       let output =
         if String.is_empty tool.output
         then
-          Option.value (raw_output_text (field "rawOutput" update)) ~default:""
+          Option.first_some
+            (raw_output_text (field "rawOutput" update))
+            (error_field_text (field "error" update))
+          |> Option.value ~default:""
         else tool.output
       in
       [ Output.Event
@@ -1381,12 +1419,27 @@ let apply_tool t id (tool : Tool.t) update =
   running @ updates @ ended
 ;;
 
-(* The call [update] names, started (with [Tool_start]) if it is new. *)
+(* The call [update] names, started (with [Tool_start]) if it is new or
+   re-opening in a new turn after staying open across [end_turn Done]. *)
 let tool_of_update t update =
   match str "toolCallId" update with
   | None -> None
   | Some id ->
     (match Hashtbl.find t.tools id with
+     | Some tool when tool.backgrounded ->
+       tool.backgrounded <- false;
+       let start =
+         Output.Event
+           (Tool_start
+              { id
+              ; kind = tool.kind
+              ; native_name = tool.native_name
+              ; title = tool.title
+              ; input = tool.input
+              ; parent = None
+              })
+       in
+       Some (id, tool, close_items t @ [ start ])
      | Some tool -> Some (id, tool, [])
      | None ->
        let acp_kind = Option.value (str "kind" update) ~default:"other" in
@@ -1400,27 +1453,25 @@ let tool_of_update t update =
            ~title
            ~raw_input
        in
+       let input = tool_input ~kind ~title raw_input in
        let tool =
          { Tool.acp_kind
          ; kind
+         ; native_name
+         ; title
+         ; input
          ; output = ""
          ; changes = []
          ; images = []
          ; running = false
          ; ended = false
+         ; backgrounded = false
          }
        in
        Hashtbl.set t.tools ~key:id ~data:tool;
        let start =
          Output.Event
-           (Tool_start
-              { id
-              ; kind
-              ; native_name
-              ; title
-              ; input = tool_input ~kind ~title raw_input
-              ; parent = None
-              })
+           (Tool_start { id; kind; native_name; title; input; parent = None })
        in
        Some (id, tool, close_items t @ [ start ]))
 ;;
@@ -1598,22 +1649,42 @@ let on_update t params =
   | _ -> []
 ;;
 
-let settle_tools t =
+let settle_tools ~(stop : Adapter_event.Stop.t) t =
   let open_ =
     Hashtbl.to_alist t.tools
-    |> List.filter ~f:(fun (_, (tool : Tool.t)) -> not tool.ended)
+    |> List.filter ~f:(fun (_, (tool : Tool.t)) ->
+      (not tool.ended) && not tool.backgrounded)
     |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
   in
-  Hashtbl.clear t.tools;
-  List.map open_ ~f:(fun (id, (tool : Tool.t)) ->
-    Output.Event
-      (Tool_end
-         { id
-         ; ok = false
-         ; output = tool.output
-         ; changes = tool.changes
-         ; images = tool.images
-         }))
+  match stop with
+  | Done ->
+    Hashtbl.filter_inplace t.tools ~f:(fun (tool : Tool.t) -> not tool.ended);
+    List.map open_ ~f:(fun (id, (tool : Tool.t)) ->
+      tool.backgrounded <- true;
+      let output =
+        if String.is_empty tool.output
+        then "[running in background]"
+        else sprintf "%s\n[running in background]" (String.rstrip tool.output)
+      in
+      Output.Event
+        (Tool_end
+           { id
+           ; ok = true
+           ; output
+           ; changes = tool.changes
+           ; images = tool.images
+           }))
+  | Interrupted | Failed _ ->
+    Hashtbl.clear t.tools;
+    List.map open_ ~f:(fun (id, (tool : Tool.t)) ->
+      Output.Event
+        (Tool_end
+           { id
+           ; ok = false
+           ; output = tool.output
+           ; changes = tool.changes
+           ; images = tool.images
+           }))
 ;;
 
 let end_turn t (stop : Adapter_event.Stop.t) =
@@ -1621,7 +1692,7 @@ let end_turn t (stop : Adapter_event.Stop.t) =
   | None -> []
   | Some turn ->
     let closed = close_items t in
-    let settled = settle_tools t in
+    let settled = settle_tools ~stop t in
     let withdrawn = withdraw_permissions t ~reply:false in
     let unasked = withdraw_questions t in
     t.turn <- None;

@@ -63,6 +63,9 @@ type t =
   ; catalog : unit -> Adapter.Catalog.t option
   ; on_change : unit -> unit
   ; on_autonomous : (unit -> unit) option
+  ; injected_errors : string Queue.t String.Table.t
+    (* failed injected MCP tool texts in the current turn, by tool name, in
+       case the harness drops the error text on [Tool_end] *)
   ; mutable warming : Warming.t option (* a [prewarm] starting *)
   ; mutable epoch : int (* [close]s: a start that outlived one stops *)
   }
@@ -135,12 +138,31 @@ let create
   ; catalog
   ; on_change
   ; on_autonomous
+  ; injected_errors = String.Table.create ()
   ; warming = None
   ; epoch = 0
   }
 ;;
 
 let thread_id t = t.thread_id
+
+let has_open_work t =
+  match t.live with
+  | Some (Live ((module L), a)) -> L.alive a && L.has_open_work a
+  | None -> false
+;;
+
+let alive t =
+  match t.live with
+  | Some (Live ((module L), a)) -> L.alive a
+  | None -> false
+;;
+
+let await_exit t =
+  match t.live with
+  | Some (Live ((module L), a)) -> L.await_exit a
+  | None -> ()
+;;
 
 let close t =
   t.epoch <- t.epoch + 1;
@@ -214,7 +236,18 @@ let injected t (s : Engine_intf.Services.t) =
                 || Cancellation.is_cancelled run_cancel ->
            (* Approved after its turn ended: nobody waits for it now. *)
            Tool_result.error "[cancelled]: its turn ended"
-         | None -> s.execute ctx tool args))
+         | None ->
+           let result = s.execute ctx tool args in
+           if result.is_error && not (String.is_empty result.text)
+           then (
+             let q =
+               Hashtbl.find_or_add
+                 t.injected_errors
+                 (Tool.name tool)
+                 ~default:Queue.create
+             in
+             Queue.enqueue q result.text);
+           result))
 ;;
 
 let settings (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
@@ -887,12 +920,15 @@ let rec run_turn
   t.services <- Some s;
   t.cancel <- turn_cancel;
   t.run_cancel <- cancel;
+  Hashtbl.clear t.injected_errors;
   (match Turn_timings.current () with
    | Some _ -> fun f -> f ()
    | None -> Turn_timings.with_ (Turn_timings.create ()))
   @@ fun () ->
   Exn.protect
-    ~finally:(fun () -> Cancellation.cancel turn_cancel)
+    ~finally:(fun () ->
+      Hashtbl.clear t.injected_errors;
+      Cancellation.cancel turn_cancel)
     ~f:(fun () ->
       match run_turn' t s ~cancel input with
       | added -> added
@@ -1147,6 +1183,46 @@ and run_turn'
              s.set_title title;
              events ~sw
            | e ->
+             let e =
+               match e with
+               | Tool_end ({ id; ok = false; output; _ } as te)
+                 when not (Hashtbl.is_empty t.injected_errors) ->
+                 let matched =
+                   Option.bind
+                     (Composer_recorder.call_canonical recorder ~tool_id:id)
+                     ~f:(fun canonical ->
+                       let matches_tool name =
+                         String.equal canonical.name name
+                         || String.is_substring
+                              canonical.native_name
+                              ~substring:
+                                (sprintf
+                                   "mcp_%s_%s"
+                                   Injected_tools.server_name
+                                   name)
+                         || String.is_substring
+                              canonical.native_name
+                              ~substring:
+                                (Injected_tools.server_name ^ "_" ^ name)
+                         || String.equal canonical.native_name name
+                       in
+                       Hashtbl.keys t.injected_errors
+                       |> List.find ~f:matches_tool
+                       |> Option.bind ~f:(fun name ->
+                         Option.bind
+                           (Hashtbl.find t.injected_errors name)
+                           ~f:(fun q ->
+                             let text = Queue.dequeue q in
+                             if Queue.is_empty q
+                             then Hashtbl.remove t.injected_errors name;
+                             text)))
+                 in
+                 (match matched with
+                  | Some err_text when String.is_empty output ->
+                    Adapter_event.Tool_end { te with output = err_text }
+                  | Some _ | None -> e)
+               | _ -> e
+             in
              (match e with
               | Thread_started { model = Some model; _ } ->
                 t.thread_model <- Some model

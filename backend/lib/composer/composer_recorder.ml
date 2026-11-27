@@ -617,3 +617,7 @@ let call_started t ~tool_id =
     if not c.ended then ensure_started t c;
     Some (c.canonical, c.parent)
 ;;
+
+let call_canonical t ~tool_id =
+  Option.map (Hashtbl.find t.calls tool_id) ~f:(fun c -> c.canonical)
+;;

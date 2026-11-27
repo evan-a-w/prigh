@@ -1041,7 +1041,9 @@ let run_once
             else Tool.Result.ok body))
   in
   end_ result;
-  result, out_of_turns && Option.is_some hint
+  ( result
+  , out_of_turns && Option.is_some hint
+  , Cancellation.is_cancelled context.cancel )
 ;;
 
 let fork_messages (source : Fork.source) ~call_id =
@@ -1223,7 +1225,7 @@ let execute
     ; children = String.Table.create ()
     }
   in
-  let result, out_of_turns =
+  let result, out_of_turns, cancelled =
     run_once
       ?inbox
       ~provider
@@ -1234,7 +1236,7 @@ let execute
       ~turn_limit:p.turn_limit
       ~prompts:[ prompt ]
   in
-  result, state, out_of_turns
+  result, state, out_of_turns, cancelled
 ;;
 
 (* What it is told when continued with a message: like a [subagent_message]
@@ -1259,7 +1261,20 @@ let continue_run
       ~max_turns
       ~message
   =
-  let result, out_of_turns =
+  let needs_prompt =
+    Option.is_some state.ext
+    ||
+    match List.last state.messages with
+    | Some (Message.Tool_result _) -> false
+    | Some (User _ | Assistant _) | None -> true
+  in
+  let prompts =
+    match message with
+    | Some m -> [ continue_message m ]
+    | None when needs_prompt -> [ continue_message (Caller, "Continue.") ]
+    | None -> []
+  in
+  let result, out_of_turns, cancelled =
     run_once
       ?inbox
       ~provider
@@ -1268,9 +1283,9 @@ let continue_run
       state
       context
       ~turn_limit:(Option.value max_turns ~default:state.prepared.turn_limit)
-      ~prompts:(Option.to_list (Option.map message ~f:continue_message))
+      ~prompts
   in
-  result, state, out_of_turns
+  result, state, out_of_turns, cancelled
 ;;
 
 let outcome_of (result : Tool.Result.t) ~parked =
@@ -1285,42 +1300,47 @@ let outcome_of (result : Tool.Result.t) ~parked =
   }
 ;;
 
-(* Parks a background subagent under its task's id when it ends: out of
-   turns, for [subagent_continue]; otherwise for the user to carry on
-   with. *)
-let rec background_outcome ~provider background ~id (result, state, out_of_turns)
+(* Parks a non-cancelled background subagent under its task's id when it ends,
+   for [subagent_continue] (or the user to carry on with). *)
+let rec background_outcome
+          ~provider
+          background
+          ~id
+          (result, state, out_of_turns, cancelled)
   =
-  Background_tasks.park
-    background
-    id
-    ~out_of_turns
-    (fun ~max_turns ~message ~inbox ~call_id:_ ~cancel ~emit ->
-       background_outcome
-         ~provider
-         background
-         ~id
-         (continue_run
-            ?inbox
-            ~provider
-            ~resumable:Background
-            state
-            { state.context with cancel; emit; on_output = ignore }
-            ~max_turns
-            ~message));
+  if not cancelled
+  then
+    Background_tasks.park
+      background
+      id
+      ~out_of_turns
+      (fun ~max_turns ~message ~inbox ~call_id:_ ~cancel ~emit ->
+         background_outcome
+           ~provider
+           background
+           ~id
+           (continue_run
+              ?inbox
+              ~provider
+              ~resumable:Background
+              state
+              { state.context with cancel; emit; on_output = ignore }
+              ~max_turns
+              ~message));
   outcome_of result ~parked:out_of_turns
 ;;
 
-(* A synchronous one is parked in its caller's tasks, which run it again
-   from [subagent_continue] (in the caller's run, with that call's
+(* A non-cancelled synchronous subagent is parked in its caller's tasks, which
+   run it again from [subagent_continue] (in the caller's run, with that call's
    [cancel] and [emit]). *)
-let rec park_sync ~provider tasks (state : State.t) =
+let rec park_sync ~provider tasks ~out_of_turns (state : State.t) =
   Background_tasks.park
     tasks
     state.agent_id
-    ~out_of_turns:true
+    ~out_of_turns
     (fun ~max_turns ~message ~inbox:_ ~call_id ~cancel ~emit ->
        let call_id = Option.value call_id ~default:state.context.call_id in
-       let result, state, out_of_turns =
+       let result, state, out_of_turns, cancelled =
          continue_run
            ~provider
            ~resumable:(Sync tasks)
@@ -1329,7 +1349,7 @@ let rec park_sync ~provider tasks (state : State.t) =
            ~max_turns
            ~message
        in
-       if out_of_turns then park_sync ~provider tasks state;
+       if not cancelled then park_sync ~provider tasks ~out_of_turns state;
        outcome_of result ~parked:out_of_turns)
 ;;
 
@@ -1468,7 +1488,7 @@ let rec create_with
            | None -> context.call_id
            | Some parent -> parent ^ "/" ^ context.call_id
          in
-         let result, state, out_of_turns =
+         let result, state, out_of_turns, cancelled =
            execute
              ~provider
              ~engines_opt
@@ -1482,7 +1502,8 @@ let rec create_with
              ~agent_id
          in
          (match resumable with
-          | Sync tasks when out_of_turns -> park_sync ~provider tasks state
+          | Sync tasks when not cancelled ->
+            park_sync ~provider tasks ~out_of_turns state
           | Background | Sync _ | No -> ());
          result)
   in
@@ -1618,20 +1639,21 @@ let continue_tool =
     control_spec
       ~name:continue_name
       ~description:
-        "Give a subagent that ran out of turns more turns: it carries on from \
-         where it stopped, with its context, under the same id. A background \
-         one runs in the background again and its report arrives as usual; \
-         your own synchronous subagent's runs now and returns its report."
+        "Continue a finished, failed, or out-of-turns subagent: it carries on \
+         from where it stopped, with its context (or external thread), under \
+         the same id. A background one runs in the background again and its \
+         report arrives as usual; your own synchronous subagent runs now and \
+         returns its report."
       (Tool_args.schema
          ~required:[ "id" ]
-         [ "id", `String, "Agent id (its out-of-turns report names it)"
+         [ "id", `String, "Agent id"
          ; ( "max_turns"
            , `Integer
            , "How many more turns (default: its limit when it started)" )
          ; ( "message"
            , `String
-           , "Something to tell it first, as from its caller (e.g. what to \
-              focus on)" )
+           , "Follow-up message to send it, as from its caller (e.g. what to \
+              do next or focus on)" )
          ])
   in
   let run (context : Tool.Context.t) args =

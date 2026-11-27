@@ -96,3 +96,6 @@ val call_started
   :  t
   -> tool_id:string
   -> (Canonical_tool.t * string option) option
+
+(** The canonical form of [tool_id], if seen in this run. *)
+val call_canonical : t -> tool_id:string -> Canonical_tool.t option
