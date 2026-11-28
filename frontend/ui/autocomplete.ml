@@ -159,14 +159,49 @@ let provider_items (auth : P.Auth_status.t list) =
       s.name)
 ;;
 
-let model_items ~logged_in (models : P.Model.t list) =
+let model_items ~logged_in ~engines ~current (models : P.Model.t list) =
+  let multi_mode = List.length (P.Engine_mode.deployed_modes engines) > 1 in
+  let providers_with_real =
+    List.fold models ~init:String.Set.empty ~f:(fun acc (model : P.Model.t) ->
+      if String.equal model.id "default"
+      then acc
+      else Set.add acc model.provider)
+  in
+  let models =
+    List.filter models ~f:(fun (model : P.Model.t) ->
+      (not (String.equal model.id "default"))
+      || Option.equal String.equal current (Some model.key)
+      || not (Set.mem providers_with_real model.provider))
+  in
   List.map models ~f:(fun (model : P.Model.t) ->
+    let mode = P.Engine_mode.of_provider model.provider in
+    let label =
+      if multi_mode
+      then P.Engine_mode.format_model ~name:model.name ~provider:model.provider
+      else model.name
+    in
+    let detail =
+      if P.Engine_mode.equal mode Native
+      then model.key
+      else P.Session_engine.harness_label model.provider
+    in
+    let search =
+      if multi_mode
+      then
+        sprintf
+          "%s @ %s %s %s"
+          model.name
+          (P.Engine_mode.to_string mode)
+          (P.Session_engine.harness_label model.provider)
+          model.key
+      else model.name ^ " " ^ model.key
+    in
     Picker.Item.create
       ~id:model.key
-      ~detail:model.key
-      ~search:(model.name ^ " " ^ model.key)
+      ~detail
+      ~search
       ~dimmed:(not (logged_in model.provider))
-      model.name)
+      label)
 ;;
 
 (* By name (else the first prompt), active ones first; accepting inserts the
@@ -288,13 +323,12 @@ let pairs items =
 let engine_items choices =
   List.map choices ~f:(fun c ->
     let key = P.Deployed_engines.Choice.key c in
+    let label = P.Deployed_engines.Choice.label c in
+    let mode = P.Engine_mode.to_string (P.Engine_mode.of_adapter c.adapter) in
     Picker.Item.create
       ~id:key
-      ~detail:
-        (sprintf
-           "%s: %s"
-           (P.Deployed_engines.Choice.label c)
-           (P.Deployed_engines.Choice.describe c))
+      ~search:(sprintf "%s %s %s" key label mode)
+      ~detail:(sprintf "%s: %s" label (P.Deployed_engines.Choice.describe c))
       key)
 ;;
 
@@ -311,7 +345,13 @@ let argument_items
       ~model
   =
   match (kind : Commands.Argument.t) with
-  | Model | Models -> Some (model_items ~logged_in models)
+  | Model | Models ->
+    Some
+      (model_items
+         ~logged_in
+         ~engines
+         ~current:(Option.map model ~f:(fun (m : P.Model.t) -> m.key))
+         models)
   | Thinking -> Some (thinking_items model)
   | Verbosity -> Some (verbosity_items ())
   | Filter ->
@@ -538,7 +578,13 @@ let compute_argument
                            run"
                         "off"
                     ]
-                  ~candidates:(model_items ~logged_in models)
+                  ~candidates:
+                    (model_items
+                       ~logged_in
+                       ~engines
+                       ~current:
+                         (Option.map model ~f:(fun (m : P.Model.t) -> m.key))
+                       models)
               | Delete when Option.is_some sessions ->
                 compute_words
                   ~spec

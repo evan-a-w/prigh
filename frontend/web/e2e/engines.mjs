@@ -212,15 +212,15 @@ try {
   await phoneAudit();
   await screenshot("first turn");
 
-  // The model menu's foot: the engine beside the access mode, with each
-  // adapter's health (Claude Code is not installed here).
+  // The model menu's foot: the execution mode selector (Native / Host) beside
+  // the access mode.
   await tap(model);
   const engineButton = page.locator(".model-engine .model-access-button");
   await tap(engineButton);
   const engineMenu = page.locator(".model-engine .model-access-menu");
-  await engineMenu.locator(".model-access-item.trouble").waitFor();
+  await engineMenu.locator(".model-access-item").first().waitFor();
   await settled(page.locator("#chip-popover"));
-  section("the model menu's engine");
+  section("the model menu's mode");
   console.log(`button: ${await engineButton.getAttribute("aria-label")}`);
   console.log((await engineMenu.locator(".model-access-item").evaluateAll(items => items.map(i => i.innerText))).map(clean).join("\n"));
   // The open menu covers the list by design: only its targets are checked.
@@ -229,7 +229,7 @@ try {
       .evaluateAll(els => els.filter(e => e.getBoundingClientRect().height < 44).length);
     console.log(`phone: ${small} targets under 44px`);
   }
-  await screenshot("model menu engine");
+  await screenshot("model menu mode");
   await page.keyboard.press("Escape");
   await engineMenu.waitFor({ state: "detached" });
   await page.keyboard.press("Escape");
@@ -281,8 +281,8 @@ try {
   await phoneAudit();
   await screenshot("settings engines");
 
-  // 6. Switching engine from the model menu: it keeps its place and size,
-  // whatever the chip now says and however many models the engine has.
+  // 6. Switching mode from the model menu: it keeps its place and size,
+  // whatever mode is browsed and however many models it has.
   await page.keyboard.press("Escape");
   await settings.waitFor({ state: "detached" });
   await tap(model);
@@ -295,17 +295,17 @@ try {
   const switchTo = async (name) => {
     await tap(engineButton);
     await tap(engineMenu.locator(".model-access-item", { hasText: name }));
-    await page.waitForFunction(n => document.querySelector(".model-engine .model-access-button")?.getAttribute("aria-label") === `Engine: ${n}`, name);
+    await page.waitForFunction(n => document.querySelector(".model-engine .model-access-button")?.getAttribute("aria-label") === `Mode: ${n}`, name);
     await page.locator(".model-list .model-row").first().waitFor();
     await settled(page.locator("#chip-popover"));
   };
   const before = await box();
-  await switchTo("prigh harness");
-  section("the model menu on another engine");
+  await switchTo("Native");
+  section("the model menu on another mode");
   console.log(`held: ${(await box()) === before}`);
-  await screenshot("model menu harness");
-  await switchTo("Codex");
-  console.log(`held, back on Codex: ${(await box()) === before}`);
+  await screenshot("model menu native");
+  await switchTo("Host");
+  console.log(`held, back on Host: ${(await box()) === before}`);
 } catch (e) {
   console.log(`failed: ${e.message.split("\n")[0]}`);
   await screenshot("failed");

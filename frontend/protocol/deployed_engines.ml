@@ -33,7 +33,7 @@ module Choice = struct
 
   let label t =
     match t.adapter, t.engine with
-    | Some adapter, _ -> Session_engine.adapter_label adapter
+    | Some adapter, _ -> Session_engine.adapter_label_with_mode adapter
     | None, "harness" -> "prigh harness"
     | None, engine -> Session_engine.engine_label engine
   ;;
@@ -83,25 +83,56 @@ let switch_targets t =
       Option.is_some c.adapter || String.equal c.engine "harness")
 ;;
 
+let is_native (c : Choice.t) =
+  match c.adapter, c.engine with
+  | None, "harness" | Some "prigh", _ -> true
+  | _ -> false
+;;
+
+let is_bridge (c : Choice.t) =
+  match c.adapter with
+  | Some a -> String.is_prefix a ~prefix:"backend:"
+  | None -> false
+;;
+
+let is_host (c : Choice.t) =
+  match c.adapter with
+  | Some a ->
+    (not (String.is_prefix a ~prefix:"backend:"))
+    && not (String.equal a "prigh")
+  | None -> false
+;;
+
 let find_in choices arg =
   let arg = String.lowercase (String.strip arg) in
-  let matches (c : Choice.t) =
-    String.equal arg (Choice.key c)
-    || String.equal arg (String.lowercase (Choice.label c))
-    || String.equal arg c.engine
+  let mode_matches =
+    match arg with
+    | "native" -> Some (List.filter choices ~f:is_native)
+    | "bridge" -> Some (List.filter choices ~f:is_bridge)
+    | "host" -> Some (List.filter choices ~f:is_host)
+    | _ -> None
   in
-  match List.filter choices ~f:matches with
-  | c :: _ -> Ok c
-  | [] ->
-    (match
-       List.filter choices ~f:(fun c ->
-         String.is_prefix (Choice.key c) ~prefix:arg
-         || String.is_prefix (String.lowercase (Choice.label c)) ~prefix:arg)
-     with
-     | [ c ] -> Ok c
-     | _ ->
-       Or_error.errorf
-         "no engine %S here: this backend runs %s"
-         arg
-         (String.concat ~sep:", " (List.map choices ~f:Choice.key)))
+  match mode_matches with
+  | Some [ c ] -> Ok c
+  | Some (c :: _) when String.equal arg "native" -> Ok c
+  | _ ->
+    let matches (c : Choice.t) =
+      String.equal arg (Choice.key c)
+      || String.equal arg (String.lowercase (Choice.label c))
+      || String.equal arg c.engine
+    in
+    (match List.filter choices ~f:matches with
+     | c :: _ -> Ok c
+     | [] ->
+       (match
+          List.filter choices ~f:(fun c ->
+            String.is_prefix (Choice.key c) ~prefix:arg
+            || String.is_prefix (String.lowercase (Choice.label c)) ~prefix:arg)
+        with
+        | [ c ] -> Ok c
+        | _ ->
+          Or_error.errorf
+            "no engine %S here: this backend runs %s"
+            arg
+            (String.concat ~sep:", " (List.map choices ~f:Choice.key))))
 ;;
