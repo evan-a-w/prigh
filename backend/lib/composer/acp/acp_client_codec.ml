@@ -1189,23 +1189,43 @@ module Tool_class = struct
   ;;
 end
 
+let is_hex_suffix s =
+  String.length s = 8 && String.for_all s ~f:Char.is_hex_digit
+;;
+
+(* Antigravity namespaces per-session MCP servers as [prigh_<8-hex-chars>],
+   naming tools [mcp_prigh_<8hex>_<tool>]. *)
+let strip_prigh_mcp_prefix name =
+  match
+    String.chop_prefix name ~prefix:("mcp_" ^ Injected_tools.server_name ^ "_")
+  with
+  | None -> None
+  | Some rest ->
+    (match String.lsplit2 rest ~on:'_' with
+     | Some (hash, tool) when is_hex_suffix hash && not (String.is_empty tool)
+       -> Some tool
+     | _ -> Some rest)
+;;
+
 let mcp_of_name ~all_tools name =
   match String.chop_prefix name ~prefix:"mcp__" with
   | Some rest ->
     (match String.substr_index rest ~pattern:"__" with
      | Some i ->
+       let server = String.prefix rest i in
+       let server =
+         match
+           String.chop_prefix server ~prefix:(Injected_tools.server_name ^ "_")
+         with
+         | Some hash when is_hex_suffix hash -> Injected_tools.server_name
+         | _ -> server
+       in
        Some
          (Adapter_event.Tool_kind.Mcp
-            { server = String.prefix rest i
-            ; tool = String.drop_prefix rest (i + 2)
-            })
+            { server; tool = String.drop_prefix rest (i + 2) })
      | None -> None)
   | None ->
-    (match
-       String.chop_prefix
-         name
-         ~prefix:("mcp_" ^ Injected_tools.server_name ^ "_")
-     with
+    (match strip_prigh_mcp_prefix name with
      | Some tool
        when Option.is_some
               ((if all_tools

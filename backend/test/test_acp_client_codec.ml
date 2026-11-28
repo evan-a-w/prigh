@@ -1224,6 +1224,9 @@ let%expect_test "system_prompt_append and all_tools mcp classification" =
   List.iter
     [ {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c1","kind":"other","title":"mcp_prigh_bash","rawInput":{"command":"ls"}}}}|}
     ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c2","kind":"other","title":"mcp_prigh_read","rawInput":{"path":"a.ml"}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c3","kind":"other","title":"mcp_prigh_79ce654a_ls","rawInput":{"path":"."}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c4","kind":"other","title":"mcp_prigh_79ce654a_subagent_continue","rawInput":{"id":"a1"}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c5","kind":"other","title":"mcp__prigh_79ce654a__grep","rawInput":{"pattern":"foo"}}}}|}
     ]
     ~f:(fun line ->
       List.iter (C.handle_line t line) ~f:(function
@@ -1234,6 +1237,33 @@ let%expect_test "system_prompt_append and all_tools mcp classification" =
             (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
             c.name
             (Jsonaf.to_string c.arguments)
+        | _ -> ()));
+  (* With all_tools=false (normal acp:antigravity), hashed prigh MCP names
+     still classify injected prigh tools and leave non-injected ones as Other. *)
+  let t2 = C.create ~all_tools:false () in
+  ignore (C.initialize t2 ~client_name:"prigh" ~client_version:"0.1" : string);
+  ignore
+    (C.handle_line
+       t2
+       {|{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{}}}|}
+     : C.Output.t list);
+  ignore (C.new_session t2 ~cwd:"/proj" ~mcp_servers:[] : string);
+  ignore
+    (C.handle_line t2 {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"s2"}}|}
+     : C.Output.t list);
+  ignore (Or_error.ok_exn (C.prompt t2 [ Text "hi" ]) : C.Output.t list);
+  List.iter
+    [ {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s2","update":{"sessionUpdate":"tool_call","toolCallId":"d1","kind":"other","title":"mcp_prigh_79ce654a_render_ui","rawInput":{}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s2","update":{"sessionUpdate":"tool_call","toolCallId":"d2","kind":"other","title":"mcp_prigh_79ce654a_ls","rawInput":{}}}}|}
+    ]
+    ~f:(fun line ->
+      List.iter (C.handle_line t2 line) ~f:(function
+        | Event (Tool_start { kind; native_name; input; _ }) ->
+          let c = Canonical_tool.of_start ~kind ~native_name ~input in
+          printf
+            "default kind=%s -> %s\n"
+            (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
+            c.name
         | _ -> ()));
   [%expect
     {|
@@ -1253,5 +1283,10 @@ let%expect_test "system_prompt_append and all_tools mcp classification" =
       (config ((current_mode ()) (modes ()) (config_options ())))))
     kind=(Mcp(server prigh)(tool bash)) -> bash {"command":"ls"}
     kind=(Mcp(server prigh)(tool read)) -> read {"path":"a.ml"}
+    kind=(Mcp(server prigh)(tool ls)) -> ls {"path":"."}
+    kind=(Mcp(server prigh)(tool subagent_continue)) -> subagent_continue {"id":"a1"}
+    kind=(Mcp(server prigh)(tool grep)) -> grep {"pattern":"foo"}
+    default kind=(Mcp(server prigh)(tool render_ui)) -> render_ui
+    default kind=(Other mcp_prigh_79ce654a_ls) -> mcp_prigh_79ce654a_ls
     |}]
 ;;

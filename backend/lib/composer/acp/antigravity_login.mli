@@ -21,7 +21,7 @@ open! Import
       killed one left).
 
     Google's access tokens last an hour: the process is replaced (its session
-    resumed) before a turn when its token expires within twenty minutes
+    resumed) before a turn when its token expires within ten minutes
     ({!Adapter.Login_renewal}). *)
 
 type t [@@deriving sexp_of]
@@ -70,7 +70,7 @@ val credential : t -> Cli_credential.t
 (** The access token handed. *)
 val token : t -> string
 
-(** Whether the token expires within twenty minutes of [now_ms]. *)
+(** Whether the token expires within ten minutes of [now_ms]. *)
 val expiring : t -> now_ms:int -> bool
 
 (** A turn was refused with the token: what the user is told. *)

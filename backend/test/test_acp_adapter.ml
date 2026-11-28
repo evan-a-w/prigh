@@ -1143,7 +1143,7 @@ let agy_turn ?(refuse = false) p ~session =
 ;;
 
 let%expect_test "Antigravity on prigh's login: a token file, renewed, refused" =
-  let login = antigravity_login ~expires_min:[ 15; 60; 60 ] () in
+  let login = antigravity_login ~expires_min:[ 8; 60; 60 ] () in
   with_acp
     ~agent:antigravity
     ~on_launch:print_agy_launch
@@ -1180,7 +1180,7 @@ let%expect_test "Antigravity on prigh's login: a token file, renewed, refused" =
     recorded on g: ((input 3)(output 1)(cache_read 0)), $0.00
     assistant (acp:antigravity/default, End_turn): "ok"
     |}];
-  (* expires within 20 minutes: a new process, loading the session *)
+  (* expires within 10 minutes: a new process, loading the session *)
   prompt agent "again";
   [%expect
     {|
@@ -2233,7 +2233,7 @@ let%expect_test
                   P.update
                     p
                     "ses_be"
-                    {|{"sessionUpdate":"tool_call","toolCallId":"b1","kind":"other","title":"mcp_prigh_bash","status":"pending","rawInput":{"command":"pwd"}}|};
+                    {|{"sessionUpdate":"tool_call","toolCallId":"b1","kind":"other","title":"mcp_prigh_79ce654a_bash","status":"pending","rawInput":{"command":"pwd"}}|};
                   let injected = Option.value_exn !injected_ref in
                   let reply =
                     Injected_tools.handle_line
@@ -2291,7 +2291,13 @@ let%expect_test
     agent
     { engine = Composer; adapter = Some (Backend (Acp "antigravity")) };
   Agent.set_mode agent ~approval:Auto;
-  Agent.subscribe agent ~f:print_event;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_end { call; result }) ->
+      print_event
+        (Loop
+           (Tool_end
+              { call; result = { result with text = mask t result.text } }))
+    | e -> print_event e);
   prompt agent "first on mac";
   (* Switch tool host and plan mode: backend process stays alive, no ACP set_mode. *)
   host := "linux";
@@ -2313,7 +2319,7 @@ let%expect_test
     mcp bash -> {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ran on mac in $DIR: {\"command\":\"pwd\"}"}],"isError":false}}
     assistant (backend:acp:antigravity/default, Tool_use): ""
     tool_start bash
-    tool_end bash -> ""
+    tool_end bash -> "ran on mac in $DIR: {\"command\":\"pwd\"}"
     assistant (backend:acp:antigravity/default, End_turn): "reply 1"
     agent got session/prompt "second on linux"
     assistant (backend:acp:antigravity/default, End_turn): "reply 2"

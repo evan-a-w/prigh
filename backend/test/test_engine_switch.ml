@@ -912,3 +912,459 @@ let%expect_test
     engine=harness adapter=- model=deepseek/deepseek-flash
     |}]
 ;;
+
+let%expect_test
+    "backend:acp:antigravity multi-turn integration: remote tool hosts, no \
+     duplicate handoff, hashed MCP tools & output"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let mac_dir = Filename.concat t.dir "mac-proj" in
+  let linux_dir = Filename.concat t.dir "linux-proj" in
+  Core_unix.mkdir_p mac_dir;
+  Core_unix.mkdir_p linux_dir;
+  Tool_test_helpers.write t "mac-proj/mac-only.txt" "hello from mac\n";
+  Tool_test_helpers.write t "linux-proj/linux-only.txt" "hello from linux\n";
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let engines =
+    Or_error.ok_exn
+      (Engines.create
+         ~engines:[ Harness; Composer ]
+         ~adapters:[ Backend (Acp "antigravity") ]
+         ())
+  in
+  let provider =
+    Faux_provider.create [ Faux_provider.Reply.text "from harness" ]
+  in
+  let latest = ref None in
+  let new_agent ?session ~cwd () =
+    let agent =
+      Agent.create
+        ~env:t.env
+        ~sw
+        ~provider
+        ~tools:(Tools.all @ Tools.interaction)
+        ~sessions_dir
+        ~home:t.dir
+        ?session
+        ~backend_host:true
+        ~cwd
+        ()
+    in
+    Agent.set_mode agent ~approval:Auto;
+    latest := Some agent;
+    agent
+  in
+  let spawns = ref 0 in
+  let routes : Injected_tools.t String.Table.t = String.Table.create () in
+  let fake_agy (p : Line_transport.Peer.t) =
+    let reply j result =
+      write
+        p
+        (`Object
+            [ "jsonrpc", `String "2.0"
+            ; "id", Option.value_exn (Json.member "id" j)
+            ; "result", result
+            ])
+    in
+    let session_routes : string String.Table.t = String.Table.create () in
+    let turn = ref 0 in
+    let rec loop () =
+      match read p with
+      | None -> ()
+      | Some j ->
+        (match string_at [ "method" ] j with
+         | Some "initialize" ->
+           reply
+             j
+             (Json.parse
+                {|{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"close":{}},"_meta":{"antigravity":{"systemPrompt":{"append":true}}}},"authMethods":[]}|}
+              |> Or_error.ok_exn)
+         | Some (("session/new" | "session/load") as meth) ->
+           (* Capture this session's MCP route token from mcpServers[0].env. *)
+           let route_id =
+             Option.bind (Json.member "params" j) ~f:(fun params ->
+               match Json.member "mcpServers" params with
+               | Some (`Array (srv :: _)) ->
+                 (match Json.member "env" srv with
+                  | Some (`Array env) ->
+                    List.find_map env ~f:(fun e ->
+                      match string_at [ "name" ] e, string_at [ "value" ] e with
+                      | Some "PRIGH_MCP_TOKEN", Some v ->
+                        Option.map (String.lsplit2 v ~on:':') ~f:snd
+                      | _ -> None)
+                  | _ -> None)
+               | _ -> None)
+           in
+           let sid =
+             if String.equal meth "session/load"
+             then
+               string_at [ "params"; "sessionId" ] j
+               |> Option.value ~default:"s-agy-mt"
+             else "s-agy-mt"
+           in
+           Option.iter route_id ~f:(fun r ->
+             Hashtbl.set session_routes ~key:sid ~data:r);
+           reply
+             j
+             (Json.parse
+                {|{"sessionId":"s-agy-mt","models":{"currentModelId":"gemini-2.5-pro","availableModels":[{"modelId":"gemini-2.5-pro","name":"Gemini 2.5 Pro"}]}}|}
+              |> Or_error.ok_exn)
+         | Some "session/prompt" ->
+           incr turn;
+           let n = !turn in
+           let sid =
+             string_at [ "params"; "sessionId" ] j |> Option.value ~default:""
+           in
+           let prompt_text =
+             match Json.member "params" j with
+             | Some params ->
+               (match Json.member "prompt" params with
+                | Some (`Array (first :: _)) ->
+                  string_at [ "text" ] first |> Option.value ~default:""
+                | _ -> "")
+             | None -> ""
+           in
+           let has_handoff =
+             String.is_substring prompt_text ~substring:"Context handoff"
+           in
+           let handoff_kind =
+             if
+               String.is_substring
+                 prompt_text
+                 ~substring:"Context handoff (the session so far):"
+             then "Full"
+             else if
+               String.is_substring
+                 prompt_text
+                 ~substring:"Context handoff (since your last turn"
+             then "Since"
+             else "none"
+           in
+           let has_host_note =
+             String.is_substring prompt_text ~substring:"now runs on linux"
+             || String.is_substring prompt_text ~substring:"Tool host"
+             || String.is_substring prompt_text ~substring:"host linux"
+             || String.is_substring prompt_text ~substring:"linux-proj"
+           in
+           let has_harness_msg =
+             String.is_substring prompt_text ~substring:"from harness"
+           in
+           let has_turn1_msg =
+             String.is_substring prompt_text ~substring:"Please ls the cwd"
+           in
+           printf
+             "agy turn %d: handoff=%s (any=%b host_note=%b harness=%b turn1=%b)\n"
+             n
+             handoff_kind
+             has_handoff
+             has_host_note
+             has_harness_msg
+             has_turn1_msg;
+           if n = 1 || n = 3
+           then (
+             let call_id = sprintf "tc-%d" n in
+             write
+               p
+               (`Object
+                   [ "jsonrpc", `String "2.0"
+                   ; "method", `String "session/update"
+                   ; ( "params"
+                     , `Object
+                         [ "sessionId", `String sid
+                         ; ( "update"
+                           , `Object
+                               [ "sessionUpdate", `String "tool_call"
+                               ; "toolCallId", `String call_id
+                               ; "kind", `String "other"
+                               ; "title", `String "mcp_prigh_79ce654a_ls"
+                               ; "status", `String "pending"
+                               ; "rawInput", `Object []
+                               ] )
+                         ] )
+                   ]);
+             let route = Hashtbl.find_exn session_routes sid in
+             let injected = Hashtbl.find_exn routes route in
+             let mcp_reply =
+               Injected_tools.handle_line
+                 injected
+                 {|{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ls","arguments":{}}}|}
+               |> Option.value_exn
+             in
+             let mcp_text =
+               match Json.parse mcp_reply with
+               | Ok r ->
+                 (match Json.member "result" r with
+                  | Some res ->
+                    (match Json.member "content" res with
+                     | Some (`Array (blk :: _)) ->
+                       string_at [ "text" ] blk |> Option.value ~default:""
+                     | _ -> "")
+                  | None -> "")
+               | Error _ -> ""
+             in
+             printf "agy turn %d mcp ls -> %S\n" n (String.strip mcp_text);
+             (* Antigravity omits tool output on completed MCP tool_call_update. *)
+             write
+               p
+               (`Object
+                   [ "jsonrpc", `String "2.0"
+                   ; "method", `String "session/update"
+                   ; ( "params"
+                     , `Object
+                         [ "sessionId", `String sid
+                         ; ( "update"
+                           , `Object
+                               [ "sessionUpdate", `String "tool_call_update"
+                               ; "toolCallId", `String call_id
+                               ; "status", `String "completed"
+                               ] )
+                         ] )
+                   ]));
+           write
+             p
+             (`Object
+                 [ "jsonrpc", `String "2.0"
+                 ; "method", `String "session/update"
+                 ; ( "params"
+                   , `Object
+                       [ "sessionId", `String sid
+                       ; ( "update"
+                         , `Object
+                             [ "sessionUpdate", `String "agent_message_chunk"
+                             ; ( "content"
+                               , `Object
+                                   [ "type", `String "text"
+                                   ; "text", `String (sprintf "agy-reply-%d" n)
+                                   ] )
+                             ] )
+                       ] )
+                 ]);
+           reply j (`Object [ "stopReason", `String "end_turn" ])
+         | Some "session/close" -> reply j (`Object [])
+         | Some _ | None -> ());
+        loop ()
+    in
+    loop ()
+  in
+  let spawn_external _agent ~host (_launch : Adapter.Launch.t) =
+    incr spawns;
+    printf "spawn #%d on %s\n" !spawns host;
+    let inner = Line_transport.Peer.spawn ~sw fake_agy in
+    let base_bridge =
+      Injected_tools.Bridge.create
+        ~prigh:"prigh"
+        ~socket:"/tmp/test.sock"
+        ~token:"tok"
+    in
+    let mcp : Line_transport.Mcp.t =
+      { bridge = base_bridge
+      ; serve = ignore
+      ; route =
+          Some
+            (fun route injected ->
+              Hashtbl.set routes ~key:route ~data:injected;
+              ( Injected_tools.Bridge.with_route base_bridge ~route
+              , fun () -> Hashtbl.remove routes route ))
+      }
+    in
+    Ok
+      (Line_transport.create
+         ~read_line:(fun () -> Line_transport.read_line inner)
+         ~write_line:(fun line -> Line_transport.write_line inner line)
+         ~stop:(fun () -> Line_transport.stop inner)
+         ~ended:(fun () -> Line_transport.ended inner)
+         ~is_ended:(fun () -> Line_transport.is_ended inner)
+         ~mcp
+         ())
+  in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~login:
+        (Login_manager.create
+           ~env:t.env
+           ~sw
+           ~getenv:(fun _ -> None)
+           ~store:(Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+           ())
+      ~sessions_dir
+      ~cwd:t.dir
+      ~engines
+      ~spawn_external
+      ~new_agent
+      ()
+  in
+  let connect_tool_host ~id ~name ~cwd =
+    let stream = Eio.Stream.create Int.max_value in
+    let client = Rpc_server.connect server ~send:(Eio.Stream.add stream) in
+    ignore
+      (Rpc_server.handle
+         server
+         client
+         (Json.of_string
+            (sprintf
+               {|{"id":"h","method":"hello","params":{"name":%S,"tools":true,"host_id":%S,"cwd":%S,"home":%S}}|}
+               name
+               id
+               cwd
+               t.dir))
+       : Json.t);
+    Eio.Fiber.fork_daemon ~sw (fun () ->
+      let rec go () =
+        let ev = Eio.Stream.take stream in
+        if
+          Option.equal
+            String.equal
+            (string_at [ "event" ] ev)
+            (Some "tool_exec")
+        then (
+          let tool_name = string_at [ "name" ] ev |> Option.value ~default:"" in
+          let exec_cwd = string_at [ "cwd" ] ev |> Option.value ~default:cwd in
+          let arguments =
+            Option.value (Json.member "arguments" ev) ~default:(`Object [])
+          in
+          let result : Tool.Result.t =
+            if String.equal tool_name Host_ops.instructions_op
+            then Tool.Result.ok "[]"
+            else if String.is_prefix tool_name ~prefix:"$"
+            then
+              Host_ops.execute
+                ~mcp:None
+                ~env:t.env
+                ~cancel:Cancellation.never
+                ~on_output:ignore
+                ~cwd:exec_cwd
+                ~name:tool_name
+                ~arguments
+                ()
+            else (
+              match Tools.find tool_name with
+              | Some tool ->
+                let ctx =
+                  Tool.Context.create
+                    ~env:t.env
+                    ~cwd:exec_cwd
+                    ~home:(fun () -> Some t.dir)
+                    ()
+                in
+                tool.run ctx arguments
+              | None -> Tool.Result.error ("unknown tool: " ^ tool_name))
+          in
+          ignore
+            (Rpc_server.handle
+               server
+               client
+               (`Object
+                   [ "id", `Number "0"
+                   ; "method", `String "tool_exec_result"
+                   ; ( "params"
+                     , `Object
+                         [ ( "exec_id"
+                           , `String
+                               (string_at [ "exec_id" ] ev
+                                |> Option.value ~default:"") )
+                         ; "text", `String result.text
+                         ; ( "is_error"
+                           , if result.is_error then `True else `False )
+                         ] )
+                   ])
+             : Json.t));
+        go ()
+      in
+      go ())
+  in
+  connect_tool_host ~id:"host-mac" ~name:"mac" ~cwd:mac_dir;
+  connect_tool_host ~id:"host-linux" ~name:"linux" ~cwd:linux_dir;
+  let models_loaded, set_models_loaded = Eio.Promise.create () in
+  let client =
+    Rpc_server.connect server ~send:(fun ev ->
+      match string_at [ "event" ] ev with
+      | Some "models_changed" when not (Eio.Promise.is_resolved models_loaded)
+        -> Eio.Promise.resolve set_models_loaded ()
+      | _ -> ())
+  in
+  let call ?(params = "{}") meth =
+    let resp =
+      Rpc_server.handle
+        server
+        client
+        (Json.of_string
+           (sprintf {|{"id": "r", "method": "%s", "params": %s}|} meth params))
+    in
+    (match Json.member "ok" resp with
+     | Some `True -> ()
+     | _ -> failwithf "RPC %s failed: %s" meth (Json.to_string resp) ());
+    resp
+  in
+  let send_prompt text =
+    ignore (call ~params:(sprintf {|{"text": %S}|} text) "prompt" : Json.t);
+    Agent.wait_idle (Option.value_exn !latest)
+  in
+  ignore (call "new_session" : Json.t);
+  ignore (call "list_models" : Json.t);
+  Eio.Promise.await models_loaded;
+  ignore
+    (call
+       ~params:(sprintf {|{"host": "host-mac", "cwd": %S}|} mac_dir)
+       "set_active_host"
+     : Json.t);
+  ignore
+    (call
+       ~params:{|{"model": "backend:acp:antigravity/gemini-2.5-pro"}|}
+       "set_model"
+     : Json.t);
+  (* Turn 1 on host-mac: no handoff, ls runs on host-mac, output preserved. *)
+  send_prompt "Please ls the cwd";
+  (* Turn 2 on same host-mac: NO handoff! *)
+  send_prompt "Follow up on mac";
+  (* Turn 3 after switching active host to host-linux: compact Since note only. *)
+  ignore
+    (call
+       ~params:(sprintf {|{"host": "host-linux", "cwd": %S}|} linux_dir)
+       "set_active_host"
+     : Json.t);
+  send_prompt "Now ls linux";
+  (* Turn 4 on same host-linux: NO handoff! *)
+  send_prompt "Follow up on linux";
+  (* Switch to harness for 1 turn, then back to backend:acp:antigravity. *)
+  ignore
+    (call ~params:{|{"model": "deepseek/deepseek-flash"}|} "set_model" : Json.t);
+  send_prompt "Harness turn";
+  ignore
+    (call
+       ~params:{|{"model": "backend:acp:antigravity/gemini-2.5-pro"}|}
+       "set_model"
+     : Json.t);
+  send_prompt "Back to agy";
+  (* Inspect all recorded tool results in the session. *)
+  List.iter
+    (Agent.messages (Option.value_exn !latest))
+    ~f:(function
+      | Tool_result r ->
+        printf
+          "recorded tool_result: name=%s err=%b text=%S\n"
+          r.tool_name
+          r.is_error
+          (String.strip r.text)
+      | _ -> ());
+  printf "total spawns=%d\n" !spawns;
+  Rpc_server.shutdown server;
+  [%expect
+    {|
+    spawn #1 on backend
+    agy turn 1: handoff=none (any=false host_note=false harness=false turn1=true)
+    agy turn 1 mcp ls -> "mac-only.txt"
+    agy turn 2: handoff=none (any=false host_note=false harness=false turn1=false)
+    agy turn 3: handoff=none (any=false host_note=true harness=false turn1=false)
+    agy turn 3 mcp ls -> "linux-only.txt"
+    agy turn 4: handoff=none (any=false host_note=false harness=false turn1=false)
+    agy turn 5: handoff=Since (any=true host_note=true harness=true turn1=false)
+    recorded tool_result: name=ls err=false text="mac-only.txt"
+    recorded tool_result: name=ls err=false text="linux-only.txt"
+    total spawns=1
+    |}]
+;;
