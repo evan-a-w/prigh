@@ -94,8 +94,10 @@ in
         default = true;
         description = ''
           Install the Antigravity CLI (`agy`, antigravityPackage), an ACP
-          agent the composer drives (`-adapters acp:antigravity`, which runs
-          `agy acp`, added in antigravity-cli 1.5.0). It is unfree: your
+          agent the composer drives (`-adapters antigravity` or
+          `-adapters bridge:antigravity`, which runs `agy acp`, added in
+          antigravity-cli 1.5.0; `acp:antigravity` and
+          `backend:acp:antigravity` also work). It is unfree: your
           nixpkgs must allow it, unless it is older than 1.5.0 and so the
           default is prigh's (see antigravityPackage). Log in with `agy acp --login`, or in prigh
           with `/adapters import antigravity` or `/login google-antigravity`.
@@ -124,7 +126,8 @@ in
         default = true;
         description = ''
           Install OpenCode (`opencode`), an ACP agent the composer drives
-          (`-adapters acp:opencode`). Log in with `opencode auth login`.
+          (`-adapters opencode`; `acp:opencode` also works). Log in with
+          `opencode auth login`.
         '';
       };
 
@@ -133,7 +136,8 @@ in
         default = false;
         description = ''
           Install Goose (`goose`, pkgs.goose-cli), an ACP agent the composer
-          drives (`-adapters acp:goose`). Set it up with `goose configure`.
+          drives (`-adapters goose`; `acp:goose` also works). Set it up with
+          `goose configure`.
         '';
       };
       bubblewrap = mkOption {
@@ -152,10 +156,11 @@ in
         default = [ ];
         example = lib.literalExpression "[ pkgs.crush ]";
         description = ''
-          Other agent CLIs for the composer, e.g. ACP agents
-          (`-adapters acp:mine=my-agent --acp`). xAI's Grok Build
-          (`acp:grok`, `grok agent stdio`) is not in nixpkgs (pkgs.grok-cli
-          is a different tool): install it yourself.
+          Other agent CLIs for the composer, e.g. unofficial ACP agents
+          (`-adapters acp:my-agent --acp` or
+          `-adapters acp:mine=my-agent --acp`). xAI's Grok Build
+          (`grok` / `acp:grok`, `grok agent stdio`) is not in nixpkgs
+          (pkgs.grok-cli is a different tool): install it yourself.
         '';
       };
     };

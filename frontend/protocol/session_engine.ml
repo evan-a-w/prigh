@@ -205,13 +205,13 @@ let of_state_json j =
   }
 ;;
 
-let rec adapter_label = function
+let rec harness_label = function
   | "codex" -> "Codex"
   | "claude" -> "Claude Code"
   | "prigh" -> "prigh"
   | adapter ->
     (match String.chop_prefix adapter ~prefix:"backend:" with
-     | Some inner -> adapter_label inner ^ " (backend)"
+     | Some inner -> harness_label inner
      | None ->
        (match String.chop_prefix adapter ~prefix:"acp:" with
         | Some "opencode" -> "OpenCode"
@@ -221,6 +221,14 @@ let rec adapter_label = function
         | Some "goose" -> "Goose"
         | Some name -> name ^ " (ACP)"
         | None -> adapter))
+;;
+
+let adapter_label = harness_label
+
+let adapter_label_with_mode adapter =
+  match String.chop_prefix adapter ~prefix:"backend:" with
+  | Some inner -> harness_label inner ^ " (bridge)"
+  | None -> harness_label adapter
 ;;
 
 let engine_label = function

@@ -14,10 +14,11 @@ module Tab : sig
 end
 
 type t =
-  { tab : Tab.t
+  { mode : Engine_mode.t
+  ; tab : Tab.t
   ; more : bool (** the provider's older models too ("Show more") *)
   ; access_open : bool (** the foot's menu of modes *)
-  ; engine_open : bool (** the foot's menu of engines *)
+  ; engine_open : bool (** the foot's menu of engine modes *)
   }
 [@@deriving sexp_of, equal]
 
@@ -40,12 +41,21 @@ val offered
     provider has a [default]) keep the order it gave. *)
 val newest_first : Llm.t list -> Llm.t list
 
-(** The rail: the favourites, then each provider with a model on offer, in
-    the order of their first. *)
-val tabs : Llm.t list -> Tab.t list
+(** Models belonging to a given execution mode ({!Engine_mode.of_provider}). *)
+val models_for_mode : Engine_mode.t -> Llm.t list -> Llm.t list
 
-(** Opened on the current model's provider. *)
-val opening : Llm.t list -> current:string option -> t
+(** The rail for [mode]: the favourites, then each provider with a model on
+    offer in [mode], in the order of their first. *)
+val tabs : mode:Engine_mode.t -> Llm.t list -> Tab.t list
+
+(** Opened on [mode] and the current model's provider if in [mode] (else the
+    first provider in [mode], else {!Tab.Favourites}). *)
+val opening : Llm.t list -> mode:Engine_mode.t -> current:string option -> t
+
+(** Switch the browsed execution mode, closing the mode popover, resetting
+    [more], and picking [current]'s provider tab if in the new mode else its
+    first provider tab. *)
+val set_mode : ?current:string -> t -> Engine_mode.t -> Llm.t list -> t
 
 (** The rows of the tab (favourites in the order they were starred, a
     provider's newest first, cut to {!shown} unless [more]), and how many

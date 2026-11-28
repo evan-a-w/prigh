@@ -284,23 +284,19 @@ let model_chip (m : App.Model.t) (state : State.t) ~fixed ~inject =
            (Provider_mark.of_model
               ~provider:state.model.provider
               ~name:state.model.name)
-       ; (if Session_engine.is_harness state.engine
-          then span ~cls:"chip-label" (Model_menu.short_name state.model.name)
-          else
-            (* On the narrowest phones the model keeps the room: the engine
+       ; (match trouble with
+          | Some chip ->
+            (* On the narrowest phones the error keeps the room: the engine
                is in the chip's title and label. *)
             Node.span
               ~attrs:[ Attr.class_ "chip-label" ]
               [ Node.span
                   ~attrs:[ Attr.class_ "chip-engine max-[359px]:hidden" ]
-                  [ Node.text
-                      (Session_engine.who state.engine
-                       ^ if Option.is_some trouble then ": " else " · ")
-                  ]
-              ; Node.text
-                  (Option.value_or_thunk trouble ~default:(fun () ->
-                     Model_menu.short_name state.model.name))
-              ])
+                  [ Node.text (Session_engine.who state.engine ^ ": ") ]
+              ; Node.text chip
+              ]
+          | None ->
+            span ~cls:"chip-label" (Model_menu.short_name state.model.name))
        ]
        @ Option.value_map login ~default:[] ~f:(fun l ->
          [ span

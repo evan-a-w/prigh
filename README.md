@@ -287,15 +287,21 @@ NAME=TOKEN,...` sign in as NAME but never as a superuser, for tool hosts.
 
 ### Engines
 
-A backend runs sessions on the **harness**, prigh's own agent loop calling
-the model's API (the default), and, when you deploy it, the **composer**,
-which hands the work to a coding agent installed and signed in on the
-session's tool host: the Codex CLI (`codex app-server`), Claude Code
-(`claude`, stream-json), an ACP agent (`acp:opencode`, `acp:antigravity`
-(`agy acp`), `backend:acp:antigravity` (runs `agy acp` on the backend while
-routing all prigh tools to the session's active tool host, listed directly
-in `/model`), `acp:grok` (Grok Build), `acp:goose`, or
-`acp:mine=my-agent --acp`) or `prigh`, prigh's own harness as an adapter.
+Sessions run in one of three execution modes:
+
+- **Native**: prigh's built-in **harness**, calling the model's API directly
+  (the default).
+- **Bridge**: an external agent running on the prigh server (`bridge:<adapter>`,
+  e.g. `bridge:antigravity`; `backend:` also works), bridging all prigh tools
+  to the session's active tool host over MCP.
+- **Host**: the **composer**, which hands the work to a coding agent
+  installed and signed in directly on the session's tool host: the Codex CLI
+  (`codex app-server`), Claude Code (`claude`, stream-json), a known ACP agent
+  (`opencode`, `antigravity` (`agy acp`), `grok` (Grok Build), `gemini`,
+  `goose`; `acp:<known>` also works), an unofficial ACP server
+  (`acp:<command>` or `acp:<name>=<command>`, e.g. `acp:my-agent --acp` or
+  `acp:mine=my-agent --acp`), or `prigh`, prigh's own harness as an adapter.
+
 prigh keeps the session: its log (messages, tool calls, models, usage and
 the cost the agent reports), naming, search, worktrees, approvals and the
 UI, so a Codex or Claude Code session looks and works like any other. Their
@@ -305,15 +311,19 @@ tools run on the tool host you choose, and prigh's own tools they lack
 instructions and what prigh knows about you go to them too.
 
 ```
-prigh serve -engines harness,composer -adapters codex,claude
+prigh serve -engines harness,composer -adapters codex,claude,antigravity,bridge:antigravity,opencode
 ```
 
 (or `$PRIGH_ENGINES`, `$PRIGH_ADAPTERS`; the first engine is the default for
 new sessions). Users, settings and sign-ins are the same on either engine,
-so one backend can run both or you can run one of each. With the composer
-deployed, prigh-web's new-session screen has an engine chip, `/new codex`
-(or `/new` for a picker) starts a session on an adapter, and `/engine`
-switches a session to another agent (or the harness), which gets the
+so one backend can run both or you can run one of each. When more than one
+mode is deployed, prigh-web's model menu has a **Native / Bridge / Host**
+mode selector, flat model pickers (and the TUI's `/model`) tag models as
+`<name> @ native`, `<name> @ bridge`, or `<name> @ host`, and picking a
+model switches modes transparently. prigh-web's new-session screen also has
+an engine chip, `/new codex` (or `/new native`, `/new bridge`, `/new host`,
+or `/new` for a picker) starts a session on an engine, and `/engine`
+switches a session to another agent (or back to `native`), which gets the
 conversation so far quoted in a handoff ahead of your next message, as does
 an agent taking over on another tool host. The model chip and status line
 say which agent runs it (`Codex · gpt-5.2-codex`; a cost Codex does not

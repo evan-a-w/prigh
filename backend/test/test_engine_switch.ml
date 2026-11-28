@@ -412,7 +412,7 @@ let%expect_test "switching adapters hands each what it has not seen" =
   [%expect
     {|
     ok: engine composer, adapter codex
-    error: "unknown adapter \"gemini\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"
+    error: "this backend's composer does not drive Gemini CLI (it drives Codex, Claude Code)"
     error: "missing param \"adapter\""
     |}];
   show_entries (Agent.session (agent ()));
@@ -679,7 +679,7 @@ let%expect_test "back to the harness engine and out again; models follow" =
 
     first
     codex/gpt-5
-    models: codex/default
+    models: codex/default claude/default anthropic/claude-fable-5 ...
     error: "Codex has no model \"nope\": pick one of default (/model lists them)"
     error: "Codex uses its own login, not prigh's: pick default without @LOGIN"
     error: "Codex uses its own login, not prigh's: pick the model without @LOGIN"

@@ -89,18 +89,31 @@ let known =
 
 let find_known name = List.find known ~f:(fun a -> String.equal a.name name)
 
+let split_command s =
+  String.split_on_chars s ~on:[ ' '; '\t' ]
+  |> List.filter ~f:(Fn.non String.is_empty)
+;;
+
+let inferred_name program =
+  let base = Filename.basename program |> String.strip in
+  match base with
+  | "" | "." | ".." | "/" -> None
+  | name -> Some name
+;;
+
 let of_spec spec =
-  match String.lsplit2 spec ~on:'=' with
-  | None ->
-    Or_error.errorf
-      "%S is not name=command: e.g. acp:myagent=myagent --acp"
-      spec
+  let explicit_name =
+    match String.lsplit2 spec ~on:'=' with
+    | Some (lhs, rhs)
+      when not
+             (String.exists (String.strip lhs) ~f:(function
+                | ' ' | '\t' -> true
+                | _ -> false)) -> Some (String.strip lhs, rhs)
+    | _ -> None
+  in
+  match explicit_name with
   | Some (name, command) ->
-    let name = String.strip name in
-    let command =
-      String.split_on_chars command ~on:[ ' '; '\t' ]
-      |> List.filter ~f:(Fn.non String.is_empty)
-    in
+    let command = split_command command in
     if String.is_empty name
     then
       Or_error.errorf "%S names no agent: e.g. acp:myagent=myagent --acp" spec
@@ -115,6 +128,23 @@ let of_spec spec =
       match find_known name with
       | Some known -> Ok { known with command }
       | None -> Ok { name; display_name = name; command; quirks = Quirks.none })
+  | None ->
+    let command = split_command spec in
+    (match command with
+     | [] ->
+       Or_error.errorf
+         "empty ACP command: e.g. acp:myagent --acp or acp:myagent=myagent \
+          --acp"
+     | program :: _ ->
+       (match inferred_name program with
+        | None ->
+          Or_error.errorf
+            "cannot infer ACP agent name from %S: give a name with \
+             acp:<name>=%s"
+            spec
+            spec
+        | Some name ->
+          Ok { name; display_name = name; command; quirks = Quirks.none }))
 ;;
 
 let numbers version =

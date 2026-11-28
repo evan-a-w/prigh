@@ -9,7 +9,8 @@ module Tab = struct
 end
 
 type t =
-  { tab : Tab.t
+  { mode : Engine_mode.t
+  ; tab : Tab.t
   ; more : bool
   ; access_open : bool
   ; engine_open : bool
@@ -17,7 +18,12 @@ type t =
 [@@deriving sexp_of, equal]
 
 let init =
-  { tab = Favourites; more = false; access_open = false; engine_open = false }
+  { mode = Engine_mode.Native
+  ; tab = Favourites
+  ; more = false
+  ; access_open = false
+  ; engine_open = false
+  }
 ;;
 
 let shown = 6
@@ -85,6 +91,11 @@ let newest_first models =
     | _ -> sorted, m)
 ;;
 
+let models_for_mode mode (models : Llm.t list) =
+  List.filter models ~f:(fun (m : Llm.t) ->
+    Engine_mode.equal (Engine_mode.of_provider m.provider) mode)
+;;
+
 let providers (models : Llm.t list) =
   List.fold models ~init:[] ~f:(fun acc (model : Llm.t) ->
     if List.mem acc model.provider ~equal:String.equal
@@ -93,26 +104,34 @@ let providers (models : Llm.t list) =
   |> List.rev
 ;;
 
-let tabs models =
+let tabs ~mode models =
+  let models = models_for_mode mode models in
   Tab.Favourites :: List.map (providers models) ~f:(fun p -> Tab.Provider p)
 ;;
 
-let opening (models : Llm.t list) ~current =
-  let tab =
-    match
-      List.find models ~f:(fun (l : Llm.t) ->
-        Option.equal String.equal current (Some l.key))
-    with
-    | Some l -> Tab.Provider l.provider
-    | None ->
-      (match providers models with
-       | p :: _ -> Provider p
-       | [] -> Favourites)
-  in
-  { init with tab }
+let tab_for_mode mode (models : Llm.t list) ~current =
+  let models = models_for_mode mode models in
+  match
+    List.find models ~f:(fun (l : Llm.t) ->
+      Option.equal String.equal current (Some l.key))
+  with
+  | Some l -> Tab.Provider l.provider
+  | None ->
+    (match providers models with
+     | p :: _ -> Provider p
+     | [] -> Favourites)
+;;
+
+let opening (models : Llm.t list) ~mode ~current =
+  { init with mode; tab = tab_for_mode mode models ~current }
+;;
+
+let set_mode ?current (_t : t) mode models =
+  { init with mode; tab = tab_for_mode mode models ~current }
 ;;
 
 let rows ?current t (models : Llm.t list) ~favourites =
+  let models = models_for_mode t.mode models in
   match t.tab with
   | Favourites ->
     ( List.filter_map favourites ~f:(fun key ->
@@ -147,7 +166,7 @@ let set_tab t tab =
 ;;
 
 let step t models delta =
-  let tabs = Array.of_list (tabs models) in
+  let tabs = Array.of_list (tabs ~mode:t.mode models) in
   let n = Array.length tabs in
   let i =
     Array.findi tabs ~f:(fun _ tab -> Tab.equal tab t.tab)

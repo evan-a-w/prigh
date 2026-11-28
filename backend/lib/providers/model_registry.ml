@@ -259,19 +259,22 @@ let unknown_start_model t ~home =
      | None -> []
      | Some key when Option.is_some (find t key) -> []
      | Some key ->
-       [ sprintf
-           "%s %S (in %s) is not a known model, so new sessions start on \
-            another; did you mean %s? (/change_default saves the current model \
-            as the default)"
-           (if Option.is_some config.default_model
-            then "default_model"
-            else "fallback_models' first")
-           key
-           (Config.path ~home)
-           (String.concat
-              ~sep:" or "
-              (List.map (Model.closest_in (models t) key) ~f:Model.key))
-       ])
+       (match External_model.parse_spec key with
+        | Some (Ok _) -> []
+        | Some (Error _) | None ->
+          [ sprintf
+              "%s %S (in %s) is not a known model, so new sessions start on \
+               another; did you mean %s? (/change_default saves the current \
+               model as the default)"
+              (if Option.is_some config.default_model
+               then "default_model"
+               else "fallback_models' first")
+              key
+              (Config.path ~home)
+              (String.concat
+                 ~sep:" or "
+                 (List.map (Model.closest_in (models t) key) ~f:Model.key))
+          ]))
 ;;
 
 let unknown_compaction_model t ~home =

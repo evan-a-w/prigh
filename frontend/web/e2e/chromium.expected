@@ -5467,14 +5467,13 @@ Claude Code Anthropic's Claude Code CLI on the session's tool host
 === chromium: engines (desktop): chosen ===
 chip: Codex
 === chromium: engines (desktop): the first turn ===
-Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
-model chip: Codex · gpt-5.2-codex
+Hello from Codex: ask me to look at the project. gpt-5.2-codex 2.3k in 100 out <TIME>
+model chip: gpt-5.2-codex
 sidebar: 1 session, "Hello"
-=== chromium: engines (desktop): the model menu's engine ===
-button: Engine: Codex
-Codex 0.166.0 · logged in (ChatGPT)
-prigh harness prigh's own agent, calling the model directly
-Claude Code Claude Code is not installed on server-laptop, please install it
+=== chromium: engines (desktop): the model menu's mode ===
+button: Mode: Host
+Native prigh's built-in harness, calling the model directly
+Host external agent running directly on the active tool host
 === chromium: engines (desktop): Codex asks to run a command ===
 Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
 === chromium: engines (desktop): the command ran ===
@@ -5487,9 +5486,9 @@ Agent CLIs Checked on each connected tool host when you open this page, when a h
 Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
 Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
 copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
-=== chromium: engines (desktop): the model menu on another engine ===
+=== chromium: engines (desktop): the model menu on another mode ===
 held: true
-held, back on Codex: true
+held, back on Host: true
 === chromium: engines (desktop): errors ===
 none
 === chromium: engines (phone): the new-session engine chip ===
@@ -5502,15 +5501,14 @@ phone: ok
 === chromium: engines (phone): chosen ===
 chip: Codex
 === chromium: engines (phone): the first turn ===
-Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
-model chip: Codex · gpt-5.2-codex
+Hello from Codex: ask me to look at the project. gpt-5.2-codex 2.3k in 100 out <TIME>
+model chip: gpt-5.2-codex
 sidebar: 1 session, "Hello"
 phone: ok
-=== chromium: engines (phone): the model menu's engine ===
-button: Engine: Codex
-Codex 0.166.0 · logged in (ChatGPT)
-prigh harness prigh's own agent, calling the model directly
-Claude Code Claude Code is not installed on server-laptop, please install it
+=== chromium: engines (phone): the model menu's mode ===
+button: Mode: Host
+Native prigh's built-in harness, calling the model directly
+Host external agent running directly on the active tool host
 phone: 0 targets under 44px
 === chromium: engines (phone): Codex asks to run a command ===
 Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
@@ -5526,9 +5524,9 @@ Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
 Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
 copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
 phone: ok
-=== chromium: engines (phone): the model menu on another engine ===
+=== chromium: engines (phone): the model menu on another mode ===
 held: true
-held, back on Codex: true
+held, back on Host: true
 === chromium: engines (phone): errors ===
 none
 === chromium: engines (small): the new-session engine chip ===
@@ -5541,15 +5539,14 @@ phone: ok
 === chromium: engines (small): chosen ===
 chip: Codex
 === chromium: engines (small): the first turn ===
-Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
+Hello from Codex: ask me to look at the project. gpt-5.2-codex 2.3k in 100 out <TIME>
 model chip: gpt-5.2-codex
 sidebar: 1 session, "Hello"
 phone: ok
-=== chromium: engines (small): the model menu's engine ===
-button: Engine: Codex
-Codex 0.166.0 · logged in (ChatGPT)
-prigh harness prigh's own agent, calling the model directly
-Claude Code Claude Code is not installed on server-laptop, please install it
+=== chromium: engines (small): the model menu's mode ===
+button: Mode: Host
+Native prigh's built-in harness, calling the model directly
+Host external agent running directly on the active tool host
 phone: 0 targets under 44px
 === chromium: engines (small): Codex asks to run a command ===
 Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
@@ -5565,9 +5562,9 @@ Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
 Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
 copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
 phone: ok
-=== chromium: engines (small): the model menu on another engine ===
+=== chromium: engines (small): the model menu on another mode ===
 held: true
-held, back on Codex: true
+held, back on Host: true
 === chromium: engines (small): errors ===
 none
 === chromium: smoke: sign in ===

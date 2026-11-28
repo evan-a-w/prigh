@@ -97,7 +97,7 @@ let%expect_test
     ((spec acp:)
      (parsed
       ((Error
-        "unknown adapter \"acp:\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"))))
+        "unknown adapter \"acp:\": expected codex, claude, prigh, opencode, gemini, antigravity, grok, goose, bridge:<adapter>, acp:<command> or acp:<name>=<command>"))))
     ((spec deepseek/deepseek-flash) (parsed ()))
     ((spec anthropic/claude-haiku-4-5) (parsed ()))
     ((spec claude) (parsed ()))

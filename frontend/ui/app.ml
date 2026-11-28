@@ -964,34 +964,91 @@ let format_tokens n =
   else sprintf "%.0fM" (Float.round (n /. 1e6))
 ;;
 
+let filter_placeholder_models ~keep models =
+  let providers_with_real =
+    List.fold models ~init:String.Set.empty ~f:(fun acc (model : P.Model.t) ->
+      if String.equal model.id "default"
+      then acc
+      else Set.add acc model.provider)
+  in
+  List.filter models ~f:(fun (model : P.Model.t) ->
+    (not (String.equal model.id "default"))
+    || keep model
+    || not (Set.mem providers_with_real model.provider))
+;;
+
+let format_model_key m key =
+  if List.length (P.Engine_mode.deployed_modes m.deployed) > 1
+  then (
+    match
+      List.find m.models ~f:(fun (model : P.Model.t) ->
+        String.equal model.key key)
+    with
+    | Some model ->
+      P.Engine_mode.format_model ~name:model.name ~provider:model.provider
+    | None ->
+      (match String.lsplit2 key ~on:'/' with
+       | Some (provider, id) -> P.Engine_mode.format_model ~name:id ~provider
+       | None -> key))
+  else key
+;;
+
 let model_items m ~logged_in_only =
   let current = Option.map m.state ~f:(fun s -> s.model.key) in
   let scoped = scoped_keys m in
+  let multi_mode = List.length (P.Engine_mode.deployed_modes m.deployed) > 1 in
+  let models =
+    filter_placeholder_models
+      ~keep:(fun model -> Option.equal String.equal current (Some model.key))
+      m.models
+  in
   let models =
     if logged_in_only
-    then List.filter m.models ~f:(fun model -> logged_in m model.provider)
-    else m.models
+    then List.filter models ~f:(fun model -> logged_in m model.provider)
+    else models
   in
   List.map models ~f:(fun (model : P.Model.t) ->
     let logged = logged_in m model.provider in
     let scoped_mark = if Set.mem scoped model.key then " ◆" else "" in
+    let mode = P.Engine_mode.of_provider model.provider in
+    let label =
+      if multi_mode
+      then P.Engine_mode.format_model ~name:model.name ~provider:model.provider
+      else model.name
+    in
+    let provider_detail =
+      if P.Engine_mode.equal mode Native
+      then model.key
+      else P.Session_engine.harness_label model.provider
+    in
+    let search =
+      if multi_mode
+      then
+        sprintf
+          "%s @ %s %s %s"
+          model.name
+          (P.Engine_mode.to_string mode)
+          (P.Session_engine.harness_label model.provider)
+          model.key
+      else model.name ^ " " ^ model.key
+    in
     Picker.Item.create
       ~id:model.key
       ~detail:
         (String.concat
            ~sep:"  "
-           ([ model.key ^ scoped_mark ]
+           ([ provider_detail ^ scoped_mark ]
             @ (if model.context_window > 0
                then
                  [ "ctx " ^ format_tokens (Float.of_int model.context_window) ]
                else [])
             @ [ format_price model.cost ]
             @ if logged then [] else [ "not logged in" ]))
-      ~search:(model.name ^ " " ^ model.key)
+      ~search
       ~marked:
         (Option.value_map current ~default:false ~f:(String.equal model.key))
       ~dimmed:(not logged)
-      model.name)
+      label)
 ;;
 
 (* The session's agent CLI could not list its models: what to do about it,
@@ -1035,9 +1092,26 @@ let scoped_models_picker m =
       String.Set.of_list keys
     | _ -> scoped_keys m
   in
+  let multi_mode = List.length (P.Engine_mode.deployed_modes m.deployed) > 1 in
+  let models =
+    filter_placeholder_models
+      ~keep:(fun model -> Set.mem checked model.key)
+      m.models
+  in
   let items =
-    List.map m.models ~f:(fun (model : P.Model.t) ->
-      Picker.Item.create ~id:model.key ~detail:model.name model.name)
+    List.map models ~f:(fun (model : P.Model.t) ->
+      let label =
+        if multi_mode
+        then
+          P.Engine_mode.format_model ~name:model.name ~provider:model.provider
+        else model.name
+      in
+      let detail =
+        if P.Engine_mode.equal (P.Engine_mode.of_provider model.provider) Native
+        then model.name
+        else P.Session_engine.harness_label model.provider
+      in
+      Picker.Item.create ~id:model.key ~detail label)
   in
   open_picker
     m
@@ -1090,17 +1164,29 @@ let engine_choices m ~switch =
   | _ -> choices
 ;;
 
-let engine_picker m ~switch =
+let engine_picker ?choices ?mode_label m ~switch =
   let current = current_choice m in
+  let choices = Option.value choices ~default:(engine_choices m ~switch) in
   let items =
-    List.map (engine_choices m ~switch) ~f:(fun c ->
+    List.map choices ~f:(fun c ->
+      let key = P.Deployed_engines.Choice.key c in
+      let label = P.Deployed_engines.Choice.label c in
+      let mode = P.Engine_mode.to_string (P.Engine_mode.of_adapter c.adapter) in
       Picker.Item.create
-        ~id:(P.Deployed_engines.Choice.key c)
+        ~id:key
+        ~search:(sprintf "%s %s %s" key label mode)
         ~detail:(P.Deployed_engines.Choice.describe c)
         ~marked:(Option.equal P.Deployed_engines.Choice.equal current (Some c))
-        (P.Deployed_engines.Choice.label c))
+        label)
   in
-  let title = if switch then "Switch this session to" else "New session on" in
+  let base_title =
+    if switch then "Switch this session to" else "New session on"
+  in
+  let title =
+    match mode_label with
+    | Some ml -> sprintf "%s (%s)" base_title ml
+    | None -> base_title
+  in
   open_picker m (Engines { switch }) (Picker.create ~title items)
 ;;
 
@@ -1135,9 +1221,29 @@ let engine_chosen m ~switch arg =
     then P.Deployed_engines.switch_targets m.deployed
     else P.Deployed_engines.choices m.deployed
   in
-  match P.Deployed_engines.find_in choices arg with
-  | Error e -> error m (Error.to_string_hum e), []
-  | Ok c -> if switch then switch_adapter m c else new_session_on m c
+  match P.Engine_mode.of_string arg with
+  | Some mode ->
+    let matching =
+      List.filter (engine_choices m ~switch) ~f:(fun c ->
+        P.Engine_mode.equal (P.Engine_mode.of_adapter c.adapter) mode)
+    in
+    (match matching with
+     | [ c ] -> if switch then switch_adapter m c else new_session_on m c
+     | _ :: _ :: _ ->
+       ( engine_picker
+           ~choices:matching
+           ~mode_label:(P.Engine_mode.label mode)
+           m
+           ~switch
+       , [] )
+     | [] ->
+       (match P.Deployed_engines.find_in choices arg with
+        | Error e -> error m (Error.to_string_hum e), []
+        | Ok c -> if switch then switch_adapter m c else new_session_on m c))
+  | None ->
+    (match P.Deployed_engines.find_in choices arg with
+     | Error e -> error m (Error.to_string_hum e), []
+     | Ok c -> if switch then switch_adapter m c else new_session_on m c)
 ;;
 
 let new_command m args =
@@ -8512,13 +8618,16 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          , [] ))
      | Default_saved ->
        decode json ~f:P.Config.of_json (fun config ->
-         let show = Option.value ~default:"?" in
+         let model =
+           Option.value_map
+             config.default_model
+             ~default:"?"
+             ~f:(format_model_key m)
+         in
+         let thinking = Option.value config.default_thinking ~default:"?" in
          ( notice
              { m with config = Some config }
-             (sprintf
-                "default: %s, thinking %s"
-                (show config.default_model)
-                (show config.default_thinking))
+             (sprintf "default: %s, thinking %s" model thinking)
          , [] ))
      | Fallback_shown | Fallback_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->

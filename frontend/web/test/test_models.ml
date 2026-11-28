@@ -19,10 +19,10 @@ let%expect_test
     Switch model
     (Close (Esc))
     []
-    Claude Opus 5.5 anthropic, 200k ctx ✓
-    Claude Sonnet 5 anthropic, 200k ctx
-    GPT-6 openai, 200k ctx, not logged in
-    DeepSeek Chat deepseek, 200k ctx, not logged in
+    Claude Opus 5.5 Anthropic, 200k ctx ✓
+    Claude Sonnet 5 Anthropic, 200k ctx
+    GPT-6 OpenAI API, 200k ctx, not logged in
+    DeepSeek Chat DeepSeek, 200k ctx, not logged in
     ↑↓ to move, Enter to choose, Esc to close
     |}];
   (* The highlight starts on the current model. *)
@@ -30,7 +30,7 @@ let%expect_test
   [%expect {| <span class="picker-label"> Claude Opus 5.5 </span> |}];
   H.act h (Picker_query "sonn");
   H.text h ~selector:".picker-items";
-  [%expect {| Claude Sonnet 5 anthropic, 200k ctx |}];
+  [%expect {| Claude Sonnet 5 Anthropic, 200k ctx |}];
   H.act h (Picker_query "");
   H.key h "ArrowDown" ~target:Field;
   H.key h "ArrowDown" ~target:Field;
@@ -39,7 +39,7 @@ let%expect_test
     {|
     (Dialog_move 1)
     (Dialog_move 1)
-    GPT-6 openai, 200k ctx, not logged in
+    GPT-6 OpenAI API, 200k ctx, not logged in
     |}];
   (* It switches, and says how to log in to its provider. *)
   H.key h "Enter" ~target:Field;
@@ -103,8 +103,8 @@ let%expect_test "/model with a name switches, or says what matches" =
     (Rpc (method_ push_pref)
      (params ((key history) (value "/model claude") (max 500))) (tag Ignore))
     (Focus picker-input)
-    Claude Opus 5.5 anthropic, 200k ctx ✓
-    Claude Sonnet 5 anthropic, 200k ctx
+    Claude Opus 5.5 Anthropic, 200k ctx ✓
+    Claude Sonnet 5 Anthropic, 200k ctx
     |}];
   H.act h Close_dialog;
   H.type_ h "/model gemini";

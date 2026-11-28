@@ -63,7 +63,7 @@ let%expect_test "Engine_choice.names and Engines.resolve" =
   resolve ~t:single_composer "composer";
   [%expect
     {|
-    harness (prigh harness): harness, prigh harness
+    harness (prigh harness): harness, prigh harness, native
     codex (Codex): codex
     claude (Claude Code): claude, claude code
     acp:antigravity (Antigravity): agy, antigravity, acp:antigravity, Antigravity

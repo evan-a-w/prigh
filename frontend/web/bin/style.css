@@ -1383,12 +1383,14 @@ kbd {
 .model-menu-foot > .menu-keys { padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-foot-controls { display: flex; align-items: center; gap: 2px; flex: none; min-width: 0; }
 .model-access { position: relative; flex: none; }
-.model-engine .model-access-button { width: 132px; justify-content: flex-start; }
+.model-engine .model-access-button { width: 100px; justify-content: flex-start; }
 .model-engine .model-access-button .chevron { margin-left: auto; }
 .model-engine .model-access-button .chip-label { flex: 0 1 auto; min-width: 0; }
-.model-engine .model-access-button .chip-label { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-engine .model-access-button .chip-label { max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-engine .model-access-button .provider-mark, .model-engine .model-access-item .provider-mark { width: 14px; height: 14px; flex: none; }
 .model-engine .model-access-menu { width: 300px; }
+.model-engine .model-access-item .menu-label { display: inline-flex; align-items: center; gap: 6px; }
+.model-mode-active { font-size: 10.5px; font-weight: 500; padding: 1px 5px; border-radius: 999px; background: var(--accent); color: var(--muted-foreground); }
 .model-engine .model-access-item .menu-detail { white-space: normal; }
 .model-engine .model-access-item.trouble .menu-detail { color: var(--destructive); }
 .model-engine .model-access-item:disabled { opacity: 0.55; cursor: default; }

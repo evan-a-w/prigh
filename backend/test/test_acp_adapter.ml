@@ -560,10 +560,7 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
   show "acp:unheard-of";
   [%expect
     {|
-    ((adapters (acp:unheard-of))
-     (check
-      (Error
-       "prigh does not know how to start the ACP agent unheard-of: give its command with -adapters acp:unheard-of=<command and args> (it knows opencode, gemini, antigravity, grok, goose)"))
+    ((adapters (acp:unheard-of)) (check (Ok ()))
      (opencode
       (((name opencode) (display_name OpenCode) (command (opencode acp))
         (quirks
@@ -2312,7 +2309,7 @@ let%expect_test
   printf "total spawns=%d\n" !spawns;
   [%expect
     {|
-    id=backend:acp:antigravity display=Antigravity (backend) all_tools=true on_backend=true plan_mode=true
+    id=backend:acp:antigravity display=Antigravity (bridge) all_tools=true on_backend=true plan_mode=true
     own launch uses backend_wrapper=true secret=false
     prigh fetches a token valid for 40 min
     login launch uses backend_wrapper=true secret=true

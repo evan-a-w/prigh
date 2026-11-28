@@ -733,8 +733,10 @@ let serve_command =
          (optional string)
          ~doc:
            "ADAPTER,... the agents the composer drives: codex, claude, prigh, \
-            acp:NAME; the first is the default (default: $PRIGH_ADAPTERS, else \
-            codex,claude)"
+            antigravity, opencode, gemini, grok, goose, bridge:<adapter>, \
+            acp:<command> or acp:<name>=<command> (backend: and acp:<known> \
+            also work); the first is the default (default: $PRIGH_ADAPTERS, \
+            else codex,claude)"
      and nix_gc_helper =
        flag
          "-nix-gc-helper"

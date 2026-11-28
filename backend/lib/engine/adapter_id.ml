@@ -17,28 +17,43 @@ let rec to_string = function
   | Prigh -> "prigh"
 ;;
 
+let known_acp_names () =
+  String.concat ~sep:", " (List.map Acp_agent.known ~f:(fun a -> a.name))
+;;
+
 let of_inner s =
   match s with
   | "codex" -> Ok Codex
   | "claude" -> Ok Claude
   | "prigh" -> Ok Prigh
   | _ ->
-    (match String.chop_prefix s ~prefix:"acp:" with
-     | Some name when not (String.is_empty (String.strip name)) -> Ok (Acp name)
-     | Some _ | None ->
-       Or_error.errorf
-         "unknown adapter %S: expected codex, claude, prigh, acp:<name> or \
-          backend:acp:<name>"
-         s)
+    (match Acp_agent.find_known s with
+     | Some agent -> Ok (Acp agent.name)
+     | None ->
+       (match String.chop_prefix s ~prefix:"acp:" with
+        | Some name when not (String.is_empty (String.strip name)) ->
+          Ok (Acp name)
+        | Some _ | None ->
+          Or_error.errorf
+            "unknown adapter %S: expected codex, claude, prigh, %s, \
+             bridge:<adapter>, acp:<command> or acp:<name>=<command>"
+            s
+            (known_acp_names ())))
+;;
+
+let strip_bridge_prefix s =
+  match String.chop_prefix s ~prefix:"bridge:" with
+  | Some rest -> Some rest
+  | None -> String.chop_prefix s ~prefix:"backend:"
 ;;
 
 let of_string s =
-  match String.chop_prefix s ~prefix:"backend:" with
+  match strip_bridge_prefix s with
   | Some rest ->
     (match of_inner rest with
      | Ok (Prigh | Backend _) ->
        Or_error.errorf
-         "invalid backend adapter %S: prigh's own harness already runs on the \
+         "invalid bridge adapter %S: prigh's own harness already runs on the \
           backend"
          s
      | Ok inner -> Ok (Backend inner)
@@ -46,15 +61,20 @@ let of_string s =
   | None -> of_inner s
 ;;
 
-let rec label = function
+let rec harness_label = function
   | Codex -> "Codex"
   | Claude -> "Claude Code"
   | Acp name ->
     (match Acp_agent.find_known name with
      | Some agent -> agent.display_name
      | None -> name ^ " (ACP)")
-  | Backend inner -> label inner ^ " (backend)"
+  | Backend inner -> harness_label inner
   | Prigh -> "prigh"
+;;
+
+let label = function
+  | Backend inner -> harness_label inner ^ " (bridge)"
+  | (Codex | Claude | Acp _ | Prigh) as a -> harness_label a
 ;;
 
 let on_backend = function

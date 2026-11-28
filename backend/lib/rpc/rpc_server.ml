@@ -1192,6 +1192,13 @@ let backend_empty_cwd =
 
 let backend_adapters t = List.filter t.engines.adapters ~f:Adapter_id.on_backend
 
+let host_adapters t =
+  List.filter t.engines.adapters ~f:(fun a ->
+    Adapter_id.is_external a && not (Adapter_id.on_backend a))
+;;
+
+let external_adapters t = backend_adapters t @ host_adapters t
+
 (* Where a composer session's harness is with listing its models while the
    session's model is a placeholder: being asked, or why it could not. *)
 let harness_models t (s : Agent.State.t) =
@@ -2065,6 +2072,118 @@ let external_models t agent =
          [ External_model.unlisted ~adapter:(Adapter_id.to_string a) ]
        | None -> [ External_model.pending ~adapter:(Adapter_id.to_string a) ])
   | None, _ -> None
+;;
+
+(* One of an external harness's models, by key ([codex/gpt-5]), id or
+   name. *)
+let resolve_external (models : Model.t list) query ~who =
+  let q = String.lowercase query in
+  match
+    List.find models ~f:(fun m ->
+      String.equal (Model.key m) query
+      || String.equal m.id query
+      || String.equal (String.lowercase m.name) q)
+  with
+  | Some m -> Ok m
+  | None ->
+    Or_error.errorf
+      "%s has no model %S: pick one of %s (/model lists them)"
+      who
+      query
+      (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
+;;
+
+let can_probe_adapter t agent (a : Adapter_id.t) =
+  Adapter_id.on_backend a
+  || Option.is_some t.spawn_external
+  ||
+  let host = Agent.active_host agent in
+  if String.equal host Agent.Host.backend_id
+  then t.backend_host
+  else Option.is_some (host_client t host)
+;;
+
+(* Models for an external adapter (bridge or host), triggering a background
+   catalog fetch if none is cached yet and its execution host is reachable. *)
+let adapter_models_for
+      ?(probe = true)
+      ?(probe_host = false)
+      t
+      agent
+      (a : Adapter_id.t)
+  =
+  let adapter = Adapter_id.to_string a in
+  let is_current =
+    match Agent.engine_choice agent with
+    | { engine = Composer; adapter = Some cur } -> Adapter_id.equal cur a
+    | _ -> false
+  in
+  let live_models = if is_current then Agent.external_models agent else None in
+  match live_models with
+  | Some (_ :: _ as models)
+    when not (List.for_all models ~f:External_model.is_placeholder) -> models
+  | _ ->
+    (match catalog_on t ~host:(Agent.active_host agent) a with
+     | Some { models = _ :: _ as models; _ } -> models
+     | Some { models = []; _ } -> [ External_model.unlisted ~adapter ]
+     | None ->
+       if
+         probe
+         && (is_current || Adapter_id.on_backend a || probe_host)
+         && can_probe_adapter t agent a
+         && ((not is_current) || not (Agent.external_live agent))
+       then ensure_catalog_for t agent a;
+       [ External_model.pending ~adapter ])
+;;
+
+let all_external_adapter_models ?probe ?probe_host t agent ~skip =
+  List.concat_map (external_adapters t) ~f:(fun a ->
+    if Option.equal Adapter_id.equal skip (Some a)
+    then []
+    else adapter_models_for ?probe ?probe_host t agent a)
+;;
+
+let harness_deployed t =
+  List.mem t.engines.engines Engine_id.Harness ~equal:Engine_id.equal
+;;
+
+let default_engine_and_model t (config : Config.t)
+  : Engine_choice.t * string option
+  =
+  match Config.start_model config with
+  | Some spec ->
+    (match External_model.parse_spec spec with
+     | Some (Ok (adapter_id, _))
+       when Adapter_id.is_external adapter_id
+            && List.mem t.engines.adapters adapter_id ~equal:Adapter_id.equal ->
+       { Engine_choice.engine = Composer; adapter = Some adapter_id }, Some spec
+     | _ -> Engines.default_choice t.engines, None)
+  | None -> Engines.default_choice t.engines, None
+;;
+
+let apply_initial_external_model t agent (engine : Engine_choice.t) spec =
+  match engine with
+  | { engine = Composer; adapter = Some a } when Adapter_id.is_external a ->
+    let models = adapter_models_for ~probe:false t agent a in
+    let model =
+      match resolve_external models spec ~who:(Adapter_id.label a) with
+      | Ok model -> Some model
+      | Error _ ->
+        (match External_model.parse_spec spec with
+         | Some (Ok (parsed, raw_id)) when Adapter_id.equal parsed a ->
+           Some (External_model.model ~adapter:(Adapter_id.to_string a) raw_id)
+         | _ -> None)
+    in
+    Option.iter model ~f:(Agent.set_model agent)
+  | _ -> ()
+;;
+
+(* The namespace's file as it is now, which another session may have
+   changed. *)
+let current_config t agent =
+  match Option.map t.home ~f:(fun home -> Config.load ~home) with
+  | Some (Ok config) -> config
+  | Some (Error _) | None -> Agent.config agent
 ;;
 
 (* A composer session's harness login's usage, as the harness says (asked
@@ -3711,6 +3830,8 @@ let hello t (client : Client.t) params =
                         ~equal:String.equal ->
               Result.ok (Computer_info.of_json json)
             | _ -> None);
+        let was_placeholder = Option.is_some client.placeholder in
+        let explicit_session = Option.is_some (param params "session") in
         let agent =
           match param params "session", string "temporary_key" with
           | Some (`String session), Some key -> find_temporary t ~session ~key
@@ -3720,6 +3841,24 @@ let hello t (client : Client.t) params =
         client.placeholder <- None;
         Or_error.map agent ~f:(fun agent ->
           attach t client agent;
+          if
+            (not explicit_session)
+            && was_placeholder
+            && (not (Session.persisted (Agent.session agent)))
+            && List.is_empty (Session.messages (Agent.session agent))
+            && Engine_choice.is_harness (Agent.engine_choice agent)
+          then (
+            let config = current_config t agent in
+            match default_engine_and_model t config with
+            | engine, (Some _ as initial_model) ->
+              Agent.set_engine agent engine;
+              Agent.set_unavailable agent (engine_unavailable t agent);
+              attach_engine t agent;
+              Option.iter
+                initial_model
+                ~f:(apply_initial_external_model t agent engine);
+              Agent.prewarm agent
+            | _, None -> ());
           if tools
           then
             (* The frontends on its machine that came before it. *)
@@ -3749,14 +3888,6 @@ let hello t (client : Client.t) params =
              ; "state", state_json t (Agent.state agent)
              ]
              @ engines_json t)))))
-;;
-
-(* The namespace's file as it is now, which another session may have
-   changed. *)
-let current_config t agent =
-  match Option.map t.home ~f:(fun home -> Config.load ~home) with
-  | Some (Ok config) -> config
-  | Some (Error _) | None -> Agent.config agent
 ;;
 
 (* Every session hears of a change one of them saved, and tells its clients:
@@ -3880,6 +4011,7 @@ let new_session_start t (client : Client.t) =
 
 let new_session
       ?(engine = Engine_choice.harness)
+      ?initial_model
       t
       (client : Client.t)
       ~temporary
@@ -3914,6 +4046,7 @@ let new_session
   Agent.set_engine agent engine;
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
+  Option.iter initial_model ~f:(apply_initial_external_model t agent engine);
   Agent.prewarm agent;
   match attached_state t client, key with
   | `Object fields, Some key ->
@@ -5394,60 +5527,7 @@ let account_methods t (client : Client.t) ~meth ~params =
   | _ -> None
 ;;
 
-(* One of an external harness's models, by key ([codex/gpt-5]), id or
-   name. *)
-let resolve_external (models : Model.t list) query ~who =
-  let q = String.lowercase query in
-  match
-    List.find models ~f:(fun m ->
-      String.equal (Model.key m) query
-      || String.equal m.id query
-      || String.equal (String.lowercase m.name) q)
-  with
-  | Some m -> Ok m
-  | None ->
-    Or_error.errorf
-      "%s has no model %S: pick one of %s (/model lists them)"
-      who
-      query
-      (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
-;;
-
-(* Models for a backend-hosted adapter, triggering a background catalog fetch
-   if none is cached yet. *)
-let backend_adapter_models_for t agent (a : Adapter_id.t) =
-  let adapter = Adapter_id.to_string a in
-  let is_current =
-    match Agent.engine_choice agent with
-    | { engine = Composer; adapter = Some cur } -> Adapter_id.equal cur a
-    | _ -> false
-  in
-  let live_models = if is_current then Agent.external_models agent else None in
-  match live_models with
-  | Some (_ :: _ as models)
-    when not (List.for_all models ~f:External_model.is_placeholder) -> models
-  | _ ->
-    (match catalog_on t ~host:Agent.Host.backend_id a with
-     | Some { models = _ :: _ as models; _ } -> models
-     | Some { models = []; _ } -> [ External_model.unlisted ~adapter ]
-     | None ->
-       if (not is_current) || not (Agent.external_live agent)
-       then ensure_catalog_for t agent a;
-       [ External_model.pending ~adapter ])
-;;
-
-let all_backend_adapter_models t agent ~skip =
-  List.concat_map (backend_adapters t) ~f:(fun a ->
-    if Option.equal Adapter_id.equal skip (Some a)
-    then []
-    else backend_adapter_models_for t agent a)
-;;
-
-let harness_deployed t =
-  List.mem t.engines.engines Engine_id.Harness ~equal:Engine_id.equal
-;;
-
-let set_model_for_backend t agent ~id ~account (a : Adapter_id.t) =
+let set_model_for_adapter t agent ~id ~account (a : Adapter_id.t) =
   let open Or_error.Let_syntax in
   let who = Adapter_id.label a in
   let%bind () =
@@ -5458,7 +5538,7 @@ let set_model_for_backend t agent ~id ~account (a : Adapter_id.t) =
         "%s uses its own login, not prigh's: pick the model without @LOGIN"
         who
   in
-  let models = backend_adapter_models_for t agent a in
+  let models = adapter_models_for t agent a in
   let%bind model =
     match resolve_external models id ~who, String.rsplit2 id ~on:'@' with
     | Ok model, _ -> Ok model
@@ -5469,8 +5549,7 @@ let set_model_for_backend t agent ~id ~account (a : Adapter_id.t) =
         who
         key
     | (Error _ as error), _ ->
-      (* Allow explicit [backend:acp:antigravity/<id>] even before its catalog
-         has loaded. *)
+      (* Allow explicit [<adapter>/<id>] even before its catalog has loaded. *)
       (match External_model.parse_spec id with
        | Some (Ok (parsed, raw_id))
          when Adapter_id.equal parsed a
@@ -5492,50 +5571,64 @@ let set_model_server t (client : Client.t) params =
     let open Or_error.Let_syntax in
     let agent = client.agent in
     let choice = Agent.engine_choice agent in
-    let on_backend_now =
+    let on_external_now =
       match choice with
-      | { engine = Composer; adapter = Some a } when Adapter_id.on_backend a ->
+      | { engine = Composer; adapter = Some a } when Adapter_id.is_external a ->
         Some a
       | _ -> None
     in
-    let target_backend =
-      let deployed a =
-        Adapter_id.on_backend a
-        && List.mem t.engines.adapters a ~equal:Adapter_id.equal
-      in
-      match External_model.parse_spec id with
-      | Some (Ok (a, _)) when deployed a -> Some a
-      | _ ->
-        (match
-           List.find (backend_adapters t) ~f:(fun a ->
-             let models = backend_adapter_models_for t agent a in
-             Result.is_ok (resolve_external models id ~who:(Adapter_id.label a)))
-         with
-         | Some a
-           when Option.is_some on_backend_now
-                || Engine_choice.is_harness choice
-                || Option.equal
-                     Adapter_id.equal
-                     choice.adapter
-                     (Some Adapter_id.Prigh) -> Some a
-         | _ -> None)
+    let deployed a =
+      Adapter_id.is_external a
+      && List.mem t.engines.adapters a ~equal:Adapter_id.equal
     in
-    (match target_backend, on_backend_now with
-     | Some a, _ -> Some (set_model_for_backend t agent ~id ~account a)
-     | None, Some a ->
-       if harness_deployed t
-       then (
-         match model_with_account ?member:t.member t.login id ~account with
-         | Ok (model, acc) ->
-           Some
-             (let%map (_ : bool) =
-                switch_engine t agent Engine_choice.harness
+    let find_in_adapters adapters =
+      List.find adapters ~f:(fun a ->
+        let models = adapter_models_for ~probe:false t agent a in
+        Result.is_ok (resolve_external models id ~who:(Adapter_id.label a)))
+    in
+    (match External_model.parse_spec id with
+     | Some (Ok (a, _)) when deployed a ->
+       Some (set_model_for_adapter t agent ~id ~account a)
+     | _ ->
+       (match on_external_now with
+        | Some cur ->
+          let cur_models = adapter_models_for ~probe:false t agent cur in
+          if
+            Result.is_ok
+              (resolve_external cur_models id ~who:(Adapter_id.label cur))
+          then Some (set_model_for_adapter t agent ~id ~account cur)
+          else (
+            match
+              if harness_deployed t
+              then
+                Result.ok
+                  (model_with_account ?member:t.member t.login id ~account)
+              else None
+            with
+            | Some (model, acc) ->
+              Some
+                (let%map (_ : bool) =
+                   switch_engine t agent Engine_choice.harness
+                 in
+                 Agent.set_model ?account:acc agent model;
+                 `Object [])
+            | None ->
+              let others =
+                List.filter (external_adapters t) ~f:(fun a ->
+                  not (Adapter_id.equal a cur))
               in
-              Agent.set_model ?account:acc agent model;
-              `Object [])
-         | Error _ -> Some (set_model_for_backend t agent ~id ~account a))
-       else Some (set_model_for_backend t agent ~id ~account a)
-     | None, None -> None)
+              (match find_in_adapters others with
+               | Some a -> Some (set_model_for_adapter t agent ~id ~account a)
+               | None -> Some (set_model_for_adapter t agent ~id ~account cur)))
+        | None ->
+          (* On harness (or Composer Prigh): prefer harness resolution when the
+             model exists there; otherwise check deployed external adapters. *)
+          (match model_with_account ?member:t.member t.login id ~account with
+           | Ok _ -> None
+           | Error _ ->
+             (match find_in_adapters (external_adapters t) with
+              | Some a -> Some (set_model_for_adapter t agent ~id ~account a)
+              | None -> None))))
 ;;
 
 let dispatch_server t (client : Client.t) ~meth ~params
@@ -5646,8 +5739,16 @@ let dispatch_server t (client : Client.t) ~meth ~params
        in
        let%bind.Or_error engine = string_param_opt params "engine" in
        let%bind.Or_error adapter = string_param_opt params "adapter" in
-       let%map.Or_error engine = Engines.choose t.engines ~engine ~adapter in
-       new_session ~engine t client ~temporary)
+       let%map.Or_error engine, initial_model =
+         match engine, adapter with
+         | None, None ->
+           let config = current_config t client.agent in
+           Ok (default_engine_and_model t config)
+         | _ ->
+           Or_error.map (Engines.choose t.engines ~engine ~adapter) ~f:(fun e ->
+             e, None)
+       in
+       new_session ~engine ?initial_model t client ~temporary)
   | "keep_session" -> Some (keep_session t client)
   | "switch_session" ->
     Some
@@ -5964,6 +6065,11 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some (ok (`Object []))
   | "list_models" ->
     let agent = client.agent in
+    let probe_host =
+      match param params "probe_host" with
+      | Some `True -> true
+      | _ -> false
+    in
     let harness_models () =
       let models = Login_manager.models t.login in
       Model_registry.reload models;
@@ -5972,14 +6078,14 @@ let dispatch_server t (client : Client.t) ~meth ~params
     in
     (match external_models t agent, Agent.engine_choice agent with
      | Some models, { engine = Composer; adapter = Some a }
-       when Adapter_id.on_backend a ->
+       when Adapter_id.is_external a ->
        if
          List.length models <= 1
          && (not (Agent.external_live agent))
          && not (lists_no_models t agent)
        then ensure_catalog t agent;
        let extras =
-         all_backend_adapter_models t agent ~skip:(Some a)
+         all_external_adapter_models ~probe_host t agent ~skip:(Some a)
          @ if harness_deployed t then harness_models () else []
        in
        Some (ok (`Array (List.map (models @ extras) ~f:Rpc_json.model)))
@@ -5995,7 +6101,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
        Some (ok (`Array (List.map models ~f:Rpc_json.model)))
      | None, _ ->
        let models =
-         harness_models () @ all_backend_adapter_models t agent ~skip:None
+         harness_models ()
+         @ all_external_adapter_models ~probe_host t agent ~skip:None
        in
        Some (ok (`Array (List.map models ~f:Rpc_json.model))))
   | "set_model" -> set_model_server t client params

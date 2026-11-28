@@ -51,7 +51,8 @@ let session ?deployed ?unavailable ?(fields = []) () =
 
 let toasts h = H.text h ~selector:".toast"
 
-let%expect_test "the model chip names the adapter; a harness session's does not"
+let%expect_test
+    "the model chip's title names the adapter; its text shows just the model"
   =
   let h = session () in
   H.names h ~selector:".model-chip";
@@ -61,7 +62,7 @@ let%expect_test "the model chip names the adapter; a harness session's does not"
   [%expect
     {|
     button "Model: Codex \194\183 Claude Opus 5.5, Medium" -- Codex · Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
-    (Codex · Opus 5.5)
+    (Opus 5.5)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
     |}]
 ;;
@@ -319,6 +320,7 @@ let%expect_test "the picker lists what the CLI's login offers, when it says" =
     (Open_chip Model)
     (Focus popover-filter)
     Place_popover
+    (Rpc (method_ list_models) (params ((probe_host true))) (tag Models))
     [tab] button "Favourites"
     [tab] button "Codex"
     loading models… Alt+1 (Star: into the favourites (Alt+F))
@@ -500,7 +502,7 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "the model menu's foot switches the engine" =
+let%expect_test "the model menu's foot switches the browsed mode" =
   let deployed : Prigh_protocol.Deployed_engines.t =
     { engines = [ "harness"; "composer" ]
     ; adapters = [ "codex"; "acp:antigravity" ]
@@ -515,10 +517,10 @@ let%expect_test "the model menu's foot switches the engine" =
     (Open_chip Model)
     ↑ ↓ models · ← → providers · Enter switches · Esc closes
     (Full access)
-    (Codex)
-    div "Codex"
+    (Host)
+    div "Host"
     |}];
-  (* Opened, it asks the adapters' health, shown on each. *)
+  (* Opened, it lists deployed modes and asks the adapters' health. *)
   H.click h ~selector:".model-engine .model-access-button";
   H.quiet h (fun () ->
     H.reply
@@ -532,53 +534,23 @@ let%expect_test "the model menu's foot switches the engine" =
     {|
     Model_menu_engine
     (Rpc (method_ list_adapters) (params ()) (tag Adapters_loaded))
-    (Codex 0.166.0 · logged in (ChatGPT) ✓) (prigh harness prigh's own agent, calling the model directly) (A Antigravity 1.5.13)
+    (Native prigh's built-in harness, calling the model directly) (Host external agent running directly on the active tool host ✓)
     |}];
-  (* Choosing one switches the session; the picker stays, and lists the new
-     adapter's models once the backend says they changed. *)
-  H.click h ~nth:2 ~selector:".model-engine .model-access-item";
-  H.names h ~selector:".model-engine .model-access-menu";
-  H.quiet h (fun () ->
-    H.event
-      h
-      (sprintf
-         {|{"event":"state","state":%s}|}
-         (H.state_json
-            ~fields:
-              [ "engine", `String "composer"
-              ; "adapter", `String "acp:antigravity"
-              ; "capabilities", codex_capabilities
-              ; "message_count", `Number "4"
-              ]
-            ())));
-  H.event h {|{"type":"event","event":"models_changed"}|};
-  H.reply
-    h
-    "list_models"
-    (sprintf
-       "[%s]"
-       (H.model_json
-          ~thinking:false
-          ~provider:"acp:antigravity"
-          ~id:"flash"
-          ~name:"Gemini 3.8 Flash"
-          ()));
-  H.text h ~selector:".model-menu-main";
+  (* Choosing Native switches the browsed mode without closing the model menu;
+     reopening the mode selector marks Host as Active while Native is checked. *)
+  H.click h ~nth:0 ~selector:".model-engine .model-access-item";
   H.names h ~selector:".model-engine .model-access-button";
+  H.click h ~selector:".model-engine .model-access-button";
+  H.text h ~selector:".model-engine .model-access-menu";
   [%expect
     {|
-    (Model_menu_engine_pick acp:antigravity)
-    (Rpc (method_ set_adapter) (params ((adapter acp:antigravity)))
-     (tag Show_error))
-    (Expire_toast (id 0) (after_ms 2580))
-    (Rpc (method_ list_models) (params ()) (tag Models))
-    []
-    Antigravity
-    Gemini 3.8 Flash Alt+1 (Star: into the favourites (Alt+F))
-    button "Engine: Antigravity" -- Runs on Antigravity: switch the engine (Alt+E)
+    (Model_menu_mode_pick Native)
+    (Focus popover-filter)
+    button "Mode: Native" -- Mode: Native — prigh's built-in harness, calling the model directly
+    Model_menu_engine
+    (Native prigh's built-in harness, calling the model directly ✓) (Host Active external agent running directly on the active tool host)
     |}];
-  (* Esc closes its menu first; Alt+E is the keyboard's picker. *)
-  H.quiet h (fun () -> H.click h ~selector:".model-engine .model-access-button");
+  (* Esc closes its menu first; Alt+E is the keyboard's engine picker. *)
   H.key h "Escape";
   H.elements h ~selector:".model-engine .model-access-menu";
   H.names h ~selector:"#chip-popover";
@@ -586,7 +558,6 @@ let%expect_test "the model menu's foot switches the engine" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    Model_menu_engine
     Close_dialog
     [dialog] div "Model"
     Model_menu_engine_picker
@@ -594,9 +565,9 @@ let%expect_test "the model menu's foot switches the engine" =
     Switch this session to
     (Close (Esc))
     []
-    Antigravity an ACP agent on the session's tool host ✓
+    Codex OpenAI's Codex CLI on the session's tool host ✓
     prigh harness prigh's own agent, calling the model directly
-    Codex OpenAI's Codex CLI on the session's tool host
+    Antigravity an ACP agent on the session's tool host
     ↑↓ to move, Enter to choose, Esc to close
     |}]
 ;;
@@ -615,14 +586,10 @@ let%expect_test "mid-run the engine waits for the turn" =
   [%expect
     {|
     (Open_chip Model)
-    button "Engine: Codex" -- Switch after this turn (Esc stops it)
+    button "Mode: Host" -- Mode: Host — external agent running directly on the active tool host
     Model_menu_engine
     (Rpc (method_ list_adapters) (params ()) (tag Adapters_loaded))
-    Switch after this turn (Esc stops it)
-    (Codex OpenAI's Codex CLI on the session's tool host ✓) (prigh harness prigh's own agent, calling the model directly) (Claude Code Anthropic's Claude Code CLI on the session's tool host)
-    <button class="model-access-item on">
-    <button class="model-access-item">
-    <button class="model-access-item">
+    (Native prigh's built-in harness, calling the model directly) (Host external agent running directly on the active tool host ✓)
     Model_menu_engine_picker
     (Expire_toast (id 0) (after_ms 2980))
     Switch after this turn (Esc stops it)
@@ -770,12 +737,14 @@ let%expect_test
   H.names h ~selector:".model-trouble";
   [%expect
     {|
-    (Codex · loading models…)
-    (Codex · GPT-6.2-Sol)
+    (loading models…)
+    (GPT-6.2-Sol)
     |}]
 ;;
 
-let%expect_test "backend:acp:antigravity appears in the model menu on harness" =
+let%expect_test
+    "Native, Bridge, and Host modes namespace the rail and switch transparently"
+  =
   let h = H.create () in
   let models =
     [ Jsonaf.of_string
@@ -787,8 +756,14 @@ let%expect_test "backend:acp:antigravity appears in the model menu on harness" =
     ; Jsonaf.of_string
         (H.model_json
            ~provider:"backend:acp:antigravity"
-           ~id:"gemini-2.5-pro"
-           ~name:"Gemini 2.5 Pro"
+           ~id:"gemini-4-neon"
+           ~name:"Gemini 4 Neon"
+           ())
+    ; Jsonaf.of_string
+        (H.model_json
+           ~provider:"acp:antigravity"
+           ~id:"default"
+           ~name:"loading models…"
            ())
     ]
   in
@@ -796,15 +771,54 @@ let%expect_test "backend:acp:antigravity appears in the model menu on harness" =
     hello
       ~deployed:
         { engines = [ "harness"; "composer" ]
-        ; adapters = [ "backend:acp:antigravity" ]
+        ; adapters = [ "backend:acp:antigravity"; "acp:antigravity"; "codex" ]
         }
       h;
     H.act h (Reply (Models, Ok (`Array models))));
+  (* Opens on Native: only Native labs appear in the rail. *)
   H.click h ~selector:".model-chip";
   H.names h ~selector:".model-rail-tab";
-  H.click h ~selector:".model-rail-tab" ~nth:2;
+  H.names h ~selector:".model-engine .model-access-button";
+  (* Switch to Bridge via the footer mode selector: clean "Antigravity" name,
+     no "(backend)" suffix. *)
+  H.click h ~selector:".model-engine .model-access-button";
+  H.click h ~nth:1 ~selector:".model-engine .model-access-item";
+  H.names h ~selector:".model-rail-tab";
   H.text h ~selector:".model-list-head";
   H.text h ~selector:".model-list";
+  (* Switch to Host: triggers probe_host because Host has a pending placeholder. *)
+  H.click h ~selector:".model-engine .model-access-button";
+  H.click h ~nth:2 ~selector:".model-engine .model-access-item";
+  (* Backend replies with real Host models; menu stays on Host. *)
+  let host_loaded_models =
+    [ Jsonaf.of_string
+        (H.model_json
+           ~provider:"anthropic"
+           ~id:"claude-sonnet-5"
+           ~name:"Claude Sonnet 5"
+           ())
+    ; Jsonaf.of_string
+        (H.model_json
+           ~provider:"backend:acp:antigravity"
+           ~id:"gemini-4-neon"
+           ~name:"Gemini 4 Neon"
+           ())
+    ; Jsonaf.of_string
+        (H.model_json
+           ~provider:"acp:antigravity"
+           ~id:"gemini-4-neon"
+           ~name:"Gemini 4 Neon"
+           ())
+    ; Jsonaf.of_string
+        (H.model_json
+           ~provider:"codex"
+           ~id:"gpt-6.2-sol"
+           ~name:"GPT-6.2 Sol"
+           ())
+    ]
+  in
+  H.act h (Reply (Models, Ok (`Array host_loaded_models)));
+  H.names h ~selector:".model-rail-tab";
   H.click h ~selector:".model-row";
   [%expect
     {|
@@ -813,14 +827,114 @@ let%expect_test "backend:acp:antigravity appears in the model menu on harness" =
     Place_popover
     [tab] button "Favourites"
     [tab] button "Anthropic"
-    [tab] button "Antigravity (backend)"
-    (Model_menu_tab (Provider backend:acp:antigravity))
+    button "Mode: Native" -- Mode: Native — prigh's built-in harness, calling the model directly
+    Model_menu_engine
+    (Rpc (method_ list_adapters) (params ()) (tag Adapters_loaded))
+    (Model_menu_mode_pick Bridge)
     (Focus popover-filter)
-    Antigravity (backend)
-    Gemini 2.5 Pro Alt+1 (Star: into the favourites (Alt+F))
-    (Picker_choose backend:acp:antigravity/gemini-2.5-pro)
+    [tab] button "Favourites"
+    [tab] button "Antigravity"
+    Antigravity
+    Gemini 4 Neon Alt+1 (Star: into the favourites (Alt+F))
+    Model_menu_engine
+    (Model_menu_mode_pick Host)
+    (Rpc (method_ list_models) (params ((probe_host true))) (tag Models))
+    (Focus popover-filter)
+    [tab] button "Favourites"
+    [tab] button "Antigravity"
+    [tab] button "Codex"
+    (Picker_choose acp:antigravity/gemini-4-neon)
+    (Focus editor)
+    (Rpc (method_ set_model) (params ((model acp:antigravity/gemini-4-neon)))
+     (tag Model_set))
+    |}];
+  (* Picking a Bridge model sends its full namespaced key. *)
+  H.quiet h (fun () ->
+    H.key h "l" ~ctrl:true;
+    H.click h ~selector:".model-engine .model-access-button";
+    H.click h ~nth:1 ~selector:".model-engine .model-access-item");
+  H.click h ~selector:".model-row";
+  [%expect
+    {|
+    (Open_chip Model)
+    Model_menu_engine
+    (Model_menu_mode_pick Bridge)
+    (Picker_choose backend:acp:antigravity/gemini-4-neon)
     (Focus editor)
     (Rpc (method_ set_model)
-     (params ((model backend:acp:antigravity/gemini-2.5-pro))) (tag Model_set))
+     (params ((model backend:acp:antigravity/gemini-4-neon))) (tag Model_set))
+    |}]
+;;
+
+let%expect_test "Settings -> New sessions default_model shows @ mode tags" =
+  let h = H.create () in
+  let models =
+    [ Jsonaf.of_string
+        (H.model_json
+           ~provider:"google"
+           ~id:"gemini-4-neon"
+           ~name:"Gemini 4 Neon"
+           ())
+    ; Jsonaf.of_string
+        (H.model_json
+           ~provider:"backend:acp:antigravity"
+           ~id:"gemini-4-neon"
+           ~name:"Gemini 4 Neon"
+           ())
+    ; Jsonaf.of_string
+        (H.model_json
+           ~provider:"acp:antigravity"
+           ~id:"gemini-4-neon"
+           ~name:"Gemini 4 Neon"
+           ())
+    ; Jsonaf.of_string
+        (H.model_json
+           ~provider:"codex"
+           ~id:"default"
+           ~name:"loading models…"
+           ())
+    ]
+  in
+  H.quiet h (fun () ->
+    hello
+      ~deployed:
+        { engines = [ "harness"; "composer" ]
+        ; adapters = [ "backend:acp:antigravity"; "acp:antigravity"; "codex" ]
+        }
+      h;
+    H.act h (Reply (Models, Ok (`Array models)));
+    H.act h Open_settings;
+    H.act h (Settings_section New_sessions);
+    H.act
+      h
+      (Reply
+         ( Config
+         , Ok
+             (Jsonaf.of_string
+                {|{"approval_mode":"auto","default_model":"backend:acp:antigravity/gemini-4-neon","default_chat_mode":false,"fallback_models":["codex/gpt-6.2-sol"]}|})
+         )));
+  H.text h ~selector:".setting.default-model";
+  H.text h ~selector:".setting.default-fallback";
+  H.click h ~selector:".default-model-choice";
+  H.text h ~selector:".modal";
+  [%expect
+    {|
+    Model
+    New sessions start with Gemini 4 Neon @ bridge.
+    (Gemini 4 Neon @ bridge) (This session’s) (Back to the built-in: the backend's choice)
+    Fallback models
+    When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+    1 gpt-6.2-sol @ host (Take gpt-6.2-sol @ host out of the chain)
+    (Add) (Back to the built-in: none)
+    (Pick_default Model)
+    (Focus picker-input)
+    New sessions' model
+    (Close (Esc))
+    []
+    The backend's choice one you are logged in to
+    Gemini 4 Neon @ native google, 200k ctx
+    Gemini 4 Neon @ bridge Antigravity, 200k ctx ✓
+    Gemini 4 Neon @ host Antigravity, 200k ctx
+    ↑↓ to move, Enter to choose, Esc to close
     |}]
 ;;
