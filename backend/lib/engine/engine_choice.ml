@@ -55,7 +55,8 @@ let display_name t =
 
 let names t =
   match t.engine, t.adapter with
-  | Harness, _ | Composer, Some Prigh -> [ "harness"; "prigh harness" ]
+  | Harness, _ | Composer, Some Prigh ->
+    [ "harness"; "prigh harness"; "native" ]
   | Composer, Some Codex -> [ "codex" ]
   | Composer, Some Claude -> [ "claude"; "claude code" ]
   | Composer, Some (Acp name) ->
@@ -63,15 +64,22 @@ let names t =
     if String.equal name "antigravity" then "agy" :: base else base
   | Composer, Some (Backend (Acp name) as a) ->
     let base =
-      [ name ^ "-backend"
+      [ name ^ "-bridge"
+      ; "bridge:" ^ name
+      ; "bridge:acp:" ^ name
+      ; name ^ "-backend"
       ; "backend:" ^ name
       ; "backend:acp:" ^ name
       ; Adapter_id.label a
       ]
     in
-    if String.equal name "antigravity" then "agy-backend" :: base else base
+    if String.equal name "antigravity"
+    then "agy-bridge" :: "agy-backend" :: base
+    else base
   | Composer, Some (Backend inner as a) ->
     [ Adapter_id.to_string a
+    ; Adapter_id.to_string inner ^ "-bridge"
+    ; "bridge:" ^ Adapter_id.to_string inner
     ; Adapter_id.to_string inner ^ "-backend"
     ; Adapter_id.label a
     ]

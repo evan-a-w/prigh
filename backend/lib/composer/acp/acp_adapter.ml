@@ -231,7 +231,7 @@ let create
 
     let display_name =
       if backend_hosted
-      then agent.display_name ^ " (backend)"
+      then agent.display_name ^ " (bridge)"
       else agent.display_name
     ;;
 

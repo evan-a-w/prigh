@@ -82,10 +82,19 @@ val is_harness : t -> bool
     [unavailable]. *)
 val of_state_json : Json.t -> t Or_error.t
 
-(** How sessions of an adapter are named: [codex] is "Codex", [claude]
-    "Claude Code", [acp:NAME] the agent's name for those prigh knows
-    (the backend's [Acp_agent.known]: "Antigravity"), else "NAME (ACP)". *)
+(** The bare harness name without mode suffix: [codex] is "Codex", [claude]
+    "Claude Code", [acp:antigravity] and [backend:acp:antigravity] are both
+    "Antigravity", other [acp:NAME] are "NAME (ACP)". *)
+val harness_label : string -> string
+
+(** How sessions of an adapter are named (same clean harness name as
+    {!harness_label}). *)
 val adapter_label : string -> string
+
+(** Adapter label with mode disambiguation when bridged:
+    [backend:acp:antigravity] is "Antigravity (bridge)", others match
+    {!harness_label}. *)
+val adapter_label_with_mode : string -> string
 
 (** "Harness", "Composer". *)
 val engine_label : string -> string

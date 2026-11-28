@@ -46,15 +46,20 @@ let of_string s =
   | None -> of_inner s
 ;;
 
-let rec label = function
+let rec harness_label = function
   | Codex -> "Codex"
   | Claude -> "Claude Code"
   | Acp name ->
     (match Acp_agent.find_known name with
      | Some agent -> agent.display_name
      | None -> name ^ " (ACP)")
-  | Backend inner -> label inner ^ " (backend)"
+  | Backend inner -> harness_label inner
   | Prigh -> "prigh"
+;;
+
+let label = function
+  | Backend inner -> harness_label inner ^ " (bridge)"
+  | (Codex | Claude | Acp _ | Prigh) as a -> harness_label a
 ;;
 
 let on_backend = function
