@@ -10,9 +10,11 @@ let sexp_of_t t = [%sexp { credential : Cli_credential.t = t.credential }]
 let minute_ms = 60 * 1000
 
 (* A new process gets a token valid for [valid_for]; it is replaced before a
-   turn once fewer than [margin] remain. Google's last an hour. *)
+   turn once fewer than [margin] remain. Google's last an hour. Keep [margin]
+   at 10 min (matching Codex_login) to minimize process restarts and the
+   resulting ACP [session/load] MCP-prefix prompt-cache invalidation. *)
 let valid_for_ms = 40 * minute_ms
-let margin_ms = 20 * minute_ms
+let margin_ms = 10 * minute_ms
 
 (* Variables that would make agy sign in another way. *)
 let competing =

@@ -114,9 +114,11 @@ let render index (message : Message.t) =
    the active path. *)
 let seen_through session ~to_ ~host =
   let adapter = Adapter_id.to_string to_ in
+  let on_backend = Adapter_id.on_backend to_ in
   match
     List.find (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
-      String.equal thread.adapter adapter && String.equal thread.host host)
+      String.equal thread.adapter adapter
+      && (on_backend || String.equal thread.host host))
   with
   | None -> None
   | Some thread ->
@@ -231,8 +233,18 @@ let build
       ()
   =
   let latest_thread = List.hd (Session.threads session) in
+  let latest_thread_is_backend =
+    Option.value_map latest_thread ~default:false ~f:(fun t ->
+      match Adapter_id.of_string t.adapter with
+      | Ok a -> Adapter_id.on_backend a
+      | Error _ -> false)
+  in
   let from_host =
-    Option.first_some from_host (Option.map latest_thread ~f:(fun t -> t.host))
+    Option.first_some
+      from_host
+      (if latest_thread_is_backend
+       then None
+       else Option.map latest_thread ~f:(fun t -> t.host))
   in
   let from_cwd =
     Option.first_some from_cwd (Option.map latest_thread ~f:(fun t -> t.cwd))
@@ -259,6 +271,7 @@ let build
     List.filter_map considered ~f:(fun (index, _, message) ->
       Option.map (render index message) ~f:(fun text -> index, message, text))
   in
+  let to_on_backend = Adapter_id.on_backend to_ in
   let host_changed =
     match from_host with
     | Some h -> not (String.equal h host)
@@ -269,7 +282,10 @@ let build
     | Some c -> not (String.equal c cwd)
     | None -> false
   in
-  if List.is_empty items && not (host_changed || cwd_changed)
+  (* Backend-hosted adapters keep their live thread across host/cwd changes and
+     already receive compact append-only [Told_environment] notes on the user
+     message, so a boilerplate handoff with zero missed messages is redundant. *)
+  if List.is_empty items && (to_on_backend || not (host_changed || cwd_changed))
   then None
   else (
     let header_reserve = 600 in
