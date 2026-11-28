@@ -412,7 +412,7 @@ let%expect_test "switching adapters hands each what it has not seen" =
   [%expect
     {|
     ok: engine composer, adapter codex
-    error: "unknown adapter \"gemini\": expected codex, claude, prigh or acp:<name>"
+    error: "unknown adapter \"gemini\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"
     error: "missing param \"adapter\""
     |}];
   show_entries (Agent.session (agent ()));
@@ -737,5 +737,178 @@ let%expect_test "back from an agent CLI, the session has its login again" =
     ok: engine -, adapter -
     deepseek/deepseek-flash@work
     deepseek/deepseek-flash@work
+    |}]
+;;
+
+let%expect_test
+    "backend:acp:antigravity appears in /model and switches seamlessly"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let engines =
+    Or_error.ok_exn
+      (Engines.create
+         ~engines:[ Harness; Composer ]
+         ~adapters:[ Backend (Acp "antigravity") ]
+         ())
+  in
+  let provider = Faux_provider.create [] in
+  let latest = ref None in
+  let new_agent ?session ~cwd () =
+    let agent =
+      Agent.create
+        ~env:t.env
+        ~sw
+        ~provider
+        ~tools:Tools.interaction
+        ~sessions_dir
+        ~home:t.dir
+        ?session
+        ~backend_host:true
+        ~cwd
+        ()
+    in
+    latest := Some agent;
+    agent
+  in
+  let fake_agy (p : Line_transport.Peer.t) =
+    let reply j result =
+      write
+        p
+        (`Object
+            [ "jsonrpc", `String "2.0"
+            ; "id", Option.value_exn (Json.member "id" j)
+            ; "result", result
+            ])
+    in
+    let rec loop () =
+      match read p with
+      | None -> ()
+      | Some j ->
+        (match string_at [ "method" ] j with
+         | Some "initialize" ->
+           reply
+             j
+             (Json.parse
+                {|{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"close":{}},"_meta":{"antigravity":{"systemPrompt":{"append":true}}}},"authMethods":[]}|}
+              |> Or_error.ok_exn)
+         | Some "session/new" ->
+           reply
+             j
+             (Json.parse
+                {|{"sessionId":"s-agy","models":{"currentModelId":"gemini-2.5-pro","availableModels":[{"modelId":"gemini-2.5-pro","name":"Gemini 2.5 Pro"},{"modelId":"claude-sonnet-4-5","name":"Claude Sonnet 4.5"}]}}|}
+              |> Or_error.ok_exn)
+         | Some "session/close" -> reply j (`Object [])
+         | Some _ | None -> ());
+        loop ()
+    in
+    loop ()
+  in
+  let spawned_hosts = ref [] in
+  let spawn_external _agent ~host (_launch : Adapter.Launch.t) =
+    spawned_hosts := !spawned_hosts @ [ host ];
+    Ok (Line_transport.Peer.spawn ~sw fake_agy)
+  in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~login:
+        (Login_manager.create
+           ~env:t.env
+           ~sw
+           ~getenv:(fun _ -> None)
+           ~store:(Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+           ())
+      ~sessions_dir
+      ~cwd:t.dir
+      ~engines
+      ~spawn_external
+      ~new_agent
+      ()
+  in
+  let models_loaded, set_models_loaded = Eio.Promise.create () in
+  let client =
+    Rpc_server.connect server ~send:(fun ev ->
+      match string_at [ "event" ] ev with
+      | Some "models_changed" when not (Eio.Promise.is_resolved models_loaded)
+        -> Eio.Promise.resolve set_models_loaded ()
+      | _ -> ())
+  in
+  let call ?(params = "{}") meth =
+    Rpc_server.handle
+      server
+      client
+      (Json.of_string
+         (sprintf {|{"id": "r", "method": "%s", "params": %s}|} meth params))
+  in
+  let show_state () =
+    let st = Agent.state (Option.value_exn !latest) in
+    printf
+      "engine=%s adapter=%s model=%s\n"
+      (Engine_id.to_string st.engine.engine)
+      (Option.value_map st.engine.adapter ~default:"-" ~f:Adapter_id.to_string)
+      (Model.key st.model)
+  in
+  let has_backend_models () =
+    match call "list_models" with
+    | `Object fields ->
+      (match List.Assoc.find fields "result" ~equal:String.equal with
+       | Some (`Array models) ->
+         let backend =
+           List.filter_map models ~f:(fun m ->
+             match Json.member "provider" m, Json.member "id" m with
+             | Some (`String p), Some (`String id)
+               when String.is_prefix p ~prefix:"backend:" -> Some (p ^ "/" ^ id)
+             | _ -> None)
+         in
+         let harness =
+           List.count models ~f:(fun m ->
+             match Json.member "provider" m with
+             | Some (`String p) -> not (String.is_prefix p ~prefix:"backend:")
+             | _ -> false)
+         in
+         printf
+           "list_models: harness=%b backend=[%s]\n"
+           (harness > 0)
+           (String.concat ~sep:", " backend)
+       | _ -> ())
+    | _ -> ()
+  in
+  print_result (call "new_session");
+  show_state ();
+  (* First list_models triggers the background catalog fetch on backend; wait
+     deterministically for models_changed so the real model list is loaded. *)
+  ignore (call "list_models" : Json.t);
+  Eio.Promise.await models_loaded;
+  printf "spawned hosts=[%s]\n" (String.concat ~sep:", " !spawned_hosts);
+  has_backend_models ();
+  (* Switch directly from harness to backend:acp:antigravity via set_model! *)
+  print_result
+    (call
+       ~params:{|{"model": "backend:acp:antigravity/gemini-2.5-pro"}|}
+       "set_model");
+  show_state ();
+  (* On backend:acp:antigravity, list_models still offers harness models too. *)
+  has_backend_models ();
+  (* Switch directly back to harness via set_model! *)
+  print_result
+    (call ~params:{|{"model": "deepseek/deepseek-flash"}|} "set_model");
+  show_state ();
+  Rpc_server.shutdown server;
+  [%expect
+    {|
+    ok: engine -, adapter -
+    engine=harness adapter=- model=deepseek/deepseek-flash
+    spawned hosts=[backend]
+    list_models: harness=true backend=[backend:acp:antigravity/gemini-2.5-pro, backend:acp:antigravity/claude-sonnet-4-5]
+    ok: engine -, adapter -
+    engine=composer adapter=backend:acp:antigravity model=backend:acp:antigravity/gemini-2.5-pro
+    list_models: harness=true backend=[backend:acp:antigravity/gemini-2.5-pro, backend:acp:antigravity/claude-sonnet-4-5]
+    ok: engine -, adapter -
+    engine=harness adapter=- model=deepseek/deepseek-flash
     |}]
 ;;

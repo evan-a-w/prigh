@@ -147,7 +147,7 @@ docker run --rm -it -v "$PWD:/work" -w /work ghcr.io/evan-a-w/prigh:main prigh t
 | `PRIGH_SUPERUSERS` | – | comma-separated users allowed `/setusr` and Nix store cleaning |
 | `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container |
 | `PRIGH_ENGINES` | `harness` | what runs sessions: `harness`, `composer` (drives Codex, Claude Code and other agents on each session's tool host: see [Engines](#engines)) or both, the first the default |
-| `PRIGH_ADAPTERS` | `codex,claude` | the agents the composer drives (`codex`, `claude`, `prigh`, `acp:NAME`), e.g. `codex,claude,acp:antigravity,acp:opencode` for all the image has; users sign in to them |
+| `PRIGH_ADAPTERS` | `codex,claude` | the agents the composer drives (`codex`, `claude`, `prigh`, `acp:NAME`, `backend:acp:antigravity`), e.g. `codex,claude,acp:antigravity,backend:acp:antigravity,acp:opencode` for all the image has; users sign in to them |
 | `PRIGH_SHARING` | – | `off`: users cannot share provider logins with each other |
 | `PRIGH_ALLOW_NO_TOKEN` | – | `1`: start without a token |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` behind a proxy) |

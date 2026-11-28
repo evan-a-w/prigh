@@ -29,7 +29,7 @@ let tokens_of s = (String.length s + 3) / 4
 
 let needed : Adapter_id.t -> bool = function
   | Prigh -> false
-  | Codex | Claude | Acp _ -> true
+  | Codex | Claude | Acp _ | Backend _ -> true
 ;;
 
 (* Backs [i] off UTF-8 continuation bytes, so a cut never splits a

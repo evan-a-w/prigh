@@ -778,20 +778,25 @@ let no_choice auth (state : P.State.t) =
   then (
     let who = P.Session_engine.who state.engine in
     let adapter = Option.value state.engine.adapter ~default:"" in
+    let login_adapter =
+      Option.value
+        (String.chop_prefix adapter ~prefix:"backend:")
+        ~default:adapter
+    in
     Some
-      (match state.engine.login, adapter with
+      (match state.engine.login, login_adapter with
        | Some label, _ ->
          sprintf
            "%s runs on prigh's login %s: /adapters login %s changes it"
            who
            label
-           adapter
+           login_adapter
        | None, ("codex" | "claude" | "acp:antigravity") ->
          sprintf
            "%s uses its own login: /adapters login %s runs it on one of \
             prigh's, or sign in through its CLI"
            who
-           adapter
+           login_adapter
        | None, _ ->
          sprintf
            "%s uses its own login, not prigh's: sign in through its CLI to \

@@ -2142,3 +2142,181 @@ let%expect_test
     mcp reply: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"invalid arguments: unknown subagent \"a9\": only a finished, failed, or out-of-turns subagent of yours can be continued (those that can: none)"}],"isError":true}}
     |}]
 ;;
+
+let%expect_test
+    "backend-hosted antigravity: launch wrapper, system_prompt_append, all \
+     tools, host/cwd stability"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let adapter =
+    Acp_adapter.create
+      ~backend_hosted:true
+      ~load_quiet:(Time_float.Span.of_sec 0.2)
+      antigravity
+  in
+  let (module A) = adapter in
+  printf
+    "id=%s display=%s all_tools=%b on_backend=%b plan_mode=%b\n"
+    A.id
+    A.display_name
+    A.all_tools
+    A.on_backend
+    A.capabilities.plan_mode;
+  let own_launch = A.launch (Adapter.Start.default ~cwd:"/empty") in
+  printf
+    "own launch uses backend_wrapper=%b secret=%b\n"
+    (List.mem
+       own_launch.argv
+       Antigravity_login.For_testing.backend_wrapper
+       ~equal:String.equal)
+    (Option.is_some own_launch.secret);
+  let login = antigravity_login ~expires_min:[ 60 ] () in
+  let login_launch =
+    A.launch { (Adapter.Start.default ~cwd:"/empty") with login = Some login }
+  in
+  printf
+    "login launch uses backend_wrapper=%b secret=%b\n"
+    (List.mem
+       login_launch.argv
+       Antigravity_login.For_testing.backend_wrapper
+       ~equal:String.equal)
+    (Option.is_some login_launch.secret);
+  let spawns = ref 0 in
+  let host = ref "mac" in
+  let injected_ref = ref None in
+  let fake_bash =
+    { Tool.spec = (Tools.find "bash" |> Option.value_exn).spec
+    ; run =
+        (fun ctx args ->
+          Tool_result.ok
+            (sprintf "ran on %s in %s: %s" !host ctx.cwd (Json.to_string args)))
+    }
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~start:(fun ~cwd ->
+        { (Adapter.Start.default ~cwd) with
+          developer_instructions = Some "SYSTEM PROMPT FOR MAC"
+        })
+      ~host:(fun () -> !host)
+      ~spawn:(fun _launch ->
+        incr spawns;
+        printf "spawn #%d\n" !spawns;
+        let inner =
+          Line_transport.Peer.spawn ~sw (fun p ->
+            P.initialize
+              ~caps:
+                {|{"loadSession":true,"sessionCapabilities":{"close":{}},"_meta":{"antigravity":{"systemPrompt":{"append":true}}}}|}
+              p;
+            let ns = P.expect p "session/new" in
+            let append =
+              Option.bind (Json.member "params" ns) ~f:(fun params ->
+                Option.bind (Json.member "_meta" params) ~f:(fun m ->
+                  Option.bind (Json.member "antigravity" m) ~f:(fun a ->
+                    Option.bind (Json.member "systemPrompt" a) ~f:(fun s ->
+                      Option.bind (Json.member "append" s) ~f:Json.string))))
+            in
+            printf
+              "session/new systemPrompt.append=%s\n"
+              (Option.value append ~default:"-");
+            P.result p ns (sprintf {|{"sessionId":"ses_be",%s}|} P.modes);
+            let rec turns n =
+              match P.next p with
+              | Some ("session/prompt", req) ->
+                if n = 1
+                then (
+                  P.update
+                    p
+                    "ses_be"
+                    {|{"sessionUpdate":"tool_call","toolCallId":"b1","kind":"other","title":"mcp_prigh_bash","status":"pending","rawInput":{"command":"pwd"}}|};
+                  let injected = Option.value_exn !injected_ref in
+                  let reply =
+                    Injected_tools.handle_line
+                      injected
+                      {|{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"bash","arguments":{"command":"pwd"}}}|}
+                    |> Option.value_exn
+                  in
+                  printf "mcp bash -> %s\n" (mask t reply);
+                  P.update
+                    p
+                    "ses_be"
+                    {|{"sessionUpdate":"tool_call_update","toolCallId":"b1","status":"completed"}|});
+                P.text p "ses_be" (sprintf "reply %d" n);
+                P.result p req {|{"stopReason":"end_turn"}|};
+                turns (n + 1)
+              | _ -> ()
+            in
+            turns 1)
+        in
+        let mcp : Line_transport.Mcp.t =
+          { bridge =
+              Injected_tools.Bridge.create
+                ~prigh:"prigh"
+                ~socket:"/tmp/test.sock"
+                ~token:"tok"
+          ; serve = (fun injected -> injected_ref := Some injected)
+          ; route = None
+          }
+        in
+        Ok
+          (Line_transport.create
+             ~read_line:(fun () -> Line_transport.read_line inner)
+             ~write_line:(Line_transport.write_line inner)
+             ~stop:(fun () -> Line_transport.stop inner)
+             ~ended:(fun () -> Line_transport.ended inner)
+             ~is_ended:(fun () -> Line_transport.is_ended inner)
+             ~mcp
+             ()))
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:(fake_bash :: Tools.interaction)
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine
+    agent
+    { engine = Composer; adapter = Some (Backend (Acp "antigravity")) };
+  Agent.set_mode agent ~approval:Auto;
+  Agent.subscribe agent ~f:print_event;
+  prompt agent "first on mac";
+  (* Switch tool host and plan mode: backend process stays alive, no ACP set_mode. *)
+  host := "linux";
+  Agent.set_mode agent ~plan:true;
+  prompt agent "second on linux";
+  Composer_runner.close composer;
+  printf "total spawns=%d\n" !spawns;
+  [%expect
+    {|
+    id=backend:acp:antigravity display=Antigravity (backend) all_tools=true on_backend=true plan_mode=true
+    own launch uses backend_wrapper=true secret=false
+    prigh fetches a token valid for 40 min
+    login launch uses backend_wrapper=true secret=true
+    spawn #1
+    agent got initialize
+    agent got session/new session=- mcp=[prigh]
+    session/new systemPrompt.append=SYSTEM PROMPT FOR MAC
+    agent got session/prompt "first on mac"
+    mcp bash -> {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ran on mac in $DIR: {\"command\":\"pwd\"}"}],"isError":false}}
+    assistant (backend:acp:antigravity/default, Tool_use): ""
+    tool_start bash
+    tool_end bash -> ""
+    assistant (backend:acp:antigravity/default, End_turn): "reply 1"
+    agent got session/prompt "second on linux"
+    assistant (backend:acp:antigravity/default, End_turn): "reply 2"
+    total spawns=1
+    |}]
+;;

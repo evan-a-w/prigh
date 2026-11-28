@@ -44,6 +44,8 @@ module Choice = struct
     | Some "claude", _ ->
       "Anthropic's Claude Code CLI on the session's tool host"
     | Some "prigh", _ -> "prigh's harness, run by the composer"
+    | Some a, _ when String.is_prefix a ~prefix:"backend:" ->
+      "runs on the backend, with prigh's tools on the session's tool host"
     | Some _, _ -> "an ACP agent on the session's tool host"
     | None, "harness" -> "prigh's own agent, calling the model directly"
     | None, _ -> "external agents on the session's tool host"

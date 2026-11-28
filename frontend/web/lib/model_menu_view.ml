@@ -207,7 +207,9 @@ let reasoning (m : App.Model.t) ~inject =
       ; div
           ~cls:"model-reasoning-note"
           [ Node.text
-              (if String.is_prefix model.provider ~prefix:"acp:"
+              (if
+                 String.is_prefix model.provider ~prefix:"acp:"
+                 || String.is_prefix model.provider ~prefix:"backend:acp:"
                then
                  sprintf
                    "%s chooses how much it reasons."

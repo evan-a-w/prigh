@@ -880,8 +880,9 @@ let list_sessions t client =
 (* The clients that have signed in: the namespace's events (its sessions,
    settings, hosts and agent CLIs) are not for a connection that has not. *)
 let iter_authed t ~f =
-  List.iter (List.rev (Hashtbl.data t.clients)) ~f:(fun (c : Client.t) ->
-    if c.authed then f c)
+  List.iter
+    (List.rev (Hashtbl.data t.clients))
+    ~f:(fun (c : Client.t) -> if c.authed then f c)
 ;;
 
 let broadcast t json = iter_authed t ~f:(fun (c : Client.t) -> c.send json)
@@ -1163,14 +1164,44 @@ let cli_credential t agent ~adapter =
         ())
 ;;
 
+let process_host_of ~session_host (a : Adapter_id.t) =
+  if Adapter_id.on_backend a then Agent.Host.backend_id else session_host
+;;
+
+let backend_empty_cwd =
+  let dir = ref None in
+  fun () ->
+    match !dir with
+    | Some d when Stdlib.Sys.file_exists d -> d
+    | _ ->
+      let base =
+        match Sys.getenv "XDG_RUNTIME_DIR" with
+        | Some d when not (String.is_empty d) -> d
+        | _ -> Filename.temp_dir_name
+      in
+      let path =
+        Filename.concat
+          base
+          (sprintf "prigh-backend-cwd-%d" (Core_unix.getuid ()))
+      in
+      (try Core_unix.mkdir_p ~perm:0o700 path with
+       | _ -> ());
+      dir := Some path;
+      path
+;;
+
+let backend_adapters t = List.filter t.engines.adapters ~f:Adapter_id.on_backend
+
 (* Where a composer session's harness is with listing its models while the
    session's model is a placeholder: being asked, or why it could not. *)
 let harness_models t (s : Agent.State.t) =
   match s.engine with
-  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) }
+  | { engine = Composer
+    ; adapter = Some ((Codex | Claude | Acp _ | Backend _) as a)
+    }
     when External_model.is_placeholder s.model ->
     let adapter = Adapter_id.to_string a in
-    let host = s.active_host in
+    let host = process_host_of ~session_host:s.active_host a in
     let login = catalog_login t ~adapter in
     (match
        ( Adapter_catalog.asking t.catalogs ~host ~login adapter
@@ -1180,15 +1211,18 @@ let harness_models t (s : Agent.State.t) =
      | true, _, _ -> Some Harness_models.Loading
      | false, Some why, _ ->
        let host_name =
-         match
-           List.find s.hosts ~f:(fun (h : Agent.Host.t) ->
-             String.equal h.id host)
-         with
-         | Some h when not (String.is_empty h.name) -> h.name
-         | _ ->
-           (match s.active_host_name with
-            | Some name when not (String.is_empty name) -> name
-            | _ -> host)
+         if Adapter_id.on_backend a
+         then "backend"
+         else (
+           match
+             List.find s.hosts ~f:(fun (h : Agent.Host.t) ->
+               String.equal h.id host)
+           with
+           | Some h when not (String.is_empty h.name) -> h.name
+           | _ ->
+             (match s.active_host_name with
+              | Some name when not (String.is_empty name) -> name
+              | _ -> host))
        in
        Some
          (Harness_models.failed
@@ -1261,9 +1295,12 @@ let models_changed t agent =
    login, its clients ask its models again, which asks them there. *)
 let note_catalog_key t agent =
   match Agent.engine_choice agent with
-  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) } ->
+  | { engine = Composer
+    ; adapter = Some ((Codex | Claude | Acp _ | Backend _) as a)
+    } ->
     let key =
-      Agent.active_host agent, catalog_login t ~adapter:(Adapter_id.to_string a)
+      ( process_host_of ~session_host:(Agent.active_host agent) a
+      , catalog_login t ~adapter:(Adapter_id.to_string a) )
     in
     let id = session_id agent in
     (match Hashtbl.find t.catalog_keys id with
@@ -1358,7 +1395,7 @@ let with_evidence t (s : Adapter_health.Status.t) =
          (match Codex_sandbox.Cache.find t.codex_sandbox ~host:s.host with
           | Some (Unavailable why) -> Some why
           | Some (Works | Unknown _) | None -> None)
-       | Claude | Prigh | Acp _ -> None)
+       | Claude | Prigh | Acp _ | Backend _ -> None)
     s
     ~prigh_login:
       (Option.map (adapter_login t ~adapter) ~f:(fun (provider, ref_) ->
@@ -1368,12 +1405,27 @@ let with_evidence t (s : Adapter_health.Status.t) =
       (Adapter_catalog.asking t.catalogs ~host:s.host ~login:None adapter)
 ;;
 
-(* The statuses of the deployed adapters on [hosts], in that order. *)
+(* The statuses of the deployed adapters on [hosts], in that order, plus any
+   backend-hosted adapters (which always live on the backend). *)
 let adapter_statuses t hosts =
-  List.concat_map hosts ~f:(fun (host : Agent.Host.t) ->
-    List.filter_map t.engines.adapters ~f:(fun adapter ->
-      Adapter_health.Cache.find t.adapter_health ~host:host.id adapter
-      |> Option.map ~f:(with_evidence t)))
+  let backend_statuses =
+    List.filter_map (backend_adapters t) ~f:(fun adapter ->
+      Adapter_health.Cache.find
+        t.adapter_health
+        ~host:Agent.Host.backend_id
+        adapter
+      |> Option.map ~f:(with_evidence t))
+  in
+  let tool_host_adapters =
+    List.filter t.engines.adapters ~f:(Fn.non Adapter_id.on_backend)
+  in
+  let host_statuses =
+    List.concat_map hosts ~f:(fun (host : Agent.Host.t) ->
+      List.filter_map tool_host_adapters ~f:(fun adapter ->
+        Adapter_health.Cache.find t.adapter_health ~host:host.id adapter
+        |> Option.map ~f:(with_evidence t)))
+  in
+  backend_statuses @ host_statuses
 ;;
 
 let adapters_json t statuses =
@@ -1394,8 +1446,8 @@ let adapters_changed t ~hosts =
 (* Notes what starting an ACP agent on its own login on [host] showed of
    that login: whether that changed what is known. *)
 let note_seen t ~host (adapter : Adapter_id.t) (result : _ Or_error.t) =
-  match adapter with
-  | Codex | Claude | Prigh -> false
+  match Adapter_id.inner adapter with
+  | Codex | Claude | Prigh | Backend _ -> false
   | Acp _ ->
     let at = t.now () in
     let seen : Adapter_health.Seen.t =
@@ -1572,13 +1624,29 @@ let pool_cwd t ~host ~fallback =
     | None -> fallback)
 ;;
 
+(* Runs a host op directly on the backend process (even when [t.backend_host]
+   is false): used for backend-hosted composer CLIs and their health checks. *)
+let backend_local_exec t ~cwd : Host_stream.Exec.t =
+  fun ~stdin ~cancel ~on_output ~name arguments ->
+  Host_ops.execute
+    ~mcp:None
+    ~env:t.env
+    ~stdin
+    ~cancel
+    ~on_output
+    ~cwd
+    ~name
+    ~arguments
+    ()
+;;
+
 let pool_protocol_of
       t
       ~(adapter_id : Adapter_id.t)
       ~(start : Adapter.Start.t)
       ~(launch : Adapter.Launch.t)
   =
-  match adapter_id with
+  match Adapter_id.inner adapter_id with
   | Acp name ->
     let xai =
       Option.value_map
@@ -1593,7 +1661,7 @@ let pool_protocol_of
     in
     if xai || login_fallback then None else Some Harness_mux.Protocol.Acp
   | Codex -> Some Harness_mux.Protocol.Codex
-  | Claude | Prigh -> None
+  | Claude | Prigh | Backend _ -> None
 ;;
 
 let acquire_external
@@ -1606,9 +1674,18 @@ let acquire_external
       ~(start : Adapter.Start.t)
       ~(launch : Adapter.Launch.t)
   =
+  let on_backend = Adapter_id.on_backend adapter_id in
+  let host = if on_backend then Agent.Host.backend_id else host in
+  let host_name = if on_backend then "backend" else host_name in
   let spawn_direct () =
     match t.spawn_external with
     | Some spawn -> spawn agent ~host launch
+    | None when on_backend ->
+      Host_transport.spawn
+        ~sw
+        ~exec:(backend_local_exec t ~cwd:(backend_empty_cwd ()))
+        ~host:"backend"
+        launch
     | None -> host_spawn_on agent ~sw ~host ~host_name launch
   in
   match pool_protocol_of t ~adapter_id ~start ~launch with
@@ -1637,7 +1714,7 @@ let acquire_external
       }
     in
     let token_info =
-      match adapter_id, start.login with
+      match Adapter_id.inner adapter_id, start.login with
       | Acp "antigravity", Some cred ->
         (match
            Antigravity_login.of_launch cred ~refused:start.login_refused
@@ -1659,6 +1736,12 @@ let acquire_external
     let spawn_pooled ~sw =
       match t.spawn_external with
       | Some spawn -> spawn agent ~host launch
+      | None when on_backend ->
+        Host_transport.spawn
+          ~sw
+          ~exec:(backend_local_exec t ~cwd:(backend_empty_cwd ()))
+          ~host:"backend"
+          launch
       | None ->
         let cwd = pool_cwd t ~host ~fallback:launch.cwd in
         Host_transport.spawn
@@ -1690,13 +1773,29 @@ let host_spawn t agent launch =
 (* [adapter]'s harness failed to start on [host]: what was known of it there
    is checked again, and the frontends told. *)
 let recheck_adapter_on t agent ~host ~host_name ~cwd adapter =
+  let on_backend = Adapter_id.on_backend adapter in
+  let host = if on_backend then Agent.Host.backend_id else host in
+  let host_name = if on_backend then "backend" else host_name in
+  let cwd = if on_backend then backend_empty_cwd () else cwd in
   Adapter_health.Cache.forget t.adapter_health ~host adapter;
   Codex_sandbox.Cache.forget_host t.codex_sandbox ~host;
   Guarded.fork ~sw:t.sw ~what:"rechecking an adapter" (fun () ->
     let statuses =
       Adapter_health.probe
+        ~acp:(Engines.acp_agent t.engines)
         ~exec:(fun ~name arguments ->
-          Agent.host_call_on agent ~host ~cwd ~name arguments)
+          if on_backend
+          then
+            Host_ops.execute
+              ~mcp:None
+              ~env:t.env
+              ~cancel:Cancellation.never
+              ~on_output:ignore
+              ~cwd
+              ~name
+              ~arguments
+              ()
+          else Agent.host_call_on agent ~host ~cwd ~name arguments)
         [ adapter ]
         ~host
         ~host_name
@@ -1717,17 +1816,28 @@ let recheck_adapter t agent adapter =
 ;;
 
 (* The harness [adapter] said its catalog on [host], on the login [login]:
-   the sessions it runs there, on that login, show its models. *)
+   the sessions it runs there, on that login, show its models. Backend-hosted
+   adapters' models also appear in harness sessions' [/model] picker. *)
 let catalog_changed t ~host ~login adapter =
   if [%equal: string option] login (catalog_login t ~adapter)
-  then
+  then (
+    let is_backend = String.is_prefix adapter ~prefix:"backend:" in
     List.iter (Hashtbl.data t.agents) ~f:(fun agent ->
       match Agent.engine_choice agent with
       | { engine = Composer; adapter = Some a }
         when String.equal (Adapter_id.to_string a) adapter
-             && String.equal (Agent.active_host agent) host ->
+             && String.equal
+                  (process_host_of ~session_host:(Agent.active_host agent) a)
+                  host -> models_changed t agent
+      | ({ engine = Harness; _ } | { engine = Composer; adapter = Some Prigh })
+        when is_backend && String.equal host Agent.Host.backend_id ->
         models_changed t agent
-      | _ -> ())
+      | { engine = Composer; adapter = Some a }
+        when is_backend
+             && Adapter_id.on_backend a
+             && String.equal host Agent.Host.backend_id ->
+        models_changed t agent
+      | _ -> ()))
 ;;
 
 (* Why [adapter_id]'s harness, handed prigh's login [credential], did not
@@ -1774,7 +1884,7 @@ let no_sandbox t agent ~host ~host_name ~cwd (adapter : Adapter_id.t) =
     | Some { install = Unknown _; _ } | None -> `Unknown
   in
   match adapter, t.spawn_external with
-  | (Claude | Prigh | Acp _), _ | Codex, Some _ -> None
+  | (Claude | Prigh | Acp _ | Backend _), _ | Codex, Some _ -> None
   | Codex, None ->
     (match installed () with
      | `None -> None
@@ -1847,52 +1957,73 @@ let fetch_catalog
     Result.map_error result ~f:(catalog_login_error adapter_id credential)
 ;;
 
+(* Asks, in the background, the catalog of [adapter_id] on its execution host
+   (the backend for backend-hosted adapters, else the session's tool host),
+   on the login it runs on, unless one younger than [max_age] seconds is
+   kept. *)
+let ensure_catalog_for
+      ?force
+      ?(max_age = 1800.)
+      t
+      agent
+      (adapter_id : Adapter_id.t)
+  =
+  match Composer_adapters.find t.engines adapter_id with
+  | Error _ -> ()
+  | Ok adapter ->
+    let on_backend = Adapter_id.on_backend adapter_id in
+    let host =
+      process_host_of ~session_host:(Agent.active_host agent) adapter_id
+    in
+    let host_name = if on_backend then "backend" else active_host_label agent in
+    let cwd =
+      if on_backend
+      then backend_empty_cwd ()
+      else Session.cwd (Agent.session agent)
+    in
+    let name = Adapter_id.to_string adapter_id in
+    let login = catalog_login t ~adapter:name in
+    let was_asking = Adapter_catalog.asking t.catalogs ~host ~login name in
+    Adapter_catalog.refresh
+      ?force
+      t.catalogs
+      ~sw:t.sw
+      ~host
+      ~login
+      name
+      ~max_age
+      ~fetch:
+        (fetch_catalog
+           t
+           agent
+           ~host
+           ~host_name
+           ~cwd
+           ~login:(lazy (cli_credential t agent ~adapter:name))
+           adapter_id
+           adapter)
+      ~on_done:(fun () ->
+        catalog_changed t ~host ~login name;
+        match Adapter_id.inner adapter_id with
+        | Acp _ when Option.is_none login -> adapters_changed t ~hosts:(hosts t)
+        | Acp _ | Codex | Claude | Prigh | Backend _ -> ());
+    if (not was_asking) && Adapter_catalog.asking t.catalogs ~host ~login name
+    then send_harness_models t agent
+;;
+
 (* Asks, in the background, the catalog of a Codex, Claude Code or ACP
-   session's harness on its tool host, on the login it runs on, unless one
-   younger than [max_age] seconds is kept. *)
+   session's harness on its execution host, on the login it runs on, unless
+   one younger than [max_age] seconds is kept. *)
 let ensure_catalog ?force ?(max_age = 1800.) t agent =
   match Agent.engine_choice agent with
   | { engine = Composer
-    ; adapter = Some ((Codex | Claude | Acp _) as adapter_id)
-    } ->
-    (match Composer_adapters.find t.engines adapter_id with
-     | Error _ -> ()
-     | Ok adapter ->
-       let host = Agent.active_host agent in
-       let name = Adapter_id.to_string adapter_id in
-       let login = catalog_login t ~adapter:name in
-       let was_asking = Adapter_catalog.asking t.catalogs ~host ~login name in
-       Adapter_catalog.refresh
-         ?force
-         t.catalogs
-         ~sw:t.sw
-         ~host
-         ~login
-         name
-         ~max_age
-         ~fetch:
-           (fetch_catalog
-              t
-              agent
-              ~host
-              ~host_name:(active_host_label agent)
-              ~cwd:(Session.cwd (Agent.session agent))
-              ~login:(lazy (cli_credential t agent ~adapter:name))
-              adapter_id
-              adapter)
-         ~on_done:(fun () ->
-           catalog_changed t ~host ~login name;
-           match adapter_id with
-           | Acp _ when Option.is_none login ->
-             adapters_changed t ~hosts:(hosts t)
-           | Acp _ | Codex | Claude | Prigh -> ());
-       if
-         (not was_asking) && Adapter_catalog.asking t.catalogs ~host ~login name
-       then send_harness_models t agent)
+    ; adapter = Some ((Codex | Claude | Acp _ | Backend _) as adapter_id)
+    } -> ensure_catalog_for ?force ~max_age t agent adapter_id
   | _ -> ()
 ;;
 
 let catalog_on t ~host (a : Adapter_id.t) =
+  let host = process_host_of ~session_host:host a in
   let adapter = Adapter_id.to_string a in
   Adapter_catalog.find
     t.catalogs
@@ -1901,7 +2032,7 @@ let catalog_on t ~host (a : Adapter_id.t) =
     adapter
 ;;
 
-(* The session's harness's catalog, as asked on its tool host on its
+(* The session's harness's catalog, as asked on its execution host on its
    login. *)
 let find_catalog t agent (a : Adapter_id.t) =
   catalog_on t ~host:(Agent.active_host agent) a
@@ -1923,8 +2054,10 @@ let lists_no_models t agent =
 let external_models t agent =
   match Agent.external_models agent, Agent.engine_choice agent with
   | Some models, _ -> Some models
-  | None, { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) }
-    ->
+  | ( None
+    , { engine = Composer
+      ; adapter = Some ((Codex | Claude | Acp _ | Backend _) as a)
+      } ) ->
     Some
       (match find_catalog t agent a with
        | Some { models = _ :: _ as models; _ } -> models
@@ -2018,8 +2151,11 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
     let%map.Or_error adapter = Composer_adapters.find t.engines adapter_id in
     let session = Agent.session agent in
     let adapter_name = Adapter_id.to_string adapter_id in
+    let on_backend = Adapter_id.on_backend adapter_id in
     let start ~cwd =
-      let host = Agent.active_host agent in
+      let host =
+        process_host_of ~session_host:(Agent.active_host agent) adapter_id
+      in
       let (module A : Adapter.S) = adapter in
       let thread =
         List.find
@@ -2039,21 +2175,28 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
           then Some thread_id, true, Some at
           else None, false, None
       in
-      { (Adapter.Start.default ~cwd) with
+      let process_cwd = if on_backend then backend_empty_cwd () else cwd in
+      let developer_instructions =
+        if on_backend
+        then Some (Agent.full_system_prompt agent)
+        else composer_instructions agent
+      in
+      { (Adapter.Start.default ~cwd:process_cwd) with
         resume
       ; fork
       ; at
-      ; developer_instructions = composer_instructions agent
+      ; developer_instructions
       ; login = cli_credential t agent ~adapter:adapter_name
       ; no_sandbox =
           no_sandbox
             t
             agent
             ~host
-            ~host_name:(active_host_label agent)
-            ~cwd
+            ~host_name:
+              (if on_backend then "backend" else active_host_label agent)
+            ~cwd:process_cwd
             adapter_id
-      ; extra_dirs = composer_extra_dirs agent ~cwd
+      ; extra_dirs = (if on_backend then [] else composer_extra_dirs agent ~cwd)
       }
     in
     let on_thread thread_id =
@@ -2061,7 +2204,10 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
         (Session.record_thread
            session
            { adapter = adapter_name
-           ; host = Agent.active_host agent
+           ; host =
+               process_host_of
+                 ~session_host:(Agent.active_host agent)
+                 adapter_id
            ; thread_id
            ; cwd = Session.cwd session
            ; fork_from = None
@@ -2075,7 +2221,20 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
          ~spawn:(fun launch ->
            let spawned =
              match t.spawn_external with
-             | Some spawn -> spawn agent ~host:(Agent.active_host agent) launch
+             | Some spawn ->
+               spawn
+                 agent
+                 ~host:
+                   (process_host_of
+                      ~session_host:(Agent.active_host agent)
+                      adapter_id)
+                 launch
+             | None when on_backend ->
+               Host_transport.spawn
+                 ~sw:t.sw
+                 ~exec:(backend_local_exec t ~cwd:(backend_empty_cwd ()))
+                 ~host:"backend"
+                 launch
              | None -> host_spawn t agent launch
            in
            if Result.is_error spawned then recheck_adapter t agent adapter_id;
@@ -2098,12 +2257,15 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
          ~on_thread
          ~on_start:(fun (start : Adapter.Start.t) result ->
            (* On one of prigh's logins, it shows nothing of its own. *)
-           if
-             Option.is_none start.login
-             && note_seen t ~host:(Agent.active_host agent) adapter_id result
+           let host =
+             process_host_of ~session_host:(Agent.active_host agent) adapter_id
+           in
+           if Option.is_none start.login && note_seen t ~host adapter_id result
            then adapters_changed t ~hosts:(hosts t))
          ~on_prewarm:(fun (start : Adapter.Start.t) result ->
-           let host = Agent.active_host agent in
+           let host =
+             process_host_of ~session_host:(Agent.active_host agent) adapter_id
+           in
            let login = catalog_login t ~adapter:adapter_name in
            let result =
              match start.login with
@@ -2163,15 +2325,28 @@ let subagent_engines t agent =
     ~add_spend:(Agent.add_spend agent)
     ~notice:(Agent.notice agent)
     ~spawn:(fun ~sw ~host ~host_name ~adapter launch ->
+      let on_backend = Adapter_id.on_backend adapter in
+      let host = if on_backend then Agent.Host.backend_id else host in
       let spawned =
         match t.spawn_external with
         | Some spawn -> spawn agent ~host launch
+        | None when on_backend ->
+          Host_transport.spawn
+            ~sw
+            ~exec:(backend_local_exec t ~cwd:(backend_empty_cwd ()))
+            ~host:"backend"
+            launch
         | None -> host_spawn_on agent ~sw ~host ~host_name launch
       in
       if Result.is_error spawned
       then recheck_adapter_on t agent ~host ~host_name ~cwd:launch.cwd adapter;
       spawned)
     ~spawn_start:(fun ~sw ~host ~host_name ~adapter start launch ->
+      let start =
+        if Adapter_id.on_backend adapter
+        then { start with Adapter.Start.cwd = backend_empty_cwd () }
+        else start
+      in
       let spawned =
         acquire_external
           t
@@ -2187,6 +2362,7 @@ let subagent_engines t agent =
       then recheck_adapter_on t agent ~host ~host_name ~cwd:launch.cwd adapter;
       spawned)
     ~on_start:(fun ~host ~adapter (start : Adapter.Start.t) result ->
+      let host = process_host_of ~session_host:host adapter in
       if Option.is_none start.login && note_seen t ~host adapter result
       then adapters_changed t ~hosts:(hosts t))
     ~login:(fun ~adapter -> cli_credential t agent ~adapter)
@@ -2234,8 +2410,12 @@ let external_complete
   match Composer_adapters.find t.engines adapter_id with
   | Error _ as e -> e
   | Ok adapter ->
-    let host = Agent.active_host agent in
-    let host_name = active_host_label agent in
+    let on_backend = Adapter_id.on_backend adapter_id in
+    let host =
+      if on_backend then Agent.Host.backend_id else Agent.active_host agent
+    in
+    let host_name = if on_backend then "backend" else active_host_label agent in
+    let cwd = if on_backend then backend_empty_cwd () else cwd in
     let adapter_name = Adapter_id.to_string adapter_id in
     let catalog_models =
       match Agent.engine_choice agent with
@@ -3593,22 +3773,11 @@ let attached_state t (client : Client.t) =
   `Object [ "state", state_json t (Agent.state client.agent) ]
 ;;
 
-(* Moves the attached session to another of the composer's adapters (the
-   new one's harness takes over at the next turn, handed what it has not
-   seen of the session), or back to prigh's harness engine ([harness]),
-   which reads the session itself. Not while a run goes on. *)
-let set_adapter t (client : Client.t) params =
+let switch_engine ?(prewarm = true) t agent (choice : Engine_choice.t) =
   let open Or_error.Let_syntax in
-  let agent = client.agent in
-  let%bind name = string_param params "adapter" in
-  let%bind choice =
-    if String.equal name "harness"
-    then Engines.choose t.engines ~engine:(Some "harness") ~adapter:None
-    else Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
-  in
   let previous = Agent.engine_choice agent in
   if Engine_choice.equal choice previous
-  then Ok (attached_state t client)
+  then Ok false
   else if Agent.is_running agent
   then
     Or_error.errorf
@@ -3631,7 +3800,7 @@ let set_adapter t (client : Client.t) params =
       Agent.set_unavailable agent None;
       Agent.set_runner agent None;
       models_changed t agent;
-      Ok (attached_state t client)
+      Ok true
     | { engine = Composer; _ } ->
       let%bind adapter =
         Result.of_option
@@ -3642,9 +3811,26 @@ let set_adapter t (client : Client.t) params =
       Agent.set_engine agent choice;
       Agent.set_unavailable agent None;
       Agent.set_runner agent (Some runner);
-      Agent.prewarm agent;
+      if prewarm then Agent.prewarm agent;
       models_changed t agent;
-      attached_state t client)
+      true)
+;;
+
+(* Moves the attached session to another of the composer's adapters (the
+   new one's harness takes over at the next turn, handed what it has not
+   seen of the session), or back to prigh's harness engine ([harness]),
+   which reads the session itself. Not while a run goes on. *)
+let set_adapter t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let agent = client.agent in
+  let%bind name = string_param params "adapter" in
+  let%bind choice =
+    if String.equal name "harness"
+    then Engines.choose t.engines ~engine:(Some "harness") ~adapter:None
+    else Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
+  in
+  let%map (_ : bool) = switch_engine t agent choice in
+  attached_state t client
 ;;
 
 (* A temporary session is not saved or listed, and ends when its client
@@ -4769,10 +4955,13 @@ let set_adapter_login t (client : Client.t) params =
       Cli_login.Prigh found.ref_
   in
   let%map () = Cli_login.save ~home ~adapter choice in
+  let same_adapter (a : Adapter_id.t) =
+    String.equal (Adapter_id.to_string a) adapter
+    || String.equal (Adapter_id.to_string (Adapter_id.inner a)) adapter
+  in
   List.iter (Hashtbl.data t.agents) ~f:(fun agent ->
     match Agent.engine_choice agent with
-    | { engine = Composer; adapter = Some a }
-      when String.equal (Adapter_id.to_string a) adapter ->
+    | { engine = Composer; adapter = Some a } when same_adapter a ->
       if not (Agent.is_running agent) then Agent.stop_engine agent;
       route t agent (State_changed (Agent.state agent))
     | _ -> ());
@@ -4784,16 +4973,16 @@ let set_adapter_login t (client : Client.t) params =
    model lists, which starts them briefly on their own logins ([force], on
    Refresh: even when asking failed lately, and those found logged out, which
    may have logged in since). The adapters checked, with the host's id. *)
-let check_logins t agent ~force (host : Agent.Host.t) =
-  List.filter_map t.engines.adapters ~f:(fun adapter_id ->
+let check_logins_for t agent ~force ~host ~host_name ~cwd adapters =
+  List.filter_map adapters ~f:(fun adapter_id ->
     let checkable =
       Option.exists
-        (Adapter_health.Cache.find t.adapter_health ~host:host.id adapter_id)
+        (Adapter_health.Cache.find t.adapter_health ~host adapter_id)
         ~f:(fun s ->
           let s = with_evidence t s in
           Adapter_health.Status.checkable s
           ||
-          match force, s.adapter, s.install, s.auth with
+          match force, Adapter_id.inner s.adapter, s.install, s.auth with
           | true, Acp _, Installed _, Logged_out -> true
           | _ -> false)
     in
@@ -4804,7 +4993,7 @@ let check_logins t agent ~force (host : Agent.Host.t) =
         ~force
         t.catalogs
         ~sw:t.sw
-        ~host:host.id
+        ~host
         ~login:None
         name
         ~max_age:0.
@@ -4812,17 +5001,31 @@ let check_logins t agent ~force (host : Agent.Host.t) =
           (fetch_catalog
              t
              agent
-             ~host:host.id
-             ~host_name:host.name
-             ~cwd:host.cwd
+             ~host
+             ~host_name
+             ~cwd
              ~login:(lazy None)
              adapter_id
              adapter)
         ~on_done:(fun () ->
-          catalog_changed t ~host:host.id ~login:None name;
+          catalog_changed t ~host ~login:None name;
           adapters_changed t ~hosts:(hosts t));
-      Some (host.id, name)
+      Some (host, name)
     | _ -> None)
+;;
+
+let check_logins t agent ~force (host : Agent.Host.t) =
+  let tool_host_adapters =
+    List.filter t.engines.adapters ~f:(Fn.non Adapter_id.on_backend)
+  in
+  check_logins_for
+    t
+    agent
+    ~force
+    ~host:host.id
+    ~host_name:host.name
+    ~cwd:host.cwd
+    tool_host_adapters
 ;;
 
 let list_adapters t (client : Client.t) params =
@@ -4846,11 +5049,60 @@ let list_adapters t (client : Client.t) params =
   in
   let cache = t.adapter_health in
   let now = t.now () in
-  let changed =
+  let differs (s : Adapter_health.Status.t) =
+    match Adapter_health.Cache.find cache ~host:s.host s.adapter with
+    | None -> true
+    | Some old ->
+      not
+        (Adapter_health.Status.equal
+           { old with checked_at = 0. }
+           { s with checked_at = 0. })
+  in
+  let backend_changed =
+    let stale =
+      List.filter (backend_adapters t) ~f:(fun adapter ->
+        refresh
+        || not
+             (Adapter_health.Cache.fresh
+                cache
+                ~now
+                ~host:Agent.Host.backend_id
+                adapter))
+    in
+    if List.is_empty stale
+    then false
+    else (
+      let cwd = backend_empty_cwd () in
+      let statuses =
+        Adapter_health.probe
+          ~acp:(Engines.acp_agent t.engines)
+          ~exec:(fun ~name arguments ->
+            Host_ops.execute
+              ~mcp:None
+              ~env:t.env
+              ~cancel:Cancellation.never
+              ~on_output:ignore
+              ~cwd
+              ~name
+              ~arguments
+              ())
+          stale
+          ~host:Agent.Host.backend_id
+          ~host_name:"backend"
+          ~now
+      in
+      let changed = List.exists statuses ~f:differs in
+      Adapter_health.Cache.set cache statuses;
+      changed)
+  in
+  let tool_host_adapters =
+    List.filter t.engines.adapters ~f:(Fn.non Adapter_id.on_backend)
+  in
+  let host_changed =
     Fiber.List.map
       (fun (host : Agent.Host.t) ->
          let stale =
-           List.filter t.engines.adapters ~f:(fun adapter ->
+           List.filter tool_host_adapters ~f:(fun adapter ->
              refresh
              || not
                   (Adapter_health.Cache.fresh cache ~now ~host:host.id adapter))
@@ -4872,15 +5124,6 @@ let list_adapters t (client : Client.t) params =
                ~host:host.id
                ~host_name:host.name
                ~now
-           in
-           let differs (s : Adapter_health.Status.t) =
-             match Adapter_health.Cache.find cache ~host:s.host s.adapter with
-             | None -> true
-             | Some old ->
-               not
-                 (Adapter_health.Status.equal
-                    { old with checked_at = 0. }
-                    { s with checked_at = 0. })
            in
            let changed = List.exists statuses ~f:differs in
            Adapter_health.Cache.set cache statuses;
@@ -4904,9 +5147,20 @@ let list_adapters t (client : Client.t) params =
       hosts
     |> List.exists ~f:Fn.id
   in
-  if changed then adapters_changed t ~hosts:state.hosts;
+  if backend_changed || host_changed then adapters_changed t ~hosts:state.hosts;
+  let backend_checks =
+    check_logins_for
+      t
+      client.agent
+      ~force:refresh
+      ~host:Agent.Host.backend_id
+      ~host_name:"backend"
+      ~cwd:(backend_empty_cwd ())
+      (backend_adapters t)
+  in
   let checks =
-    List.concat_map hosts ~f:(check_logins t client.agent ~force:refresh)
+    backend_checks
+    @ List.concat_map hosts ~f:(check_logins t client.agent ~force:refresh)
   in
   if refresh
   then
@@ -5138,6 +5392,150 @@ let account_methods t (client : Client.t) ~meth ~params =
                  @ periods)
             | json -> json)))
   | _ -> None
+;;
+
+(* One of an external harness's models, by key ([codex/gpt-5]), id or
+   name. *)
+let resolve_external (models : Model.t list) query ~who =
+  let q = String.lowercase query in
+  match
+    List.find models ~f:(fun m ->
+      String.equal (Model.key m) query
+      || String.equal m.id query
+      || String.equal (String.lowercase m.name) q)
+  with
+  | Some m -> Ok m
+  | None ->
+    Or_error.errorf
+      "%s has no model %S: pick one of %s (/model lists them)"
+      who
+      query
+      (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
+;;
+
+(* Models for a backend-hosted adapter, triggering a background catalog fetch
+   if none is cached yet. *)
+let backend_adapter_models_for t agent (a : Adapter_id.t) =
+  let adapter = Adapter_id.to_string a in
+  let is_current =
+    match Agent.engine_choice agent with
+    | { engine = Composer; adapter = Some cur } -> Adapter_id.equal cur a
+    | _ -> false
+  in
+  let live_models = if is_current then Agent.external_models agent else None in
+  match live_models with
+  | Some (_ :: _ as models)
+    when not (List.for_all models ~f:External_model.is_placeholder) -> models
+  | _ ->
+    (match catalog_on t ~host:Agent.Host.backend_id a with
+     | Some { models = _ :: _ as models; _ } -> models
+     | Some { models = []; _ } -> [ External_model.unlisted ~adapter ]
+     | None ->
+       if (not is_current) || not (Agent.external_live agent)
+       then ensure_catalog_for t agent a;
+       [ External_model.pending ~adapter ])
+;;
+
+let all_backend_adapter_models t agent ~skip =
+  List.concat_map (backend_adapters t) ~f:(fun a ->
+    if Option.equal Adapter_id.equal skip (Some a)
+    then []
+    else backend_adapter_models_for t agent a)
+;;
+
+let harness_deployed t =
+  List.mem t.engines.engines Engine_id.Harness ~equal:Engine_id.equal
+;;
+
+let set_model_for_backend t agent ~id ~account (a : Adapter_id.t) =
+  let open Or_error.Let_syntax in
+  let who = Adapter_id.label a in
+  let%bind () =
+    match account with
+    | None -> Ok ()
+    | Some _ ->
+      Or_error.errorf
+        "%s uses its own login, not prigh's: pick the model without @LOGIN"
+        who
+  in
+  let models = backend_adapter_models_for t agent a in
+  let%bind model =
+    match resolve_external models id ~who, String.rsplit2 id ~on:'@' with
+    | Ok model, _ -> Ok model
+    | Error _, Some (key, _)
+      when Result.is_ok (resolve_external models key ~who) ->
+      Or_error.errorf
+        "%s uses its own login, not prigh's: pick %s without @LOGIN"
+        who
+        key
+    | (Error _ as error), _ ->
+      (* Allow explicit [backend:acp:antigravity/<id>] even before its catalog
+         has loaded. *)
+      (match External_model.parse_spec id with
+       | Some (Ok (parsed, raw_id))
+         when Adapter_id.equal parsed a
+              && List.for_all models ~f:External_model.is_placeholder ->
+         Ok (External_model.model ~adapter:(Adapter_id.to_string a) raw_id)
+       | _ -> error)
+  in
+  let choice = { Engine_choice.engine = Composer; adapter = Some a } in
+  let%map switched = switch_engine ~prewarm:false t agent choice in
+  Agent.set_model agent model;
+  if switched then Agent.prewarm agent;
+  `Object []
+;;
+
+let set_model_server t (client : Client.t) params =
+  match string_param params "model", string_param_opt params "account" with
+  | Error _, _ | _, Error _ -> None
+  | Ok id, Ok account ->
+    let open Or_error.Let_syntax in
+    let agent = client.agent in
+    let choice = Agent.engine_choice agent in
+    let on_backend_now =
+      match choice with
+      | { engine = Composer; adapter = Some a } when Adapter_id.on_backend a ->
+        Some a
+      | _ -> None
+    in
+    let target_backend =
+      let deployed a =
+        Adapter_id.on_backend a
+        && List.mem t.engines.adapters a ~equal:Adapter_id.equal
+      in
+      match External_model.parse_spec id with
+      | Some (Ok (a, _)) when deployed a -> Some a
+      | _ ->
+        (match
+           List.find (backend_adapters t) ~f:(fun a ->
+             let models = backend_adapter_models_for t agent a in
+             Result.is_ok (resolve_external models id ~who:(Adapter_id.label a)))
+         with
+         | Some a
+           when Option.is_some on_backend_now
+                || Engine_choice.is_harness choice
+                || Option.equal
+                     Adapter_id.equal
+                     choice.adapter
+                     (Some Adapter_id.Prigh) -> Some a
+         | _ -> None)
+    in
+    (match target_backend, on_backend_now with
+     | Some a, _ -> Some (set_model_for_backend t agent ~id ~account a)
+     | None, Some a ->
+       if harness_deployed t
+       then (
+         match model_with_account ?member:t.member t.login id ~account with
+         | Ok (model, acc) ->
+           Some
+             (let%map (_ : bool) =
+                switch_engine t agent Engine_choice.harness
+              in
+              Agent.set_model ?account:acc agent model;
+              `Object [])
+         | Error _ -> Some (set_model_for_backend t agent ~id ~account a))
+       else Some (set_model_for_backend t agent ~id ~account a)
+     | None, None -> None)
 ;;
 
 let dispatch_server t (client : Client.t) ~meth ~params
@@ -5566,8 +5964,26 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some (ok (`Object []))
   | "list_models" ->
     let agent = client.agent in
-    (match external_models t agent with
-     | Some models ->
+    let harness_models () =
+      let models = Login_manager.models t.login in
+      Model_registry.reload models;
+      tell_problems client (Model_registry.problems models);
+      Model_registry.models models
+    in
+    (match external_models t agent, Agent.engine_choice agent with
+     | Some models, { engine = Composer; adapter = Some a }
+       when Adapter_id.on_backend a ->
+       if
+         List.length models <= 1
+         && (not (Agent.external_live agent))
+         && not (lists_no_models t agent)
+       then ensure_catalog t agent;
+       let extras =
+         all_backend_adapter_models t agent ~skip:(Some a)
+         @ if harness_deployed t then harness_models () else []
+       in
+       Some (ok (`Array (List.map (models @ extras) ~f:Rpc_json.model)))
+     | Some models, _ ->
        (* Only the harness's default until it says its models: asked now,
           unless its process is up (its session says them) or it listed
           none before. *)
@@ -5577,13 +5993,12 @@ let dispatch_server t (client : Client.t) ~meth ~params
          && not (lists_no_models t agent)
        then ensure_catalog t agent;
        Some (ok (`Array (List.map models ~f:Rpc_json.model)))
-     | None ->
-       let models = Login_manager.models t.login in
-       Model_registry.reload models;
-       tell_problems client (Model_registry.problems models);
-       Some
-         (ok
-            (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model))))
+     | None, _ ->
+       let models =
+         harness_models () @ all_backend_adapter_models t agent ~skip:None
+       in
+       Some (ok (`Array (List.map models ~f:Rpc_json.model))))
+  | "set_model" -> set_model_server t client params
   | _ -> None
 ;;
 
@@ -5601,25 +6016,6 @@ let ui_action_param params ~meth =
       | Some _ ->
         Or_error.error_string
           "a prompt with ui_action takes no text: send text \"\"")
-;;
-
-(* One of an external harness's models, by key ([codex/gpt-5]), id or
-   name. *)
-let resolve_external (models : Model.t list) query ~who =
-  let q = String.lowercase query in
-  match
-    List.find models ~f:(fun m ->
-      String.equal (Model.key m) query
-      || String.equal m.id query
-      || String.equal (String.lowercase m.name) q)
-  with
-  | Some m -> Ok m
-  | None ->
-    Or_error.errorf
-      "%s has no model %S: pick one of %s (/model lists them)"
-      who
-      query
-      (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
 ;;
 
 let dispatch

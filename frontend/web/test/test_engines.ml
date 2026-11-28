@@ -774,3 +774,53 @@ let%expect_test
     (Codex · GPT-6.2-Sol)
     |}]
 ;;
+
+let%expect_test "backend:acp:antigravity appears in the model menu on harness" =
+  let h = H.create () in
+  let models =
+    [ Jsonaf.of_string
+        (H.model_json
+           ~provider:"anthropic"
+           ~id:"claude-sonnet-5"
+           ~name:"Claude Sonnet 5"
+           ())
+    ; Jsonaf.of_string
+        (H.model_json
+           ~provider:"backend:acp:antigravity"
+           ~id:"gemini-2.5-pro"
+           ~name:"Gemini 2.5 Pro"
+           ())
+    ]
+  in
+  H.quiet h (fun () ->
+    hello
+      ~deployed:
+        { engines = [ "harness"; "composer" ]
+        ; adapters = [ "backend:acp:antigravity" ]
+        }
+      h;
+    H.act h (Reply (Models, Ok (`Array models))));
+  H.click h ~selector:".model-chip";
+  H.names h ~selector:".model-rail-tab";
+  H.click h ~selector:".model-rail-tab" ~nth:2;
+  H.text h ~selector:".model-list-head";
+  H.text h ~selector:".model-list";
+  H.click h ~selector:".model-row";
+  [%expect
+    {|
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    [tab] button "Favourites"
+    [tab] button "Anthropic"
+    [tab] button "Antigravity (backend)"
+    (Model_menu_tab (Provider backend:acp:antigravity))
+    (Focus popover-filter)
+    Antigravity (backend)
+    Gemini 2.5 Pro Alt+1 (Star: into the favourites (Alt+F))
+    (Picker_choose backend:acp:antigravity/gemini-2.5-pro)
+    (Focus editor)
+    (Rpc (method_ set_model)
+     (params ((model backend:acp:antigravity/gemini-2.5-pro))) (tag Model_set))
+    |}]
+;;

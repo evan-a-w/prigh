@@ -206,6 +206,16 @@ module type S = sig
       Claude Code say their limits only when asked or after a turn). *)
   val starts_early : bool
 
+  (** Whether prigh exposes its full toolset ([bash], [read], [edit], ...)
+      over MCP instead of only the extras ({!Injected_tools.select_all}):
+      true when the external CLI runs with its built-in tools disabled. *)
+  val all_tools : bool
+
+  (** Whether the external CLI runs on the backend rather than the session's
+      active tool host: changing the tool host or [cwd] keeps the process
+      and thread alive while tools route to the active host. *)
+  val on_backend : bool
+
   val launch : Start.t -> Launch.t
 
   (** How to launch a lightweight process for a one-shot text completion

@@ -292,7 +292,9 @@ the model's API (the default), and, when you deploy it, the **composer**,
 which hands the work to a coding agent installed and signed in on the
 session's tool host: the Codex CLI (`codex app-server`), Claude Code
 (`claude`, stream-json), an ACP agent (`acp:opencode`, `acp:antigravity`
-(`agy acp`), `acp:grok` (Grok Build), `acp:goose`, or
+(`agy acp`), `backend:acp:antigravity` (runs `agy acp` on the backend while
+routing all prigh tools to the session's active tool host, listed directly
+in `/model`), `acp:grok` (Grok Build), `acp:goose`, or
 `acp:mine=my-agent --acp`) or `prigh`, prigh's own harness as an adapter.
 prigh keeps the session: its log (messages, tool calls, models, usage and
 the cost the agent reports), naming, search, worktrees, approvals and the

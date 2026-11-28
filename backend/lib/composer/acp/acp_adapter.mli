@@ -22,16 +22,22 @@ val create
   -> ?autonomous_quiet:Time_float.Span.t
        (** how long an autonomous turn stays open after its last text with no
            open tools or permissions (default 5s) *)
+  -> ?backend_hosted:bool
+       (** runs the CLI on the backend with built-in tools disabled, exposing
+           all of prigh's tools over MCP and keeping the process alive across
+           tool host / cwd switches (currently Antigravity) *)
   -> Acp_agent.t
   -> Adapter.t
 
 (** What an ACP agent can do, from what it advertises: no rewind or context
     edits; compaction through its compact command ([compact_command]: it
     lists [/compact] or [/compress]), else by prigh's summary; plan mode when
-    it has a [plan] mode; images when it takes them. *)
+    it has a [plan] mode (or when [backend_hosted], enforced by prigh);
+    images when it takes them. *)
 val capabilities_of
   :  ?quirks:Acp_agent.Quirks.t (** steering mid-turn, for an agent that can *)
   -> ?compact_command:bool
+  -> ?backend_hosted:bool
   -> Acp_client_codec.Agent_capabilities.t option
   -> Acp_client_codec.Session_config.t
   -> Capabilities.t

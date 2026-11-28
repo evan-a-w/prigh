@@ -722,19 +722,22 @@ let engine_choice t =
 let default_known_adapter : Adapter_id.t -> bool = function
   | Codex | Claude -> true
   | Acp name -> Option.is_some (Acp_agent.find_known name)
-  | Prigh -> false
+  | Backend (Acp "antigravity") ->
+    Option.is_some (Acp_agent.find_known "antigravity")
+  | Backend _ | Prigh -> false
 ;;
 
 (* The session's active external harness adapter, if any. *)
 let active_external_adapter t : Adapter_id.t option =
   match engine_choice t with
-  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as adapter) }
-    -> Some adapter
+  | { engine = Composer
+    ; adapter = Some ((Codex | Claude | Acp _ | Backend _) as adapter)
+    } -> Some adapter
   | _ ->
     (match t.model.provider with
      | Custom a ->
        (match Adapter_id.of_string a with
-        | Ok ((Codex | Claude | Acp _) as adapter) -> Some adapter
+        | Ok ((Codex | Claude | Acp _ | Backend _) as adapter) -> Some adapter
         | Ok Prigh | Error _ -> None)
      | Anthropic | Openai | Openai_codex | Deepseek | Google_antigravity -> None)
 ;;
@@ -763,9 +766,9 @@ let resolve_aux_model t name =
   | Some (Ok (adapter, id)) ->
     if not (t.known_adapter adapter)
     then (
-      match adapter with
+      match Adapter_id.inner adapter with
       | Acp a -> Or_error.error_string (Engines.unknown_acp a)
-      | Codex | Claude | Prigh ->
+      | Codex | Claude | Prigh | Backend _ ->
         Or_error.errorf "unknown adapter %S" (Adapter_id.to_string adapter))
     else (
       let adapter_name = Adapter_id.to_string adapter in
@@ -3143,6 +3146,8 @@ let system_prompt ?(cancel = Cancellation.never) t =
     text
 ;;
 
+let full_system_prompt t = system_prompt t
+
 (* ---- goal ------------------------------------------------------------- *)
 
 let set_goal_state t goal =
@@ -3460,6 +3465,12 @@ let own_loop t =
   match engine t, (engine_choice t).adapter with
   | Harness, _ | Composer, Some Prigh -> true
   | Composer, _ -> false
+;;
+
+let on_backend_composer t =
+  match engine t, (engine_choice t).adapter with
+  | Composer, Some a -> Adapter_id.on_backend a
+  | _ -> false
 ;;
 
 (* Who a usage limit is with: the model, or the external harness. *)
@@ -4039,7 +4050,7 @@ let complete_raw
     match model.provider with
     | Custom adapter_name ->
       (match Adapter_id.of_string adapter_name with
-       | Ok ((Codex | Claude | Acp _) as adapter) ->
+       | Ok ((Codex | Claude | Acp _ | Backend _) as adapter) ->
          run_external
            ~adapter
            ~native_model:(External_model.native_id model)
@@ -4310,7 +4321,10 @@ and run_now ~kind ~tried ~then_ t prompts =
                | Autonomous -> true
                | Prompt | Compact _ -> false
              in
-             if (not t.chat_mode) && (not is_autonomous) && own_loop t
+             if
+               (not t.chat_mode)
+               && (not is_autonomous)
+               && (own_loop t || on_backend_composer t)
              then
                Turn_timings.phase "mcp_refresh" (fun () ->
                  refresh_mcp_for_run t ~cancel);

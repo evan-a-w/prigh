@@ -60,7 +60,12 @@ let version name =
 let newest_first models =
   (* A CLI's stay in its order: its default first. *)
   let is_cli (m : Llm.t) =
-    match m.provider with
+    let provider =
+      Option.value
+        (String.chop_prefix m.provider ~prefix:"backend:")
+        ~default:m.provider
+    in
+    match provider with
     | "codex" | "claude" -> true
     | provider -> String.is_prefix provider ~prefix:"acp:"
   in
