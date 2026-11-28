@@ -65,9 +65,10 @@ val known : t list
 
 val find_known : string -> t option
 
-(** A [name=command args] spec (from [-adapters acp:name=command args]):
-    the command is split on whitespace. A known agent's name keeps its
-    display name and quirks. *)
+(** A [command args] or [name=command args] spec (from [-adapters acp:...]):
+    the command is split on whitespace. Without [name=], the agent's name is
+    inferred from the basename of the command's executable. With [name=], a
+    known agent's name keeps its display name and quirks. *)
 val of_spec : string -> t Or_error.t
 
 (** Whether [version] (as [--version] prints it: ["1.2.3"]) is older than

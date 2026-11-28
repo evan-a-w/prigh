@@ -32,21 +32,35 @@ let split s =
   |> List.filter ~f:(fun s -> not (String.is_empty s))
 ;;
 
-(* [acp:name=command args] (or [backend:acp:name=command args]) names an ACP
-   agent and how to start it. *)
+(* [acp:<command args>] or [acp:<name>=<command args>] (with optional
+   [bridge:] or [backend:] prefix) names an ACP agent and how to start it;
+   [acp:<known>] keeps its built-in command and quirks. *)
 let adapter_of_flag s =
   let open Or_error.Let_syntax in
   let on_backend, rest =
-    match String.chop_prefix s ~prefix:"backend:" with
+    match String.chop_prefix s ~prefix:"bridge:" with
     | Some rest -> true, rest
-    | None -> false, s
+    | None ->
+      (match String.chop_prefix s ~prefix:"backend:" with
+       | Some rest -> true, rest
+       | None -> false, s)
   in
   let wrap id = if on_backend then Adapter_id.Backend id else id in
   match String.chop_prefix rest ~prefix:"acp:" with
-  | Some spec when String.mem spec '=' ->
-    let%map agent = Acp_agent.of_spec spec in
-    wrap (Adapter_id.Acp agent.name), Some agent
-  | _ ->
+  | Some spec ->
+    let spec = String.strip spec in
+    if String.is_empty spec
+    then
+      Or_error.errorf
+        "empty ACP adapter %S: expected acp:<command> or acp:<name>=<command>"
+        s
+    else if
+      (not (String.mem spec '=')) && Option.is_some (Acp_agent.find_known spec)
+    then Ok (wrap (Adapter_id.Acp spec), None)
+    else (
+      let%map agent = Acp_agent.of_spec spec in
+      wrap (Adapter_id.Acp agent.name), Some agent)
+  | None ->
     let%map id = Adapter_id.of_string s in
     id, None
 ;;
@@ -129,7 +143,7 @@ let check_build t =
             | Backend inner ->
               sprintf
                 "the composer can't run %s on the backend yet (only \
-                 backend:acp:antigravity is supported)"
+                 bridge:antigravity is supported)"
                 (Adapter_id.label inner)
             | a -> sprintf "the composer can't drive %s" (Adapter_id.label a))))
 ;;

@@ -271,7 +271,7 @@ access token (from the process's secret descriptor) into a private
 `--gemini-dir` linking the rest of `~/.gemini`, removed at exit, with D-Bus
 pointed nowhere so agy reads the file; `Acp_adapter` asks for a renewal
 (`Login_renewal`) when the token nears expiry or a turn is refused.
-`backend:acp:antigravity` (`Adapter_id.Backend`, **Bridge** mode) runs
+`bridge:antigravity` (wire key `backend:acp:antigravity`, `Adapter_id.Backend`, **Bridge** mode; `backend:` and `acp:<known>` also work) runs
 `agy acp` on the backend with a minimal agent (`tools: []`,
 `excludeDefaultComponents: true`, `--include-default-customizations=false`,
 `--disable-telemetry`), reloads fresh sessions via `session/load` so the
@@ -331,7 +331,8 @@ The composer (`composer/`), from the bottom up:
   `mcpServers`, a thread continued with `session/resume`, else
   `session/load` (loaded once the replay goes quiet, as some agents never
   answer it), else anew. Commands come from `Acp_agent` (`known`, or
-  `-adapters acp:name=command`); one without fails at startup.
+  `-adapters acp:<command>` / `-adapters acp:<name>=<command>`); one without
+  fails at startup.
 - **`Host_transport`** spawns the CLI on the session's active tool host
   through `$process` (`Host_stream`, see Tool hosts), with the MCP side
   channel on; a CLI not installed there fails with `Host_stream.Ended`'s

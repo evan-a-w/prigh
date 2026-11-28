@@ -560,10 +560,7 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
   show "acp:unheard-of";
   [%expect
     {|
-    ((adapters (acp:unheard-of))
-     (check
-      (Error
-       "prigh does not know how to start the ACP agent unheard-of: give its command with -adapters acp:unheard-of=<command and args> (it knows opencode, gemini, antigravity, grok, goose)"))
+    ((adapters (acp:unheard-of)) (check (Ok ()))
      (opencode
       (((name opencode) (display_name OpenCode) (command (opencode acp))
         (quirks
