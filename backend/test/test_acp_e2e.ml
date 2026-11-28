@@ -196,6 +196,19 @@ while IFS= read -r line; do
       mcp_tok=$(printf '%%s' "$line" | sed -n 's/.*"name":"PRIGH_MCP_TOKEN","value":"\([^"]*\)".*/\1/p')
       printf '{"jsonrpc":"2.0","id":%%s,"result":{"sessionId":"ses_real","models":{"currentModelId":"gemini-2.5-pro","availableModels":[{"modelId":"gemini-2.5-pro","name":"Gemini 2.5 Pro"}]}}}\n' "$id"
       ;;
+    *'"method":"session/load"'*)
+      load_sid=$(printf '%%s' "$line" | sed -n 's/.*"sessionId":"\([^"]*\)".*/\1/p')
+      case "$line" in
+        *'"systemPrompt":{"append":'*) load_append=yes ;;
+        *) load_append=no ;;
+      esac
+      case "$line" in
+        *'"mcpServers":[{"name":"prigh",'*) load_mcp=yes ;;
+        *) load_mcp=no ;;
+      esac
+      printf 'session_load=%%s append=%%s mcp=%%s\n' "$load_sid" "$load_append" "$load_mcp" >> "$LOG"
+      printf '{"jsonrpc":"2.0","id":%%s,"result":{}}\n' "$id"
+      ;;
     *'"method":"session/prompt"'*)
       turn=$((turn + 1))
       case "$line" in
@@ -352,10 +365,11 @@ done
     turn1 tool_end: name=ls text="hello.txt"
     turn1 reply: "reply 1"
     turn2 reply: "reply 2"
-    args=acp --process-per-session --agent prigh-backend --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir <TMP>/prigh-agy.<pid>.<tmp>
+    args=acp --agent prigh-backend --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir <TMP>/prigh-agy.<pid>.<tmp>
     cwd=<TMP>/prigh-agy.<pid>.<tmp>/cwd
     agent_md=present
     sys_prompt_append=yes
+    session_load=ses_real append=yes mcp=yes
     turn1_handoff=no
     mcp_bridge_ls=ok
     turn2_handoff=no

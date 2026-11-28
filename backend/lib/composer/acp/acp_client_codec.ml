@@ -997,13 +997,22 @@ let with_models t options =
 ;;
 
 let parse_session_config t json : Session_config.t =
-  let current_mode, modes = parse_modes json in
+  let current_mode, modes =
+    match field "modes" json with
+    | Some (`Object _) -> parse_modes json
+    | _ -> t.config.current_mode, t.config.modes
+  in
   Option.iter (parse_models json) ~f:(fun m -> t.models <- Some m);
-  { current_mode
-  ; modes
-  ; config_options =
-      with_models t (parse_config_options (items "configOptions" json))
-  }
+  let config_options =
+    let parsed = parse_config_options (items "configOptions" json) in
+    if List.is_empty parsed
+    then
+      List.filter t.config.config_options ~f:(fun (o : Config_option.t) ->
+        not (String.equal o.id session_model_option))
+      |> with_models t
+    else with_models t parsed
+  in
+  { current_mode; modes; config_options }
 ;;
 
 let set_current_model t id =

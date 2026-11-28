@@ -2213,18 +2213,23 @@ let%expect_test
               ~caps:
                 {|{"loadSession":true,"sessionCapabilities":{"close":{}},"_meta":{"antigravity":{"systemPrompt":{"append":true}}}}|}
               p;
-            let ns = P.expect p "session/new" in
-            let append =
-              Option.bind (Json.member "params" ns) ~f:(fun params ->
+            let append_of req =
+              Option.bind (Json.member "params" req) ~f:(fun params ->
                 Option.bind (Json.member "_meta" params) ~f:(fun m ->
                   Option.bind (Json.member "antigravity" m) ~f:(fun a ->
                     Option.bind (Json.member "systemPrompt" a) ~f:(fun s ->
                       Option.bind (Json.member "append" s) ~f:Json.string))))
             in
+            let ns = P.expect p "session/new" in
             printf
               "session/new systemPrompt.append=%s\n"
-              (Option.value append ~default:"-");
+              (Option.value (append_of ns) ~default:"-");
             P.result p ns (sprintf {|{"sessionId":"ses_be",%s}|} P.modes);
+            let ls = P.expect p "session/load" in
+            printf
+              "session/load systemPrompt.append=%s\n"
+              (Option.value (append_of ls) ~default:"-");
+            P.result p ls {|{}|};
             let rec turns n =
               match P.next p with
               | Some ("session/prompt", req) ->
@@ -2315,6 +2320,8 @@ let%expect_test
     agent got initialize
     agent got session/new session=- mcp=[prigh]
     session/new systemPrompt.append=SYSTEM PROMPT FOR MAC
+    agent got session/load session=ses_be mcp=[prigh]
+    session/load systemPrompt.append=SYSTEM PROMPT FOR MAC
     agent got session/prompt "first on mac"
     mcp bash -> {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ran on mac in $DIR: {\"command\":\"pwd\"}"}],"isError":false}}
     assistant (backend:acp:antigravity/default, Tool_use): ""

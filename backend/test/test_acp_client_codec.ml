@@ -1290,3 +1290,67 @@ let%expect_test "system_prompt_append and all_tools mcp classification" =
     default kind=(Other mcp_prigh_79ce654a_ls) -> mcp_prigh_79ce654a_ls
     |}]
 ;;
+
+let%expect_test
+    "session/load with empty result preserves config from session/new"
+  =
+  let t = C.create () in
+  ignore (C.initialize t ~client_name:"prigh" ~client_version:"0.1" : string);
+  ignore (C.handle_line t init_response : C.Output.t list);
+  ignore (C.new_session t ~cwd:"/w" ~mcp_servers:[] : string);
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"ses_1","modes":{"currentModeId":"default","availableModes":[{"id":"default","name":"Default"},{"id":"plan","name":"Plan"}]},"models":{"currentModelId":"m1","availableModels":[{"modelId":"m1","name":"Model 1"},{"modelId":"m2","name":"Model 2"}]},"configOptions":[{"id":"thought","name":"Thinking","category":"thought_level","type":"select","currentValue":"high","options":[{"value":"low","name":"Low"},{"value":"high","name":"High"}]}]}}|};
+  ignore
+    (C.load_session t ~session_id:"ses_1" ~cwd:"/w" ~mcp_servers:[] : string);
+  recv t {|{"jsonrpc":"2.0","id":2,"result":{}}|};
+  [%expect
+    {|
+    < {"jsonrpc":"2.0","id":1,"result":{"sessionId":"ses_1","modes":{"currentModeId":"default","availableModes":[{"id":"default","name":"Default"},{"id":"plan","name":"Plan"}]},"models":{"currentModelId":"m1","availableModels":[{"modelId":"m1","name":"Model 1"},{"modelId":"m2","name":"Model 2"}]},"configOptions":[{"id":"thought","name":"Thinking","category":"thought_level","type":"select","currentValue":"high","options":[{"value":"low","name":"Low"},{"value":"high","name":"High"}]}]}}
+    (Response
+     (Session_opened (kind New_session) (session_id ses_1)
+      (config
+       ((current_mode (default))
+        (modes
+         (((id default) (name Default) (description ()))
+          ((id plan) (name Plan) (description ()))))
+        (config_options
+         (((id thought) (name Thinking) (description ())
+           (category (thought_level))
+           (value
+            (Select (current high)
+             (choices
+              (((value low) (name Low) (description ()) (group ()))
+               ((value high) (name High) (description ()) (group ())))))))
+          ((id prigh:session-model) (name Model) (description ())
+           (category (model))
+           (value
+            (Select (current m1)
+             (choices
+              (((value m1) (name "Model 1") (description ()) (group ()))
+               ((value m2) (name "Model 2") (description ()) (group ())))))))))))))
+    < {"jsonrpc":"2.0","id":2,"result":{}}
+    (Response
+     (Session_opened (kind Load_session) (session_id ses_1)
+      (config
+       ((current_mode (default))
+        (modes
+         (((id default) (name Default) (description ()))
+          ((id plan) (name Plan) (description ()))))
+        (config_options
+         (((id thought) (name Thinking) (description ())
+           (category (thought_level))
+           (value
+            (Select (current high)
+             (choices
+              (((value low) (name Low) (description ()) (group ()))
+               ((value high) (name High) (description ()) (group ())))))))
+          ((id prigh:session-model) (name Model) (description ())
+           (category (model))
+           (value
+            (Select (current m1)
+             (choices
+              (((value m1) (name "Model 1") (description ()) (group ()))
+               ((value m2) (name "Model 2") (description ()) (group ())))))))))))))
+    |}]
+;;
