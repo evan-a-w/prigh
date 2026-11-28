@@ -679,7 +679,7 @@ let%expect_test "back to the harness engine and out again; models follow" =
 
     first
     codex/gpt-5
-    models: codex/default
+    models: codex/default claude/default anthropic/claude-fable-5 ...
     error: "Codex has no model \"nope\": pick one of default (/model lists them)"
     error: "Codex uses its own login, not prigh's: pick default without @LOGIN"
     error: "Codex uses its own login, not prigh's: pick the model without @LOGIN"

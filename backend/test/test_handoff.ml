@@ -479,7 +479,7 @@ let%expect_test
      (omitted ()) (tokens 231))
     ---
     Context handoff (since your last turn: your own thread has what came before):
-    prigh session <id> moves from prigh's harness to you (Antigravity (backend)) on host linux, working directory /work.
+    prigh session <id> moves from prigh's harness to you (Antigravity (bridge)) on host linux, working directory /work.
     It ran on host mac until now: files, processes and anything not committed may differ here.
     Its working directory was /proj; yours is /work.
     Covered messages #4 to #5 of 6. Quoted intact: 2; left out: none.

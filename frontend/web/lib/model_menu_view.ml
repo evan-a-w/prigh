@@ -7,7 +7,7 @@ let option_id i = sprintf "popover-option-%d" i
 
 let provider_name (m : App.Model.t) id =
   List.find m.auth ~f:(fun (s : Auth_status.t) -> String.equal s.provider id)
-  |> Option.value_map ~default:(Session_engine.adapter_label id) ~f:(fun s ->
+  |> Option.value_map ~default:(Session_engine.harness_label id) ~f:(fun s ->
     s.name)
 ;;
 
@@ -52,7 +52,7 @@ let rail (m : App.Model.t) ~offered ~inject =
         ]
       [ glyph ]
   in
-  match Model_menu.tabs offered with
+  match Model_menu.tabs ~mode:m.model_menu.mode offered with
   | favourites :: providers ->
     Node.div
       ~attrs:
@@ -213,7 +213,7 @@ let reasoning (m : App.Model.t) ~inject =
                then
                  sprintf
                    "%s chooses how much it reasons."
-                   (Session_engine.adapter_label model.provider)
+                   (Session_engine.harness_label model.provider)
                else "This model does not reason.")
           ]
       ]
@@ -332,26 +332,20 @@ let access (m : App.Model.t) ~inject =
       ]
 ;;
 
-(* The session's engine, beside the access mode: switching it takes this
-   session to another agent (a fresh one: a new session on it). *)
+(* The execution mode selector, beside the access mode: lets the user browse
+   Native (prigh's built-in harness), Bridge (external agents on the server),
+   or Host (external agents on the active tool host). Picking a model in any
+   mode switches the session transparently. *)
 let engine (m : App.Model.t) ~inject =
-  match App.engine_options m with
-  | [] -> Node.none
-  | options ->
-    let mark (c : Deployed_engines.Choice.t) =
-      match c.adapter with
-      | None | Some "prigh" -> icon Bot
-      | Some _ -> Provider_mark.view (Deployed_engines.Choice.label c)
+  let modes = Engine_mode.deployed_modes (App.deployed m) in
+  if List.length modes < 2
+  then Node.none
+  else (
+    let browsed = m.model_menu.mode in
+    let active =
+      Option.map m.state ~f:(fun s -> Engine_mode.of_engine s.engine)
     in
-    let current =
-      List.find options ~f:(fun (o : App.Engine_option.t) -> o.current)
-    in
-    let label =
-      match current with
-      | Some o -> Deployed_engines.Choice.label o.choice
-      | None -> "Engine"
-    in
-    let busy = App.Model.running m in
+    let label = Engine_mode.label browsed in
     let open_ = m.model_menu.engine_open in
     Node.div
       ~attrs:[ classes [ "model-access"; "model-engine" ] [ "open", open_ ] ]
@@ -361,37 +355,36 @@ let engine (m : App.Model.t) ~inject =
              ~attrs:
                [ Attr.class_ "model-access-menu menu-surface"
                ; Attr.role "menu"
-               ; Attr.create "aria-label" "Engine"
+               ; Attr.create "aria-label" "Mode"
                ]
-             ((if busy
-               then
-                 [ div ~cls:"model-engine-busy" [ Node.text App.engine_busy ] ]
-               else [])
-              @ List.map options ~f:(fun (o : App.Engine_option.t) ->
+             (List.map modes ~f:(fun mode ->
+                let on = Engine_mode.equal mode browsed in
+                let is_active =
+                  Option.equal Engine_mode.equal active (Some mode)
+                in
                 Node.button
                   ~attrs:
-                    [ classes
-                        [ "model-access-item" ]
-                        [ "on", o.current; "trouble", o.trouble ]
+                    [ classes [ "model-access-item" ] [ "on", on ]
                     ; Attr.type_ "button"
                     ; Attr.role "menuitemradio"
-                    ; Attr.create "aria-checked" (Bool.to_string o.current)
-                    ; Attr.title o.hint
-                    ; (if busy then Attr.disabled else Attr.empty)
+                    ; Attr.create "aria-checked" (Bool.to_string on)
+                    ; Attr.title (Engine_mode.describe mode)
                     ; Attr.on_click (fun _ ->
-                        inject
-                          (Action.Model_menu_engine_pick
-                             (Deployed_engines.Choice.key o.choice)))
+                        inject (Action.Model_menu_mode_pick mode))
                     ]
-                  [ mark o.choice
+                  [ icon (Provider_mark.mode_icon mode)
                   ; Node.span
                       ~attrs:[ Attr.class_ "menu-text" ]
-                      [ span
-                          ~cls:"menu-label"
-                          (Deployed_engines.Choice.label o.choice)
-                      ; span ~cls:"menu-detail" o.hint
+                      [ Node.span
+                          ~attrs:[ Attr.class_ "menu-label" ]
+                          [ Node.text (Engine_mode.label mode)
+                          ; (if is_active && not on
+                             then span ~cls:"model-mode-active" "Active"
+                             else Node.none)
+                          ]
+                      ; span ~cls:"menu-detail" (Engine_mode.describe mode)
                       ]
-                  ; (if o.current
+                  ; (if on
                      then Html.mark ~cls:"model-check" Check
                      else Node.span ~attrs:[ Attr.class_ "model-check" ] [])
                   ]))
@@ -401,45 +394,84 @@ let engine (m : App.Model.t) ~inject =
             [ Attr.class_ "model-access-button"
             ; Attr.type_ "button"
             ; Attr.title
-                (if busy
-                 then App.engine_busy
-                 else sprintf "Runs on %s: switch the engine (Alt+E)" label)
-            ; Attr.create "aria-label" (sprintf "Engine: %s" label)
+                (sprintf "Mode: %s — %s" label (Engine_mode.describe browsed))
+            ; Attr.create "aria-label" (sprintf "Mode: %s" label)
             ; Attr.create "aria-haspopup" "menu"
             ; Attr.create "aria-expanded" (Bool.to_string open_)
             ; Attr.on_click (fun _ -> inject Action.Model_menu_engine)
             ]
-          [ (match current with
-             | Some o -> mark o.choice
-             | None -> icon Bot)
+          [ icon (Provider_mark.mode_icon browsed)
           ; span ~cls:"chip-label" label
           ; icon ~cls:"chevron" Chevron
           ]
-      ]
+      ])
 ;;
 
-(* Why the session's agent CLI could not list its models, and a button per
-   thing to do about it. *)
+(* Why an external agent CLI could not list its models (for the session's
+   adapter with fix buttons, or for any browsed Bridge/Host tab whose CLI
+   reported a problem). *)
 let harness_trouble (m : App.Model.t) ~inject =
-  match m.state with
-  | Some { engine = { models = Some (Failed { message; fixes; _ }); _ }; _ } ->
-    Node.div
-      ~attrs:[ Attr.class_ "model-trouble"; Attr.role "alert" ]
-      [ div ~cls:"model-trouble-text" [ Node.text message ]
-      ; div
-          ~cls:"model-trouble-fixes"
-          (List.map fixes ~f:(fun fix ->
-             Node.button
-               ~attrs:
-                 [ Attr.class_ "model-trouble-fix"
-                 ; Attr.type_ "button"
-                 ; Attr.title (Harness_models.Fix.command fix)
-                 ; Attr.on_click (fun _ ->
-                     inject (Action.Run (Harness_models.Fix.command fix)))
-                 ]
-               [ Node.text (Harness_models.Fix.label fix) ]))
-      ]
-  | _ -> Node.none
+  let browsed_adapter =
+    match m.model_menu.tab with
+    | Provider p when not (Engine_mode.equal (Engine_mode.of_provider p) Native)
+      -> Some p
+    | _ -> None
+  in
+  let session_trouble =
+    match m.state with
+    | Some
+        { engine =
+            { adapter = Some cur
+            ; models = Some (Failed { message; fixes; _ })
+            ; _
+            } as eng
+        ; _
+        }
+      when Option.equal String.equal browsed_adapter (Some cur)
+           || (Model_menu.Tab.equal m.model_menu.tab Favourites
+               && Engine_mode.equal
+                    m.model_menu.mode
+                    (Engine_mode.of_engine eng)) ->
+      Some
+        (Node.div
+           ~attrs:[ Attr.class_ "model-trouble"; Attr.role "alert" ]
+           [ div ~cls:"model-trouble-text" [ Node.text message ]
+           ; div
+               ~cls:"model-trouble-fixes"
+               (List.map fixes ~f:(fun fix ->
+                  Node.button
+                    ~attrs:
+                      [ Attr.class_ "model-trouble-fix"
+                      ; Attr.type_ "button"
+                      ; Attr.title (Harness_models.Fix.command fix)
+                      ; Attr.on_click (fun _ ->
+                          inject (Action.Run (Harness_models.Fix.command fix)))
+                      ]
+                    [ Node.text (Harness_models.Fix.label fix) ]))
+           ])
+    | _ -> None
+  in
+  match session_trouble with
+  | Some node -> node
+  | None ->
+    (match browsed_adapter, m.adapters.statuses with
+     | Some adapter, Some (Ok statuses) ->
+       let want_host =
+         if String.is_prefix adapter ~prefix:"backend:"
+         then Some Host.backend_id
+         else Option.map m.state ~f:(fun s -> s.active_host)
+       in
+       (match
+          List.find statuses ~f:(fun (s : Adapter_status.t) ->
+            String.equal s.adapter adapter
+            && Option.equal String.equal (Some s.host) want_host)
+        with
+        | Some { problem = Some problem; _ } ->
+          Node.div
+            ~attrs:[ Attr.class_ "model-trouble"; Attr.role "alert" ]
+            [ div ~cls:"model-trouble-text" [ Node.text problem ] ]
+        | _ -> Node.none)
+     | _ -> Node.none)
 ;;
 
 let view (m : App.Model.t) (p : Picker.t) ~inject =
@@ -461,9 +493,15 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
     | [], Provider _ -> Some "No models here."
     | _ :: _, _ -> None
   in
+  let multi_mode =
+    List.length (Engine_mode.deployed_modes (App.deployed m)) > 1
+  in
   let heading =
     if not (String.is_empty query)
-    then "All providers"
+    then
+      if multi_mode
+      then sprintf "All in %s" (Engine_mode.label m.model_menu.mode)
+      else "All providers"
     else (
       match m.model_menu.tab with
       | Favourites -> "Favourites"
@@ -519,7 +557,8 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
                  Node.div
                    ~key:
                      (sprintf
-                        "%s|%s|%b"
+                        "%s|%s|%s|%b"
+                        (Engine_mode.to_string m.model_menu.mode)
                         query
                         (Sexp.to_string
                            (Model_menu.Tab.sexp_of_t m.model_menu.tab))

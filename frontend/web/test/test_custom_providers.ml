@@ -253,12 +253,12 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
     (Rpc (method_ push_pref) (params ((key history) (value /model) (max 500)))
      (tag Ignore))
     (Focus picker-input)
-    Claude Opus 5.5 anthropic, 200k ctx ✓
-    Claude Sonnet 5 anthropic, 200k ctx
+    Claude Opus 5.5 Anthropic, 200k ctx ✓
+    Claude Sonnet 5 Anthropic, 200k ctx
     gpt-4o aiproxy, 128k ctx
     openai/gpt-4o-mini aiproxy, 128k ctx
-    GPT-6 openai, 200k ctx, not logged in
-    DeepSeek Chat deepseek, 200k ctx, not logged in
+    GPT-6 OpenAI API, 200k ctx, not logged in
+    DeepSeek Chat DeepSeek, 200k ctx, not logged in
     |}];
   H.act h (Picker_query "mini");
   H.key h "Enter" ~target:Field;

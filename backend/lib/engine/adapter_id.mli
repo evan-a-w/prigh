@@ -21,9 +21,13 @@ val to_string : t -> string
 (** The inverse of [to_string]; an error lists what is known. *)
 val of_string : string -> t Or_error.t
 
-(** For people: [Codex], [Claude Code], [<name> (ACP)], [<label> (backend)],
+(** For people: [Codex], [Claude Code], [<name> (ACP)], [<label> (bridge)],
     [prigh]. *)
 val label : t -> string
+
+(** The bare harness name without mode suffix: [Backend (Acp "antigravity")]
+    and [Acp "antigravity"] both return ["Antigravity"]. *)
+val harness_label : t -> string
 
 (** Whether the adapter's CLI runs on the backend with tools routed to the
     session's tool host. *)

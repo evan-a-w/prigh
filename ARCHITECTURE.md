@@ -220,7 +220,12 @@ and budgets, delivery of background work's reports, and eviction.
 A session runs on an engine (`engine/`): the **harness** (prigh's own
 `Agent_loop`, providers and tools; `Harness_runner` in `agent/`) or the
 **composer**, which drives an external coding agent (Codex, Claude Code,
-ACP agents, prigh itself) on the session's tool host through an adapter.
+ACP agents, prigh itself) on the session's tool host or on the backend
+(`backend:*`) through an adapter. In the protocol and UI (`Engine_mode`),
+these map to three execution modes: **Native** (built-in harness),
+**Bridge** (`backend:*` external agents running on the prigh server,
+bridging tools to the active tool host over MCP), and **Host** (external
+agents running directly on the active tool host).
 `Agent` stays the session object either way (log, clients, queues,
 approvals, hosts, worktrees, naming); only its runs go through `Runner`
 (`Engine_intf`), whose `Capabilities` say what the engine supports.
@@ -266,15 +271,18 @@ access token (from the process's secret descriptor) into a private
 `--gemini-dir` linking the rest of `~/.gemini`, removed at exit, with D-Bus
 pointed nowhere so agy reads the file; `Acp_adapter` asks for a renewal
 (`Login_renewal`) when the token nears expiry or a turn is refused.
-`backend:acp:antigravity` (`Adapter_id.Backend`) runs `agy acp` on the
-backend with a minimal agent (`tools: []`, `excludeDefaultComponents: true`,
-`--include-default-customizations=false`, `--disable-telemetry`), reloads
-fresh sessions via `session/load` so the custom agent applies the `mcpServers`
-overlay in a single pooled process, appends prigh's system prompt via
-`_meta.antigravity.systemPrompt.append`, serves all prigh tools over routed
-MCP to the session's active tool host, shares `acp:antigravity`'s login, and
-appears directly in `/model` alongside harness models (switching engine
-transparently via `set_model`).
+`backend:acp:antigravity` (`Adapter_id.Backend`, **Bridge** mode) runs
+`agy acp` on the backend with a minimal agent (`tools: []`,
+`excludeDefaultComponents: true`, `--include-default-customizations=false`,
+`--disable-telemetry`), reloads fresh sessions via `session/load` so the
+custom agent applies the `mcpServers` overlay in a single pooled process,
+appends prigh's system prompt via `_meta.antigravity.systemPrompt.append`,
+serves all prigh tools over routed MCP to the session's active tool host,
+shares `acp:antigravity`'s login, and is returned by `list_models` alongside
+Native and Host models (switching engines transparently via `set_model`).
+When multiple modes are deployed, prigh-web's model menu offers a Native /
+Bridge / Host mode selector and flat pickers (web and TUI) format models
+with `@ native` / `@ bridge` / `@ host`.
 `Oauth_antigravity` (`auth/`) holds Google's client (found in agy's binary
 by hash, never shipped) and refreshes; `Subscription_usage` reads Code
 Assist's `loadCodeAssist` and `retrieveUserQuotaSummary`.

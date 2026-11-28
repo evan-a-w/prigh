@@ -642,11 +642,11 @@ module Action : sig
     | Model_menu_more (** "Show more": the provider's older models *)
     | Model_menu_access (** opens or closes the access menu in its foot *)
     | Model_menu_engine
-    (** opens or closes the engine menu in its foot (asking the adapters'
+    (** opens or closes the mode selector in its foot (asking the adapters'
         health the first time) *)
-    | Model_menu_engine_pick of string
-    (** a choice of the engine menu, by key: switches this session (a fresh
-        one gives way to a new session on it, as the engine chip) *)
+    | Model_menu_mode_pick of Engine_mode.t
+    (** switches the browsed execution mode ({!Engine_mode.t}) in the model
+        menu, keeping the menu open and probing host catalogs if needed *)
     | Model_menu_engine_picker (** Alt+E: the engine picker, by keyboard *)
     | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
     | Toggle_favourite of string option

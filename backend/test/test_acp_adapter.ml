@@ -2312,7 +2312,7 @@ let%expect_test
   printf "total spawns=%d\n" !spawns;
   [%expect
     {|
-    id=backend:acp:antigravity display=Antigravity (backend) all_tools=true on_backend=true plan_mode=true
+    id=backend:acp:antigravity display=Antigravity (bridge) all_tools=true on_backend=true plan_mode=true
     own launch uses backend_wrapper=true secret=false
     prigh fetches a token valid for 40 min
     login launch uses backend_wrapper=true secret=true

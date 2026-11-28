@@ -275,7 +275,7 @@ let%expect_test
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     Model  (1)
     / ▏
-    ▸  loading models…  codex/default  ctx 200k  $10/$50 per M
+    ▸  loading models… @ host  Codex  ctx 200k  $10/$50 per M
     ────────────────────────────────────────────────────────────────────────────────
     >
     Codex · deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
@@ -288,9 +288,9 @@ let%expect_test
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     Model  (3)
     / ▏
-    ▸  GPT-6.2-Sol   codex/gpt-6.2-sol  ctx 200k  $10/$50 per M
-       GPT-6.2-Mini  codex/gpt-6.2-mini  ctx 200k  $10/$50 per M
-       GPT-6.2-Max   codex/gpt-6.2-max  ctx 200k  $10/$50 per M
+    ▸  GPT-6.2-Sol @ host   Codex  ctx 200k  $10/$50 per M
+       GPT-6.2-Mini @ host  Codex  ctx 200k  $10/$50 per M
+       GPT-6.2-Max @ host   Codex  ctx 200k  $10/$50 per M
     ────────────────────────────────────────────────────────────────────────────────
     >
     Codex · deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
@@ -341,8 +341,139 @@ let%expect_test
   H.key h (Key.plain Down);
   H.enter h;
   command h "/adapters retry";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ retry_models) (params ()) (tag Show_error))
     (Rpc (method_ retry_models) (params ()) (tag Show_error))
+    |}]
+;;
+
+let all_modes_deployed : P.Deployed_engines.t =
+  { engines = [ "harness"; "composer" ]
+  ; adapters = [ "backend:acp:antigravity"; "acp:antigravity"; "codex" ]
+  }
+;;
+
+let%expect_test
+    "/model formats @ native / @ bridge / @ host, uses clean harness names, \
+     and skips default placeholders"
+  =
+  let h = connected ~deployed:all_modes_deployed () in
+  let models =
+    sprintf
+      "[%s,%s,%s,%s,%s]"
+      (model_json
+         ~provider:"anthropic"
+         ~context_window:200000
+         "claude-5"
+         "Claude 5")
+      (model_json
+         ~provider:"backend:acp:antigravity"
+         ~context_window:200000
+         "default"
+         "Antigravity default")
+      (model_json
+         ~provider:"backend:acp:antigravity"
+         ~context_window:200000
+         "gemini-4-neon"
+         "Gemini 4 Neon")
+      (model_json
+         ~provider:"acp:antigravity"
+         ~context_window:200000
+         "gemini-4-neon"
+         "Gemini 4 Neon")
+      (model_json
+         ~provider:"codex"
+         ~context_window:200000
+         "default"
+         "loading models…")
+  in
+  H.reply ~quiet:true h Models_catalog models;
+  H.step ~quiet:true h (Intent Model_picker);
+  H.show h;
+  (* /change_default formats the default model with @ bridge in multi-mode. *)
+  H.key h (Key.plain Escape);
+  H.reply
+    ~quiet:true
+    h
+    Default_saved
+    {|{"default_model":"backend:acp:antigravity/gemini-4-neon","default_thinking":"high"}|};
+  print_endline
+    (Option.value_map h.H.model.notice ~default:"(no notice)" ~f:(fun n ->
+       n.text));
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Model  (4)
+    / ▏
+    ▸  Claude 5 @ native       anthropic/claude-5  ctx 200k  $10/$50 per M  not log…
+       Gemini 4 Neon @ bridge  Antigravity ◆  ctx 200k  $10/$50 per M
+       Gemini 4 Neon @ host    Antigravity ◆  ctx 200k  $10/$50 per M
+       loading models… @ host  Codex ◆  ctx 200k  $10/$50 per M
+    ────────────────────────────────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  Enter selects · Esc closes · Ctrl+N logged-in only
+    default: Gemini 4 Neon @ bridge, thinking high
+    |}]
+;;
+
+let%expect_test
+    "/engine and /new distinguish bridge vs host and accept native, bridge, \
+     host"
+  =
+  let h = connected ~deployed:all_modes_deployed ~extra:codex_engine () in
+  command h "/engine";
+  H.show h;
+  H.key h (Key.plain Escape);
+  (* Unambiguous mode arguments switch or create directly. *)
+  command h "/engine native";
+  command h "/engine bridge";
+  command h "/new native";
+  (* Ambiguous mode argument ("host" has Antigravity and Codex) opens a
+     filtered picker. *)
+  command h "/engine host";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    Switch this session to  (4)
+    / ▏
+    ▸* Codex                 OpenAI's Codex CLI on the session's tool host
+       prigh harness         prigh's own agent, calling the model directly
+       Antigravity (bridge)  runs on the prigh server, bridging tools to the host o…
+       Antigravity           an ACP agent on the session's tool host
+    ────────────────────────────────────────────────────────────────────────────────
+    >
+    Codex · deepseek-flash  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
+    (Rpc (method_ set_adapter) (params ((adapter harness))) (tag Show_error))
+    (Rpc
+      (method_ set_adapter)
+      (params ((adapter backend:acp:antigravity)))
+      (tag Show_error))
+    (Rpc
+      (method_ new_session)
+      (params ((engine harness)))
+      (tag (Reload_messages_notice "new prigh harness session")))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    Switch this session to (Host)  (2)
+    / ▏
+    ▸* Codex        OpenAI's Codex CLI on the session's tool host
+       Antigravity  an ACP agent on the session's tool host
+    ────────────────────────────────────────────────────────────────────────────────
+    >
+    Codex · deepseek-flash  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]
 ;;

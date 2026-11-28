@@ -524,11 +524,12 @@ let%expect_test
       }];
   [%expect
     {|
-    ((key backend:acp:antigravity) (label "composer (Antigravity (backend))")
-     (display_name "Antigravity (backend)")
+    ((key backend:acp:antigravity) (label "composer (Antigravity (bridge))")
+     (display_name "Antigravity (bridge)")
      (names
-      (agy-backend antigravity-backend backend:antigravity
-       backend:acp:antigravity "Antigravity (backend)")))
+      (agy-bridge agy-backend antigravity-bridge bridge:antigravity
+       bridge:acp:antigravity antigravity-backend backend:antigravity
+       backend:acp:antigravity "Antigravity (bridge)")))
     |}];
   print_s
     [%sexp

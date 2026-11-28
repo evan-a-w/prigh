@@ -2886,3 +2886,83 @@ let%expect_test
        (model m)))
     |}]
 ;;
+
+let%expect_test "Engine_mode, Session_engine labels, and Deployed_engines" =
+  List.iter Engine_mode.all ~f:(fun m ->
+    printf
+      "%s (%s): %s | roundtrip=%b\n"
+      (Engine_mode.to_string m)
+      (Engine_mode.label m)
+      (Engine_mode.describe m)
+      (Option.equal Engine_mode.equal (Engine_mode.of_string (Engine_mode.to_string m)) (Some m)));
+  List.iter
+    [ None
+    ; Some "prigh"
+    ; Some "backend:acp:antigravity"
+    ; Some "acp:antigravity"
+    ; Some "codex"
+    ; Some "claude"
+    ]
+    ~f:(fun a ->
+      printf
+        "adapter=%s -> mode=%s\n"
+        (Option.value a ~default:"-")
+        (Engine_mode.to_string (Engine_mode.of_adapter a)));
+  List.iter
+    [ "anthropic", "Claude Sonnet 4.6"
+    ; "backend:acp:antigravity", "Sol 6.2"
+    ; "acp:antigravity", "Sol 6.2"
+    ; "codex", "GPT-6.2-Sol"
+    ; "claude", "Opus 5.5"
+    ]
+    ~f:(fun (provider, name) ->
+      printf
+        "%s -> %s\n"
+        provider
+        (Engine_mode.format_model ~name ~provider));
+  List.iter
+    [ "backend:acp:antigravity"; "acp:antigravity"; "codex"; "claude" ]
+    ~f:(fun a ->
+      printf
+        "%s: harness=%S adapter=%S with_mode=%S\n"
+        a
+        (Session_engine.harness_label a)
+        (Session_engine.adapter_label a)
+        (Session_engine.adapter_label_with_mode a));
+  let deployed : Deployed_engines.t =
+    { engines = [ "harness"; "composer" ]
+    ; adapters = [ "backend:acp:antigravity"; "codex"; "acp:antigravity" ]
+    }
+  in
+  print_s
+    [%sexp
+      { modes = (Engine_mode.deployed_modes deployed : Engine_mode.t list)
+      ; bridge_desc =
+          (Deployed_engines.Choice.describe
+             { engine = "composer"; adapter = Some "backend:acp:antigravity" }
+           : string)
+      }];
+  [%expect
+    {|
+    native (Native): prigh's built-in harness, calling the model directly | roundtrip=true
+    bridge (Bridge): external agent running on the prigh server, bridging tools to the host over MCP | roundtrip=true
+    host (Host): external agent running directly on the active tool host | roundtrip=true
+    adapter=- -> mode=native
+    adapter=prigh -> mode=native
+    adapter=backend:acp:antigravity -> mode=bridge
+    adapter=acp:antigravity -> mode=host
+    adapter=codex -> mode=host
+    adapter=claude -> mode=host
+    anthropic -> Claude Sonnet 4.6 @ native
+    backend:acp:antigravity -> Sol 6.2 @ bridge
+    acp:antigravity -> Sol 6.2 @ host
+    codex -> GPT-6.2-Sol @ host
+    claude -> Opus 5.5 @ host
+    backend:acp:antigravity: harness="Antigravity" adapter="Antigravity" with_mode="Antigravity (bridge)"
+    acp:antigravity: harness="Antigravity" adapter="Antigravity" with_mode="Antigravity"
+    codex: harness="Codex" adapter="Codex" with_mode="Codex"
+    claude: harness="Claude Code" adapter="Claude Code" with_mode="Claude Code"
+    ((modes (Native Bridge Host))
+     (bridge_desc "runs on the prigh server, bridging tools to the host over MCP"))
+    |}]
+;;

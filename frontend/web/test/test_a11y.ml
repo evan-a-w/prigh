@@ -186,10 +186,10 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     [combobox] input "Filter models"
     [combobox] input "Filter models"
     [listbox] div "Switch model"
-    [option] div "Claude Opus 5.5 anthropic, 200k ctx"
-    [option] div "Claude Sonnet 5 anthropic, 200k ctx"
-    [option] div "GPT-6 openai, 200k ctx, not logged in"
-    [option] div "DeepSeek Chat deepseek, 200k ctx, not logged in"
+    [option] div "Claude Opus 5.5 Anthropic, 200k ctx"
+    [option] div "Claude Sonnet 5 Anthropic, 200k ctx"
+    [option] div "GPT-6 OpenAI API, 200k ctx, not logged in"
+    [option] div "DeepSeek Chat DeepSeek, 200k ctx, not logged in"
     |}]
 ;;
 

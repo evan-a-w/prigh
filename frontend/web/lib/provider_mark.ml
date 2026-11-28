@@ -75,3 +75,9 @@ let view ?(cls = "") provider =
         ]
       [ Node.text (letter provider) ]
 ;;
+
+let mode_icon : Engine_mode.t -> Html.Icon.t = function
+  | Native -> Bot
+  | Bridge -> Server
+  | Host -> Terminal
+;;

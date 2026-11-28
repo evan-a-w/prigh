@@ -441,22 +441,35 @@ let with_server
     | _ -> assert false
   in
   let models () =
+    let current_prefix =
+      Option.map
+        (string_at [ "adapter" ] (call "get_state"))
+        ~f:(fun a -> a ^ "/")
+    in
     match call "list_models" with
     | `Array models ->
       List.iter models ~f:(fun m ->
-        printf
-          "  %s %S thinking=[%s]\n"
-          (Option.value_exn (string_at [ "key" ] m))
-          (Option.value_exn (string_at [ "name" ] m))
-          (match member [ "thinking_options" ] m with
-           | Some (`Array l) ->
-             String.concat
-               ~sep:" "
-               (List.filter_map l ~f:(fun o ->
-                  match o with
-                  | `String s -> Some s
-                  | o -> Option.bind (Json.member "level" o) ~f:Json.string))
-           | _ -> "?"))
+        let key = Option.value_exn (string_at [ "key" ] m) in
+        let show =
+          match current_prefix with
+          | None -> true
+          | Some prefix -> String.is_prefix key ~prefix
+        in
+        if show
+        then
+          printf
+            "  %s %S thinking=[%s]\n"
+            key
+            (Option.value_exn (string_at [ "name" ] m))
+            (match member [ "thinking_options" ] m with
+             | Some (`Array l) ->
+               String.concat
+                 ~sep:" "
+                 (List.filter_map l ~f:(fun o ->
+                    match o with
+                    | `String s -> Some s
+                    | o -> Option.bind (Json.member "level" o) ~f:Json.string))
+             | _ -> "?"))
     | _ -> print_endline "models: ?"
   in
   let chip () =

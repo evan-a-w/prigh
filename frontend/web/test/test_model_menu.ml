@@ -430,6 +430,6 @@ let%expect_test "newest first, a CLI's models in its own order where they stand"
     backend:acp:antigravity: A
     custom: C
     of_model: Gemini 2.5 Pro
-    label: Antigravity (backend)
+    label: Antigravity
     |}]
 ;;
