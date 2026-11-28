@@ -5468,7 +5468,7 @@ Claude Code Anthropic's Claude Code CLI on the session's tool host
 chip: Codex
 === chromium: engines (desktop): the first turn ===
 Hello from Codex: ask me to look at the project. gpt-5.2-codex 2.3k in 100 out <TIME>
-model chip: Codex · gpt-5.2-codex
+model chip: gpt-5.2-codex
 sidebar: 1 session, "Hello"
 === chromium: engines (desktop): the model menu's mode ===
 button: Mode: Host
@@ -5502,7 +5502,7 @@ phone: ok
 chip: Codex
 === chromium: engines (phone): the first turn ===
 Hello from Codex: ask me to look at the project. gpt-5.2-codex 2.3k in 100 out <TIME>
-model chip: Codex · gpt-5.2-codex
+model chip: gpt-5.2-codex
 sidebar: 1 session, "Hello"
 phone: ok
 === chromium: engines (phone): the model menu's mode ===
