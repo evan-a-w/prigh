@@ -352,7 +352,7 @@ done
     turn1 tool_end: name=ls text="hello.txt"
     turn1 reply: "reply 1"
     turn2 reply: "reply 2"
-    args=acp --agent prigh-backend --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir <TMP>/prigh-agy.<pid>.<tmp>
+    args=acp --process-per-session --agent prigh-backend --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir <TMP>/prigh-agy.<pid>.<tmp>
     cwd=<TMP>/prigh-agy.<pid>.<tmp>/cwd
     agent_md=present
     sys_prompt_append=yes

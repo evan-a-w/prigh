@@ -266,13 +266,14 @@ access token (from the process's secret descriptor) into a private
 `--gemini-dir` linking the rest of `~/.gemini`, removed at exit, with D-Bus
 pointed nowhere so agy reads the file; `Acp_adapter` asks for a renewal
 (`Login_renewal`) when the token nears expiry or a turn is refused.
-`backend:acp:antigravity` (`Adapter_id.Backend`) runs `agy acp` on the
-backend with a minimal agent (`tools: []`, `excludeDefaultComponents: true`,
-`--include-default-customizations=false`, `--disable-telemetry`), appends
-prigh's system prompt via `_meta.antigravity.systemPrompt.append`, serves
-all prigh tools over routed MCP to the session's active tool host, shares
-`acp:antigravity`'s login, and appears directly in `/model` alongside
-harness models (switching engine transparently via `set_model`).
+`backend:acp:antigravity` (`Adapter_id.Backend`) runs `agy acp
+--process-per-session` on the backend with a minimal agent (`tools: []`,
+`excludeDefaultComponents: true`, `--include-default-customizations=false`,
+`--disable-telemetry`), appends prigh's system prompt via
+`_meta.antigravity.systemPrompt.append`, serves all prigh tools over routed
+MCP to the session's active tool host, shares `acp:antigravity`'s login, and
+appears directly in `/model` alongside harness models (switching engine
+transparently via `set_model`).
 `Oauth_antigravity` (`auth/`) holds Google's client (found in agy's binary
 by hash, never shipped) and refreshes; `Subscription_usage` reads Code
 Assist's `loadCodeAssist` and `retrieveUserQuotaSummary`.
