@@ -493,29 +493,39 @@ let focus_reporting_input ~on_focus =
         let%bind.Deferred () = Ivar.read resume in
         read_loop ()
       | None ->
-        let choices =
-          [ Deferred.choice (Ivar.read !pause_input) (fun () -> `Paused)
-          ; Deferred.choice (Fd.ready_to stdin_fd `Read) (fun r -> `Fd r)
-          ]
-          @
+        let interrupt =
+          let pause =
+            let%map.Deferred () = Ivar.read !pause_input in
+            `Paused
+          in
           if Term_focus.has_pending focus_parser
           then
-            [ Deferred.choice
-                (Clock.after (Time_float.Span.of_ms 25.))
-                (fun () -> `Flush)
-            ]
-          else []
+            Deferred.any
+              [ pause
+              ; (let%map.Deferred () =
+                   Clock.after (Time_float.Span.of_ms 25.)
+                 in
+                 `Flush)
+              ]
+          else pause
         in
-        let%bind.Deferred ready = Deferred.choose choices in
+        let%bind.Deferred ready =
+          Fd.interruptible_ready_to
+            stdin_fd
+            `Read
+            ~interrupt:(Deferred.ignore_m interrupt)
+        in
         (match ready with
-         | `Paused -> read_loop ()
-         | `Flush ->
-           flush_pending ();
-           read_loop ()
-         | `Fd (`Bad_fd | `Closed) ->
+         | `Interrupted ->
+           (match Deferred.peek interrupt with
+            | Some `Flush ->
+              flush_pending ();
+              read_loop ()
+            | Some `Paused | None -> read_loop ())
+         | `Bad_fd | `Closed ->
            flush_pending ();
            Deferred.return ()
-         | `Fd `Ready ->
+         | `Ready ->
            if Option.is_some !resume_input
            then read_loop ()
            else (
