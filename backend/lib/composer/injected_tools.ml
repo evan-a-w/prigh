@@ -27,12 +27,22 @@ let select ~native_questions tools =
     List.find tools ~f:(fun t -> String.equal (Tool.name t) name))
 ;;
 
+let select_all ~native_questions tools =
+  List.filter tools ~f:(fun (t : Tool.t) ->
+    Option.is_none t.spec.native
+    && not (native_questions && String.equal (Tool.name t) Tool_ask_user.name))
+;;
+
 let canonical_of_mcp ~server ~tool =
   if
     String.equal server server_name
     && List.mem (default_names ~native_questions:false) tool ~equal:String.equal
   then Some tool
   else None
+;;
+
+let canonical_of_mcp_all ~server ~tool =
+  if String.equal server server_name then Some tool else None
 ;;
 
 let result_to_mcp (result : Tool_result.t) =
@@ -58,9 +68,11 @@ let result_to_mcp (result : Tool_result.t) =
 type t =
   { tools : Tool.t list
   ; execute : Tool.t -> Json.t -> Tool_result.t
+  ; all_tools : bool
   }
 
-let create ~tools ~execute = { tools; execute }
+let create ~tools ~execute = { tools; execute; all_tools = false }
+let create_all ~tools ~execute = { tools; execute; all_tools = true }
 let tools t = t.tools
 
 (* MCP revisions we can speak; the client's is echoed when it is one. *)
@@ -93,11 +105,29 @@ let string_member name json =
   | _ -> None
 ;;
 
-let initialize params =
+let initialize t params =
   let version =
     match Option.bind params ~f:(string_member "protocolVersion") with
     | Some v when List.mem protocol_versions v ~equal:String.equal -> v
     | Some _ | None -> List.hd_exn protocol_versions
+  in
+  let instructions =
+    if t.all_tools
+    then
+      "prigh's complete toolset for the user's session: file, search and shell \
+       tools executed on the user's active tool host, plus components shown in \
+       the chat, the user's memory, other sessions, pull requests, issues and \
+       CI through the user's sign-in, worktrees, and subagents. Use these MCP \
+       tools for all workspace interaction."
+    else
+      "prigh's tools for the user's session: components shown in the chat, the \
+       user's memory, other sessions, pull requests, issues and CI through the \
+       user's sign-in, worktrees, and subagents. Always use prigh's subagent \
+       (and subagent_*) tools — not your own built-in or native subagent, \
+       agent, task or swarm tools — when spawning or managing subagents, so \
+       they run in prigh's UI with live progress, worktree tracking and \
+       steering (defaults to this session's engine, model and host; only \
+       switch engine, model or host when the user explicitly asks)."
   in
   `Object
     [ "protocolVersion", `String version
@@ -106,17 +136,7 @@ let initialize params =
       , `Object
           [ "name", `String server_name; "version", `String Version.to_string ]
       )
-    ; ( "instructions"
-      , `String
-          "prigh's tools for the user's session: components shown in the chat, \
-           the user's memory, other sessions, pull requests, issues and CI \
-           through the user's sign-in, worktrees, and subagents. Always use \
-           prigh's subagent (and subagent_*) tools — not your own built-in or \
-           native subagent, agent, task or swarm tools — when spawning or \
-           managing subagents, so they run in prigh's UI with live progress, \
-           worktree tracking and steering (defaults to this session's engine, \
-           model and host; only switch engine, model or host when the user \
-           explicitly asks)." )
+    ; "instructions", `String instructions
     ]
 ;;
 
@@ -189,7 +209,7 @@ let handle t (message : Json.t) =
   | Some method_, Some id ->
     Some
       (match method_ with
-       | "initialize" -> response ~id (initialize params)
+       | "initialize" -> response ~id (initialize t params)
        | "ping" -> response ~id (`Object [])
        | "tools/list" ->
          response

@@ -12,6 +12,13 @@ module Warming = struct
     }
 end
 
+module Injected_result = struct
+  type t =
+    { args : string
+    ; result : Tool_result.t
+    }
+end
+
 type t =
   { sw : Switch.t
   ; adapter : Adapter.t
@@ -63,9 +70,9 @@ type t =
   ; catalog : unit -> Adapter.Catalog.t option
   ; on_change : unit -> unit
   ; on_autonomous : (unit -> unit) option
-  ; injected_errors : string Queue.t String.Table.t
-    (* failed injected MCP tool texts in the current turn, by tool name, in
-       case the harness drops the error text on [Tool_end] *)
+  ; injected_results : Injected_result.t Queue.t String.Table.t
+    (* results of injected MCP tool calls in the current turn, by tool name,
+       in case the harness drops the output/images on [Tool_end] *)
   ; extra_dirs : unit -> string list
   ; mutable preapproved : (string * Json.t) list
     (** injected prigh MCP calls already approved in this turn's outer CLI
@@ -148,7 +155,7 @@ let create
   ; catalog
   ; on_change
   ; on_autonomous
-  ; injected_errors = String.Table.create ()
+  ; injected_results = String.Table.create ()
   ; extra_dirs
   ; preapproved = []
   ; warming = None
@@ -243,8 +250,13 @@ let take_preapproved t ~tool ~args =
 let injected t (s : Engine_intf.Services.t) =
   let (module A : Adapter.S) = t.adapter in
   let native_questions = A.native_questions in
-  Injected_tools.create
-    ~tools:(Injected_tools.select ~native_questions s.tools)
+  let tools =
+    if A.all_tools
+    then Injected_tools.select_all ~native_questions s.tools
+    else Injected_tools.select ~native_questions s.tools
+  in
+  (if A.all_tools then Injected_tools.create_all else Injected_tools.create)
+    ~tools
     ~execute:(fun tool args ->
       match t.services with
       | None -> Tool_result.error "no turn is running"
@@ -259,25 +271,24 @@ let injected t (s : Engine_intf.Services.t) =
           then None
           else s.approve ctx tool args
         in
+        let record_injected result =
+          let q =
+            Hashtbl.find_or_add
+              t.injected_results
+              (Tool.name tool)
+              ~default:Queue.create
+          in
+          Queue.enqueue q { Injected_result.args = Json.to_string args; result };
+          result
+        in
         (match refusal with
-         | Some refused -> refused
+         | Some refused -> record_injected refused
          | None
            when Cancellation.is_cancelled ctx.cancel
                 || Cancellation.is_cancelled run_cancel ->
            (* Approved after its turn ended: nobody waits for it now. *)
-           Tool_result.error "[cancelled]: its turn ended"
-         | None ->
-           let result = s.execute ctx tool args in
-           if result.is_error && not (String.is_empty result.text)
-           then (
-             let q =
-               Hashtbl.find_or_add
-                 t.injected_errors
-                 (Tool.name tool)
-                 ~default:Queue.create
-             in
-             Queue.enqueue q result.text);
-           result))
+           record_injected (Tool_result.error "[cancelled]: its turn ended")
+         | None -> record_injected (s.execute ctx tool args)))
 ;;
 
 let settings t (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
@@ -498,18 +509,21 @@ let live_now
     Or_error.errorf "%s is not running" A.display_name
   | _ ->
     let host = t.host () in
-    (* The session moved to another tool host: its harness runs there now,
-     on a thread of its own there. *)
+    (* The session moved to another tool host: a tool-host harness runs there
+       now, on a thread of its own there. A backend-hosted harness stays alive
+       on the backend and routes tools to the new host/cwd. *)
     (match t.live with
      | Some (Live ((module A), a))
-       when not (Option.equal String.equal t.live_host (Some host)) ->
+       when (not A.on_backend)
+            && not (Option.equal String.equal t.live_host (Some host)) ->
        A.stop a;
        t.live <- None;
        t.live_cwd <- None;
        t.thread_id <- None;
        t.models <- []
      | Some (Live ((module A), a))
-       when A.starts_early
+       when (not A.on_backend)
+            && A.starts_early
             && not (Option.equal String.equal t.live_cwd (Some s.cwd)) ->
        A.stop a;
        t.live <- None;
@@ -688,14 +702,16 @@ let prewarm t (s : Engine_intf.Services.t) input =
       match t.live with
       | Some (Live ((module L), a)) ->
         L.alive a
-        && Option.equal String.equal t.live_host (Some host)
-        && Option.equal String.equal t.live_cwd (Some s.cwd)
+        && (L.on_backend
+            || (Option.equal String.equal t.live_host (Some host)
+                && Option.equal String.equal t.live_cwd (Some s.cwd)))
       | None -> false
     in
     if not up
     then (
       let already_warming =
         match t.warming with
+        | Some _ when A.on_backend -> true
         | Some w when String.equal w.host host && String.equal w.cwd s.cwd ->
           true
         | Some w ->
@@ -961,7 +977,7 @@ let rec run_turn
   t.services <- Some s;
   t.cancel <- turn_cancel;
   t.run_cancel <- cancel;
-  Hashtbl.clear t.injected_errors;
+  Hashtbl.clear t.injected_results;
   t.preapproved <- [];
   (match Turn_timings.current () with
    | Some _ -> fun f -> f ()
@@ -969,7 +985,7 @@ let rec run_turn
   @@ fun () ->
   Exn.protect
     ~finally:(fun () ->
-      Hashtbl.clear t.injected_errors;
+      Hashtbl.clear t.injected_results;
       t.preapproved <- [];
       Cancellation.cancel turn_cancel)
     ~f:(fun () ->
@@ -996,7 +1012,9 @@ and run_turn'
   let before = ref None in
   let cost_total = ref None in
   let recorder =
-    Composer_recorder.create
+    (if A.all_tools
+     then Composer_recorder.create_all
+     else Composer_recorder.create)
       ~adapter:A.id
       ~model:(Option.first_some input.model t.thread_model)
       ~cwd:s.cwd
@@ -1186,7 +1204,12 @@ and run_turn'
                         | None -> kind_name kind, None
                       in
                       let canonical =
-                        Canonical_tool.of_start ~kind ~native_name ~input
+                        (if A.all_tools
+                         then Canonical_tool.of_start_all
+                         else Canonical_tool.of_start)
+                          ~kind
+                          ~native_name
+                          ~input
                       in
                       (* Where the harness runs it (Codex says), for the
                       rules: else the session's. *)
@@ -1208,7 +1231,9 @@ and run_turn'
                         match kind with
                         | Mcp { server; tool = mcp_tool } ->
                           Option.is_some
-                            (Injected_tools.canonical_of_mcp
+                            ((if A.all_tools
+                              then Injected_tools.canonical_of_mcp_all
+                              else Injected_tools.canonical_of_mcp)
                                ~server
                                ~tool:mcp_tool)
                         | _ -> false
@@ -1261,8 +1286,8 @@ and run_turn'
               | e ->
                 let e =
                   match e with
-                  | Tool_end ({ id; ok = false; output; _ } as te)
-                    when not (Hashtbl.is_empty t.injected_errors) ->
+                  | Tool_end ({ id; ok = _; output; images; _ } as te)
+                    when not (Hashtbl.is_empty t.injected_results) ->
                     let matched =
                       Option.bind
                         (Composer_recorder.call_canonical recorder ~tool_id:id)
@@ -1276,27 +1301,61 @@ and run_turn'
                                       "mcp_%s_%s"
                                       Injected_tools.server_name
                                       name)
+                            || (String.is_substring
+                                  canonical.native_name
+                                  ~substring:
+                                    (sprintf
+                                       "mcp_%s_"
+                                       Injected_tools.server_name)
+                                && String.is_suffix
+                                     canonical.native_name
+                                     ~suffix:("_" ^ name))
                             || String.is_substring
                                  canonical.native_name
                                  ~substring:
                                    (Injected_tools.server_name ^ "_" ^ name)
                             || String.equal canonical.native_name name
                           in
-                          Hashtbl.keys t.injected_errors
+                          Hashtbl.keys t.injected_results
                           |> List.find ~f:matches_tool
                           |> Option.bind ~f:(fun name ->
                             Option.bind
-                              (Hashtbl.find t.injected_errors name)
+                              (Hashtbl.find t.injected_results name)
                               ~f:(fun q ->
-                                let text = Queue.dequeue q in
-                                if Queue.is_empty q
-                                then Hashtbl.remove t.injected_errors name;
-                                text)))
+                                let want_args =
+                                  Json.to_string canonical.arguments
+                                in
+                                let items = Queue.to_list q in
+                                Queue.clear q;
+                                let rec extract acc = function
+                                  | [] -> None, List.rev acc
+                                  | (item : Injected_result.t) :: rest
+                                    when String.equal item.args want_args ->
+                                    Some item.result, List.rev_append acc rest
+                                  | item :: rest -> extract (item :: acc) rest
+                                in
+                                let found, rest =
+                                  match extract [] items with
+                                  | (Some _ as found), rest -> found, rest
+                                  | None, [] -> None, []
+                                  | None, first :: rest ->
+                                    Some first.result, rest
+                                in
+                                if List.is_empty rest
+                                then Hashtbl.remove t.injected_results name
+                                else Queue.enqueue_all q rest;
+                                found)))
                     in
                     (match matched with
-                     | Some err_text when String.is_empty output ->
-                       Adapter_event.Tool_end { te with output = err_text }
-                     | Some _ | None -> e)
+                     | Some result ->
+                       let output =
+                         if String.is_empty output then result.text else output
+                       in
+                       let images =
+                         if List.is_empty images then result.images else images
+                       in
+                       Adapter_event.Tool_end { te with output; images }
+                     | None -> e)
                   | _ -> e
                 in
                 (match e with

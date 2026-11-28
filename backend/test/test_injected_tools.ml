@@ -347,3 +347,50 @@ let%expect_test "mcp-bridge relay" =
     cannot reach prigh's tools at $DIR/gone.sock: the session that started this harness is gone
     |}]
 ;;
+
+let%expect_test "all_tools mode (backend-hosted)" =
+  let names native_questions =
+    Injected_tools.select_all ~native_questions session_tools
+    |> List.map ~f:Tool.name
+  in
+  print_s [%sexp (names true : string list)];
+  print_s [%sexp (names false : string list)];
+  List.iter
+    [ "prigh", "bash"; "prigh", "read"; "prigh", "edit"; "github", "bash" ]
+    ~f:(fun (server, tool) ->
+      print_s
+        [%sexp
+          (server : string)
+        , (tool : string)
+        , (Injected_tools.canonical_of_mcp_all ~server ~tool : string option)]);
+  let t =
+    Injected_tools.create_all
+      ~tools:(Injected_tools.select_all ~native_questions:false session_tools)
+      ~execute:(fun tool args ->
+        Tool_result.ok (sprintf "%s:%s" (Tool.name tool) (Json.to_string args)))
+  in
+  exchange
+    t
+    {|{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}|};
+  exchange
+    t
+    {|{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"bash","arguments":{"command":"uname -s"}}}|};
+  [%expect
+    {|
+    (bash read write edit ls grep find web_fetch web_search update_plan render_ui
+     worktree memory pull_request sessions issue repo subagent ask_session
+     answer_session custom_instructions reply_to_comment goal_complete)
+    (bash read write edit ls grep find web_fetch web_search update_plan ask_user
+     render_ui worktree memory pull_request sessions issue repo subagent
+     ask_session answer_session custom_instructions reply_to_comment
+     goal_complete)
+    (prigh bash (bash))
+    (prigh read (read))
+    (prigh edit (edit))
+    (github bash ())
+    > {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}
+    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's complete toolset for the user's session: file, search and shell tools executed on the user's active tool host, plus components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Use these MCP tools for all workspace interaction."}}
+    > {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"bash","arguments":{"command":"uname -s"}}}
+    < {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"bash:{\"command\":\"uname -s\"}"}],"isError":false}}
+    |}]
+;;

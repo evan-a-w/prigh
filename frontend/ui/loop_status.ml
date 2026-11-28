@@ -18,6 +18,11 @@ let unpriced (s : P.State.t) =
   &&
   match s.engine.adapter with
   | Some adapter ->
+    let adapter =
+      Option.value
+        (String.chop_prefix adapter ~prefix:"backend:")
+        ~default:adapter
+    in
     String.equal adapter "codex" || String.is_prefix adapter ~prefix:"acp:"
   | None -> false
 ;;

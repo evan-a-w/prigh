@@ -324,8 +324,9 @@ let is_harness_choice (c : Engine_choice.t) =
   match c with
   | { engine = Harness; _ } | { engine = Composer; adapter = Some Prigh } ->
     true
-  | { engine = Composer; adapter = Some (Codex | Claude | Acp _) | None } ->
-    false
+  | { engine = Composer
+    ; adapter = Some (Codex | Claude | Acp _ | Backend _) | None
+    } -> false
 ;;
 
 let prepare

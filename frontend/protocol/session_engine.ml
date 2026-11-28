@@ -205,19 +205,22 @@ let of_state_json j =
   }
 ;;
 
-let adapter_label = function
+let rec adapter_label = function
   | "codex" -> "Codex"
   | "claude" -> "Claude Code"
   | "prigh" -> "prigh"
   | adapter ->
-    (match String.chop_prefix adapter ~prefix:"acp:" with
-     | Some "opencode" -> "OpenCode"
-     | Some "gemini" -> "Gemini CLI"
-     | Some "antigravity" -> "Antigravity"
-     | Some "grok" -> "Grok Build"
-     | Some "goose" -> "Goose"
-     | Some name -> name ^ " (ACP)"
-     | None -> adapter)
+    (match String.chop_prefix adapter ~prefix:"backend:" with
+     | Some inner -> adapter_label inner ^ " (backend)"
+     | None ->
+       (match String.chop_prefix adapter ~prefix:"acp:" with
+        | Some "opencode" -> "OpenCode"
+        | Some "gemini" -> "Gemini CLI"
+        | Some "antigravity" -> "Antigravity"
+        | Some "grok" -> "Grok Build"
+        | Some "goose" -> "Goose"
+        | Some name -> name ^ " (ACP)"
+        | None -> adapter))
 ;;
 
 let engine_label = function

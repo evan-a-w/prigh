@@ -72,31 +72,33 @@ end
 
 let acp_agent ?(acp = Acp_agent.find_known) name = acp name
 
-let quirks ?acp : Adapter_id.t -> Acp_agent.Quirks.t = function
+let quirks ?acp (adapter : Adapter_id.t) =
+  match Adapter_id.inner adapter with
   | Acp name ->
     Option.value_map
       (acp_agent ?acp name)
       ~default:Acp_agent.Quirks.none
       ~f:(fun a -> a.quirks)
-  | Codex | Claude | Prigh -> Acp_agent.Quirks.none
+  | Codex | Claude | Prigh | Backend _ -> Acp_agent.Quirks.none
 ;;
 
-let program ?acp : Adapter_id.t -> string option = function
+let program ?acp (adapter : Adapter_id.t) =
+  match Adapter_id.inner adapter with
   | Codex -> Some "codex"
   | Claude -> Some "claude"
   | Acp name ->
     (match acp_agent ?acp name with
      | Some agent -> List.hd agent.command
      | None -> Some name)
-  | Prigh -> None
+  | Prigh | Backend _ -> None
 ;;
 
-let login_command (quirks : Acp_agent.Quirks.t) : Adapter_id.t -> string option
-  = function
+let login_command (quirks : Acp_agent.Quirks.t) (adapter : Adapter_id.t) =
+  match Adapter_id.inner adapter with
   | Codex -> Some "codex login"
   | Claude -> Some "claude auth login"
   | Acp _ -> quirks.login
-  | Prigh -> None
+  | Prigh | Backend _ -> None
 ;;
 
 module Status = struct
@@ -122,9 +124,9 @@ module Status = struct
   ;;
 
   let is_acp t =
-    match t.adapter with
+    match Adapter_id.inner t.adapter with
     | Acp _ -> true
-    | Codex | Claude | Prigh -> false
+    | Codex | Claude | Prigh | Backend _ -> false
   ;;
 
   let checkable t =
@@ -318,10 +320,11 @@ module Status = struct
   ;;
 end
 
-let status_args : Adapter_id.t -> string list = function
+let status_args (adapter : Adapter_id.t) =
+  match Adapter_id.inner adapter with
   | Codex -> [ "login"; "status" ]
   | Claude -> [ "auth"; "status" ]
-  | Acp _ | Prigh -> []
+  | Acp _ | Prigh | Backend _ -> []
 ;;
 
 let request ?acp adapters : Host_probe.Request.t =
@@ -406,12 +409,13 @@ let auth ?acp ~files adapter (found : Host_probe.Found.t) : Auth.t =
       Auth.Logged_in { account = None; via = Login_file { path = f.path } }
     | None -> Unknown
   in
-  match (adapter : Adapter_id.t), found.status with
+  match Adapter_id.inner adapter, found.status with
   | Prigh, _ -> Not_needed
   | Acp _, _ -> login_file ()
   | _, None -> Unknown
   | Codex, Some out -> codex_auth out
   | Claude, Some out -> claude_auth out
+  | Backend _, _ -> Unknown
 ;;
 
 let of_found

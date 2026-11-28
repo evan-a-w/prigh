@@ -1309,9 +1309,14 @@ module Model = struct
   (* An agent CLI's models' names: its replies are by their keys. *)
   let model_names t =
     let external_ (model : Llm.t) =
-      String.equal model.provider "codex"
-      || String.equal model.provider "claude"
-      || String.is_prefix model.provider ~prefix:"acp:"
+      let provider =
+        Option.value
+          (String.chop_prefix model.provider ~prefix:"backend:")
+          ~default:model.provider
+      in
+      String.equal provider "codex"
+      || String.equal provider "claude"
+      || String.is_prefix provider ~prefix:"acp:"
     in
     List.filter_map
       [ t.state; shown_state t ]
@@ -6905,11 +6910,16 @@ let engine_options (m : Model.t) =
     let current = current_choice m in
     let host = Option.map m.state ~f:(fun (s : State.t) -> s.active_host) in
     let status adapter =
+      let want_host =
+        if String.is_prefix adapter ~prefix:"backend:"
+        then Some Host.backend_id
+        else host
+      in
       match m.adapters.statuses with
       | Some (Ok statuses) ->
         List.find statuses ~f:(fun (s : Adapter_status.t) ->
           String.equal s.adapter adapter
-          && Option.equal String.equal (Some s.host) host)
+          && Option.equal String.equal (Some s.host) want_host)
       | Some (Error _) | None -> None
     in
     List.map choices ~f:(fun (c : Deployed_engines.Choice.t) ->

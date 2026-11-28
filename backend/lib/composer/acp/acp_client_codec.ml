@@ -21,6 +21,7 @@ module Agent_capabilities = struct
     ; embedded_context : bool
     ; mcp_http : bool
     ; mcp_sse : bool
+    ; system_prompt_append : bool
     }
   [@@deriving sexp_of, equal]
 end
@@ -326,13 +327,16 @@ type t =
   ; mutable cost : float option
   ; compacted : String.Hash_set.t (* compactionIds already reported *)
   ; quirks : Acp_agent.Quirks.t
+  ; all_tools : bool
   ; questions : (Json.t * User_question.t list) String.Table.t
     (* Grok's [x.ai/ask_user_question]s waiting for the user: their ids *)
   }
 
-let create ?(quirks = Acp_agent.Quirks.none) ?cost_total () =
+let create ?(quirks = Acp_agent.Quirks.none) ?(all_tools = false) ?cost_total ()
+  =
   { next_id = 0
   ; quirks
+  ; all_tools
   ; pending = Int.Table.create ()
   ; capabilities = None
   ; session_id = None
@@ -410,29 +414,52 @@ let initialize t ~client_name ~client_version =
 
 let mcp_json servers = `Array (List.map servers ~f:Mcp_server.to_json)
 
-let new_session t ~cwd ~mcp_servers =
+let system_prompt_meta = function
+  | Some text when not (String.is_empty (String.strip text)) ->
+    [ ( "_meta"
+      , `Object
+          [ ( "antigravity"
+            , `Object [ "systemPrompt", `Object [ "append", `String text ] ] )
+          ] )
+    ]
+  | Some _ | None -> []
+;;
+
+let new_session ?system_prompt_append t ~cwd ~mcp_servers =
   request
     t
     New_session
     "session/new"
-    (`Object [ "cwd", `String cwd; "mcpServers", mcp_json mcp_servers ])
+    (`Object
+        ([ "cwd", `String cwd; "mcpServers", mcp_json mcp_servers ]
+         @ system_prompt_meta system_prompt_append))
 ;;
 
-let open_session t ~pending ~method_ ~session_id ~cwd ~mcp_servers =
+let open_session
+      ?system_prompt_append
+      t
+      ~pending
+      ~method_
+      ~session_id
+      ~cwd
+      ~mcp_servers
+  =
   request
     t
     pending
     method_
     (`Object
-        [ "sessionId", `String session_id
-        ; "cwd", `String cwd
-        ; "mcpServers", mcp_json mcp_servers
-        ])
+        ([ "sessionId", `String session_id
+         ; "cwd", `String cwd
+         ; "mcpServers", mcp_json mcp_servers
+         ]
+         @ system_prompt_meta system_prompt_append))
 ;;
 
-let load_session t ~session_id ~cwd ~mcp_servers =
+let load_session ?system_prompt_append t ~session_id ~cwd ~mcp_servers =
   t.loading <- true;
   open_session
+    ?system_prompt_append
     t
     ~pending:(Load_session session_id)
     ~method_:"session/load"
@@ -441,8 +468,9 @@ let load_session t ~session_id ~cwd ~mcp_servers =
     ~mcp_servers
 ;;
 
-let resume_session t ~session_id ~cwd ~mcp_servers =
+let resume_session ?system_prompt_append t ~session_id ~cwd ~mcp_servers =
   open_session
+    ?system_prompt_append
     t
     ~pending:(Resume_session session_id)
     ~method_:"session/resume"
@@ -844,6 +872,9 @@ let parse_capabilities json : Agent_capabilities.t =
   let prompt = obj (field "promptCapabilities" caps) in
   let mcp = obj (field "mcpCapabilities" caps) in
   let session = obj (field "sessionCapabilities" caps) in
+  let meta = obj (field "_meta" caps) in
+  let antigravity = obj (field "antigravity" meta) in
+  let system_prompt = obj (field "systemPrompt" antigravity) in
   { load_session = flag "loadSession" caps
   ; resume_session = present "resume" session
   ; close_session = present "close" session
@@ -852,6 +883,7 @@ let parse_capabilities json : Agent_capabilities.t =
   ; embedded_context = flag "embeddedContext" prompt
   ; mcp_http = flag "http" mcp
   ; mcp_sse = flag "sse" mcp
+  ; system_prompt_append = flag "append" system_prompt
   }
 ;;
 
@@ -965,13 +997,22 @@ let with_models t options =
 ;;
 
 let parse_session_config t json : Session_config.t =
-  let current_mode, modes = parse_modes json in
+  let current_mode, modes =
+    match field "modes" json with
+    | Some (`Object _) -> parse_modes json
+    | _ -> t.config.current_mode, t.config.modes
+  in
   Option.iter (parse_models json) ~f:(fun m -> t.models <- Some m);
-  { current_mode
-  ; modes
-  ; config_options =
-      with_models t (parse_config_options (items "configOptions" json))
-  }
+  let config_options =
+    let parsed = parse_config_options (items "configOptions" json) in
+    if List.is_empty parsed
+    then
+      List.filter t.config.config_options ~f:(fun (o : Config_option.t) ->
+        not (String.equal o.id session_model_option))
+      |> with_models t
+    else with_models t parsed
+  in
+  { current_mode; modes; config_options }
 ;;
 
 let set_current_model t id =
@@ -1157,26 +1198,48 @@ module Tool_class = struct
   ;;
 end
 
-let mcp_of_name name =
+let is_hex_suffix s =
+  String.length s = 8 && String.for_all s ~f:Char.is_hex_digit
+;;
+
+(* Antigravity namespaces per-session MCP servers as [prigh_<8-hex-chars>],
+   naming tools [mcp_prigh_<8hex>_<tool>]. *)
+let strip_prigh_mcp_prefix name =
+  match
+    String.chop_prefix name ~prefix:("mcp_" ^ Injected_tools.server_name ^ "_")
+  with
+  | None -> None
+  | Some rest ->
+    (match String.lsplit2 rest ~on:'_' with
+     | Some (hash, tool) when is_hex_suffix hash && not (String.is_empty tool)
+       -> Some tool
+     | _ -> Some rest)
+;;
+
+let mcp_of_name ~all_tools name =
   match String.chop_prefix name ~prefix:"mcp__" with
   | Some rest ->
     (match String.substr_index rest ~pattern:"__" with
      | Some i ->
+       let server = String.prefix rest i in
+       let server =
+         match
+           String.chop_prefix server ~prefix:(Injected_tools.server_name ^ "_")
+         with
+         | Some hash when is_hex_suffix hash -> Injected_tools.server_name
+         | _ -> server
+       in
        Some
          (Adapter_event.Tool_kind.Mcp
-            { server = String.prefix rest i
-            ; tool = String.drop_prefix rest (i + 2)
-            })
+            { server; tool = String.drop_prefix rest (i + 2) })
      | None -> None)
   | None ->
-    (match
-       String.chop_prefix
-         name
-         ~prefix:("mcp_" ^ Injected_tools.server_name ^ "_")
-     with
+    (match strip_prigh_mcp_prefix name with
      | Some tool
        when Option.is_some
-              (Injected_tools.canonical_of_mcp
+              ((if all_tools
+                then Injected_tools.canonical_of_mcp_all
+                else Injected_tools.canonical_of_mcp)
                  ~server:Injected_tools.server_name
                  ~tool) ->
        Some (Mcp { server = Injected_tools.server_name; tool })
@@ -1185,13 +1248,15 @@ let mcp_of_name name =
 
 (* What a call is, and the name it goes by: when not sure, [Other] with the
    agent's own title, rather than a wrong prigh tool. *)
-let tool_kind ~acp_kind ~name ~meta ~title ~raw_input
+let tool_kind ~all_tools ~acp_kind ~name ~meta ~title ~raw_input
   : Adapter_event.Tool_kind.t * string
   =
   let tool_name = Tool_class.tool_name ~name ~meta ~title in
   let native default = Option.value tool_name ~default in
   match
-    Option.first_some (Option.bind tool_name ~f:mcp_of_name) (mcp_of_name title)
+    Option.first_some
+      (Option.bind tool_name ~f:(mcp_of_name ~all_tools))
+      (mcp_of_name ~all_tools title)
   with
   | Some mcp -> mcp, native title
   | None ->
@@ -1523,6 +1588,7 @@ let tool_of_update t update =
        let raw_input = field "rawInput" update in
        let kind, native_name =
          tool_kind
+           ~all_tools:t.all_tools
            ~acp_kind
            ~name:(str "name" update)
            ~meta:(field "_meta" update)

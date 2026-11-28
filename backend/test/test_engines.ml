@@ -63,7 +63,7 @@ let%expect_test "-engines and -adapters" =
   [%expect {| "unknown engine \"harnes\": expected harness or composer" |}];
   flags ~engines:"composer" ~adapters:"cursor" ();
   [%expect
-    {| "unknown adapter \"cursor\": expected codex, claude, prigh or acp:<name>" |}];
+    {| "unknown adapter \"cursor\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>" |}];
   flags ~adapters:"codex" ();
   [%expect
     {| adapters (codex) are for the composer engine: add -engines composer (or harness,composer) |}];
@@ -470,4 +470,88 @@ let%expect_test
    | Some (`Array messages) -> printf "%d message(s)\n" (List.length messages)
    | json -> print_s [%sexp (Option.map json ~f:Json.to_string : string option)]);
   [%expect {| 1 message(s) |}]
+;;
+
+let%expect_test
+    "backend-hosted adapters: flags, aliases, model specs, shared login"
+  =
+  flags ~engines:"harness,composer" ~adapters:"backend:acp:antigravity" ();
+  [%expect
+    {|
+    (((engines (Harness Composer)) (adapters ((Backend (Acp antigravity))))
+      (acp_agents ()))
+     (Ok ()) ((engine Harness) (adapter ())))
+    |}];
+  flags ~engines:"composer" ~adapters:"backend:codex" ();
+  [%expect
+    {|
+    (((engines (Composer)) (adapters ((Backend Codex))) (acp_agents ()))
+     (Error
+      "the composer can't run Codex on the backend yet (only backend:acp:antigravity is supported)")
+     ((engine Composer) (adapter ((Backend Codex)))))
+    |}];
+  List.iter
+    [ "backend:acp:antigravity"
+    ; "backend:prigh"
+    ; "backend:backend:acp:antigravity"
+    ; "backend:"
+    ]
+    ~f:(fun s ->
+      print_s
+        [%sexp (s : string), (Adapter_id.of_string s : Adapter_id.t Or_error.t)]);
+  [%expect
+    {|
+    (backend:acp:antigravity (Ok (Backend (Acp antigravity))))
+    (backend:prigh
+     (Error
+      "invalid backend adapter \"backend:prigh\": prigh's own harness already runs on the backend"))
+    (backend:backend:acp:antigravity
+     (Error
+      "unknown adapter \"backend:acp:antigravity\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"))
+    (backend:
+     (Error
+      "unknown adapter \"\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"))
+    |}];
+  let choice : Engine_choice.t =
+    { engine = Composer; adapter = Some (Backend (Acp "antigravity")) }
+  in
+  print_s
+    [%sexp
+      { key = (Engine_choice.key choice : string)
+      ; label = (Engine_choice.label choice : string)
+      ; display_name = (Engine_choice.display_name choice : string)
+      ; names = (Engine_choice.names choice : string list)
+      }];
+  [%expect
+    {|
+    ((key backend:acp:antigravity) (label "composer (Antigravity (backend))")
+     (display_name "Antigravity (backend)")
+     (names
+      (agy-backend antigravity-backend backend:antigravity
+       backend:acp:antigravity "Antigravity (backend)")))
+    |}];
+  print_s
+    [%sexp
+      (External_model.parse_spec "backend:acp:antigravity/gemini-2.5-pro"
+       : (Adapter_id.t * string) Or_error.t option)];
+  with_dir (fun home ->
+    Or_error.ok_exn
+      (Cli_login.save
+         ~home
+         ~adapter:"acp:antigravity"
+         (Prigh (Or_error.ok_exn (Account_ref.of_string "work"))));
+    print_s
+      [%sexp
+        { provider =
+            (Cli_login.provider ~adapter:"backend:acp:antigravity"
+             : Provider_id.t option)
+        ; shared =
+            (Cli_login.find ~home ~adapter:"backend:acp:antigravity"
+             : Cli_login.t)
+        }]);
+  [%expect
+    {|
+    ((Ok ((Backend (Acp antigravity)) gemini-2.5-pro)))
+    ((provider (Google_antigravity)) (shared (Prigh (Own work))))
+    |}]
 ;;

@@ -6,8 +6,14 @@ type t =
   | Prigh of Account_ref.t
 [@@deriving sexp_of, equal]
 
+(* Backend-hosted adapters share the login configuration of their underlying
+   adapter (e.g. [backend:acp:antigravity] uses [acp:antigravity]'s login). *)
+let canonical adapter =
+  Option.value (String.chop_prefix adapter ~prefix:"backend:") ~default:adapter
+;;
+
 let provider ~adapter : Provider_id.t option =
-  match adapter with
+  match canonical adapter with
   | "codex" -> Some Openai_codex
   | "claude" -> Some Anthropic
   | "acp:antigravity" -> Some Google_antigravity
@@ -50,11 +56,13 @@ let load ~home =
 ;;
 
 let find ~home ~adapter =
+  let adapter = canonical adapter in
   List.Assoc.find (load ~home) ~equal:String.equal adapter
   |> Option.value ~default:Own
 ;;
 
 let save ~home ~adapter login =
+  let adapter = canonical adapter in
   let open Or_error.Let_syntax in
   let%bind () =
     match login, provider ~adapter with

@@ -61,5 +61,19 @@ let names t =
   | Composer, Some (Acp name) ->
     let base = [ name; "acp:" ^ name; Adapter_id.label (Acp name) ] in
     if String.equal name "antigravity" then "agy" :: base else base
+  | Composer, Some (Backend (Acp name) as a) ->
+    let base =
+      [ name ^ "-backend"
+      ; "backend:" ^ name
+      ; "backend:acp:" ^ name
+      ; Adapter_id.label a
+      ]
+    in
+    if String.equal name "antigravity" then "agy-backend" :: base else base
+  | Composer, Some (Backend inner as a) ->
+    [ Adapter_id.to_string a
+    ; Adapter_id.to_string inner ^ "-backend"
+    ; Adapter_id.label a
+    ]
   | Composer, None -> [ "composer" ]
 ;;

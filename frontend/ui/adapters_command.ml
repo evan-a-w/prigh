@@ -24,7 +24,11 @@ end
 (* What the user may type for an adapter whose id is longer. *)
 let canonical adapter =
   match String.lowercase adapter with
-  | "antigravity" | "agy" -> "acp:antigravity"
+  | "antigravity"
+  | "agy"
+  | "backend:acp:antigravity"
+  | "antigravity-backend"
+  | "agy-backend" -> "acp:antigravity"
   | _ -> adapter
 ;;
 

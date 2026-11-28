@@ -86,7 +86,7 @@ let%expect_test "initialize and session/new" =
       (capabilities
        ((load_session true) (resume_session true) (close_session false)
         (images true) (audio false) (embedded_context true) (mcp_http true)
-        (mcp_sse false)))
+        (mcp_sse false) (system_prompt_append false)))
       (auth_methods
        (((id login) (name "Log in") (description ("Run opencode auth login"))
          (terminal true))))))
@@ -358,7 +358,7 @@ let%expect_test
       (capabilities
        ((load_session false) (resume_session false) (close_session false)
         (images false) (audio false) (embedded_context false) (mcp_http false)
-        (mcp_sse false)))
+        (mcp_sse false) (system_prompt_append false)))
       (auth_methods ())))
     |}]
 ;;
@@ -571,7 +571,7 @@ let%expect_test "session/load drops the replay; other sessions and odd lines" =
       (capabilities
        ((load_session true) (resume_session true) (close_session false)
         (images true) (audio false) (embedded_context true) (mcp_http true)
-        (mcp_sse false)))
+        (mcp_sse false) (system_prompt_append false)))
       (auth_methods
        (((id login) (name "Log in") (description ("Run opencode auth login"))
          (terminal true))))))
@@ -1204,5 +1204,153 @@ let%expect_test
     approval kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/b.ml"}
     tool_start kind=Command -> bash {"command":"dune build @runtest"}
     approval kind=Command -> bash {"command":"dune build @runtest"}
+    |}]
+;;
+
+let%expect_test "system_prompt_append and all_tools mcp classification" =
+  let t = C.create ~all_tools:true () in
+  send (C.initialize t ~client_name:"prigh" ~client_version:"0.1");
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{},"close":{}},"_meta":{"antigravity":{"systemPrompt":{"append":true}}}}}}|};
+  send
+    (C.new_session
+       ~system_prompt_append:"Remote host: mac"
+       t
+       ~cwd:"/empty"
+       ~mcp_servers:[]);
+  recv t {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"s1"}}|};
+  ignore (Or_error.ok_exn (C.prompt t [ Text "run ls" ]) : C.Output.t list);
+  List.iter
+    [ {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c1","kind":"other","title":"mcp_prigh_bash","rawInput":{"command":"ls"}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c2","kind":"other","title":"mcp_prigh_read","rawInput":{"path":"a.ml"}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c3","kind":"other","title":"mcp_prigh_79ce654a_ls","rawInput":{"path":"."}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c4","kind":"other","title":"mcp_prigh_79ce654a_subagent_continue","rawInput":{"id":"a1"}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c5","kind":"other","title":"mcp__prigh_79ce654a__grep","rawInput":{"pattern":"foo"}}}}|}
+    ]
+    ~f:(fun line ->
+      List.iter (C.handle_line t line) ~f:(function
+        | Event (Tool_start { kind; native_name; input; _ }) ->
+          let c = Canonical_tool.of_start_all ~kind ~native_name ~input in
+          printf
+            "kind=%s -> %s %s\n"
+            (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
+            c.name
+            (Jsonaf.to_string c.arguments)
+        | _ -> ()));
+  (* With all_tools=false (normal acp:antigravity), hashed prigh MCP names
+     still classify injected prigh tools and leave non-injected ones as Other. *)
+  let t2 = C.create ~all_tools:false () in
+  ignore (C.initialize t2 ~client_name:"prigh" ~client_version:"0.1" : string);
+  ignore
+    (C.handle_line
+       t2
+       {|{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{}}}|}
+     : C.Output.t list);
+  ignore (C.new_session t2 ~cwd:"/proj" ~mcp_servers:[] : string);
+  ignore
+    (C.handle_line t2 {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"s2"}}|}
+     : C.Output.t list);
+  ignore (Or_error.ok_exn (C.prompt t2 [ Text "hi" ]) : C.Output.t list);
+  List.iter
+    [ {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s2","update":{"sessionUpdate":"tool_call","toolCallId":"d1","kind":"other","title":"mcp_prigh_79ce654a_render_ui","rawInput":{}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s2","update":{"sessionUpdate":"tool_call","toolCallId":"d2","kind":"other","title":"mcp_prigh_79ce654a_ls","rawInput":{}}}}|}
+    ]
+    ~f:(fun line ->
+      List.iter (C.handle_line t2 line) ~f:(function
+        | Event (Tool_start { kind; native_name; input; _ }) ->
+          let c = Canonical_tool.of_start ~kind ~native_name ~input in
+          printf
+            "default kind=%s -> %s\n"
+            (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
+            c.name
+        | _ -> ()));
+  [%expect
+    {|
+    > {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false,"session":{"notices":{},"compaction":{}}},"clientInfo":{"name":"prigh","version":"0.1"}}}
+    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{},"close":{}},"_meta":{"antigravity":{"systemPrompt":{"append":true}}}}}}
+    (Response
+     (Initialized (protocol_version 1) (agent ())
+      (capabilities
+       ((load_session true) (resume_session true) (close_session true)
+        (images false) (audio false) (embedded_context false) (mcp_http false)
+        (mcp_sse false) (system_prompt_append true)))
+      (auth_methods ())))
+    > {"jsonrpc":"2.0","id":1,"method":"session/new","params":{"cwd":"/empty","mcpServers":[],"_meta":{"antigravity":{"systemPrompt":{"append":"Remote host: mac"}}}}}
+    < {"jsonrpc":"2.0","id":1,"result":{"sessionId":"s1"}}
+    (Response
+     (Session_opened (kind New_session) (session_id s1)
+      (config ((current_mode ()) (modes ()) (config_options ())))))
+    kind=(Mcp(server prigh)(tool bash)) -> bash {"command":"ls"}
+    kind=(Mcp(server prigh)(tool read)) -> read {"path":"a.ml"}
+    kind=(Mcp(server prigh)(tool ls)) -> ls {"path":"."}
+    kind=(Mcp(server prigh)(tool subagent_continue)) -> subagent_continue {"id":"a1"}
+    kind=(Mcp(server prigh)(tool grep)) -> grep {"pattern":"foo"}
+    default kind=(Mcp(server prigh)(tool render_ui)) -> render_ui
+    default kind=(Other mcp_prigh_79ce654a_ls) -> mcp_prigh_79ce654a_ls
+    |}]
+;;
+
+let%expect_test
+    "session/load with empty result preserves config from session/new"
+  =
+  let t = C.create () in
+  ignore (C.initialize t ~client_name:"prigh" ~client_version:"0.1" : string);
+  ignore (C.handle_line t init_response : C.Output.t list);
+  ignore (C.new_session t ~cwd:"/w" ~mcp_servers:[] : string);
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"ses_1","modes":{"currentModeId":"default","availableModes":[{"id":"default","name":"Default"},{"id":"plan","name":"Plan"}]},"models":{"currentModelId":"m1","availableModels":[{"modelId":"m1","name":"Model 1"},{"modelId":"m2","name":"Model 2"}]},"configOptions":[{"id":"thought","name":"Thinking","category":"thought_level","type":"select","currentValue":"high","options":[{"value":"low","name":"Low"},{"value":"high","name":"High"}]}]}}|};
+  ignore
+    (C.load_session t ~session_id:"ses_1" ~cwd:"/w" ~mcp_servers:[] : string);
+  recv t {|{"jsonrpc":"2.0","id":2,"result":{}}|};
+  [%expect
+    {|
+    < {"jsonrpc":"2.0","id":1,"result":{"sessionId":"ses_1","modes":{"currentModeId":"default","availableModes":[{"id":"default","name":"Default"},{"id":"plan","name":"Plan"}]},"models":{"currentModelId":"m1","availableModels":[{"modelId":"m1","name":"Model 1"},{"modelId":"m2","name":"Model 2"}]},"configOptions":[{"id":"thought","name":"Thinking","category":"thought_level","type":"select","currentValue":"high","options":[{"value":"low","name":"Low"},{"value":"high","name":"High"}]}]}}
+    (Response
+     (Session_opened (kind New_session) (session_id ses_1)
+      (config
+       ((current_mode (default))
+        (modes
+         (((id default) (name Default) (description ()))
+          ((id plan) (name Plan) (description ()))))
+        (config_options
+         (((id thought) (name Thinking) (description ())
+           (category (thought_level))
+           (value
+            (Select (current high)
+             (choices
+              (((value low) (name Low) (description ()) (group ()))
+               ((value high) (name High) (description ()) (group ())))))))
+          ((id prigh:session-model) (name Model) (description ())
+           (category (model))
+           (value
+            (Select (current m1)
+             (choices
+              (((value m1) (name "Model 1") (description ()) (group ()))
+               ((value m2) (name "Model 2") (description ()) (group ())))))))))))))
+    < {"jsonrpc":"2.0","id":2,"result":{}}
+    (Response
+     (Session_opened (kind Load_session) (session_id ses_1)
+      (config
+       ((current_mode (default))
+        (modes
+         (((id default) (name Default) (description ()))
+          ((id plan) (name Plan) (description ()))))
+        (config_options
+         (((id thought) (name Thinking) (description ())
+           (category (thought_level))
+           (value
+            (Select (current high)
+             (choices
+              (((value low) (name Low) (description ()) (group ()))
+               ((value high) (name High) (description ()) (group ())))))))
+          ((id prigh:session-model) (name Model) (description ())
+           (category (model))
+           (value
+            (Select (current m1)
+             (choices
+              (((value m1) (name "Model 1") (description ()) (group ()))
+               ((value m2) (name "Model 2") (description ()) (group ())))))))))))))
     |}]
 ;;

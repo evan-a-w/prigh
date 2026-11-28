@@ -21,7 +21,7 @@ open! Import
       killed one left).
 
     Google's access tokens last an hour: the process is replaced (its session
-    resumed) before a turn when its token expires within twenty minutes
+    resumed) before a turn when its token expires within ten minutes
     ({!Adapter.Login_renewal}). *)
 
 type t [@@deriving sexp_of]
@@ -45,6 +45,19 @@ val launch
   -> command:string list
   -> Launch.t
 
+(** How to run [command] ([agy acp]) on the backend with its built-in tools
+    disabled (using a generated custom agent with
+    [excludeDefaultComponents: true], [inheritCustomizations: false],
+    [tools: []], [--include-default-customizations=false], and
+    [--dangerously-skip-permissions]), an isolated empty working directory,
+    and either prigh's [credential] token (when [Some] and usable) or the
+    backend's own agy login. *)
+val launch_backend
+  :  credential:Cli_credential.t option
+  -> refused:string option
+  -> command:string list
+  -> Launch.t
+
 (** What {!launch} handed the process, read back from [credential];
     [Error]: nothing, saying why the session runs on agy's own login. *)
 val of_launch
@@ -57,7 +70,7 @@ val credential : t -> Cli_credential.t
 (** The access token handed. *)
 val token : t -> string
 
-(** Whether the token expires within twenty minutes of [now_ms]. *)
+(** Whether the token expires within ten minutes of [now_ms]. *)
 val expiring : t -> now_ms:int -> bool
 
 (** A turn was refused with the token: what the user is told. *)
@@ -65,4 +78,6 @@ val refused_hint : t -> string
 
 module For_testing : sig
   val wrapper : string
+  val backend_wrapper : string
+  val backend_agent_name : string
 end

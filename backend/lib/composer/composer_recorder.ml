@@ -42,6 +42,7 @@ end
 
 type t =
   { adapter : string
+  ; all_tools : bool
   ; mutable model : string
   ; cwd : string (* the session's: where the harness's subagents work *)
   ; emit : Agent_event.t -> unit
@@ -67,12 +68,13 @@ type t =
 
 let model_name = External_model.name
 
-let create ~adapter ~model ~cwd ~emit ~notice ~prompts =
+let create_with ~all_tools ~adapter ~model ~cwd ~emit ~notice ~prompts =
   emit Agent_event.Agent_start;
   List.iter prompts ~f:(fun m ->
     emit (Agent_event.Message_start m);
     emit (Message_end m));
   { adapter
+  ; all_tools
   ; model = model_name ~adapter model
   ; cwd
   ; emit
@@ -97,6 +99,8 @@ let create ~adapter ~model ~cwd ~emit ~notice ~prompts =
   }
 ;;
 
+let create = create_with ~all_tools:false
+let create_all = create_with ~all_tools:true
 let stop t = t.stop
 let thread_id t = t.thread_id
 let model t = t.model
@@ -321,7 +325,11 @@ let ensure_started t (c : Call.t) =
 ;;
 
 let tool_start t ~id ~kind ~native_name ~input ~parent =
-  let canonical = Canonical_tool.of_start ~kind ~native_name ~input in
+  let canonical =
+    if t.all_tools
+    then Canonical_tool.of_start_all ~kind ~native_name ~input
+    else Canonical_tool.of_start ~kind ~native_name ~input
+  in
   let call =
     { Content.Tool_call.id
     ; name = canonical.name

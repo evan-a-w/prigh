@@ -97,7 +97,7 @@ let%expect_test
     ((spec acp:)
      (parsed
       ((Error
-        "unknown adapter \"acp:\": expected codex, claude, prigh or acp:<name>"))))
+        "unknown adapter \"acp:\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"))))
     ((spec deepseek/deepseek-flash) (parsed ()))
     ((spec anthropic/claude-haiku-4-5) (parsed ()))
     ((spec claude) (parsed ()))
@@ -882,7 +882,7 @@ let%expect_test
     Queue.enqueue ext_calls key;
     let text =
       match adapter with
-      | Acp _ -> "External ACP title"
+      | Acp _ | Backend _ -> "External ACP title"
       | Codex -> "feat/codex-branch"
       | Claude -> "Claude subagent"
       | Prigh -> "unused"

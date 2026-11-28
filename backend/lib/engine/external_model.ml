@@ -3,9 +3,12 @@ open! Import
 
 let fixed = [ "codex"; "claude" ]
 
-let is_adapter adapter =
-  List.mem fixed adapter ~equal:String.equal
-  || String.is_prefix adapter ~prefix:"acp:"
+let rec is_adapter adapter =
+  match String.chop_prefix adapter ~prefix:"backend:" with
+  | Some rest -> is_adapter rest
+  | None ->
+    List.mem fixed adapter ~equal:String.equal
+    || String.is_prefix adapter ~prefix:"acp:"
 ;;
 
 let default_id = "default"
@@ -29,14 +32,17 @@ let parse_spec s =
     then Some (Or_error.errorf "empty model name for %s" adapter)
     else (
       match Adapter_id.of_string adapter with
-      | Ok ((Codex | Claude | Acp _) as adapter_id) ->
+      | Ok ((Codex | Claude | Acp _ | Backend _) as adapter_id) ->
         Some (Ok (adapter_id, id))
       | Ok Prigh -> None
       | Error _ as e -> Some e)
   | Some _ -> None
-  | None when String.is_prefix s ~prefix:"acp:" ->
+  | None
+    when String.is_prefix s ~prefix:"acp:"
+         || String.is_prefix s ~prefix:"backend:" ->
     (match Adapter_id.of_string s with
-     | Ok (Acp _ as adapter_id) -> Some (Ok (adapter_id, default_id))
+     | Ok ((Acp _ | Backend _) as adapter_id) ->
+       Some (Ok (adapter_id, default_id))
      | Ok (Codex | Claude | Prigh) -> None
      | Error _ as e -> Some e)
   | None -> None

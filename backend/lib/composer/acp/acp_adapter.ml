@@ -5,6 +5,7 @@ module Codec = Acp_client_codec
 let capabilities_of
       ?(quirks = Acp_agent.Quirks.none)
       ?(compact_command = false)
+      ?(backend_hosted = false)
       (caps : Codec.Agent_capabilities.t option)
       (config : Codec.Session_config.t)
   : Capabilities.t
@@ -18,7 +19,8 @@ let capabilities_of
        | Between_turns -> Between_turns
        | Prompt | Xai_interject -> In_run)
   ; plan_mode =
-      List.exists config.modes ~f:(fun (m : Codec.Mode.t) ->
+      backend_hosted
+      || List.exists config.modes ~f:(fun (m : Codec.Mode.t) ->
         String.Caseless.equal m.id "plan")
   ; btw = false
   ; subagents = Unsupported
@@ -218,37 +220,50 @@ let create
       ?(load_quiet = Time_float.Span.of_sec 2.)
       ?(load_timeout = Time_float.Span.of_sec 90.)
       ?(autonomous_quiet = Time_float.Span.of_sec 5.)
+      ?(backend_hosted = false)
       (agent : Acp_agent.t)
   : Adapter.t
   =
   (module struct
     type nonrec t = t
 
-    let id = "acp:" ^ agent.name
-    let display_name = agent.display_name
+    let id = (if backend_hosted then "backend:acp:" else "acp:") ^ agent.name
+
+    let display_name =
+      if backend_hosted
+      then agent.display_name ^ " (backend)"
+      else agent.display_name
+    ;;
 
     let capabilities =
-      capabilities_of ~quirks:agent.quirks None Codec.Session_config.empty
+      capabilities_of
+        ~quirks:agent.quirks
+        ~backend_hosted
+        None
+        Codec.Session_config.empty
     ;;
 
     let current_capabilities t =
       capabilities_of
         ~quirks:agent.quirks
         ~compact_command:(Option.is_some (compact_command t))
+        ~backend_hosted
         (Codec.agent_capabilities t.codec)
         (Codec.session_config t.codec)
     ;;
 
     let native_questions = agent.quirks.xai_extensions
     let starts_early = true
+    let all_tools = backend_hosted
+    let on_backend = backend_hosted
     let takes_login = String.equal agent.name "antigravity"
 
     let launch (start : Adapter.Start.t) : Adapter.Launch.t =
-      match start.login with
-      | Some login when takes_login ->
+      if backend_hosted && takes_login
+      then (
         let l =
-          Antigravity_login.launch
-            login
+          Antigravity_login.launch_backend
+            ~credential:start.login
             ~refused:start.login_refused
             ~command:agent.command
         in
@@ -258,15 +273,31 @@ let create
         ; cwd = start.cwd
         ; mcp = true
         ; secret = l.secret
-        }
-      | Some _ | None ->
-        { argv = agent.command
-        ; env_set = []
-        ; env_unset = []
-        ; cwd = start.cwd
-        ; mcp = true
-        ; secret = None
-        }
+        })
+      else (
+        match start.login with
+        | Some login when takes_login ->
+          let l =
+            Antigravity_login.launch
+              login
+              ~refused:start.login_refused
+              ~command:agent.command
+          in
+          { argv = l.argv
+          ; env_set = l.env_set
+          ; env_unset = l.env_unset
+          ; cwd = start.cwd
+          ; mcp = true
+          ; secret = l.secret
+          }
+        | Some _ | None ->
+          { argv = agent.command
+          ; env_set = []
+          ; env_unset = []
+          ; cwd = start.cwd
+          ; mcp = true
+          ; secret = None
+          })
     ;;
 
     let launch_complete (start : Adapter.Start.t) : Adapter.Launch.t =
@@ -368,23 +399,26 @@ let create
       in
       let plan_changed = not (Option.equal Bool.equal t.plan (Some s.plan)) in
       let%bind () =
-        match plan_id with
-        | _ when not plan_changed -> Ok ()
-        | Some plan when s.plan && not in_plan ->
-          t.before_plan <- config.current_mode;
-          set_mode t plan
-        | Some _ when (not s.plan) && in_plan ->
-          let back =
-            Option.first_some
-              t.before_plan
-              (List.find_map config.modes ~f:(fun (m : Codec.Mode.t) ->
-                 Option.some_if (not (String.Caseless.equal m.id "plan")) m.id))
-          in
-          t.before_plan <- None;
-          (match back with
-           | Some mode -> set_mode t mode
-           | None -> Ok ())
-        | _ -> Ok ()
+        if backend_hosted
+        then Ok ()
+        else (
+          match plan_id with
+          | _ when not plan_changed -> Ok ()
+          | Some plan when s.plan && not in_plan ->
+            t.before_plan <- config.current_mode;
+            set_mode t plan
+          | Some _ when (not s.plan) && in_plan ->
+            let back =
+              Option.first_some
+                t.before_plan
+                (List.find_map config.modes ~f:(fun (m : Codec.Mode.t) ->
+                   Option.some_if (not (String.Caseless.equal m.id "plan")) m.id))
+            in
+            t.before_plan <- None;
+            (match back with
+             | Some mode -> set_mode t mode
+             | None -> Ok ())
+          | _ -> Ok ())
       in
       t.plan <- Some s.plan;
       let set_option ~what (option : Codec.Config_option.t) value =
@@ -499,7 +533,11 @@ let create
           (start : Adapter.Start.t)
       =
       let codec =
-        Codec.create ~quirks:agent.quirks ?cost_total:start.cost_total ()
+        Codec.create
+          ~quirks:agent.quirks
+          ~all_tools:backend_hosted
+          ?cost_total:start.cost_total
+          ()
       in
       let driver =
         Adapter.Driver.create
@@ -611,15 +649,54 @@ let create
       let can_resume =
         Option.value_map caps ~default:false ~f:(fun c -> c.resume_session)
       in
+      let system_prompt_append =
+        if
+          backend_hosted
+          && Option.value_map caps ~default:false ~f:(fun c ->
+            c.system_prompt_append)
+        then start.developer_instructions
+        else None
+      in
       let fresh () =
-        Turn_timings.phase "session/new" (fun () ->
-          Adapter.Driver.request
-            driver
-            (Codec.new_session codec ~cwd:start.cwd ~mcp_servers)
-            ~matches:(function
-            | Session_opened { kind = New_session; _ }
-            | Failed { kind = New_session; _ } -> true
-            | _ -> false))
+        let%bind opened =
+          Turn_timings.phase "session/new" (fun () ->
+            Adapter.Driver.request
+              driver
+              (Codec.new_session
+                 ?system_prompt_append
+                 codec
+                 ~cwd:start.cwd
+                 ~mcp_servers)
+              ~matches:(function
+              | Session_opened { kind = New_session; _ }
+              | Failed { kind = New_session; _ } -> true
+              | _ -> false))
+        in
+        match opened with
+        | Session_opened { kind = New_session; session_id; _ }
+          when backend_hosted && can_load && not (List.is_empty mcp_servers) ->
+          (* In agy 1.5.13's multi-session mode, [session/new] with a custom
+             [--agent] gives the model none of its [mcpServers]' tools, while
+             [session/load] applies the MCP overlay. Reloading the empty
+             session attaches the tools in a single pooled process. Wait for
+             the real response rather than [load]'s quiet-wait so a slow MCP
+             startup after an early notification cannot send the first prompt
+             before the overlay is attached. *)
+          Turn_timings.phase "session/load (mcp)" (fun () ->
+            Adapter.Driver.request
+              ~timeout:load_timeout
+              driver
+              (Codec.load_session
+                 ?system_prompt_append
+                 codec
+                 ~session_id
+                 ~cwd:start.cwd
+                 ~mcp_servers)
+              ~matches:(function
+              | Session_opened { kind = Load_session; _ }
+              | Failed { kind = Load_session; _ } -> true
+              | _ -> false))
+        | _ -> Ok opened
       in
       let%bind opened =
         (match start.resume with
@@ -628,6 +705,7 @@ let create
              Adapter.Driver.request
                driver
                (Codec.resume_session
+                  ?system_prompt_append
                   codec
                   ~session_id
                   ~cwd:start.cwd
@@ -641,6 +719,7 @@ let create
              load
                t
                (Codec.load_session
+                  ?system_prompt_append
                   codec
                   ~session_id
                   ~cwd:start.cwd
