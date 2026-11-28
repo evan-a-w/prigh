@@ -86,7 +86,7 @@ let%expect_test "initialize and session/new" =
       (capabilities
        ((load_session true) (resume_session true) (close_session false)
         (images true) (audio false) (embedded_context true) (mcp_http true)
-        (mcp_sse false)))
+        (mcp_sse false) (system_prompt_append false)))
       (auth_methods
        (((id login) (name "Log in") (description ("Run opencode auth login"))
          (terminal true))))))
@@ -358,7 +358,7 @@ let%expect_test
       (capabilities
        ((load_session false) (resume_session false) (close_session false)
         (images false) (audio false) (embedded_context false) (mcp_http false)
-        (mcp_sse false)))
+        (mcp_sse false) (system_prompt_append false)))
       (auth_methods ())))
     |}]
 ;;
@@ -571,7 +571,7 @@ let%expect_test "session/load drops the replay; other sessions and odd lines" =
       (capabilities
        ((load_session true) (resume_session true) (close_session false)
         (images true) (audio false) (embedded_context true) (mcp_http true)
-        (mcp_sse false)))
+        (mcp_sse false) (system_prompt_append false)))
       (auth_methods
        (((id login) (name "Log in") (description ("Run opencode auth login"))
          (terminal true))))))
@@ -1204,5 +1204,54 @@ let%expect_test
     approval kind=File_change -> edit {"path":"/home/u/.prigh/worktrees/app/feat/b.ml"}
     tool_start kind=Command -> bash {"command":"dune build @runtest"}
     approval kind=Command -> bash {"command":"dune build @runtest"}
+    |}]
+;;
+
+let%expect_test "system_prompt_append and all_tools mcp classification" =
+  let t = C.create ~all_tools:true () in
+  send (C.initialize t ~client_name:"prigh" ~client_version:"0.1");
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{},"close":{}},"_meta":{"antigravity":{"systemPrompt":{"append":true}}}}}}|};
+  send
+    (C.new_session
+       ~system_prompt_append:"Remote host: mac"
+       t
+       ~cwd:"/empty"
+       ~mcp_servers:[]);
+  recv t {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"s1"}}|};
+  ignore (Or_error.ok_exn (C.prompt t [ Text "run ls" ]) : C.Output.t list);
+  List.iter
+    [ {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c1","kind":"other","title":"mcp_prigh_bash","rawInput":{"command":"ls"}}}}|}
+    ; {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"c2","kind":"other","title":"mcp_prigh_read","rawInput":{"path":"a.ml"}}}}|}
+    ]
+    ~f:(fun line ->
+      List.iter (C.handle_line t line) ~f:(function
+        | Event (Tool_start { kind; native_name; input; _ }) ->
+          let c = Canonical_tool.of_start_all ~kind ~native_name ~input in
+          printf
+            "kind=%s -> %s %s\n"
+            (Sexp.to_string [%sexp (kind : Adapter_event.Tool_kind.t)])
+            c.name
+            (Jsonaf.to_string c.arguments)
+        | _ -> ()));
+  [%expect
+    {|
+    > {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false,"session":{"notices":{},"compaction":{}}},"clientInfo":{"name":"prigh","version":"0.1"}}}
+    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{},"close":{}},"_meta":{"antigravity":{"systemPrompt":{"append":true}}}}}}
+    (Response
+     (Initialized (protocol_version 1) (agent ())
+      (capabilities
+       ((load_session true) (resume_session true) (close_session true)
+        (images false) (audio false) (embedded_context false) (mcp_http false)
+        (mcp_sse false) (system_prompt_append true)))
+      (auth_methods ())))
+    > {"jsonrpc":"2.0","id":1,"method":"session/new","params":{"cwd":"/empty","mcpServers":[],"_meta":{"antigravity":{"systemPrompt":{"append":"Remote host: mac"}}}}}
+    < {"jsonrpc":"2.0","id":1,"result":{"sessionId":"s1"}}
+    (Response
+     (Session_opened (kind New_session) (session_id s1)
+      (config ((current_mode ()) (modes ()) (config_options ())))))
+    kind=(Mcp(server prigh)(tool bash)) -> bash {"command":"ls"}
+    kind=(Mcp(server prigh)(tool read)) -> read {"path":"a.ml"}
     |}]
 ;;

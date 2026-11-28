@@ -43,6 +43,9 @@ module Agent_capabilities : sig
     ; embedded_context : bool
     ; mcp_http : bool
     ; mcp_sse : bool
+    ; system_prompt_append : bool
+      (** [_meta.antigravity.systemPrompt.append]: accepts appended system
+          prompt text in [session/new] *)
     }
   [@@deriving sexp_of, equal]
 end
@@ -204,7 +207,12 @@ type t
 (** [cost_total]: the running cost total ([usage_update.cost]) the session
     to resume reported last: the first live update counts only what came
     after it. *)
-val create : ?quirks:Acp_agent.Quirks.t -> ?cost_total:float -> unit -> t
+val create
+  :  ?quirks:Acp_agent.Quirks.t
+  -> ?all_tools:bool
+  -> ?cost_total:float
+  -> unit
+  -> t
 
 (** The session's running cost total, as the agent reported it last. *)
 val cost_total : t -> float option
@@ -212,12 +220,18 @@ val cost_total : t -> float option
 (** [initialize] with protocol version 1. *)
 val initialize : t -> client_name:string -> client_version:string -> string
 
-val new_session : t -> cwd:string -> mcp_servers:Mcp_server.t list -> string
+val new_session
+  :  ?system_prompt_append:string
+  -> t
+  -> cwd:string
+  -> mcp_servers:Mcp_server.t list
+  -> string
 
 (** [session/load]: the agent replays the session's history as updates,
     which are dropped until the response. *)
 val load_session
-  :  t
+  :  ?system_prompt_append:string
+  -> t
   -> session_id:string
   -> cwd:string
   -> mcp_servers:Mcp_server.t list
@@ -226,7 +240,8 @@ val load_session
 (** [session/resume] (when {!Agent_capabilities.t.resume_session}): no
     replay. *)
 val resume_session
-  :  t
+  :  ?system_prompt_append:string
+  -> t
   -> session_id:string
   -> cwd:string
   -> mcp_servers:Mcp_server.t list

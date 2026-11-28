@@ -312,7 +312,12 @@ let plan_step json =
   | None, _ -> None
 ;;
 
-let of_start ~(kind : Adapter_event.Tool_kind.t) ~native_name ~input =
+let of_start_with
+      ~all_tools
+      ~(kind : Adapter_event.Tool_kind.t)
+      ~native_name
+      ~input
+  =
   let keep () = { name = native_name; arguments = input; native_name } in
   match kind with
   | Command ->
@@ -383,8 +388,13 @@ let of_start ~(kind : Adapter_event.Tool_kind.t) ~native_name ~input =
        }
      | None, None -> keep ())
   | Mcp { server; tool } ->
+    let canonical =
+      if all_tools
+      then Injected_tools.canonical_of_mcp_all ~server ~tool
+      else Injected_tools.canonical_of_mcp ~server ~tool
+    in
     { name =
-        (match Injected_tools.canonical_of_mcp ~server ~tool with
+        (match canonical with
          | Some name -> name
          | None -> Mcp_tools.tool_name ~server ~tool)
     ; arguments = input
@@ -420,6 +430,9 @@ let of_start ~(kind : Adapter_event.Tool_kind.t) ~native_name ~input =
      | None -> keep ())
   | Other _ -> keep ()
 ;;
+
+let of_start = of_start_with ~all_tools:false
+let of_start_all = of_start_with ~all_tools:true
 
 let with_headers ~path diff =
   let diff =

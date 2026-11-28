@@ -37,6 +37,8 @@ let capabilities : Capabilities.t =
 let current_capabilities _ = capabilities
 let native_questions = true
 let starts_early = false
+let all_tools = false
+let on_backend = false
 
 (* Claude Code asks ([can_use_tool]) before every tool that is not
    read-only, in every prigh mode: prigh's approval (the session's mode, its

@@ -405,8 +405,17 @@ let%expect_test "newest first, a CLI's models in its own order where they stand"
     ; model "anthropic" "haiku" "Haiku"
     ]
   |> List.iter ~f:(fun (m : Prigh_protocol.Model.t) -> print_endline m.key);
-  List.iter [ "acp:opencode"; "acp:goose"; "custom" ] ~f:(fun p ->
-    printf "%s: %s\n" p (Prigh_web.Provider_mark.letter p));
+  List.iter
+    [ "acp:opencode"; "acp:goose"; "backend:acp:antigravity"; "custom" ]
+    ~f:(fun p -> printf "%s: %s\n" p (Prigh_web.Provider_mark.letter p));
+  printf
+    "of_model: %s\n"
+    (Prigh_web.Provider_mark.of_model
+       ~provider:"backend:acp:antigravity"
+       ~name:"Gemini 2.5 Pro");
+  printf
+    "label: %s\n"
+    (Prigh_protocol.Session_engine.adapter_label "backend:acp:antigravity");
   [%expect
     {|
     anthropic/opus-5
@@ -418,6 +427,9 @@ let%expect_test "newest first, a CLI's models in its own order where they stand"
     anthropic/haiku
     acp:opencode: O
     acp:goose: G
+    backend:acp:antigravity: A
     custom: C
+    of_model: Gemini 2.5 Pro
+    label: Antigravity (backend)
     |}]
 ;;

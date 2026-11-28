@@ -243,8 +243,13 @@ let take_preapproved t ~tool ~args =
 let injected t (s : Engine_intf.Services.t) =
   let (module A : Adapter.S) = t.adapter in
   let native_questions = A.native_questions in
-  Injected_tools.create
-    ~tools:(Injected_tools.select ~native_questions s.tools)
+  let tools =
+    if A.all_tools
+    then Injected_tools.select_all ~native_questions s.tools
+    else Injected_tools.select ~native_questions s.tools
+  in
+  (if A.all_tools then Injected_tools.create_all else Injected_tools.create)
+    ~tools
     ~execute:(fun tool args ->
       match t.services with
       | None -> Tool_result.error "no turn is running"
@@ -498,18 +503,21 @@ let live_now
     Or_error.errorf "%s is not running" A.display_name
   | _ ->
     let host = t.host () in
-    (* The session moved to another tool host: its harness runs there now,
-     on a thread of its own there. *)
+    (* The session moved to another tool host: a tool-host harness runs there
+       now, on a thread of its own there. A backend-hosted harness stays alive
+       on the backend and routes tools to the new host/cwd. *)
     (match t.live with
      | Some (Live ((module A), a))
-       when not (Option.equal String.equal t.live_host (Some host)) ->
+       when (not A.on_backend)
+            && not (Option.equal String.equal t.live_host (Some host)) ->
        A.stop a;
        t.live <- None;
        t.live_cwd <- None;
        t.thread_id <- None;
        t.models <- []
      | Some (Live ((module A), a))
-       when A.starts_early
+       when (not A.on_backend)
+            && A.starts_early
             && not (Option.equal String.equal t.live_cwd (Some s.cwd)) ->
        A.stop a;
        t.live <- None;
@@ -688,14 +696,16 @@ let prewarm t (s : Engine_intf.Services.t) input =
       match t.live with
       | Some (Live ((module L), a)) ->
         L.alive a
-        && Option.equal String.equal t.live_host (Some host)
-        && Option.equal String.equal t.live_cwd (Some s.cwd)
+        && (L.on_backend
+            || (Option.equal String.equal t.live_host (Some host)
+                && Option.equal String.equal t.live_cwd (Some s.cwd)))
       | None -> false
     in
     if not up
     then (
       let already_warming =
         match t.warming with
+        | Some _ when A.on_backend -> true
         | Some w when String.equal w.host host && String.equal w.cwd s.cwd ->
           true
         | Some w ->
@@ -996,7 +1006,9 @@ and run_turn'
   let before = ref None in
   let cost_total = ref None in
   let recorder =
-    Composer_recorder.create
+    (if A.all_tools
+     then Composer_recorder.create_all
+     else Composer_recorder.create)
       ~adapter:A.id
       ~model:(Option.first_some input.model t.thread_model)
       ~cwd:s.cwd
@@ -1186,7 +1198,12 @@ and run_turn'
                         | None -> kind_name kind, None
                       in
                       let canonical =
-                        Canonical_tool.of_start ~kind ~native_name ~input
+                        (if A.all_tools
+                         then Canonical_tool.of_start_all
+                         else Canonical_tool.of_start)
+                          ~kind
+                          ~native_name
+                          ~input
                       in
                       (* Where the harness runs it (Codex says), for the
                       rules: else the session's. *)
@@ -1208,7 +1225,9 @@ and run_turn'
                         match kind with
                         | Mcp { server; tool = mcp_tool } ->
                           Option.is_some
-                            (Injected_tools.canonical_of_mcp
+                            ((if A.all_tools
+                              then Injected_tools.canonical_of_mcp_all
+                              else Injected_tools.canonical_of_mcp)
                                ~server
                                ~tool:mcp_tool)
                         | _ -> false

@@ -31,7 +31,12 @@ let icon provider : Html.Icon.t option =
 
 (* An ACP agent offers other makers' models: each shows its maker's. *)
 let of_model ~provider ~name =
-  if String.is_prefix provider ~prefix:"acp:"
+  let inner =
+    Option.value
+      (String.chop_prefix provider ~prefix:"backend:")
+      ~default:provider
+  in
+  if String.is_prefix inner ~prefix:"acp:"
   then (
     let n = String.lowercase name in
     if
@@ -46,6 +51,11 @@ let of_model ~provider ~name =
 ;;
 
 let letter provider =
+  let provider =
+    Option.value
+      (String.chop_prefix provider ~prefix:"backend:")
+      ~default:provider
+  in
   let provider =
     Option.value (String.chop_prefix provider ~prefix:"acp:") ~default:provider
   in

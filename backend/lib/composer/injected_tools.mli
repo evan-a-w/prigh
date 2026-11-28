@@ -32,11 +32,21 @@ val default_names : native_questions:bool -> string list
     {!default_names}, in that order. *)
 val select : native_questions:bool -> Tool.t list -> Tool.t list
 
+(** All non-native tools in [tools] (file, shell, search, interaction,
+    session, subagent, computer, and host MCP tools), excluding [ask_user]
+    only when [native_questions] is true: for a backend-hosted harness whose
+    own built-in tools are disabled. *)
+val select_all : native_questions:bool -> Tool.t list -> Tool.t list
+
 (** The prigh tool an MCP call of the harness is, when it is one of ours:
     [canonical_of_mcp ~server:"prigh" ~tool:"render_ui"] is
     [Some "render_ui"], so the recorder shows (and frontends render) it as
     the prigh tool itself. [None] for other servers and unknown tools. *)
 val canonical_of_mcp : server:string -> tool:string -> string option
+
+(** Like {!canonical_of_mcp}, for backend-hosted harnesses where every prigh
+    tool (including [bash], [read], [edit], etc.) is served on [prigh]. *)
+val canonical_of_mcp_all : server:string -> tool:string -> string option
 
 (** The tool's MCP content: [text] (when non-empty, or when there are no
     images) then the images, with [isError]. *)
@@ -47,6 +57,13 @@ type t
 (** [execute tool arguments] runs a call (blocking: [ask_user] waits for
     the user). Exceptions it raises become error results. *)
 val create
+  :  tools:Tool.t list
+  -> execute:(Tool.t -> Json.t -> Tool_result.t)
+  -> t
+
+(** Like {!create}, for backend-hosted harnesses where all prigh tools run
+    through this server. *)
+val create_all
   :  tools:Tool.t list
   -> execute:(Tool.t -> Json.t -> Tool_result.t)
   -> t

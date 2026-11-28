@@ -34,6 +34,15 @@ val create
   -> prompts:Message.t list
   -> t
 
+val create_all
+  :  adapter:string
+  -> model:string option
+  -> cwd:string
+  -> emit:(Agent_event.t -> unit)
+  -> notice:(string -> unit)
+  -> prompts:Message.t list
+  -> t
+
 val feed : t -> Adapter_event.t -> unit
 
 (** The harness was handed a turn: emits [Agent_waiting], and again

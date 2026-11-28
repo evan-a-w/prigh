@@ -23,6 +23,12 @@ val of_start
   -> input:Json.t
   -> t
 
+val of_start_all
+  :  kind:Adapter_event.Tool_kind.t
+  -> native_name:string
+  -> input:Json.t
+  -> t
+
 (** The tool result text prigh's own tool would have given: for file
     changes, the diffs the frontends render ([edit]: the unified diff;
     [apply_patch]: its [Success.] summary and diffs); otherwise [output]. *)

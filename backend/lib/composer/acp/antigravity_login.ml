@@ -74,6 +74,83 @@ while kill -0 "$c" 2>/dev/null; do wait "$c"; s=$?; done
 exit "$s"|}
 ;;
 
+let backend_agent_name = "prigh-backend"
+
+let backend_agent_md =
+  {|---
+name: prigh-backend
+description: Prigh backend-hosted agent
+mainAgent: true
+excludeDefaultComponents: true
+inheritCustomizations: false
+tools: []
+---
+You are a coding assistant driven by prigh. Use only the MCP tools provided by the `prigh` MCP server to inspect files, edit code, run commands, and interact with the user's workspace on their active tool host.
+|}
+;;
+
+let backend_wrapper =
+  sprintf
+    {|set -u
+m=$(umask)
+umask 077
+base=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
+{ [ -d "$base" ] && [ -w "$base" ]; } || base=/tmp
+for old in "$base"/prigh-agy.*; do
+  [ -d "$old" ] && [ -O "$old" ] || continue
+  pid=${old#"$base"/prigh-agy.}
+  pid=${pid%%.*}
+  kill -0 "$pid" 2>/dev/null || rm -rf "$old"
+done
+d=$(mktemp -d "$base/prigh-agy.$$.XXXXXX") || exit 1
+trap 'rm -rf "$d"' EXIT
+g=$HOME/.gemini
+mkdir -p "$g/antigravity-cli/conversations" "$g/antigravity-cli/brain" "$g/antigravity-cli/implicit" "$g/antigravity-cli/log" "$d/antigravity-cli" "$d/config/agents" "$d/cwd"
+cat >"$d/config/agents/%s.md" <<'PRIGH_BACKEND_AGENT_EOF'
+%sPRIGH_BACKEND_AGENT_EOF
+use_token=0
+if [ -n "${PRIGH_AGY_TOKEN_FD:-}" ] || [ -n "${PRIGH_AGY_TOKEN:-}" ]; then
+  use_token=1
+fi
+for f in "$g/antigravity-cli"/* "$g/antigravity-cli"/.[!.]*; do
+  { [ -e "$f" ] || [ -L "$f" ]; } || continue
+  if [ "$use_token" = 1 ]; then
+    case ${f##*/} in
+      antigravity-oauth-token*) continue ;;
+    esac
+  fi
+  ln -s "$f" "$d/antigravity-cli/"
+done
+if [ "$use_token" = 1 ]; then
+  t=$d/antigravity-cli/antigravity-oauth-token
+  if [ -n "${PRIGH_AGY_TOKEN_FD:-}" ]; then
+    cat <&"$PRIGH_AGY_TOKEN_FD" >"$t"
+    eval "exec $PRIGH_AGY_TOKEN_FD<&-"
+    unset PRIGH_AGY_TOKEN_FD
+  else
+    printf '%%s\n' "${PRIGH_AGY_TOKEN:-}" >"$t"
+  fi
+  unset PRIGH_AGY_TOKEN
+fi
+umask "$m"
+cd "$d/cwd" || exit 1
+if [ "$use_token" = 1 ]; then
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/prigh-agy "$@" --agent %s --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir "$d" <&0 &
+else
+  "$@" --agent %s --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir "$d" <&0 &
+fi
+c=$!
+trap 'kill -TERM "$c" 2>/dev/null' TERM HUP INT
+wait "$c"
+s=$?
+while kill -0 "$c" 2>/dev/null; do wait "$c"; s=$?; done
+exit "$s"|}
+    backend_agent_name
+    backend_agent_md
+    backend_agent_name
+    backend_agent_name
+;;
+
 module Launch = struct
   type t =
     { argv : string list
@@ -103,6 +180,26 @@ let launch credential ~refused ~command : Launch.t =
   | Error _ -> { argv = command; env_set = []; env_unset = []; secret = None }
   | Ok resolved ->
     { argv = [ "bash"; "-c"; wrapper; "agy" ] @ command
+    ; env_set = []
+    ; env_unset = competing
+    ; secret =
+        Some
+          { fd_env
+          ; env = token_env
+          ; value =
+              Oauth_antigravity.agy_token_document
+                ~access:resolved.token
+                ~expires_ms:(Option.value_exn resolved.expires_ms)
+          }
+    }
+;;
+
+let launch_backend ~credential ~refused ~command : Launch.t =
+  let argv = [ "bash"; "-c"; backend_wrapper; "agy" ] @ command in
+  match Option.bind credential ~f:(fun c -> Result.ok (fetch c ~refused)) with
+  | None -> { argv; env_set = []; env_unset = []; secret = None }
+  | Some resolved ->
+    { argv
     ; env_set = []
     ; env_unset = competing
     ; secret =
@@ -160,4 +257,6 @@ let refused_hint t =
 
 module For_testing = struct
   let wrapper = wrapper
+  let backend_wrapper = backend_wrapper
+  let backend_agent_name = backend_agent_name
 end

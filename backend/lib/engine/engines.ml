@@ -32,13 +32,20 @@ let split s =
   |> List.filter ~f:(fun s -> not (String.is_empty s))
 ;;
 
-(* [acp:name=command args] names an ACP agent and how to start it. *)
+(* [acp:name=command args] (or [backend:acp:name=command args]) names an ACP
+   agent and how to start it. *)
 let adapter_of_flag s =
   let open Or_error.Let_syntax in
-  match String.chop_prefix s ~prefix:"acp:" with
+  let on_backend, rest =
+    match String.chop_prefix s ~prefix:"backend:" with
+    | Some rest -> true, rest
+    | None -> false, s
+  in
+  let wrap id = if on_backend then Adapter_id.Backend id else id in
+  match String.chop_prefix rest ~prefix:"acp:" with
   | Some spec when String.mem spec '=' ->
     let%map agent = Acp_agent.of_spec spec in
-    Adapter_id.Acp agent.name, Some agent
+    wrap (Adapter_id.Acp agent.name), Some agent
   | _ ->
     let%map id = Adapter_id.of_string s in
     id, None
@@ -97,6 +104,8 @@ let acp_agent t name =
 let drivable t : Adapter_id.t -> bool = function
   | Codex | Claude | Prigh -> true
   | Acp name -> Option.is_some (acp_agent t name)
+  | Backend (Acp "antigravity") -> Option.is_some (acp_agent t "antigravity")
+  | Backend _ -> false
 ;;
 
 let unknown_acp name =
@@ -117,6 +126,11 @@ let check_build t =
          ~sep:"; "
          (List.map missing ~f:(function
             | Acp name -> unknown_acp name
+            | Backend inner ->
+              sprintf
+                "the composer can't run %s on the backend yet (only \
+                 backend:acp:antigravity is supported)"
+                (Adapter_id.label inner)
             | a -> sprintf "the composer can't drive %s" (Adapter_id.label a))))
 ;;
 

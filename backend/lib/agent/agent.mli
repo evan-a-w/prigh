@@ -1251,6 +1251,12 @@ val active_host_name : t -> string
     harness. *)
 val user_instructions : t -> string option
 
+(** The harness's full system prompt (including active tool host, cwd,
+    project instructions, skills, and custom instructions), for a
+    backend-hosted external CLI whose own built-in prompt and tools are
+    disabled. *)
+val full_system_prompt : t -> string
+
 (** Where the session runs, as it records it ({!Session.Host}): the active
     host, connected or not, and the cwd there; [None] while it has none. *)
 val location : t -> (Session.Host.t * string) option
