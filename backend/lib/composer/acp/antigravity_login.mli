@@ -46,8 +46,7 @@ val launch
   -> Launch.t
 
 (** How to run [command] ([agy acp]) on the backend with its built-in tools
-    disabled (using [--process-per-session] so each ACP session boots its own
-    worker with its [mcpServers] overlay, a generated custom agent with
+    disabled (using a generated custom agent with
     [excludeDefaultComponents: true], [inheritCustomizations: false],
     [tools: []], [--include-default-customizations=false], and
     [--dangerously-skip-permissions]), an isolated empty working directory,

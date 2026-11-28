@@ -658,18 +658,45 @@ let create
         else None
       in
       let fresh () =
-        Turn_timings.phase "session/new" (fun () ->
-          Adapter.Driver.request
-            driver
-            (Codec.new_session
-               ?system_prompt_append
-               codec
-               ~cwd:start.cwd
-               ~mcp_servers)
-            ~matches:(function
-            | Session_opened { kind = New_session; _ }
-            | Failed { kind = New_session; _ } -> true
-            | _ -> false))
+        let%bind opened =
+          Turn_timings.phase "session/new" (fun () ->
+            Adapter.Driver.request
+              driver
+              (Codec.new_session
+                 ?system_prompt_append
+                 codec
+                 ~cwd:start.cwd
+                 ~mcp_servers)
+              ~matches:(function
+              | Session_opened { kind = New_session; _ }
+              | Failed { kind = New_session; _ } -> true
+              | _ -> false))
+        in
+        match opened with
+        | Session_opened { kind = New_session; session_id; _ }
+          when backend_hosted && can_load && not (List.is_empty mcp_servers) ->
+          (* In agy 1.5.13's multi-session mode, [session/new] with a custom
+             [--agent] gives the model none of its [mcpServers]' tools, while
+             [session/load] applies the MCP overlay. Reloading the empty
+             session attaches the tools in a single pooled process. Wait for
+             the real response rather than [load]'s quiet-wait so a slow MCP
+             startup after an early notification cannot send the first prompt
+             before the overlay is attached. *)
+          Turn_timings.phase "session/load (mcp)" (fun () ->
+            Adapter.Driver.request
+              ~timeout:load_timeout
+              driver
+              (Codec.load_session
+                 ?system_prompt_append
+                 codec
+                 ~session_id
+                 ~cwd:start.cwd
+                 ~mcp_servers)
+              ~matches:(function
+              | Session_opened { kind = Load_session; _ }
+              | Failed { kind = Load_session; _ } -> true
+              | _ -> false))
+        | _ -> Ok opened
       in
       let%bind opened =
         (match start.resume with
