@@ -517,11 +517,10 @@ module Action = struct
     | Model_menu_more (** "Show more": the provider's older models *)
     | Model_menu_access (** opens or closes the access menu in its foot *)
     | Model_menu_engine
-    (** opens or closes the engine menu in its foot (asking the adapters'
+    (** opens or closes the mode selector in its foot (asking the adapters'
         health the first time) *)
-    | Model_menu_engine_pick of string
-    (** a choice of the engine menu, by key: switches this session (a fresh
-        one gives way to a new session on it, as the engine chip) *)
+    | Model_menu_mode_pick of Engine_mode.t
+    (** switches the browsed execution mode in the model menu *)
     | Model_menu_engine_picker (** Alt+E: the engine picker, by keyboard *)
     | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
     | Toggle_favourite of string option
@@ -2256,6 +2255,12 @@ let compact_tokens n =
   else Int.to_string n
 ;;
 
+let provider_display_name (m : Model.t) id =
+  List.find m.auth ~f:(fun (s : Auth_status.t) -> String.equal s.provider id)
+  |> Option.value_map ~default:(Session_engine.harness_label id) ~f:(fun s ->
+    s.name)
+;;
+
 (* Those that can be used first, each provider's together. *)
 let models_picker
       ?(query = "")
@@ -2271,9 +2276,13 @@ let models_picker
   in
   let known = not (List.is_empty m.auth) in
   let usable (model : Llm.t) = (not known) || logged_in m model.provider in
+  let is_current (model : Llm.t) =
+    Option.equal String.equal current (Some model.key)
+  in
   let models =
     List.filter m.models ~f:(fun (model : Llm.t) ->
-      (not model.legacy) || Option.equal String.equal current (Some model.key))
+      is_current model
+      || ((not model.legacy) && not (String.equal model.id "default")))
   in
   let first (model : Llm.t) =
     List.findi m.models ~f:(fun _ (other : Llm.t) ->
@@ -2286,22 +2295,37 @@ let models_picker
       | 0 -> Int.compare (first a) (first b)
       | c -> c)
   in
+  let multi_mode = List.length (Engine_mode.deployed_modes (deployed m)) > 1 in
   let items =
     List.map models ~f:(fun model ->
+      let label =
+        if multi_mode
+        then Engine_mode.format_model ~name:model.name ~provider:model.provider
+        else model.name
+      in
+      let provider_name = provider_display_name m model.provider in
+      let mode_str =
+        Engine_mode.to_string (Engine_mode.of_provider model.provider)
+      in
+      let search =
+        if multi_mode
+        then sprintf "%s @ %s %s %s" model.name mode_str provider_name model.key
+        else model.name ^ " " ^ model.provider ^ " " ^ model.key
+      in
       Picker.Item.create
         ~id:model.key
         ~detail:
           (sprintf
              "%s%s%s"
-             model.provider
+             provider_name
              (if model.context_window > 0
               then sprintf ", %s ctx" (compact_tokens model.context_window)
               else "")
              (if usable model then "" else ", not logged in"))
-        ~search:(model.name ^ " " ^ model.provider ^ " " ^ model.key)
-        ~marked:(Option.equal String.equal current (Some model.key))
+        ~search
+        ~marked:(is_current model)
         ~dimmed:(not (usable model))
-        model.name)
+        label)
   in
   Picker.create ~query ~title (leading @ items)
 ;;
@@ -4196,8 +4220,20 @@ let offered_models (m : Model.t) =
   Model_menu.offered m.models ~auth:m.auth ~current:(menu_model_key m)
 ;;
 
+let has_pending_host_models (m : Model.t) =
+  List.exists m.models ~f:(fun (model : Llm.t) ->
+    Engine_mode.equal (Engine_mode.of_provider model.provider) Host
+    && String.equal model.id "default")
+;;
+
+let probe_host_if_needed (m : Model.t) mode =
+  if Engine_mode.equal mode Host && has_pending_host_models m
+  then [ rpc "list_models" [ "probe_host", `True ] ~tag:Models ]
+  else []
+;;
+
 (* Unfiltered, the tab's rows (and "Show more"); filtered, every provider's
-   models on offer, best first. *)
+   models on offer in the active mode, best first. *)
 let model_menu_picker ?(query = "") (m : Model.t) =
   let current = menu_model_key m in
   let offered = offered_models m in
@@ -4230,11 +4266,12 @@ let model_menu_picker ?(query = "") (m : Model.t) =
              (sprintf "Show %d more" more)
          ]
        else []))
-  else
+  else (
+    let in_mode = Model_menu.models_for_mode m.model_menu.mode offered in
     Picker.create
       ~query
       ~title:"Model"
-      (List.map (Model_menu.newest_first offered) ~f:item)
+      (List.map (Model_menu.newest_first in_mode) ~f:item))
 ;;
 
 let with_model_menu (m : Model.t) ?query model_menu =
@@ -4297,15 +4334,20 @@ let open_chip (m : Model.t) (chip : Chip.t) =
        | Model | Attach -> Model)
   | _ ->
     current_state m ~f:(fun state ->
-      let m =
+      let m, extra_cmds =
         match chip with
         | Model ->
-          { m with
-            model_menu =
-              Model_menu.opening (offered_models m) ~current:(menu_model_key m)
-          ; context_card = false
-          }
-        | Host | Attach -> { m with context_card = false }
+          let mode = Engine_mode.of_engine state.engine in
+          ( { m with
+              model_menu =
+                Model_menu.opening
+                  (offered_models m)
+                  ~mode
+                  ~current:(menu_model_key m)
+            ; context_card = false
+            }
+          , probe_host_if_needed m mode )
+        | Host | Attach -> { m with context_card = false }, []
       in
       let picker =
         match chip with
@@ -4322,7 +4364,7 @@ let open_chip (m : Model.t) (chip : Chip.t) =
              | Attach -> "popover-list")
           (Popover { chip; picker })
       in
-      m, cmds @ [ Command.Place_popover ])
+      m, cmds @ [ Command.Place_popover ] @ extra_cmds)
 ;;
 
 (* A choice made in the model's menu keeps the keyboard in it: Esc still
@@ -6957,11 +6999,16 @@ let model_menu_engine (m : Model.t) =
   else m, []
 ;;
 
-let model_menu_engine_pick (m : Model.t) key =
-  let m = close_engine_menu m in
-  if Model.running m
-  then toast m engine_busy
-  else engine_chosen m ~switch:(not (fresh m)) key
+let model_menu_mode_pick (m : Model.t) mode =
+  let model_menu =
+    Model_menu.set_mode
+      ?current:(menu_model_key m)
+      m.model_menu
+      mode
+      (offered_models m)
+  in
+  let m, cmds = with_model_menu m ~query:"" model_menu in
+  hub_keeps_focus m (m, cmds @ probe_host_if_needed m mode)
 ;;
 
 let model_menu_engine_picker (m : Model.t) =
@@ -10393,18 +10440,20 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Models, Ok json ->
     decode m json (decode_list Llm.of_json) ~f:(fun models ->
       let m = { m with models } in
-      (* Another engine's models: the menu opens on the new current one's
-         provider rather than on one that offers nothing now. *)
+      (* Keep the browsed mode; if the selected provider tab is no longer
+         offered in it, fall back to the current model's provider in that
+         mode or its first provider. *)
       let offered = offered_models m in
+      let mode = m.model_menu.mode in
       let model_menu =
         if
           List.mem
-            (Model_menu.tabs offered)
+            (Model_menu.tabs ~mode offered)
             m.model_menu.tab
             ~equal:Model_menu.Tab.equal
         then m.model_menu
         else
-          { (Model_menu.opening offered ~current:(menu_model_key m)) with
+          { (Model_menu.opening offered ~mode ~current:(menu_model_key m)) with
             access_open = m.model_menu.access_open
           ; engine_open = m.model_menu.engine_open
           }
@@ -12798,7 +12847,7 @@ let update_connected (m : Model.t) (action : Action.t) =
       }
     , [] )
   | Model_menu_engine -> model_menu_engine m
-  | Model_menu_engine_pick key -> model_menu_engine_pick m key
+  | Model_menu_mode_pick mode -> model_menu_mode_pick m mode
   | Model_menu_engine_picker -> model_menu_engine_picker m
   | Model_menu_nth n -> model_menu_nth m n
   | Toggle_favourite key ->

@@ -18,3 +18,6 @@ val letter : string -> string
 
 (** The logo, or the name's first letter for a provider without one. *)
 val view : ?cls:string -> string -> Node.t
+
+(** Icon for an execution mode in the model picker's mode selector. *)
+val mode_icon : Engine_mode.t -> Html.Icon.t

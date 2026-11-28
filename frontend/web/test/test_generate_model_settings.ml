@@ -39,10 +39,10 @@ let%expect_test "drafting model: shown, picked, back to the default" =
     (Close (Esc))
     []
     Default the session's model ✓
-    Claude Opus 5.5 anthropic, 200k ctx
-    Claude Sonnet 5 anthropic, 200k ctx
-    GPT-6 openai, 200k ctx, not logged in
-    DeepSeek Chat deepseek, 200k ctx, not logged in
+    Claude Opus 5.5 Anthropic, 200k ctx
+    Claude Sonnet 5 Anthropic, 200k ctx
+    GPT-6 OpenAI API, 200k ctx, not logged in
+    DeepSeek Chat DeepSeek, 200k ctx, not logged in
     ↑↓ to move, Enter to choose, Esc to close
     |}];
   H.quiet h (fun () -> H.act h (Picker_query "sonnet"));
@@ -75,7 +75,7 @@ let%expect_test "drafting model: shown, picked, back to the default" =
   [%expect
     {|
     (Run /generate-model)
-    Claude Sonnet 5 anthropic, 200k ctx ✓
+    Claude Sonnet 5 Anthropic, 200k ctx ✓
     Dialog_accept
     (Focus dialog)
     (Rpc (method_ set_config) (params ((config ((generate_model null)))))
@@ -103,10 +103,10 @@ let%expect_test
     (Close (Esc))
     []
     Default the session's model ✓
-    Claude Opus 5.5 anthropic, 200k ctx
-    Claude Sonnet 5 anthropic, 200k ctx
-    GPT-6 openai, 200k ctx, not logged in
-    DeepSeek Chat deepseek, 200k ctx, not logged in
+    Claude Opus 5.5 Anthropic, 200k ctx
+    Claude Sonnet 5 Anthropic, 200k ctx
+    GPT-6 OpenAI API, 200k ctx, not logged in
+    DeepSeek Chat DeepSeek, 200k ctx, not logged in
     ↑↓ to move, Enter to choose, Esc to close
     Close_dialog
     |}];

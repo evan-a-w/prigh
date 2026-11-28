@@ -7,11 +7,23 @@ open Settings_row
 let waiting = "muted", "Waiting for the backend's settings…"
 
 let model_name (m : App.Model.t) key =
+  let multi_mode =
+    List.length (Engine_mode.deployed_modes (App.deployed m)) > 1
+  in
   match
     List.find m.models ~f:(fun (model : Llm.t) -> String.equal model.key key)
   with
-  | Some model -> model.name
-  | None -> key
+  | Some model ->
+    if multi_mode
+    then Engine_mode.format_model ~name:model.name ~provider:model.provider
+    else model.name
+  | None ->
+    if multi_mode
+    then (
+      match String.lsplit2 key ~on:'/' with
+      | Some (provider, id) -> Engine_mode.format_model ~name:id ~provider
+      | None -> key)
+    else key
 ;;
 
 let host_name (m : App.Model.t) id =

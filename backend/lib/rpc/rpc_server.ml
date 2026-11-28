@@ -2105,7 +2105,13 @@ let can_probe_adapter t agent (a : Adapter_id.t) =
 
 (* Models for an external adapter (bridge or host), triggering a background
    catalog fetch if none is cached yet and its execution host is reachable. *)
-let adapter_models_for ?(probe = true) t agent (a : Adapter_id.t) =
+let adapter_models_for
+      ?(probe = true)
+      ?(probe_host = false)
+      t
+      agent
+      (a : Adapter_id.t)
+  =
   let adapter = Adapter_id.to_string a in
   let is_current =
     match Agent.engine_choice agent with
@@ -2123,18 +2129,18 @@ let adapter_models_for ?(probe = true) t agent (a : Adapter_id.t) =
      | None ->
        if
          probe
-         && (is_current || Adapter_id.on_backend a)
+         && (is_current || Adapter_id.on_backend a || probe_host)
          && can_probe_adapter t agent a
          && ((not is_current) || not (Agent.external_live agent))
        then ensure_catalog_for t agent a;
        [ External_model.pending ~adapter ])
 ;;
 
-let all_external_adapter_models ?probe t agent ~skip =
+let all_external_adapter_models ?probe ?probe_host t agent ~skip =
   List.concat_map (external_adapters t) ~f:(fun a ->
     if Option.equal Adapter_id.equal skip (Some a)
     then []
-    else adapter_models_for ?probe t agent a)
+    else adapter_models_for ?probe ?probe_host t agent a)
 ;;
 
 let harness_deployed t =
@@ -6059,6 +6065,11 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some (ok (`Object []))
   | "list_models" ->
     let agent = client.agent in
+    let probe_host =
+      match param params "probe_host" with
+      | Some `True -> true
+      | _ -> false
+    in
     let harness_models () =
       let models = Login_manager.models t.login in
       Model_registry.reload models;
@@ -6074,7 +6085,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
          && not (lists_no_models t agent)
        then ensure_catalog t agent;
        let extras =
-         all_external_adapter_models t agent ~skip:(Some a)
+         all_external_adapter_models ~probe_host t agent ~skip:(Some a)
          @ if harness_deployed t then harness_models () else []
        in
        Some (ok (`Array (List.map (models @ extras) ~f:Rpc_json.model)))
@@ -6090,7 +6101,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
        Some (ok (`Array (List.map models ~f:Rpc_json.model)))
      | None, _ ->
        let models =
-         harness_models () @ all_external_adapter_models t agent ~skip:None
+         harness_models ()
+         @ all_external_adapter_models ~probe_host t agent ~skip:None
        in
        Some (ok (`Array (List.map models ~f:Rpc_json.model))))
   | "set_model" -> set_model_server t client params

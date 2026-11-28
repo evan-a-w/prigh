@@ -355,6 +355,7 @@
 .app.narrow .model-menu-foot { flex: none; padding: 4px max(8px, var(--safe-r)) 0 max(12px, var(--safe-l)); justify-content: flex-end; }
 .app.narrow .model-menu-foot > .menu-keys { display: none; }
 .app.narrow .model-access-button { min-height: var(--tap); }
+.app.narrow .model-engine .model-access-button { width: auto; min-width: 88px; }
 .app.narrow .model-access-item { min-height: var(--tap); }
 .app.narrow .model-access-menu {
   position: fixed;
