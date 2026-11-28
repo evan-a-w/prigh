@@ -63,7 +63,7 @@ let%expect_test "-engines and -adapters" =
   [%expect {| "unknown engine \"harnes\": expected harness or composer" |}];
   flags ~engines:"composer" ~adapters:"cursor" ();
   [%expect
-    {| "unknown adapter \"cursor\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>" |}];
+    {| "unknown adapter \"cursor\": expected codex, claude, prigh, opencode, gemini, antigravity, grok, goose, bridge:<adapter>, acp:<command> or acp:<name>=<command>" |}];
   flags ~adapters:"codex" ();
   [%expect
     {| adapters (codex) are for the composer engine: add -engines composer (or harness,composer) |}];
@@ -487,7 +487,7 @@ let%expect_test
     {|
     (((engines (Composer)) (adapters ((Backend Codex))) (acp_agents ()))
      (Error
-      "the composer can't run Codex on the backend yet (only backend:acp:antigravity is supported)")
+      "the composer can't run Codex on the backend yet (only bridge:antigravity is supported)")
      ((engine Composer) (adapter ((Backend Codex)))))
     |}];
   List.iter
@@ -504,13 +504,13 @@ let%expect_test
     (backend:acp:antigravity (Ok (Backend (Acp antigravity))))
     (backend:prigh
      (Error
-      "invalid backend adapter \"backend:prigh\": prigh's own harness already runs on the backend"))
+      "invalid bridge adapter \"backend:prigh\": prigh's own harness already runs on the backend"))
     (backend:backend:acp:antigravity
      (Error
-      "unknown adapter \"backend:acp:antigravity\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"))
+      "unknown adapter \"backend:acp:antigravity\": expected codex, claude, prigh, opencode, gemini, antigravity, grok, goose, bridge:<adapter>, acp:<command> or acp:<name>=<command>"))
     (backend:
      (Error
-      "unknown adapter \"\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"))
+      "unknown adapter \"\": expected codex, claude, prigh, opencode, gemini, antigravity, grok, goose, bridge:<adapter>, acp:<command> or acp:<name>=<command>"))
     |}];
   let choice : Engine_choice.t =
     { engine = Composer; adapter = Some (Backend (Acp "antigravity")) }
@@ -555,4 +555,100 @@ let%expect_test
     ((Ok ((Backend (Acp antigravity)) gemini-2.5-pro)))
     ((provider (Google_antigravity)) (shared (Prigh (Own work))))
     |}]
+;;
+
+let%expect_test "adapter syntax: bare known ACP, bridge:, acp:<command>, compat"
+  =
+  flags
+    ~engines:"harness,composer"
+    ~adapters:"codex,claude,antigravity,bridge:antigravity,opencode"
+    ();
+  [%expect
+    {|
+    (((engines (Harness Composer))
+      (adapters
+       (Codex Claude (Acp antigravity) (Backend (Acp antigravity))
+        (Acp opencode)))
+      (acp_agents ()))
+     (Ok ()) ((engine Harness) (adapter ())))
+    |}];
+  print_s
+    [%sexp
+      (Adapter_id.equal
+         (Or_error.ok_exn (Adapter_id.of_string "bridge:antigravity"))
+         (Or_error.ok_exn (Adapter_id.of_string "backend:acp:antigravity"))
+       : bool)
+    , (Adapter_id.to_string
+         (Or_error.ok_exn (Adapter_id.of_string "bridge:antigravity"))
+       : string)
+    , (Adapter_id.equal
+         (Or_error.ok_exn (Adapter_id.of_string "antigravity"))
+         (Or_error.ok_exn (Adapter_id.of_string "acp:antigravity"))
+       : bool)
+    , (Adapter_id.to_string
+         (Or_error.ok_exn (Adapter_id.of_string "antigravity"))
+       : string)];
+  [%expect {| (true backend:acp:antigravity true acp:antigravity) |}];
+  flags ~engines:"composer" ~adapters:"acp:my-agent --acp" ();
+  [%expect
+    {|
+    (((engines (Composer)) (adapters ((Acp my-agent)))
+      (acp_agents
+       (((name my-agent) (display_name my-agent) (command (my-agent --acp))
+         (quirks
+          ((login ()) (login_file ()) (min_version ()) (prompt_usage Ignored)
+           (steer Between_turns) (xai_extensions false)))))))
+     (Ok ()) ((engine Composer) (adapter ((Acp my-agent)))))
+    |}];
+  flags ~engines:"composer" ~adapters:"acp:/usr/local/bin/my-agent --acp" ();
+  [%expect
+    {|
+    (((engines (Composer)) (adapters ((Acp my-agent)))
+      (acp_agents
+       (((name my-agent) (display_name my-agent)
+         (command (/usr/local/bin/my-agent --acp))
+         (quirks
+          ((login ()) (login_file ()) (min_version ()) (prompt_usage Ignored)
+           (steer Between_turns) (xai_extensions false)))))))
+     (Ok ()) ((engine Composer) (adapter ((Acp my-agent)))))
+    |}];
+  flags ~engines:"composer" ~adapters:"acp:mine=my-agent --acp" ();
+  [%expect
+    {|
+    (((engines (Composer)) (adapters ((Acp mine)))
+      (acp_agents
+       (((name mine) (display_name mine) (command (my-agent --acp))
+         (quirks
+          ((login ()) (login_file ()) (min_version ()) (prompt_usage Ignored)
+           (steer Between_turns) (xai_extensions false)))))))
+     (Ok ()) ((engine Composer) (adapter ((Acp mine)))))
+    |}];
+  flags ~engines:"composer" ~adapters:"acp:my-agent --acp --mode=stdio" ();
+  [%expect
+    {|
+    (((engines (Composer)) (adapters ((Acp my-agent)))
+      (acp_agents
+       (((name my-agent) (display_name my-agent)
+         (command (my-agent --acp --mode=stdio))
+         (quirks
+          ((login ()) (login_file ()) (min_version ()) (prompt_usage Ignored)
+           (steer Between_turns) (xai_extensions false)))))))
+     (Ok ()) ((engine Composer) (adapter ((Acp my-agent)))))
+    |}];
+  flags
+    ~engines:"composer"
+    ~adapters:"acp:antigravity,backend:acp:antigravity"
+    ();
+  [%expect
+    {|
+    (((engines (Composer))
+      (adapters ((Acp antigravity) (Backend (Acp antigravity)))) (acp_agents ()))
+     (Ok ()) ((engine Composer) (adapter ((Acp antigravity)))))
+    |}];
+  flags ~engines:"composer" ~adapters:"acp:" ();
+  [%expect
+    {| "empty ACP adapter \"acp:\": expected acp:<command> or acp:<name>=<command>" |}];
+  flags ~engines:"composer" ~adapters:"bridge:prigh" ();
+  [%expect
+    {| "invalid bridge adapter \"bridge:prigh\": prigh's own harness already runs on the backend" |}]
 ;;

@@ -291,15 +291,16 @@ Sessions run in one of three execution modes:
 
 - **Native**: prigh's built-in **harness**, calling the model's API directly
   (the default).
-- **Bridge**: an external agent running on the prigh server (`backend:*`,
-  e.g. `backend:acp:antigravity`), bridging all prigh tools to the session's
-  active tool host over MCP.
+- **Bridge**: an external agent running on the prigh server (`bridge:<adapter>`,
+  e.g. `bridge:antigravity`; `backend:` also works), bridging all prigh tools
+  to the session's active tool host over MCP.
 - **Host**: the **composer**, which hands the work to a coding agent
   installed and signed in directly on the session's tool host: the Codex CLI
-  (`codex app-server`), Claude Code (`claude`, stream-json), an ACP agent
-  (`acp:opencode`, `acp:antigravity` (`agy acp`), `acp:grok` (Grok Build),
-  `acp:goose`, or `acp:mine=my-agent --acp`) or `prigh`, prigh's own harness
-  as an adapter.
+  (`codex app-server`), Claude Code (`claude`, stream-json), a known ACP agent
+  (`opencode`, `antigravity` (`agy acp`), `grok` (Grok Build), `gemini`,
+  `goose`; `acp:<known>` also works), an unofficial ACP server
+  (`acp:<command>` or `acp:<name>=<command>`, e.g. `acp:my-agent --acp` or
+  `acp:mine=my-agent --acp`), or `prigh`, prigh's own harness as an adapter.
 
 prigh keeps the session: its log (messages, tool calls, models, usage and
 the cost the agent reports), naming, search, worktrees, approvals and the
@@ -310,7 +311,7 @@ tools run on the tool host you choose, and prigh's own tools they lack
 instructions and what prigh knows about you go to them too.
 
 ```
-prigh serve -engines harness,composer -adapters codex,claude
+prigh serve -engines harness,composer -adapters codex,claude,antigravity,bridge:antigravity,opencode
 ```
 
 (or `$PRIGH_ENGINES`, `$PRIGH_ADAPTERS`; the first engine is the default for

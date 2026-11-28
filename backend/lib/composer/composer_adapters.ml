@@ -16,8 +16,8 @@ let find ?autonomous_quiet engines : Adapter_id.t -> Adapter.t Or_error.t
      | None -> Or_error.error_string (Engines.unknown_acp "antigravity"))
   | Backend inner ->
     Or_error.errorf
-      "the composer can't run %s on the backend yet (only \
-       backend:acp:antigravity is supported)"
+      "the composer can't run %s on the backend yet (only bridge:antigravity \
+       is supported)"
       (Adapter_id.label inner)
   | Prigh ->
     Or_error.error_string

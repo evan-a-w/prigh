@@ -18,7 +18,10 @@ type t =
 (** [codex], [claude], [acp:<name>], [backend:<adapter>], [prigh]. *)
 val to_string : t -> string
 
-(** The inverse of [to_string]; an error lists what is known. *)
+(** Parses an adapter name: [codex], [claude], [prigh], bare known ACP
+    agent names ([antigravity], [opencode], [gemini], [grok], [goose]),
+    [acp:<name>], [bridge:<adapter>] or the backwards-compatible alias
+    [backend:<adapter>]. An error lists what is known. *)
 val of_string : string -> t Or_error.t
 
 (** For people: [Codex], [Claude Code], [<name> (ACP)], [<label> (bridge)],

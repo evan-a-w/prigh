@@ -412,7 +412,7 @@ let%expect_test "switching adapters hands each what it has not seen" =
   [%expect
     {|
     ok: engine composer, adapter codex
-    error: "unknown adapter \"gemini\": expected codex, claude, prigh, acp:<name> or backend:acp:<name>"
+    error: "this backend's composer does not drive Gemini CLI (it drives Codex, Claude Code)"
     error: "missing param \"adapter\""
     |}];
   show_entries (Agent.session (agent ()));
