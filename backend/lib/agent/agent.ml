@@ -722,6 +722,7 @@ let engine_choice t =
 let default_known_adapter : Adapter_id.t -> bool = function
   | Codex | Claude -> true
   | Acp name -> Option.is_some (Acp_agent.find_known name)
+  | Backend (Codex | Claude) -> true
   | Backend (Acp "antigravity") ->
     Option.is_some (Acp_agent.find_known "antigravity")
   | Backend _ | Prigh -> false

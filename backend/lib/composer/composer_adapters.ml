@@ -9,6 +9,8 @@ let find ?autonomous_quiet engines : Adapter_id.t -> Adapter.t Or_error.t
     (match Engines.acp_agent engines name with
      | Some agent -> Ok (Acp_adapter.create ?autonomous_quiet agent)
      | None -> Or_error.error_string (Engines.unknown_acp name))
+  | Backend Codex -> Ok (Codex_adapter.create ~backend_hosted:true ())
+  | Backend Claude -> Ok (Claude_adapter.create ~backend_hosted:true ())
   | Backend (Acp "antigravity") ->
     (match Engines.acp_agent engines "antigravity" with
      | Some agent ->
@@ -16,8 +18,8 @@ let find ?autonomous_quiet engines : Adapter_id.t -> Adapter.t Or_error.t
      | None -> Or_error.error_string (Engines.unknown_acp "antigravity"))
   | Backend inner ->
     Or_error.errorf
-      "the composer can't run %s on the backend yet (only bridge:antigravity \
-       is supported)"
+      "the composer can't run %s on the backend yet (only bridge:codex, \
+       bridge:claude and bridge:antigravity are supported)"
       (Adapter_id.label inner)
   | Prigh ->
     Or_error.error_string

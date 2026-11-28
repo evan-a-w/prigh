@@ -66,14 +66,40 @@ let result_to_mcp (result : Tool_result.t) =
 ;;
 
 type t =
-  { tools : Tool.t list
+  { mutable tools : Tool.t list
   ; execute : Tool.t -> Json.t -> Tool_result.t
   ; all_tools : bool
+  ; mutable on_tools_changed : (unit -> unit) list
   }
 
-let create ~tools ~execute = { tools; execute; all_tools = false }
-let create_all ~tools ~execute = { tools; execute; all_tools = true }
+let create ~tools ~execute =
+  { tools; execute; all_tools = false; on_tools_changed = [] }
+;;
+
+let create_all ~tools ~execute =
+  { tools; execute; all_tools = true; on_tools_changed = [] }
+;;
+
 let tools t = t.tools
+
+let list_changed_notification =
+  Json.to_string
+    (`Object
+        [ "jsonrpc", `String "2.0"
+        ; "method", `String "notifications/tools/list_changed"
+        ])
+;;
+
+let on_tools_changed t f = t.on_tools_changed <- f :: t.on_tools_changed
+
+let set_tools t tools =
+  let old_names = List.map t.tools ~f:Tool.name in
+  let new_names = List.map tools ~f:Tool.name in
+  t.tools <- tools;
+  let changed = not (List.equal String.equal old_names new_names) in
+  if changed then List.iter (List.rev t.on_tools_changed) ~f:(fun f -> f ());
+  changed
+;;
 
 (* MCP revisions we can speak; the client's is echoed when it is one. *)
 let protocol_versions = [ "2025-06-18"; "2025-03-26"; "2024-11-05" ]
@@ -131,7 +157,7 @@ let initialize t params =
   in
   `Object
     [ "protocolVersion", `String version
-    ; "capabilities", `Object [ "tools", `Object [] ]
+    ; "capabilities", `Object [ "tools", `Object [ "listChanged", `True ] ]
     ; ( "serverInfo"
       , `Object
           [ "name", `String server_name; "version", `String Version.to_string ]

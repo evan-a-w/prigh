@@ -73,6 +73,9 @@ type t =
   ; injected_results : Injected_result.t Queue.t String.Table.t
     (* results of injected MCP tool calls in the current turn, by tool name,
        in case the harness drops the output/images on [Tool_end] *)
+  ; mutable injected : Injected_tools.t option
+    (* live process's MCP server, updated on every turn so host switches and
+       chat-mode changes immediately add/remove tools *)
   ; extra_dirs : unit -> string list
   ; mutable preapproved : (string * Json.t) list
     (** injected prigh MCP calls already approved in this turn's outer CLI
@@ -156,6 +159,7 @@ let create
   ; on_change
   ; on_autonomous
   ; injected_results = String.Table.create ()
+  ; injected = None
   ; extra_dirs
   ; preapproved = []
   ; warming = None
@@ -191,6 +195,7 @@ let close t =
     t.known <- Some (A.current_capabilities a);
     A.stop a);
   t.live <- None;
+  t.injected <- None;
   t.live_cwd <- None;
   t.models <- []
 ;;
@@ -245,16 +250,19 @@ let take_preapproved t ~tool ~args =
   remove [] t.preapproved
 ;;
 
+let selected_injected_tools t (s : Engine_intf.Services.t) =
+  let (module A : Adapter.S) = t.adapter in
+  let native_questions = A.native_questions in
+  if A.all_tools
+  then Injected_tools.select_all ~native_questions s.tools
+  else Injected_tools.select ~native_questions s.tools
+;;
+
 (* prigh's tools called over MCP: approved and run as the harness engine's
    calls are. *)
 let injected t (s : Engine_intf.Services.t) =
   let (module A : Adapter.S) = t.adapter in
-  let native_questions = A.native_questions in
-  let tools =
-    if A.all_tools
-    then Injected_tools.select_all ~native_questions s.tools
-    else Injected_tools.select ~native_questions s.tools
-  in
+  let tools = selected_injected_tools t s in
   (if A.all_tools then Injected_tools.create_all else Injected_tools.create)
     ~tools
     ~execute:(fun tool args ->
@@ -383,7 +391,7 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        t.forking <- Option.some_if start.fork start.resume |> Option.join;
        (* A new thread has seen nothing: whatever an older one saw. *)
        if Option.is_none start.resume then t.fresh <- true;
-       Ok (Live ((module A), a))
+       Ok (Live ((module A), a), injected)
      | Error e ->
        Line_transport.stop transport;
        t.on_start start (Error e);
@@ -625,13 +633,14 @@ let live_now
              ; at = None
              ; cost_total = None
              }
-         | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
+         | Ok (Live ((module L), a), injected), Some thread
+           when Option.is_some revert ->
            (* The session was rewound: its thread drops the runs it lost. *)
            (match L.revert a ~before_turn_id:(Option.value_exn revert) with
             | exception exn ->
               L.stop a;
               raise exn
-            | Ok () -> Ok (Live ((module L), a))
+            | Ok () -> Ok (Live ((module L), a), injected)
             | Error e ->
               s.notice
                 (sprintf
@@ -656,11 +665,11 @@ let live_now
          | started, _ -> started
        in
        (match started with
-        | Ok (Live ((module L), a)) when t.epoch <> epoch ->
+        | Ok (Live ((module L), a), _) when t.epoch <> epoch ->
           (* Closed while it started (the session was left): nobody runs it. *)
           L.stop a;
           Or_error.errorf "%s was stopped while it started" A.display_name
-        | Ok (Live ((module L), a) as live) ->
+        | Ok ((Live ((module L), a) as live), injected) ->
           (match L.models a with
            | [] -> ()
            | models -> t.models <- models);
@@ -673,6 +682,7 @@ let live_now
           L.on_title a (fun title ->
             Option.iter t.on_title ~f:(fun f -> f title));
           t.live <- Some live;
+          t.injected <- Some injected;
           t.live_host <- Some host;
           t.live_cwd <- Some s.cwd;
           t.live_login <- login;
@@ -975,6 +985,9 @@ let rec run_turn
     Cancellation.cancel turn_cancel;
     `Stop_daemon);
   t.services <- Some s;
+  Option.iter t.injected ~f:(fun injected ->
+    ignore
+      (Injected_tools.set_tools injected (selected_injected_tools t s) : bool));
   t.cancel <- turn_cancel;
   t.run_cancel <- cancel;
   Hashtbl.clear t.injected_results;

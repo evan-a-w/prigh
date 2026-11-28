@@ -70,6 +70,18 @@ val create_all
 
 val tools : t -> Tool.t list
 
+(** Updates the live tool list served by [tools/list] and [tools/call].
+    Returns [true] (and notifies {!on_tools_changed} listeners) when the
+    exposed tool names changed. *)
+val set_tools : t -> Tool.t list -> bool
+
+(** Registers a callback invoked whenever {!set_tools} changes the exposed
+    tool names (e.g. to send {!list_changed_notification} over stdio MCP). *)
+val on_tools_changed : t -> (unit -> unit) -> unit
+
+(** JSON-RPC 2.0 [notifications/tools/list_changed] line. *)
+val list_changed_notification : string
+
 (** One JSON-RPC message from the harness: the response for a request
     ([initialize], [ping], [tools/list], [tools/call]; an error for other
     methods), [None] for a notification or a response. A [tools/call] of an

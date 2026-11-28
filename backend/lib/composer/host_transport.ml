@@ -21,6 +21,8 @@ module Mcp_side = struct
     ; set_tools : Injected_tools.t Promise.u
     ; routes : Injected_tools.t String.Table.t
     ; conn_route : string Int.Table.t
+    ; unrouted_conns : Int.Hash_set.t
+    ; mutable stream : Host_stream.t option
     }
 
   let create () =
@@ -30,18 +32,45 @@ module Mcp_side = struct
     ; set_tools
     ; routes = String.Table.create ()
     ; conn_route = Int.Table.create ()
+    ; unrouted_conns = Int.Hash_set.create ()
+    ; stream = None
     }
   ;;
 
   let on_mcp t event = Eio.Stream.add t.events event
 
+  let notify_unrouted t =
+    Option.iter t.stream ~f:(fun stream ->
+      Hash_set.iter t.unrouted_conns ~f:(fun conn ->
+        ignore
+          (Host_stream.mcp_write
+             stream
+             ~conn
+             Injected_tools.list_changed_notification
+           : unit Or_error.t)))
+  ;;
+
   let serve t injected =
     if not (Promise.is_resolved t.tools)
-    then Promise.resolve t.set_tools injected
+    then (
+      Injected_tools.on_tools_changed injected (fun () -> notify_unrouted t);
+      Promise.resolve t.set_tools injected)
   ;;
 
   let register_route t ~stream ~base_bridge route injected =
     Hashtbl.set t.routes ~key:route ~data:injected;
+    Injected_tools.on_tools_changed injected (fun () ->
+      if Hashtbl.mem t.routes route
+      then
+        Hashtbl.iteri t.conn_route ~f:(fun ~key:conn ~data:r ->
+          if String.equal r route
+          then
+            ignore
+              (Host_stream.mcp_write
+                 stream
+                 ~conn
+                 Injected_tools.list_changed_notification
+               : unit Or_error.t)));
     let bridge = Injected_tools.Bridge.with_route base_bridge ~route in
     let release () =
       Hashtbl.remove t.routes route;
@@ -58,6 +87,7 @@ module Mcp_side = struct
   ;;
 
   let run t ~sw stream =
+    t.stream <- Some stream;
     Guarded.fork ~sw ~what:"MCP side channel" (fun () ->
       Fiber.first
         (fun () ->
@@ -83,6 +113,7 @@ module Mcp_side = struct
                  loop ()
                | Closed conn ->
                  Hashtbl.remove t.conn_route conn;
+                 Hash_set.remove t.unrouted_conns conn;
                  loop ()
                | Line { conn; line } ->
                  (match Hashtbl.find t.conn_route conn with
@@ -93,6 +124,7 @@ module Mcp_side = struct
                        (* Closed or unknown session route: never cross-talk. *)
                        Host_stream.mcp_close stream ~conn)
                   | None ->
+                    Hash_set.add t.unrouted_conns conn;
                     Guarded.fork ~sw:mcp_sw ~what:"MCP tool call" (fun () ->
                       let injected = Promise.await t.tools in
                       Option.iter
