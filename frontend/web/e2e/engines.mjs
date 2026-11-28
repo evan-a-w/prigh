@@ -107,7 +107,7 @@ const server = spawn(
   backend,
   ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-faux", "-token", token, "-cwd", cwd,
     "-engines", "harness,composer", "-adapters", "codex,claude"],
-  { env: { ...process.env, HOME: home, PATH: path, TMUX_TMPDIR: dir, SHELL: "/bin/sh" }, stdio: ["ignore", "ignore", "pipe"] },
+  { env: { ...process.env, HOME: home, PATH: path, TMUX_TMPDIR: dir, SHELL: "/bin/sh", ANTHROPIC_API_KEY: "test" }, stdio: ["ignore", "ignore", "pipe"] },
 );
 const url = await new Promise((resolve, reject) => {
   let err = "";
@@ -242,6 +242,7 @@ try {
   const confirm = page.locator("#confirm");
   await confirm.waitFor();
   await settled(confirm);
+  await toast("Ask").waitFor({ state: "detached" });
   section("Codex asks to run a command");
   console.log(clean(await confirm.innerText()));
   await phoneAudit();
