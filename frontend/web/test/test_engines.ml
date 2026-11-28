@@ -51,7 +51,8 @@ let session ?deployed ?unavailable ?(fields = []) () =
 
 let toasts h = H.text h ~selector:".toast"
 
-let%expect_test "the model chip names the adapter; a harness session's does not"
+let%expect_test
+    "the model chip's title names the adapter; its text shows just the model"
   =
   let h = session () in
   H.names h ~selector:".model-chip";
@@ -61,7 +62,7 @@ let%expect_test "the model chip names the adapter; a harness session's does not"
   [%expect
     {|
     button "Model: Codex \194\183 Claude Opus 5.5, Medium" -- Codex · Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
-    (Codex · Opus 5.5)
+    (Opus 5.5)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
     |}]
 ;;
@@ -736,8 +737,8 @@ let%expect_test
   H.names h ~selector:".model-trouble";
   [%expect
     {|
-    (Codex · loading models…)
-    (Codex · GPT-6.2-Sol)
+    (loading models…)
+    (GPT-6.2-Sol)
     |}]
 ;;
 
