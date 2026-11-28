@@ -91,6 +91,10 @@ You are a coding assistant driven by prigh. Use only the MCP tools provided by t
 |}
 ;;
 
+(* [--process-per-session]: in agy 1.5.13's default multi-session mode, a
+   [session/new] with a custom [--agent] gets none of its [mcpServers]' tools
+   (only [list_resources], [read_resource], [manage_task]; resumed sessions
+   are fine). A worker per session boots with the session's MCP servers. *)
 let backend_wrapper =
   sprintf
     {|set -u
@@ -137,9 +141,9 @@ fi
 umask "$m"
 cd "$d/cwd" || exit 1
 if [ "$use_token" = 1 ]; then
-  DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/prigh-agy "$@" --agent %s --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir "$d" <&0 &
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/prigh-agy "$@" --process-per-session --agent %s --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir "$d" <&0 &
 else
-  "$@" --agent %s --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir "$d" <&0 &
+  "$@" --process-per-session --agent %s --include-default-customizations=false --disable-telemetry --dangerously-skip-permissions --gemini-dir "$d" <&0 &
 fi
 c=$!
 trap 'kill -TERM "$c" 2>/dev/null' TERM HUP INT
