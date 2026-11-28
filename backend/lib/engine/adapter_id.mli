@@ -24,8 +24,8 @@ val to_string : t -> string
     [backend:<adapter>]. An error lists what is known. *)
 val of_string : string -> t Or_error.t
 
-(** For people: [Codex], [Claude Code], [<name> (ACP)], [<label> (bridge)],
-    [prigh]. *)
+(** For people: [Codex], [Claude Code], [<name> (ACP)], [prigh] (same bare
+    harness name as {!harness_label}, without any mode suffix). *)
 val label : t -> string
 
 (** The bare harness name without mode suffix: [Backend (Acp "antigravity")]

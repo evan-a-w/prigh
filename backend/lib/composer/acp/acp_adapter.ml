@@ -228,12 +228,7 @@ let create
     type nonrec t = t
 
     let id = (if backend_hosted then "backend:acp:" else "acp:") ^ agent.name
-
-    let display_name =
-      if backend_hosted
-      then agent.display_name ^ " (bridge)"
-      else agent.display_name
-    ;;
+    let display_name = agent.display_name
 
     let capabilities =
       capabilities_of

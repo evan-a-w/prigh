@@ -1483,3 +1483,355 @@ let%expect_test
     total confirms = 1
     |}]
 ;;
+
+let%expect_test
+    "bridge:claude: flags, bare display_name, backend:claude models, dynamic \
+     MCP tools"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let adapter = Claude_adapter.create ~backend_hosted:true () in
+  let (module A : Adapter.S) = adapter in
+  printf
+    "id=%s display=%s all_tools=%b on_backend=%b native_questions=%b \
+     plan_mode=%b\n"
+    A.id
+    A.display_name
+    A.all_tools
+    A.on_backend
+    A.native_questions
+    A.capabilities.plan_mode;
+  let launch =
+    A.launch
+      { (Adapter.Start.default ~cwd:t.dir) with
+        plan = true
+      ; extra_dirs = [ "/extra" ]
+      }
+  in
+  let has_pair a b =
+    let rec go = function
+      | x :: y :: _ when String.equal x a && String.equal y b -> true
+      | _ :: rest -> go rest
+      | [] -> false
+    in
+    go launch.argv
+  in
+  printf
+    "tools_disabled=%b perm_default=%b has_add_dir=%b\n"
+    (has_pair "--tools" "")
+    (has_pair "--permission-mode" "default")
+    (List.mem launch.argv "--add-dir" ~equal:String.equal);
+  let fake_bash : Tool.t =
+    { spec =
+        { name = "bash"
+        ; description = "the bash tool"
+        ; parameters = `Object [ "type", `String "object" ]
+        ; parallel_safe = false
+        ; destructive = Never
+        ; on_host = true
+        ; freeform = None
+        ; native = None
+        }
+    ; run = (fun _ args -> Tool_result.ok ("bash: " ^ Json.to_string args))
+    }
+  in
+  let peer p =
+    let read () =
+      Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+        Json.parse l |> Or_error.ok_exn)
+    in
+    let send_and_expect label line =
+      Line_transport.Peer.write_line p line;
+      match read () with
+      | Some reply -> printf "%s -> %s\n" label (Json.to_string reply)
+      | None -> printf "%s -> EOF\n" label
+    in
+    (* Handshake *)
+    (match read () with
+     | Some j ->
+       let id =
+         Option.bind (Json.member "request_id" j) ~f:Json.string
+         |> Option.value_exn
+       in
+       Line_transport.Peer.write_line
+         p
+         (sprintf
+            {|{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"models":[{"value":"claude-sonnet-4-6","displayName":"Sonnet 4.6"}]}}}|}
+            id)
+     | None -> ());
+    (* Turn 1 (chat_mode=true: workspace bash tool is hidden) *)
+    ignore (read () : Json.t option);
+    Line_transport.Peer.write_line
+      p
+      {|{"type":"system","subtype":"init","session_id":"s-be","model":"claude-sonnet-4-6"}|};
+    send_and_expect
+      "turn1 tools/list"
+      {|{"type":"control_request","request_id":"m1","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":1,"method":"tools/list"}}}|};
+    Line_transport.Peer.write_line
+      p
+      {|{"type":"result","subtype":"success","is_error":false,"result":"turn 1 ok","session_id":"s-be","usage":{"input_tokens":1,"output_tokens":1}}|};
+    (* Turn 2: chat_mode=false + plan mode toggled on; no set_permission_mode sent, bash now listed & callable *)
+    (match read () with
+     | Some j ->
+       let typ =
+         Option.bind (Json.member "type" j) ~f:Json.string
+         |> Option.value ~default:""
+       in
+       printf "turn2 first msg type=%s\n" typ
+     | None -> ());
+    send_and_expect
+      "turn2 tools/list"
+      {|{"type":"control_request","request_id":"m2","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":2,"method":"tools/list"}}}|};
+    send_and_expect
+      "turn2 call bash"
+      {|{"type":"control_request","request_id":"m3","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"bash","arguments":{"command":"pwd"}}}}}|};
+    Line_transport.Peer.write_line
+      p
+      {|{"type":"result","subtype":"success","is_error":false,"result":"turn 2 ok","session_id":"s-be","usage":{"input_tokens":1,"output_tokens":1}}|}
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ -> Ok (Line_transport.Peer.spawn ~sw peer))
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:[ fake_bash ]
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Backend Claude) };
+  Agent.set_mode agent ~approval:Auto ~chat:true;
+  Agent.subscribe agent ~f:(function
+    | Loop (Agent_waiting { agent; starting }) ->
+      printf "waiting agent=%s starting=%b\n" agent starting
+    | _ -> ());
+  prompt agent "first";
+  print_s
+    [%sexp
+      (Option.value
+         (Runner.models (Composer_runner.runner composer))
+         ~default:[]
+       |> List.map ~f:(fun (m : Model.t) -> m.provider, m.id)
+       : (Provider_id.t * string) list)];
+  Agent.set_mode agent ~chat:false ~plan:true;
+  prompt agent "second";
+  Composer_runner.close composer;
+  [%expect
+    {|
+    id=backend:claude display=Claude Code all_tools=true on_backend=true native_questions=false plan_mode=true
+    tools_disabled=true perm_default=true has_add_dir=false
+    waiting agent=Claude Code starting=true
+    waiting agent=Claude Code starting=false
+    turn1 tools/list -> {"type":"control_response","response":{"subtype":"success","request_id":"m1","response":{"mcp_response":{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"goal_complete","description":"Mark the session's goal (set by the user with /goal) as achieved, ending the automatic continuations. Call it only when current evidence proves every requirement of the goal is met, not because you are stopping or stuck.","inputSchema":{"type":"object","properties":{"summary":{"type":"string","description":"One or two sentences on what was achieved"}},"required":["summary"],"additionalProperties":false}}]}}}}}
+    waiting agent=Claude Code starting=false
+    (((Custom backend:claude) claude-sonnet-4-6))
+    waiting agent=Claude Code starting=false
+    turn2 first msg type=user
+    turn2 tools/list -> {"type":"control_response","response":{"subtype":"success","request_id":"m2","response":{"mcp_response":{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"bash","description":"the bash tool","inputSchema":{"type":"object"}},{"name":"goal_complete","description":"Mark the session's goal (set by the user with /goal) as achieved, ending the automatic continuations. Call it only when current evidence proves every requirement of the goal is met, not because you are stopping or stuck.","inputSchema":{"type":"object","properties":{"summary":{"type":"string","description":"One or two sentences on what was achieved"}},"required":["summary"],"additionalProperties":false}}]}}}}}
+    turn2 call bash -> {"type":"control_response","response":{"subtype":"success","request_id":"m3","response":{"mcp_response":{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"bash: {\"command\":\"pwd\"}"}],"isError":false}}}}}
+    waiting agent=Claude Code starting=false
+    |}]
+;;
+
+let%expect_test
+    "bridge:codex: read-only sandbox, declines built-in approvals, accepts \
+     prigh MCP"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let adapter = Codex_adapter.create ~backend_hosted:true () in
+  let (module A : Adapter.S) = adapter in
+  printf
+    "id=%s display=%s all_tools=%b on_backend=%b native_questions=%b \
+     plan_mode=%b\n"
+    A.id
+    A.display_name
+    A.all_tools
+    A.on_backend
+    A.native_questions
+    A.capabilities.plan_mode;
+  let peer p =
+    let read () =
+      Option.map (Line_transport.Peer.read_line p) ~f:(fun l ->
+        Json.parse l |> Or_error.ok_exn)
+    in
+    let id_of j =
+      Option.bind (Json.member "id" j) ~f:Json.int |> Option.value_exn
+    in
+    (* 1. initialize *)
+    let j = read () |> Option.value_exn in
+    Line_transport.Peer.write_line
+      p
+      (sprintf {|{"id":%d,"result":{"userAgent":"codex/0.171.0"}}|} (id_of j));
+    (* 2. thread/start (skip initialized notification) *)
+    let rec next_req () =
+      match read () with
+      | Some j when Option.is_none (Json.member "id" j) -> next_req ()
+      | Some j -> j
+      | None -> failwith "unexpected EOF"
+    in
+    let j = next_req () in
+    let params = Json.member "params" j |> Option.value_exn in
+    printf
+      "thread/start sandbox=%s approvalPolicy=%s\n"
+      (Option.bind (Json.member "sandbox" params) ~f:Json.string
+       |> Option.value ~default:"-")
+      (Option.bind (Json.member "approvalPolicy" params) ~f:Json.string
+       |> Option.value ~default:"-");
+    Line_transport.Peer.write_line
+      p
+      (sprintf
+         {|{"id":%d,"result":{"thread":{"id":"th-be"},"model":"gpt-5.4"}}|}
+         (id_of j));
+    (* 3. model/list and turn/start may arrive in either order *)
+    let handle_req j =
+      match Option.bind (Json.member "method" j) ~f:Json.string with
+      | Some "model/list" ->
+        Line_transport.Peer.write_line
+          p
+          (sprintf
+             {|{"id":%d,"result":{"data":[{"id":"gpt-5.4","displayName":"GPT-5.4","isDefault":true,"hidden":false,"supportedReasoningEfforts":[{"reasoningEffort":"medium"}]}]}}|}
+             (id_of j));
+        false
+      | Some "turn/start" ->
+        let params = Json.member "params" j |> Option.value_exn in
+        let sandbox_type =
+          Option.bind
+            (Json.member "sandboxPolicy" params)
+            ~f:(Json.member "type")
+          |> Option.bind ~f:Json.string
+          |> Option.value ~default:"-"
+        in
+        let collab_mode =
+          Option.bind
+            (Json.member "collaborationMode" params)
+            ~f:(Json.member "mode")
+          |> Option.bind ~f:Json.string
+          |> Option.value ~default:"-"
+        in
+        printf
+          "turn/start sandboxPolicy=%s collaborationMode=%s\n"
+          sandbox_type
+          collab_mode;
+        Line_transport.Peer.write_line
+          p
+          (sprintf {|{"id":%d,"result":{"turn":{"id":"turn-1"}}}|} (id_of j));
+        true
+      | _ -> false
+    in
+    let rec wait_turn () =
+      match read () with
+      | Some j -> if not (handle_req j) then wait_turn ()
+      | None -> ()
+    in
+    wait_turn ();
+    Line_transport.Peer.write_line
+      p
+      {|{"method":"turn/started","params":{"turn":{"id":"turn-1"}}}|};
+    (* Built-in command approval -> must be declined immediately *)
+    Line_transport.Peer.write_line
+      p
+      {|{"id":100,"method":"item/commandExecution/requestApproval","params":{"itemId":"c1","command":"rm -rf /","availableDecisions":["accept","decline"]}}|};
+    let rec next_reply label =
+      match read () with
+      | Some j when Option.is_some (Json.member "method" j) ->
+        ignore (handle_req j : bool);
+        next_reply label
+      | Some j -> printf "%s -> %s\n" label (Json.to_string j)
+      | None -> printf "%s -> EOF\n" label
+    in
+    next_reply "cmd approval";
+    (* Built-in file change approval -> must be declined immediately *)
+    Line_transport.Peer.write_line
+      p
+      {|{"id":101,"method":"item/fileChange/requestApproval","params":{"itemId":"f1"}}|};
+    next_reply "file approval";
+    (* prigh MCP tool elicitation -> must be auto-accepted *)
+    Line_transport.Peer.write_line
+      p
+      {|{"id":102,"method":"mcpServer/elicitation/request","params":{"serverName":"prigh","mode":"form","_meta":{"codex_approval_kind":"mcp_tool_call","tool_name":"bash"}}}|};
+    next_reply "prigh mcp elicitation";
+    Line_transport.Peer.write_line
+      p
+      {|{"method":"item/completed","params":{"item":{"id":"m1","type":"agentMessage","text":"used prigh MCP"}}}|};
+    Line_transport.Peer.write_line
+      p
+      {|{"method":"turn/completed","params":{"turn":{"id":"turn-1","status":"completed"}}}|}
+  in
+  let confirms = ref 0 in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun _ -> Ok (Line_transport.Peer.spawn ~sw peer))
+      ~start:(fun ~cwd ->
+        { (Adapter.Start.default ~cwd) with no_sandbox = Some "no bwrap" })
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Backend Codex) };
+  Agent.set_mode agent ~approval:Auto ~plan:true;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm _) -> incr confirms
+    | Loop (Agent_waiting { agent; starting }) ->
+      printf "waiting agent=%s starting=%b\n" agent starting
+    | _ -> ());
+  prompt agent "check host";
+  let runner_models () =
+    Option.value (Runner.models (Composer_runner.runner composer)) ~default:[]
+  in
+  (* Wait briefly for background model/list fiber if needed *)
+  let rec wait_models n =
+    if n > 0 && List.is_empty (runner_models ())
+    then (
+      Eio.Fiber.yield ();
+      wait_models (n - 1))
+  in
+  wait_models 50;
+  print_s
+    [%sexp
+      (List.map (runner_models ()) ~f:(fun (m : Model.t) -> m.provider, m.id)
+       : (Provider_id.t * string) list)];
+  Composer_runner.close composer;
+  printf "user confirms=%d\n" !confirms;
+  [%expect
+    {|
+    id=backend:codex display=Codex all_tools=true on_backend=true native_questions=false plan_mode=true
+    waiting agent=Codex starting=true
+    thread/start sandbox=read-only approvalPolicy=untrusted
+    waiting agent=Codex starting=false
+    turn/start sandboxPolicy=readOnly collaborationMode=default
+    cmd approval -> {"id":100,"result":{"decision":"decline"}}
+    file approval -> {"id":101,"result":{"decision":"decline"}}
+    prigh mcp elicitation -> {"id":102,"result":{"action":"accept"}}
+    waiting agent=Codex starting=false
+    (((Custom backend:codex) gpt-5.4))
+    user confirms=0
+    |}]
+;;

@@ -125,7 +125,7 @@ let%expect_test "initialize and list" =
   [%expect
     {|
     > {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"codex","version":"0.166.0"}}}
-    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Always use prigh's subagent (and subagent_*) tools — not your own built-in or native subagent, agent, task or swarm tools — when spawning or managing subagents, so they run in prigh's UI with live progress, worktree tracking and steering (defaults to this session's engine, model and host; only switch engine, model or host when the user explicitly asks)."}}
+    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Always use prigh's subagent (and subagent_*) tools — not your own built-in or native subagent, agent, task or swarm tools — when spawning or managing subagents, so they run in prigh's UI with live progress, worktree tracking and steering (defaults to this session's engine, model and host; only switch engine, model or host when the user explicitly asks)."}}
     > {"jsonrpc":"2.0","method":"notifications/initialized"}
     < (nothing)
     > {"jsonrpc":"2.0","id":"p","method":"ping"}
@@ -138,7 +138,7 @@ let%expect_test "initialize and list" =
   [%expect
     {|
     > {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}
-    < {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Always use prigh's subagent (and subagent_*) tools — not your own built-in or native subagent, agent, task or swarm tools — when spawning or managing subagents, so they run in prigh's UI with live progress, worktree tracking and steering (defaults to this session's engine, model and host; only switch engine, model or host when the user explicitly asks)."}}
+    < {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's tools for the user's session: components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Always use prigh's subagent (and subagent_*) tools — not your own built-in or native subagent, agent, task or swarm tools — when spawning or managing subagents, so they run in prigh's UI with live progress, worktree tracking and steering (defaults to this session's engine, model and host; only switch engine, model or host when the user explicitly asks)."}}
     |}];
   (match
      Injected_tools.handle
@@ -389,8 +389,69 @@ let%expect_test "all_tools mode (backend-hosted)" =
     (prigh edit (edit))
     (github bash ())
     > {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}
-    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's complete toolset for the user's session: file, search and shell tools executed on the user's active tool host, plus components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Use these MCP tools for all workspace interaction."}}
+    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"prigh","version":"VERSION"},"instructions":"prigh's complete toolset for the user's session: file, search and shell tools executed on the user's active tool host, plus components shown in the chat, the user's memory, other sessions, pull requests, issues and CI through the user's sign-in, worktrees, and subagents. Use these MCP tools for all workspace interaction."}}
     > {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"bash","arguments":{"command":"uname -s"}}}
     < {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"bash:{\"command\":\"uname -s\"}"}],"isError":false}}
+    |}]
+;;
+
+let%expect_test "dynamic set_tools updates tools/list, tools/call and notifies" =
+  let base_tools = [ fake "bash"; fake "read" ] in
+  let computer_tool = fake "computer" in
+  let t =
+    Injected_tools.create_all ~tools:base_tools ~execute:(fun tool args ->
+      Tool_result.ok (sprintf "%s:%s" (Tool.name tool) (Json.to_string args)))
+  in
+  let notifications = ref 0 in
+  Injected_tools.on_tools_changed t (fun () ->
+    incr notifications;
+    printf
+      "notify #%d: %s\n"
+      !notifications
+      Injected_tools.list_changed_notification);
+  let list_names () =
+    match
+      Injected_tools.handle
+        t
+        (Json.parse {|{"jsonrpc":"2.0","id":10,"method":"tools/list"}|}
+         |> Or_error.ok_exn)
+    with
+    | Some json ->
+      let names =
+        Option.bind (Json.member "result" json) ~f:(Json.member "tools")
+        |> Option.bind ~f:Json.list
+        |> Option.value ~default:[]
+        |> List.filter_map ~f:(fun tool ->
+          Option.bind (Json.member "name" tool) ~f:Json.string)
+      in
+      print_s [%sexp (names : string list)]
+    | None -> print_endline "(none)"
+  in
+  list_names ();
+  (* Calling computer before it is added fails. *)
+  exchange
+    t
+    {|{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"computer","arguments":{"action":"screenshot"}}}|};
+  (* Setting the same tools does not fire notification. *)
+  printf "same changed=%b\n" (Injected_tools.set_tools t base_tools);
+  (* Switching to a host with computer adds it and fires notification. *)
+  printf
+    "added changed=%b\n"
+    (Injected_tools.set_tools t (base_tools @ [ computer_tool ]));
+  list_names ();
+  exchange
+    t
+    {|{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"computer","arguments":{"action":"screenshot"}}}|};
+  [%expect
+    {|
+    (bash read)
+    > {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"computer","arguments":{"action":"screenshot"}}}
+    < {"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"unknown tool computer: prigh offers bash, read"}}
+    same changed=false
+    notify #1: {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}
+    added changed=true
+    (bash read computer)
+    > {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"computer","arguments":{"action":"screenshot"}}}
+    < {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"computer:{\"action\":\"screenshot\"}"}],"isError":false}}
     |}]
 ;;

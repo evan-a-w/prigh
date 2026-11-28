@@ -486,9 +486,7 @@ let%expect_test
   [%expect
     {|
     (((engines (Composer)) (adapters ((Backend Codex))) (acp_agents ()))
-     (Error
-      "the composer can't run Codex on the backend yet (only bridge:antigravity is supported)")
-     ((engine Composer) (adapter ((Backend Codex)))))
+     (Ok ()) ((engine Composer) (adapter ((Backend Codex)))))
     |}];
   List.iter
     [ "backend:acp:antigravity"
@@ -524,12 +522,12 @@ let%expect_test
       }];
   [%expect
     {|
-    ((key backend:acp:antigravity) (label "composer (Antigravity (bridge))")
-     (display_name "Antigravity (bridge)")
+    ((key backend:acp:antigravity) (label "composer (Antigravity)")
+     (display_name Antigravity)
      (names
       (agy-bridge agy-backend antigravity-bridge bridge:antigravity
        bridge:acp:antigravity antigravity-backend backend:antigravity
-       backend:acp:antigravity "Antigravity (bridge)")))
+       backend:acp:antigravity Antigravity)))
     |}];
   print_s
     [%sexp
@@ -651,4 +649,38 @@ let%expect_test "adapter syntax: bare known ACP, bridge:, acp:<command>, compat"
   flags ~engines:"composer" ~adapters:"bridge:prigh" ();
   [%expect
     {| "invalid bridge adapter \"bridge:prigh\": prigh's own harness already runs on the backend" |}]
+;;
+
+let%expect_test
+    "bridge:codex, bridge:claude, bridge:antigravity accepted; bare labels"
+  =
+  flags
+    ~engines:"harness,composer"
+    ~adapters:"bridge:codex,bridge:claude,bridge:antigravity"
+    ();
+  [%expect
+    {|
+    (((engines (Harness Composer))
+      (adapters ((Backend Codex) (Backend Claude) (Backend (Acp antigravity))))
+      (acp_agents ()))
+     (Ok ()) ((engine Harness) (adapter ())))
+    |}];
+  flags ~engines:"composer" ~adapters:"bridge:opencode" ();
+  [%expect
+    {|
+    (((engines (Composer)) (adapters ((Backend (Acp opencode)))) (acp_agents ()))
+     (Error
+      "the composer can't run OpenCode on the backend yet (only bridge:codex, bridge:claude and bridge:antigravity are supported)")
+     ((engine Composer) (adapter ((Backend (Acp opencode))))))
+    |}];
+  List.iter
+    [ Adapter_id.Backend Codex; Backend Claude; Backend (Acp "antigravity") ]
+    ~f:(fun a ->
+      printf "%s -> label=%s\n" (Adapter_id.to_string a) (Adapter_id.label a));
+  [%expect
+    {|
+    backend:codex -> label=Codex
+    backend:claude -> label=Claude Code
+    backend:acp:antigravity -> label=Antigravity
+    |}]
 ;;

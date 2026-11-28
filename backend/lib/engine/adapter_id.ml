@@ -72,10 +72,7 @@ let rec harness_label = function
   | Prigh -> "prigh"
 ;;
 
-let label = function
-  | Backend inner -> harness_label inner ^ " (bridge)"
-  | (Codex | Claude | Acp _ | Prigh) as a -> harness_label a
-;;
+let label = harness_label
 
 let on_backend = function
   | Backend _ -> true

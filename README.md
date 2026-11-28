@@ -292,8 +292,8 @@ Sessions run in one of three execution modes:
 - **Native**: prigh's built-in **harness**, calling the model's API directly
   (the default).
 - **Bridge**: an external agent running on the prigh server (`bridge:<adapter>`,
-  e.g. `bridge:antigravity`; `backend:` also works), bridging all prigh tools
-  to the session's active tool host over MCP.
+  e.g. `bridge:codex`, `bridge:claude`, `bridge:antigravity`; `backend:` also
+  works), bridging all prigh tools to the session's active tool host over MCP.
 - **Host**: the **composer**, which hands the work to a coding agent
   installed and signed in directly on the session's tool host: the Codex CLI
   (`codex app-server`), Claude Code (`claude`, stream-json), a known ACP agent
@@ -311,7 +311,7 @@ tools run on the tool host you choose, and prigh's own tools they lack
 instructions and what prigh knows about you go to them too.
 
 ```
-prigh serve -engines harness,composer -adapters codex,claude,antigravity,bridge:antigravity,opencode
+prigh serve -engines harness,composer -adapters codex,claude,antigravity,bridge:codex,bridge:claude,bridge:antigravity,opencode
 ```
 
 (or `$PRIGH_ENGINES`, `$PRIGH_ADAPTERS`; the first engine is the default for

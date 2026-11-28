@@ -118,6 +118,7 @@ let acp_agent t name =
 let drivable t : Adapter_id.t -> bool = function
   | Codex | Claude | Prigh -> true
   | Acp name -> Option.is_some (acp_agent t name)
+  | Backend (Codex | Claude) -> true
   | Backend (Acp "antigravity") -> Option.is_some (acp_agent t "antigravity")
   | Backend _ -> false
 ;;
@@ -143,7 +144,8 @@ let check_build t =
             | Backend inner ->
               sprintf
                 "the composer can't run %s on the backend yet (only \
-                 bridge:antigravity is supported)"
+                 bridge:codex, bridge:claude and bridge:antigravity are \
+                 supported)"
                 (Adapter_id.label inner)
             | a -> sprintf "the composer can't drive %s" (Adapter_id.label a))))
 ;;

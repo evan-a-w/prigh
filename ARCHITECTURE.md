@@ -271,15 +271,25 @@ access token (from the process's secret descriptor) into a private
 `--gemini-dir` linking the rest of `~/.gemini`, removed at exit, with D-Bus
 pointed nowhere so agy reads the file; `Acp_adapter` asks for a renewal
 (`Login_renewal`) when the token nears expiry or a turn is refused.
-`bridge:antigravity` (wire key `backend:acp:antigravity`, `Adapter_id.Backend`, **Bridge** mode; `backend:` and `acp:<known>` also work) runs
+`bridge:codex` (`backend:codex`), `bridge:claude` (`backend:claude`), and
+`bridge:antigravity` (`backend:acp:antigravity`, `Adapter_id.Backend`,
+**Bridge** mode; `backend:` and `acp:<known>` also work) run the CLI on the
+backend while serving all prigh tools (dynamically updated on every turn,
+advertising `tools.listChanged` and emitting `notifications/tools/list_changed`
+over MCP) to the session's active tool host: `bridge:claude` passes
+`--tools ""` and keeps Claude in `Default` permission mode while prigh enforces
+plan mode at the in-band SDK MCP boundary; `bridge:codex` forces a read-only
+sandbox, keeps `collaborationMode` default, and immediately declines built-in
+local tool approvals while auto-accepting `prigh` MCP tool calls;
+`bridge:antigravity` runs
 `agy acp` on the backend with a minimal agent (`tools: []`,
 `excludeDefaultComponents: true`, `--include-default-customizations=false`,
 `--disable-telemetry`), reloads fresh sessions via `session/load` so the
 custom agent applies the `mcpServers` overlay in a single pooled process,
-appends prigh's system prompt via `_meta.antigravity.systemPrompt.append`,
-serves all prigh tools over routed MCP to the session's active tool host,
-shares `acp:antigravity`'s login, and is returned by `list_models` alongside
-Native and Host models (switching engines transparently via `set_model`).
+and appends prigh's system prompt via `_meta.antigravity.systemPrompt.append`.
+All three share their underlying adapter's login and are returned by
+`list_models` alongside Native and Host models (switching engines transparently
+via `set_model`).
 When multiple modes are deployed, prigh-web's model menu offers a Native /
 Bridge / Host mode selector and flat pickers (web and TUI) format models
 with `@ native` / `@ bridge` / `@ host`.
